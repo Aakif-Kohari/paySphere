@@ -9,7 +9,7 @@ import { EmployeeBreakdownSkeleton, EmployeeCardSkeleton, StatCardSkeleton } fro
 import api from "../services/api";
 
 // --- Dashboard Component ---
-const DashboardOverview = ({ search, setSearch, filtered, getInitials, onAddUpdate, onAddEmployee, totalPayout, employeeCount, loading, payrolls }) => {
+const DashboardOverview = ({ search, setSearch, filtered, getInitials, onAddUpdate, onAddEmployee, totalPayout, employeeCount, loading, payrolls,navigate, }) => {
   // Build a map from employeeId to payroll data
   const payrollMap = {};
   (payrolls || []).forEach(p => { payrollMap[p.employeeId] = p; });
@@ -28,7 +28,9 @@ const DashboardOverview = ({ search, setSearch, filtered, getInitials, onAddUpda
         </div>
 
         <div className="flex gap-3 w-full sm:w-auto">
-          <button className="flex-1 sm:flex-none px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 transition-colors">
+          <button 
+          onClick={() => navigate("/reports")}
+          className="flex-1 sm:flex-none px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 transition-colors">
             Reports
           </button>
 
@@ -589,6 +591,7 @@ export default function PaySphereDashboard() {
             setSearch={setSearch}
             filtered={filtered}
             getInitials={getInitials}
+            navigate={navigate}
             onAddUpdate={() => navigate("/monthly-updates")}
             onAddEmployee={() => navigate("/add-employee")}
             totalPayout={totalPayout}

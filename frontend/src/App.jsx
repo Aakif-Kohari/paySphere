@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard"
 import MonthlyUpdates from "./pages/MonthlyUpdates"
 import AddEmployee from "./pages/AddEmployee"
 import ResetPassword from "./pages/ResetPassword"
+import Reports from "./pages/Reports";
 
 function App() {
   const themeMode = useSelector((state) => state.ui.themeMode);
@@ -41,14 +42,15 @@ function App() {
     <ThemeProvider theme={muiTheme}>
       <CssBaseline />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/auth" element={<LoginSignUp />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/monthly-updates" element={<MonthlyUpdates />} />
-          <Route path="/add-employee" element={<AddEmployee />} />
-          <Route path="/reset-password/:token" element={<ResetPassword />} />
-        </Routes>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/auth" element={<LoginSignUp />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/monthly-updates" element={<MonthlyUpdates />} />
+        <Route path="/add-employee" element={<AddEmployee />} />
+        <Route path="/reports" element={<Reports />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
+      </Routes>
       </BrowserRouter>
     </ThemeProvider>
   )
