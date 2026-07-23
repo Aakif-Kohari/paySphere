@@ -82,36 +82,12 @@ export default function ReportFilters({ onGenerate, loading ,successMessage}) {
           className="px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950"
         >
            <option value=" Employees"> Employees</option>
-           <option>Rahul Sharma</option>
-           <option>Priya Singh</option>
-           <option>Neha Verma</option>
-           <option>Arjun Mehta</option>
-           <option>Amit Kumar</option>
-           <option>Sneha Gupta</option>
-           <option>Rohit Jain</option>
-           <option>Pooja Nair</option>
-           <option>Karan Patel</option>
-           <option>Meera Iyer</option>
-           <option>Vikram Rao</option>
-           <option>Kavya Sharma</option>
-           <option>Aditya Kapoor</option>
-           <option>Nisha Agarwal</option>
-           <option>Sahil Arora</option>
-           <option>Ananya Das</option>
-           <option>Harsh Vardhan</option>
-           <option>Riya Malhotra</option>
-           <option>Akash Yadav</option>
-           <option>Simran Kaur</option>
-           <option>Rakesh Verma</option>
-           <option>Pallavi Joshi</option>
-           <option>Nitin Sharma</option>
-           <option>Anjali Menon</option>
-           <option>Deepak Gupta</option>
-           <option>Snehal Patil</option>
-           <option>Mohit Arora</option>
-           <option>Isha Kapoor</option>
-           <option>Kunal Desai</option>
-           <option>Priyanka Roy</option>
+          <option value="">All Employees</option>
+          <option value="Rahul Sharma">Rahul Sharma</option>
+          <option value="Priya Singh">Priya Singh</option>
+          <option value="Neha Verma">Neha Verma</option>
+          <option value="Amit Kumar">Amit Kumar</option>
+          <option value="Rohit Jain">Rohit Jain</option>
     </select>
 
         {/* Status */}
