@@ -8,6 +8,9 @@ const { createAuditLog } = require("../services/audit.service");
 // ADD EMPLOYEE
 exports.addEmployee = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { fullName, role, monthlySalary, overtimeRate } = req.body;
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(role)) {
@@ -290,6 +293,9 @@ exports.importEmployees = async (req, res, next) => {
 // UPDATE EMPLOYEE
 exports.updateEmployee = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { id } = req.params;
     const { fullName, role, monthlySalary, overtimeRate } = req.body;
 

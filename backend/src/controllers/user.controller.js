@@ -18,6 +18,9 @@ const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
 // SIGN UP
 exports.signup = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { fullName, email, companyName, password } = req.body;
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(email) || !isNonEmptyString(companyName) || !isNonEmptyString(password)) {
@@ -121,6 +124,9 @@ exports.getSettings = async (req, res, next) => {
 // UPDATE USER SETTINGS
 exports.updateSettings = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { settings, fullName, email, companyName, defaultOvertimeRate, defaultDailyRate, avatar } = req.body;
 
     const user = await User.findById(req.userId);
@@ -194,6 +200,9 @@ exports.updateSettings = async (req, res, next) => {
 // UPDATE PASSWORD
 exports.updatePassword = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { currentPassword, newPassword } = req.body;
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -236,6 +245,9 @@ exports.updatePassword = async (req, res, next) => {
 // GOOGLE AUTH
 exports.googleAuth = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { credential, accessToken, companyName } = req.body;
     let googleData;
 
@@ -309,6 +321,9 @@ const resetCooldowns = new Map();
 // FORGOT PASSWORD
 exports.forgotPassword = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { email } = req.body;
     if (!isNonEmptyString(email) || !isValidEmail(email)) {
       return res.status(400).json({ message: "A valid email address is required" });
@@ -379,6 +394,9 @@ exports.forgotPassword = async (req, res, next) => {
 exports.resetPassword = async (req, res, next) => {
   try {
     const { token } = req.params;
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { password } = req.body;
 
     if (!isNonEmptyString(password) || !passwordRegex.test(password)) {
