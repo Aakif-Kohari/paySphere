@@ -8,7 +8,7 @@ const User = require("../models/user.model");
 const Employee = require("../models/employee.model");
 const PayrollUpdate = require("../models/payroll.model");
 const { sendEmail } = require("../utils/email");
-const { isNonEmptyString, isValidEmail, sanitizeText } = require("../utils/validators");
+const { isNonEmptyString, isValidEmail, sanitizeText, DAILY_RATE_MAX, OVERTIME_RATE_MAX } = require("../utils/validators");
 const logger = require("../utils/logger");
 const { createAuditLog } = require("../services/audit.service");
 
@@ -131,6 +131,13 @@ exports.updateSettings = async (req, res, next) => {
       (defaultDailyRate !== undefined && (typeof defaultDailyRate !== "number" || isNaN(defaultDailyRate) || defaultDailyRate < 0))
     ) {
       return res.status(400).json({ message: "Default rates must be non-negative numbers" });
+    }
+
+    if (defaultOvertimeRate !== undefined && defaultOvertimeRate > OVERTIME_RATE_MAX) {
+      return res.status(400).json({ message: `Default overtime rate cannot exceed ${OVERTIME_RATE_MAX}` });
+    }
+    if (defaultDailyRate !== undefined && defaultDailyRate > DAILY_RATE_MAX) {
+      return res.status(400).json({ message: `Default daily rate cannot exceed ${DAILY_RATE_MAX}` });
     }
 
     if (fullName) user.fullName = sanitizeText(fullName);

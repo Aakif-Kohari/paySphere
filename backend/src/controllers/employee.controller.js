@@ -1,7 +1,7 @@
 const Employee = require("../models/employee.model");
 const User = require("../models/user.model");
 const { parse } = require("csv-parse");
-const { isNonEmptyString, escapeRegex, sanitizeText } = require("../utils/validators");
+const { isNonEmptyString, escapeRegex, sanitizeText, MONTHLY_SALARY_MAX, OVERTIME_RATE_MAX } = require("../utils/validators");
 const PayrollUpdate = require("../models/payroll.model");
 const logger = require("../utils/logger");
 const { createAuditLog } = require("../services/audit.service");
@@ -18,12 +18,18 @@ exports.addEmployee = async (req, res, next) => {
     if (monthlySalary === undefined || monthlySalary === null || isNaN(numSalary) || !Number.isFinite(numSalary) || numSalary <= 0) {
       return res.status(400).json({ message: "Monthly salary must be a positive number" });
     }
+    if (numSalary > MONTHLY_SALARY_MAX) {
+      return res.status(400).json({ message: `Monthly salary cannot exceed ${MONTHLY_SALARY_MAX}` });
+    }
 
     let numOvertime = 0;
     if (overtimeRate !== undefined && overtimeRate !== null) {
       numOvertime = Number(overtimeRate);
       if (isNaN(numOvertime) || !Number.isFinite(numOvertime) || numOvertime < 0) {
         return res.status(400).json({ message: "Overtime rate must be a non-negative number" });
+      }
+      if (numOvertime > OVERTIME_RATE_MAX) {
+        return res.status(400).json({ message: `Overtime rate cannot exceed ${OVERTIME_RATE_MAX}` });
       }
     }
 
@@ -193,12 +199,28 @@ exports.importEmployees = async (req, res, next) => {
               });
               return;
             }
+            if (monthlySalary > MONTHLY_SALARY_MAX) {
+              skipped++;
+              errors.push({
+                row: index + 2,
+                reason: `Monthly salary exceeds maximum of ${MONTHLY_SALARY_MAX}`,
+              });
+              return;
+            }
 
             if (isNaN(overtimeRate) || overtimeRate < 0) {
               skipped++;
               errors.push({
                 row: index + 2,
                 reason: "Invalid overtime rate",
+              });
+              return;
+            }
+            if (overtimeRate > OVERTIME_RATE_MAX) {
+              skipped++;
+              errors.push({
+                row: index + 2,
+                reason: `Overtime rate exceeds maximum of ${OVERTIME_RATE_MAX}`,
               });
               return;
             }
@@ -286,9 +308,15 @@ exports.updateEmployee = async (req, res, next) => {
     if (monthlySalary !== undefined && (isNaN(monthlySalary) || !Number.isFinite(Number(monthlySalary)) || monthlySalary <= 0)) {
       return res.status(400).json({ message: "Monthly salary must be a positive number" });
     }
+    if (monthlySalary !== undefined && Number(monthlySalary) > MONTHLY_SALARY_MAX) {
+      return res.status(400).json({ message: `Monthly salary cannot exceed ${MONTHLY_SALARY_MAX}` });
+    }
 
     if (overtimeRate !== undefined && (isNaN(overtimeRate) || !Number.isFinite(Number(overtimeRate)) || overtimeRate < 0)) {
       return res.status(400).json({ message: "Overtime rate must be a non-negative number" });
+    }
+    if (overtimeRate !== undefined && Number(overtimeRate) > OVERTIME_RATE_MAX) {
+      return res.status(400).json({ message: `Overtime rate cannot exceed ${OVERTIME_RATE_MAX}` });
     }
 
     // Apply updates only for provided fields

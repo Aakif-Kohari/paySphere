@@ -3,6 +3,11 @@
  */
 
 // Check if value is a non-empty string (rejects objects, numbers, arrays, empty strings)
+const MONTHLY_SALARY_MAX = 100000000;
+const DAILY_RATE_MAX = 10000000;
+const OVERTIME_RATE_MAX = 1000000;
+const MAX_SAFE_PAYROLL = 10000000000;
+
 const isNonEmptyString = (val) => typeof val === "string" && val.trim().length > 0;
 
 // Check valid email format and type
@@ -57,4 +62,8 @@ module.exports = {
   stripHtml,
   encodeHtmlEntities,
   sanitizeText,
+  MONTHLY_SALARY_MAX,
+  DAILY_RATE_MAX,
+  OVERTIME_RATE_MAX,
+  MAX_SAFE_PAYROLL,
 };
