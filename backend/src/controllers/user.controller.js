@@ -8,7 +8,9 @@ const User = require("../models/user.model");
 const Employee = require("../models/employee.model");
 const PayrollUpdate = require("../models/payroll.model");
 const { sendEmail } = require("../utils/email");
-const { isNonEmptyString, isValidEmail } = require("../utils/validators");
+const { isNonEmptyString, isValidEmail, sanitizeText, DAILY_RATE_MAX, OVERTIME_RATE_MAX } = require("../utils/validators");
+const logger = require("../utils/logger");
+const { createAuditLog } = require("../services/audit.service");
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
@@ -39,6 +41,9 @@ const generateTokens = (user, res) => {
 // SIGN UP
 exports.signup = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { fullName, email, companyName, password } = req.body;
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(email) || !isNonEmptyString(companyName) || !isNonEmptyString(password)) {
@@ -60,9 +65,9 @@ exports.signup = async (req, res, next) => {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const newUser = new User({
-      fullName: fullName.trim(),
+      fullName: sanitizeText(fullName),
       email: cleanEmail,
-      companyName: companyName.trim(),
+      companyName: sanitizeText(companyName),
       password: hashedPassword,
     });
 
@@ -134,6 +139,9 @@ exports.getSettings = async (req, res, next) => {
 // UPDATE USER SETTINGS
 exports.updateSettings = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { settings, fullName, email, companyName, defaultOvertimeRate, defaultDailyRate, avatar } = req.body;
 
     const user = await User.findById(req.userId);
@@ -146,9 +154,16 @@ exports.updateSettings = async (req, res, next) => {
       return res.status(400).json({ message: "Default rates must be non-negative numbers" });
     }
 
-    if (fullName) user.fullName = fullName;
+    if (defaultOvertimeRate !== undefined && defaultOvertimeRate > OVERTIME_RATE_MAX) {
+      return res.status(400).json({ message: `Default overtime rate cannot exceed ${OVERTIME_RATE_MAX}` });
+    }
+    if (defaultDailyRate !== undefined && defaultDailyRate > DAILY_RATE_MAX) {
+      return res.status(400).json({ message: `Default daily rate cannot exceed ${DAILY_RATE_MAX}` });
+    }
+
+    if (fullName) user.fullName = sanitizeText(fullName);
     if (email) user.email = email;
-    if (companyName) user.companyName = companyName;
+    if (companyName) user.companyName = sanitizeText(companyName);
     if (defaultOvertimeRate !== undefined) user.defaultOvertimeRate = defaultOvertimeRate;
     if (defaultDailyRate !== undefined) user.defaultDailyRate = defaultDailyRate;
     if (avatar !== undefined) user.avatar = avatar;
@@ -172,6 +187,16 @@ exports.updateSettings = async (req, res, next) => {
 
     await user.save();
 
+    createAuditLog({
+      userId: req.userId,
+      action: "SETTINGS_UPDATE",
+      resourceType: "User",
+      details: { updatedFields: Object.keys(req.body) },
+      req,
+    });
+
+    logger.info(`Settings updated`, { userId: req.userId, fields: Object.keys(req.body) });
+
     res.status(200).json({
       message: "Settings updated successfully",
       settings: user.settings,
@@ -190,6 +215,9 @@ exports.updateSettings = async (req, res, next) => {
 // UPDATE PASSWORD
 exports.updatePassword = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { currentPassword, newPassword } = req.body;
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -214,6 +242,16 @@ exports.updatePassword = async (req, res, next) => {
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
 
+    createAuditLog({
+      userId: req.userId,
+      action: "PASSWORD_UPDATE",
+      resourceType: "User",
+      details: {},
+      req,
+    });
+
+    logger.info(`Password updated`, { userId: req.userId });
+
     res.status(200).json({ message: "Password updated successfully" });
   } catch (error) {
     next(error);
@@ -222,6 +260,9 @@ exports.updatePassword = async (req, res, next) => {
 // GOOGLE AUTH
 exports.googleAuth = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { credential, accessToken, companyName } = req.body;
     let googleData;
 
@@ -257,9 +298,9 @@ exports.googleAuth = async (req, res, next) => {
       }
 
       user = new User({
-        fullName: name,
+        fullName: sanitizeText(name),
         email,
-        companyName,
+        companyName: sanitizeText(companyName),
         googleId: googleId || googleData.sub,
         avatar: picture || googleData.picture,
       });
@@ -291,6 +332,9 @@ const resetCooldowns = new Map();
 // FORGOT PASSWORD
 exports.forgotPassword = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { email } = req.body;
     if (!isNonEmptyString(email) || !isValidEmail(email)) {
       return res.status(400).json({ message: "A valid email address is required" });
@@ -361,6 +405,9 @@ exports.forgotPassword = async (req, res, next) => {
 exports.resetPassword = async (req, res, next) => {
   try {
     const { token } = req.params;
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { password } = req.body;
 
     if (!isNonEmptyString(password) || !passwordRegex.test(password)) {
@@ -440,6 +487,16 @@ exports.deleteAccount = async (req, res, next) => {
       await session.commitTransaction();
       session.endSession();
     }
+
+    createAuditLog({
+      userId: req.userId,
+      action: "ACCOUNT_DELETE",
+      resourceType: "User",
+      details: {},
+      req,
+    });
+
+    logger.info(`Account deleted`, { userId: req.userId });
 
     res.status(200).json({ message: "Account and associated data deleted successfully." });
   } catch (error) {
