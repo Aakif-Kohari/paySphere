@@ -2,6 +2,7 @@ const nodemailer = require('nodemailer');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const { sendEmail } = require('../utils/email');
+const logger = require('../utils/logger');
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.ethereal.email',
@@ -15,13 +16,12 @@ const transporter = nodemailer.createTransport({
 
 exports.sendPayslipEmail = async (employee, payroll) => {
   if (!employee.email) {
-    console.log(`No email found for employee: ${employee.fullName}`);
+    logger.warn(`No email found for employee`, { employeeName: employee.fullName });
     return;
   }
 
   return new Promise((resolve, reject) => {
     try {
-      // Generate PDF in memory
       const doc = new PDFDocument({ margin: 50 });
       let buffers = [];
       doc.on('data', buffers.push.bind(buffers));
@@ -44,15 +44,14 @@ exports.sendPayslipEmail = async (employee, payroll) => {
 
         try {
           const info = await sendEmail(mailOptions);
-          console.log(`Payslip email sent to ${employee.email}`);
+          logger.info(`Payslip email sent to ${employee.email}`);
           resolve(info);
         } catch (err) {
-          console.error('Error sending email:', err);
+          logger.error('Error sending email', { error: err.message, employee: employee.email });
           reject(err);
         }
       });
 
-      // Build PDF content
       doc.fontSize(20).text('PaySphere', { align: 'center' });
       doc.moveDown();
       doc
@@ -85,7 +84,7 @@ exports.sendPayslipEmail = async (employee, payroll) => {
         });
       doc.end();
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      logger.error('Error generating PDF', { error: error.message });
       reject(error);
     }
   });

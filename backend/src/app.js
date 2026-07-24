@@ -2,11 +2,12 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const multer = require("multer");
-const cookieParser = require("cookie-parser");
+const morgan = require("morgan");
 const userRoutes = require("./routes/user.routes");
 const employeeRoutes = require("./routes/employee.routes");
 const payrollRoutes = require("./routes/payroll.routes");
 const reportsRoutes = require("./routes/reports.routes");
+const logger = require("./utils/logger");
 
 const app = express();
 app.use(cookieParser());
@@ -18,6 +19,9 @@ app.use(helmet({ crossOriginOpenerPolicy: false }));
 
 // Rate limiting trust proxy configuration
 app.set("trust proxy", 1);
+
+// HTTP request logging via morgan + winston
+app.use(morgan("combined", { stream: logger.stream }));
 
 // CORS configuration — restrict to frontend origin
 const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
@@ -39,6 +43,10 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use(cors(corsOptions));
 
 const { generalRateLimiter } = require("./middlewares/rateLimiter.middleware");
+const requireBody = require("./middlewares/requireBody.middleware");
+
+// Require request body for state-changing methods
+app.use("/api", requireBody);
 
 // Routes
 app.get("/", (req, res) => res.send("PaySphere API is running..."));

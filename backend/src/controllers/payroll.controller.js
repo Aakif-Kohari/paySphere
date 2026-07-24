@@ -4,6 +4,8 @@ const PayrollUpdate = require("../models/payroll.model");
 const User = require("../models/user.model");
 const { calculateNetSalary } = require("../utils/salaryCalculator");
 const { generatePayrollCSV } = require("../utils/csvExport");
+const logger = require("../utils/logger");
+const { createAuditLog } = require("../services/audit.service");
 
 // Helper: parse tag labels back into structured numbers
 function parseTagValue(label) {
@@ -18,6 +20,9 @@ function parseTagValue(label) {
 exports.finalizePayroll = async (req, res, next) => {
   let session = null;
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { activities, month, year } = req.body;
 
     if (!activities || !Array.isArray(activities) || activities.length === 0) {
@@ -217,6 +222,32 @@ exports.finalizePayroll = async (req, res, next) => {
       session.endSession();
     }
 
+    const resourceIds = results.map(r => r.payrollId).filter(Boolean);
+
+    createAuditLog({
+      userId: req.userId,
+      action: "PAYROLL_FINALIZE",
+      resourceType: "Payroll",
+      resourceIds,
+      details: {
+        month: currentMonth,
+        year: currentYear,
+        employeeCount: results.length,
+        totalNetSalary: results.reduce((sum, r) => sum + r.netSalary, 0),
+        errorCount: errors.length,
+      },
+      result: errors.length > 0 ? "partial" : "success",
+      req,
+    });
+
+    logger.info(`Payroll finalized for ${results.length} employees`, {
+      userId: req.userId,
+      month: currentMonth,
+      year: currentYear,
+      employeeCount: results.length,
+      errorCount: errors.length,
+    });
+
     res.status(200).json({
       message: `Payroll finalized for ${results.length} employee${results.length !== 1 ? "s" : ""}`,
       results,
@@ -231,6 +262,16 @@ exports.finalizePayroll = async (req, res, next) => {
         // ignore session cleanup error
       }
     }
+
+    createAuditLog({
+      userId: req.userId,
+      action: "PAYROLL_FINALIZE",
+      resourceType: "Payroll",
+      details: { month: req.body?.month, year: req.body?.year, error: error.message },
+      result: "failure",
+      req,
+    });
+
     next(error);
   }
 };
@@ -317,6 +358,18 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
     }
 
     await sendPayslipEmail(employee, payroll);
+
+    createAuditLog({
+      userId: req.userId,
+      action: "PAYSLIP_EMAIL",
+      resourceType: "Payroll",
+      resourceIds: [payroll._id],
+      details: { employeeName: employee.fullName, employeeEmail: employee.email, month: payroll.month, year: payroll.year },
+      req,
+    });
+
+    logger.info(`Payslip email sent`, { userId: req.userId, payrollId: payroll._id, employee: employee.fullName });
+
     res.status(200).json({ message: "Payslip email sent successfully" });
   } catch (error) {
     next(error);
@@ -326,7 +379,7 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
 // BULK SEND PAYSLIP EMAILS (#140)
 exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
   try {
-    let month = req.body.month ? Number(req.body.month) : (req.query.month ? Number(req.query.month) : new Date().getMonth() + 1);
+    let month = req.body && req.body.month ? Number(req.body.month) : (req.query.month ? Number(req.query.month) : new Date().getMonth() + 1);
     let year = req.body.year ? Number(req.body.year) : (req.query.year ? Number(req.query.year) : new Date().getFullYear());
 
     if (isNaN(month) || month < 1 || month > 12) {
@@ -370,11 +423,25 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
         results.push({ payrollId: payroll._id, employeeName: employee.fullName, email: employee.email, status: "sent" });
         sentCount++;
       } catch (err) {
-        console.error(`Failed to send email to ${employee.fullName}:`, err);
+        logger.error(`Failed to send email to ${employee.fullName}`, { error: err.message, payrollId: payroll._id });
         results.push({ payrollId: payroll._id, employeeName: employee.fullName, email: employee.email, status: "failed", error: err.message });
         failedCount++;
       }
     }
+
+    createAuditLog({
+      userId: req.userId,
+      action: "PAYSLIP_BULK_EMAIL",
+      resourceType: "Payroll",
+      resourceIds: payrolls.map(p => p._id),
+      details: { month, year, sentCount, failedCount, skippedCount, total: payrolls.length },
+      result: failedCount > 0 ? (sentCount > 0 ? "partial" : "failure") : "success",
+      req,
+    });
+
+    logger.info(`Bulk payslip email dispatch complete`, {
+      userId: req.userId, month, year, sentCount, failedCount, skippedCount, total: payrolls.length,
+    });
 
     res.status(200).json({
       message: `Bulk email dispatch complete. Sent: ${sentCount}, Skipped: ${skippedCount}, Failed: ${failedCount}`,
