@@ -55,9 +55,10 @@ function App() {
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
-</Routes>
+        </Routes>
         <ScrollToTop />
-      </BrowserRouter>    </ThemeProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
 

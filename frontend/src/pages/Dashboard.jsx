@@ -50,6 +50,7 @@ const DashboardOverview = ({
   search,
   setSearch,
   filtered,
+  navigate,
   onAddUpdate,
   onAddEmployee,
   totalPayout,
@@ -742,6 +743,7 @@ export default function PaySphereDashboard() {
             search={search}
             setSearch={setSearch}
             filtered={filtered}
+            navigate={navigate}
             onAddUpdate={() => navigate('/monthly-updates')}
             onAddEmployee={() => navigate('/add-employee')}
             totalPayout={totalPayout}
