@@ -162,7 +162,21 @@ exports.updateSettings = async (req, res, next) => {
     }
 
     if (fullName) user.fullName = sanitizeText(fullName);
-    if (email) user.email = email;
+    
+    if (email !== undefined) {
+      const cleanEmail = email.trim().toLowerCase();
+      if (!isValidEmail(cleanEmail)) {
+        return res.status(400).json({ message: "Invalid email address format" });
+      }
+      if (cleanEmail !== user.email) {
+        const emailExists = await User.findOne({ email: cleanEmail });
+        if (emailExists) {
+          return res.status(409).json({ message: "Email is already in use by another account" });
+        }
+        user.email = cleanEmail;
+      }
+    }
+
     if (companyName) user.companyName = sanitizeText(companyName);
     if (defaultOvertimeRate !== undefined) user.defaultOvertimeRate = defaultOvertimeRate;
     if (defaultDailyRate !== undefined) user.defaultDailyRate = defaultDailyRate;
