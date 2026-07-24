@@ -5,6 +5,7 @@ const employeeSchema = new mongoose.Schema({
   fullName: {
     type: String,
     required: true,
+    maxlength: [100, "Full name cannot exceed 100 characters"],
   },
   email: {
     type: String,
@@ -13,6 +14,7 @@ const employeeSchema = new mongoose.Schema({
   role: {
     type: String,
     default: "",
+    maxlength: [100, "Role cannot exceed 100 characters"],
   },
   monthlySalary: {
     type: Number,

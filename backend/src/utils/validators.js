@@ -7,6 +7,8 @@ const MONTHLY_SALARY_MAX = 100000000;
 const DAILY_RATE_MAX = 10000000;
 const OVERTIME_RATE_MAX = 1000000;
 const MAX_SAFE_PAYROLL = 10000000000;
+const FULLNAME_MAX_LENGTH = 100;
+const ROLE_MAX_LENGTH = 100;
 
 const isNonEmptyString = (val) => typeof val === "string" && val.trim().length > 0;
 
@@ -66,4 +68,6 @@ module.exports = {
   DAILY_RATE_MAX,
   OVERTIME_RATE_MAX,
   MAX_SAFE_PAYROLL,
+  FULLNAME_MAX_LENGTH,
+  ROLE_MAX_LENGTH,
 };

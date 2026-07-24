@@ -1,7 +1,8 @@
+const mongoose = require("mongoose");
 const Employee = require("../models/employee.model");
 const User = require("../models/user.model");
 const { parse } = require("csv-parse");
-const { isNonEmptyString, escapeRegex, sanitizeText, MONTHLY_SALARY_MAX, OVERTIME_RATE_MAX } = require("../utils/validators");
+const { isNonEmptyString, escapeRegex, sanitizeText, MONTHLY_SALARY_MAX, OVERTIME_RATE_MAX, FULLNAME_MAX_LENGTH, ROLE_MAX_LENGTH } = require("../utils/validators");
 const PayrollUpdate = require("../models/payroll.model");
 const logger = require("../utils/logger");
 const { createAuditLog } = require("../services/audit.service");
@@ -171,82 +172,69 @@ exports.importEmployees = async (req, res, next) => {
           let skipped = 0;
 
           records.forEach((record, index) => {
-            const fullName = record.fullName?.trim();
-            const role = record.role?.trim();
+            const rawName = record.fullName?.trim();
+            const rawRole = record.role?.trim();
             const monthlySalary = Number(record.monthlySalary);
             const overtimeRate = Number(record.overtimeRate || 0);
 
-            if (!fullName) {
+            if (!rawName) {
               skipped++;
-              errors.push({
-                row: index + 2,
-                reason: "Full name is required",
-              });
+              errors.push({ row: index + 2, reason: "Full name is required" });
+              return;
+            }
+            if (rawName.length > FULLNAME_MAX_LENGTH) {
+              skipped++;
+              errors.push({ row: index + 2, reason: `Full name exceeds maximum of ${FULLNAME_MAX_LENGTH} characters` });
               return;
             }
 
-            if (!role) {
+            if (!rawRole) {
               skipped++;
-              errors.push({
-                row: index + 2,
-                reason: "Role is required",
-              });
+              errors.push({ row: index + 2, reason: "Role is required" });
+              return;
+            }
+            if (rawRole.length > ROLE_MAX_LENGTH) {
+              skipped++;
+              errors.push({ row: index + 2, reason: `Role exceeds maximum of ${ROLE_MAX_LENGTH} characters` });
               return;
             }
 
-            if (isNaN(monthlySalary) || monthlySalary <= 0) {
+            if (!Number.isFinite(monthlySalary) || monthlySalary <= 0) {
               skipped++;
-              errors.push({
-                row: index + 2,
-                reason: "Invalid monthly salary",
-              });
+              errors.push({ row: index + 2, reason: "Invalid monthly salary" });
               return;
             }
             if (monthlySalary > MONTHLY_SALARY_MAX) {
               skipped++;
-              errors.push({
-                row: index + 2,
-                reason: `Monthly salary exceeds maximum of ${MONTHLY_SALARY_MAX}`,
-              });
+              errors.push({ row: index + 2, reason: `Monthly salary exceeds maximum of ${MONTHLY_SALARY_MAX}` });
               return;
             }
 
-            if (isNaN(overtimeRate) || overtimeRate < 0) {
+            if (!Number.isFinite(overtimeRate) || overtimeRate < 0) {
               skipped++;
-              errors.push({
-                row: index + 2,
-                reason: "Invalid overtime rate",
-              });
+              errors.push({ row: index + 2, reason: "Invalid overtime rate" });
               return;
             }
             if (overtimeRate > OVERTIME_RATE_MAX) {
               skipped++;
-              errors.push({
-                row: index + 2,
-                reason: `Overtime rate exceeds maximum of ${OVERTIME_RATE_MAX}`,
-              });
+              errors.push({ row: index + 2, reason: `Overtime rate exceeds maximum of ${OVERTIME_RATE_MAX}` });
               return;
             }
 
-            // Check for duplicate by fullName + role (case-insensitive)
-            const sanitizedName = sanitizeText(fullName);
-            const sanitizedRole = sanitizeText(role);
+            const sanitizedName = sanitizeText(rawName);
+            const sanitizedRole = sanitizeText(rawRole);
             const key = `${sanitizedName.toLowerCase()}|${sanitizedRole.toLowerCase()}`;
             if (existingKeys.has(key)) {
               skipped++;
-              errors.push({
-                row: index + 2,
-                reason: "Duplicate employee (same name and role already exists)",
-              });
+              errors.push({ row: index + 2, reason: "Duplicate employee (same name and role already exists)" });
               return;
             }
 
-            // Also prevent duplicates within the same CSV batch
             existingKeys.add(key);
 
             employees.push({
-              fullName: sanitizeText(fullName),
-              role: sanitizeText(role),
+              fullName: sanitizedName,
+              role: sanitizedRole,
               monthlySalary,
               overtimeRate,
               companyName: sanitizeText(user.companyName),
@@ -256,8 +244,21 @@ exports.importEmployees = async (req, res, next) => {
 
           let createdIds = [];
           if (employees.length > 0) {
-            const created = await Employee.insertMany(employees);
-            createdIds = created.map(e => e._id);
+            let session = null;
+            try {
+              session = await mongoose.startSession();
+              session.startTransaction();
+              const created = await Employee.insertMany(employees, { session, ordered: false });
+              createdIds = created.map(e => e._id);
+              await session.commitTransaction();
+            } catch (txError) {
+              if (session) {
+                try { await session.abortTransaction(); } catch (e) { }
+              }
+              throw txError;
+            } finally {
+              if (session) session.endSession();
+            }
           }
 
           createAuditLog({
