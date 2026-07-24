@@ -3,6 +3,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const multer = require("multer");
 const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
 const userRoutes = require("./routes/user.routes");
 const employeeRoutes = require("./routes/employee.routes");
 const payrollRoutes = require("./routes/payroll.routes");
