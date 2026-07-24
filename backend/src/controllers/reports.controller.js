@@ -226,11 +226,11 @@ exports.downloadPDFReport = async (req, res, next) => {
 
     const summaryData = [
       ["Total Employees", String(payrolls.length)],
-      ["Total Base Salary", `₹${totalBase.toLocaleString("en-IN")}`],
-      ["Total Overtime Pay", `₹${totalOvertime.toLocaleString("en-IN")}`],
-      ["Total Bonuses", `₹${totalBonus.toLocaleString("en-IN")}`],
-      ["Total Deductions", `₹${totalDeductions.toLocaleString("en-IN")}`],
-      ["Net Payout", `₹${totalPayout.toLocaleString("en-IN")}`],
+      ["Total Base Salary", `Rs. ${totalBase.toLocaleString("en-IN")}`],
+      ["Total Overtime Pay", `Rs. ${totalOvertime.toLocaleString("en-IN")}`],
+      ["Total Bonuses", `Rs. ${totalBonus.toLocaleString("en-IN")}`],
+      ["Total Deductions", `Rs. ${totalDeductions.toLocaleString("en-IN")}`],
+      ["Net Payout", `Rs. ${totalPayout.toLocaleString("en-IN")}`],
     ];
 
     summaryData.forEach(([label, value]) => {
@@ -305,12 +305,12 @@ exports.downloadPDFReport = async (req, res, next) => {
 
       const rowData = [
         `${p.employeeName}${role}`,
-        `₹${p.baseSalary.toLocaleString("en-IN")}`,
+        `Rs. ${p.baseSalary.toLocaleString("en-IN")}`,
         String(p.leaveDays),
-        `₹${p.overtimePay.toLocaleString("en-IN")}`,
-        `₹${p.bonus.toLocaleString("en-IN")}`,
-        `₹${(p.deductions + p.leaveDeduction).toLocaleString("en-IN")}`,
-        `₹${p.netSalary.toLocaleString("en-IN")}`,
+        `Rs. ${p.overtimePay.toLocaleString("en-IN")}`,
+        `Rs. ${p.bonus.toLocaleString("en-IN")}`,
+        `Rs. ${(p.deductions + p.leaveDeduction).toLocaleString("en-IN")}`,
+        `Rs. ${p.netSalary.toLocaleString("en-IN")}`,
       ];
 
       xPos = startX + 5;
@@ -340,7 +340,7 @@ exports.downloadPDFReport = async (req, res, next) => {
       .fontSize(9)
       .font("Helvetica-Bold")
       .fillColor("#1e3a5f")
-      .text(`Total Payout: ₹${totalPayout.toLocaleString("en-IN")}`, startX, doc.y, {
+      .text(`Total Payout: Rs. ${totalPayout.toLocaleString("en-IN")}`, startX, doc.y, {
         align: "right",
       });
 
