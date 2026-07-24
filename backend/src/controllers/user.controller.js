@@ -8,7 +8,7 @@ const User = require("../models/user.model");
 const Employee = require("../models/employee.model");
 const PayrollUpdate = require("../models/payroll.model");
 const { sendEmail } = require("../utils/email");
-const { isNonEmptyString, isValidEmail } = require("../utils/validators");
+const { isNonEmptyString, isValidEmail, sanitizeText } = require("../utils/validators");
 const logger = require("../utils/logger");
 const { createAuditLog } = require("../services/audit.service");
 
@@ -39,9 +39,9 @@ exports.signup = async (req, res, next) => {
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const newUser = new User({
-      fullName: fullName.trim(),
+      fullName: sanitizeText(fullName),
       email: cleanEmail,
-      companyName: companyName.trim(),
+      companyName: sanitizeText(companyName),
       password: hashedPassword,
     });
 
@@ -133,9 +133,9 @@ exports.updateSettings = async (req, res, next) => {
       return res.status(400).json({ message: "Default rates must be non-negative numbers" });
     }
 
-    if (fullName) user.fullName = fullName;
+    if (fullName) user.fullName = sanitizeText(fullName);
     if (email) user.email = email;
-    if (companyName) user.companyName = companyName;
+    if (companyName) user.companyName = sanitizeText(companyName);
     if (defaultOvertimeRate !== undefined) user.defaultOvertimeRate = defaultOvertimeRate;
     if (defaultDailyRate !== undefined) user.defaultDailyRate = defaultDailyRate;
     if (avatar !== undefined) user.avatar = avatar;
@@ -264,9 +264,9 @@ exports.googleAuth = async (req, res, next) => {
       }
 
       user = new User({
-        fullName: name,
+        fullName: sanitizeText(name),
         email,
-        companyName,
+        companyName: sanitizeText(companyName),
         googleId: googleId || googleData.sub,
         avatar: picture || googleData.picture,
       });

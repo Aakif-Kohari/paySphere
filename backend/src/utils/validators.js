@@ -24,6 +24,29 @@ const sanitizeString = (val) => (typeof val === "string" ? val.trim() : "");
 // Escape regex special characters to prevent ReDoS attacks
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+// Strip HTML tags to prevent stored XSS
+const stripHtml = (val) => {
+  if (typeof val !== "string") return "";
+  return val.replace(/<[^>]*>/g, "");
+};
+
+// Encode HTML entities for defense-in-depth
+const encodeHtmlEntities = (val) => {
+  if (typeof val !== "string") return "";
+  return val
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+};
+
+// Sanitize string input for text fields: strip HTML tags, then trim
+const sanitizeText = (val) => {
+  if (typeof val !== "string") return "";
+  return stripHtml(val).trim();
+};
+
 module.exports = {
   isNonEmptyString,
   isValidEmail,
@@ -31,4 +54,7 @@ module.exports = {
   isNonNegativeNumber,
   sanitizeString,
   escapeRegex,
+  stripHtml,
+  encodeHtmlEntities,
+  sanitizeText,
 };

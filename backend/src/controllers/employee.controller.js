@@ -1,7 +1,7 @@
 const Employee = require("../models/employee.model");
 const User = require("../models/user.model");
 const { parse } = require("csv-parse");
-const { isNonEmptyString, escapeRegex } = require("../utils/validators");
+const { isNonEmptyString, escapeRegex, sanitizeText } = require("../utils/validators");
 const PayrollUpdate = require("../models/payroll.model");
 const logger = require("../utils/logger");
 const { createAuditLog } = require("../services/audit.service");
@@ -32,11 +32,11 @@ exports.addEmployee = async (req, res, next) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const employee = new Employee({
-      fullName: fullName.trim(),
-      role: role.trim(),
+      fullName: sanitizeText(fullName),
+      role: sanitizeText(role),
       monthlySalary: numSalary,
       overtimeRate: numOvertime,
-      companyName: user.companyName,
+      companyName: sanitizeText(user.companyName),
       createdBy: req.userId,
     });
 
@@ -69,7 +69,7 @@ exports.getEmployees = async (req, res, next) => {
 
     let search = req.query.search;
     if (typeof search !== "string") search = "";
-    search = search.trim();
+    search = sanitizeText(search);
 
     const skip = (page - 1) * limit;
 
@@ -154,7 +154,7 @@ exports.importEmployees = async (req, res, next) => {
           // Fetch existing employees to detect duplicates by fullName + role
           const existingEmployees = await Employee.find({ createdBy: req.userId });
           const existingKeys = new Set(
-            existingEmployees.map(e => `${e.fullName.toLowerCase()}|${e.role.toLowerCase()}`)
+            existingEmployees.map(e => `${sanitizeText(e.fullName).toLowerCase()}|${sanitizeText(e.role).toLowerCase()}`)
           );
 
           const employees = [];
@@ -204,7 +204,9 @@ exports.importEmployees = async (req, res, next) => {
             }
 
             // Check for duplicate by fullName + role (case-insensitive)
-            const key = `${fullName.toLowerCase()}|${role.toLowerCase()}`;
+            const sanitizedName = sanitizeText(fullName);
+            const sanitizedRole = sanitizeText(role);
+            const key = `${sanitizedName.toLowerCase()}|${sanitizedRole.toLowerCase()}`;
             if (existingKeys.has(key)) {
               skipped++;
               errors.push({
@@ -218,11 +220,11 @@ exports.importEmployees = async (req, res, next) => {
             existingKeys.add(key);
 
             employees.push({
-              fullName,
-              role,
+              fullName: sanitizeText(fullName),
+              role: sanitizeText(role),
               monthlySalary,
               overtimeRate,
-              companyName: user.companyName,
+              companyName: sanitizeText(user.companyName),
               createdBy: req.userId,
             });
           });
@@ -290,8 +292,8 @@ exports.updateEmployee = async (req, res, next) => {
     }
 
     // Apply updates only for provided fields
-    if (fullName !== undefined) employee.fullName = fullName;
-    if (role !== undefined) employee.role = role;
+    if (fullName !== undefined) employee.fullName = sanitizeText(fullName);
+    if (role !== undefined) employee.role = sanitizeText(role);
     if (monthlySalary !== undefined) employee.monthlySalary = monthlySalary;
     if (overtimeRate !== undefined) employee.overtimeRate = overtimeRate;
 
