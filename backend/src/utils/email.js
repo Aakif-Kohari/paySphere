@@ -21,6 +21,11 @@ const sendEmail = async ({ to, subject, text, html, attachments }) => {
   }
 
   const proxyUrl = `${frontendUrl.replace(/\/+$/, '')}/api/send-email`;
+  const secret = process.env.EMAIL_PROXY_SECRET;
+  const headers = {};
+  if (secret) {
+    headers['Authorization'] = `Bearer ${secret}`;
+  }
 
   try {
     const response = await axios.post(proxyUrl, {
@@ -29,7 +34,7 @@ const sendEmail = async ({ to, subject, text, html, attachments }) => {
       text,
       html,
       attachments: formattedAttachments,
-    });
+    }, { headers });
 
     if (response.status === 200) {
       logger.info(`Email proxied to Vercel for ${to}`, { to, subject });
