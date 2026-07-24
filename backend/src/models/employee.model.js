@@ -16,6 +16,10 @@ const employeeSchema = new mongoose.Schema({
     default: "",
     maxlength: [100, "Role cannot exceed 100 characters"],
   },
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
   monthlySalary: {
     type: Number,
     required: true,
