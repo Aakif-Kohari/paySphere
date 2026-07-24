@@ -14,6 +14,8 @@ html {
   }
 }
 
+button, a { cursor: pointer; }
+
 .skeleton {
   position: relative;
   overflow: hidden;

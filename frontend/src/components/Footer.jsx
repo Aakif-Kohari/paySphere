@@ -19,7 +19,7 @@ export default function Footer() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-              <Link to="/auth?mode=signup" className="w-full sm:w-auto bg-white text-blue-600 text-base sm:text-lg font-bold px-6 sm:px-10 py-3 sm:py-4 rounded-xl shadow-xl transition-all hover:scale-105 active:scale-95">
+              <Link to="/auth?mode=signup" className="w-full cursor-pointer sm:w-auto bg-white text-blue-600 text-base sm:text-lg font-bold px-6 sm:px-10 py-3 sm:py-4 rounded-xl shadow-xl transition-all hover:scale-105 active:scale-95">
                 Start Your Free Trial
               </Link>
             </div>
@@ -85,7 +85,7 @@ export default function Footer() {
               <form className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-blue-100 dark:shadow-none transition-all active:scale-95 text-sm"
+                  className="bg-blue-600 cursor-pointer hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-blue-100 dark:shadow-none transition-all active:scale-95 text-sm"
                 >
                   Join
                 </button>

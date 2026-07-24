@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { logout, logoutUser } from "../features/auth/authSlice";
 import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
+import AttendanceCalendarModal from "../components/AttendanceCalendarModal";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const PayrollIcon = () => (
@@ -116,9 +118,11 @@ function parseInput(text, employeeList) {
   
   // 1. Try exact full-name match
   let name = null;
+  let employeeId = null;
   for (const emp of employeeList) {
     if (lower.startsWith(emp.fullName.toLowerCase())) {
       name = emp.fullName;
+      employeeId = emp._id;
       break;
     }
   }
@@ -130,6 +134,7 @@ function parseInput(text, employeeList) {
       // Check if input starts with the first name followed by a space or action word
       if (lower.startsWith(firstName + " ")) {
         name = emp.fullName;
+        employeeId = emp._id;
         break;
       }
     }
@@ -139,6 +144,8 @@ function parseInput(text, employeeList) {
   if (!name) {
     const nameMatch = text.match(/^([A-Za-z]+(?:\s[A-Za-z]+)?)/);
     name = nameMatch ? nameMatch[1] : "Unknown";
+    const matchedEmp = employeeList.find(emp => emp.fullName.toLowerCase() === name.toLowerCase());
+    employeeId = matchedEmp ? matchedEmp._id : null;
   }
 
   const tags = [];
@@ -151,13 +158,14 @@ function parseInput(text, employeeList) {
   const dedMatch = lower.match(/₹?([\d,]+)\s*deduction/);
   if (dedMatch) tags.push({ label: `– ₹${dedMatch[1]} deduction`, bg: "#FEF2F2", color: "#DC2626" });
   if (tags.length === 0) tags.push({ label: text.slice(0,30), bg: "#F3F4F6", color: "#374151" });
-  return { name, tags, note: null, pending: true };
+  return { employeeId, name, tags, note: null, pending: true };
 }
 
 const COLORS = ["#818CF8","#34D399","#FB7185","#FBBF24","#60A5FA","#A78BFA"];
 
 export default function MonthlyUpdates() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const themeMode = useSelector((state) => state.ui.themeMode);
   const isDark = themeMode === "dark";
 
@@ -173,9 +181,20 @@ export default function MonthlyUpdates() {
   const [showResults, setShowResults] = useState(false);
   const [payrollResults, setPayrollResults] = useState(null);
   const [finalizeError, setFinalizeError] = useState("");
-  const [showSettings, setShowSettings] = useState(false);
-  const [settings, setSettings] = useState({ defaultOvertimeRate: 0, defaultDailyRate: 0 });
-  const [updatingSettings, setUpdatingSettings] = useState(false);
+
+  // Attendance Calendar Modal states (#137)
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [selectedCalendarEmp, setSelectedCalendarEmp] = useState(null);
+  const [showEmpPicker, setShowEmpPicker] = useState(false);
+
+  // Bulk Email Dispatch states (#140)
+  const [sendingBulkEmail, setSendingBulkEmail] = useState(false);
+  const [emailStatuses, setEmailStatuses] = useState({});
+  const [bulkEmailMsg, setBulkEmailMsg] = useState("");
+
+  // Copy Payroll Summary state (#184)
+  const [copiedSummary, setCopiedSummary] = useState(false);
+
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
   const token = localStorage.getItem("token");
 
@@ -192,33 +211,10 @@ export default function MonthlyUpdates() {
       }
     };
     if (token) fetchEmployees();
-    else setLoadingEmployees(false);
+    else setTimeout(() => setLoadingEmployees(false), 0);
   }, [token]);
 
-  // Fetch settings
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const res = await api.get(`/api/auth/settings`);
-        setSettings(res.data);
-      } catch (err) {
-        console.error("Failed to fetch settings:", err);
-      }
-    };
-    if (token) fetchSettings();
-  }, [token]);
 
-  const saveSettings = async () => {
-    setUpdatingSettings(true);
-    try {
-      await api.put(`/api/auth/settings`, settings);
-      setShowSettings(false);
-    } catch (err) {
-      alert("Failed to save settings");
-    } finally {
-      setUpdatingSettings(false);
-    }
-  };
 
   const getCompInitials = (name) =>
     name
@@ -245,6 +241,15 @@ export default function MonthlyUpdates() {
     setInput(prev => prev ? prev + tpl : "Name" + tpl);
   };
 
+  // Handle Attendance Calendar Apply (#137)
+  const handleApplyCalendar = ({ employeeName, tags }) => {
+    const color = COLORS[nextId % COLORS.length];
+    const matchedEmp = employees.find(emp => emp.fullName.toLowerCase() === employeeName.toLowerCase());
+    const empId = matchedEmp ? matchedEmp._id : null;
+    setActivity(prev => [{ employeeId: empId, name: employeeName, tags, pending: true, id: nextId, color }, ...prev]);
+    setNextId(n => n + 1);
+  };
+
   const pendingCount = activity.filter(a => a.pending).length;
 
   const fmt = (n) => "₹" + Math.abs(n).toLocaleString("en-IN");
@@ -260,7 +265,7 @@ export default function MonthlyUpdates() {
       const res = await api.post(
         `/api/payroll/finalize`,
         {
-          activities: activity.map(a => ({ name: a.name, tags: a.tags })),
+          activities: activity.map(a => ({ employeeId: a.employeeId, name: a.name, tags: a.tags })),
           month: now.getMonth() + 1,
           year: now.getFullYear(),
         }
@@ -275,6 +280,84 @@ export default function MonthlyUpdates() {
       setFinalizeError(err.response?.data?.message || "Failed to finalize payroll.");
     } finally {
       setFinalizing(false);
+    }
+  };
+
+  // Handle Bulk Send Email (#140)
+  const handleSendAllEmails = async () => {
+    setSendingBulkEmail(true);
+    setBulkEmailMsg("");
+    try {
+      const now = new Date();
+      const res = await api.post("/api/payroll/send-all-emails", {
+        month: now.getMonth() + 1,
+        year: now.getFullYear(),
+      });
+      const statusMap = { ...emailStatuses };
+      if (res.data.results && Array.isArray(res.data.results)) {
+        res.data.results.forEach((r) => {
+          statusMap[r.employeeName] = r.status;
+        });
+      }
+      setEmailStatuses(statusMap);
+      setBulkEmailMsg(res.data.message || "Payslip emails dispatched!");
+    } catch (err) {
+      setBulkEmailMsg(err.response?.data?.message || "Failed to dispatch payslip emails.");
+    } finally {
+      setSendingBulkEmail(false);
+    }
+  };
+
+  // Handle Copy Payroll Summary to Clipboard (#184)
+  const handleCopySummary = () => {
+    if (!payrollResults || !payrollResults.results) return;
+    const now = new Date();
+    const monthName = now.toLocaleString("default", { month: "long" });
+    const year = now.getFullYear();
+    const totalPayout = payrollResults.results.reduce((sum, r) => sum + (r.netSalary || 0), 0);
+
+    let summaryText = `💰 PaySphere Payroll Summary (${monthName} ${year})\n`;
+    summaryText += `-----------------------------------\n`;
+    summaryText += `👥 Total Employees: ${payrollResults.results.length}\n`;
+    summaryText += `💵 Total Payout: ${fmt(totalPayout)}\n`;
+    summaryText += `-----------------------------------\n`;
+
+    payrollResults.results.forEach((r) => {
+      summaryText += `• ${r.employeeName}: ${fmt(r.netSalary)}\n`;
+    });
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(summaryText);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = summaryText;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+
+    setCopiedSummary(true);
+    setTimeout(() => setCopiedSummary(false), 2000);
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      const now = new Date();
+      const response = await api.get(`/api/payroll/export-csv?month=${now.getMonth() + 1}&year=${now.getFullYear()}`, {
+        responseType: 'blob',
+      });
+      const blob = response.data;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `payroll-${now.getMonth() + 1}-${now.getFullYear()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('No data to export');
     }
   };
 
@@ -376,7 +459,7 @@ export default function MonthlyUpdates() {
           {[
             { id:"dashboard",  label:"Dashboard",  icon:<GridIcon /> },
             { id:"employees",  label:"Employees",  icon:<PeopleIcon /> },
-            { id:"settings",   label:"Payroll Settings", icon:<SpeedoIcon /> },
+            { id:"settings",   label:"Settings", icon:<SpeedoIcon /> },
           ].map(item => (
             <button key={item.id} className="nav-btn"
               onClick={() => {
@@ -384,7 +467,7 @@ export default function MonthlyUpdates() {
                 if (item.id === "dashboard" || item.id === "employees") {
                   navigate("/dashboard");
                 } else if (item.id === "settings") {
-                  setShowSettings(true);
+                  navigate("/settings");
                 } else {
                   setActivePage(item.id);
                 }
@@ -423,7 +506,7 @@ export default function MonthlyUpdates() {
         <header style={{
           background: isDark ? "#111827" : "white", borderBottom: isDark ? "1.5px solid #1e293b" : "1.5px solid #F0F1F3",
           padding:"0 20px", height:62,
-          display:"flex", alignItems:"center", justifycontent:"space-between", justifyContent:"space-between",
+          display:"flex", alignItems:"center", justifyContent:"space-between",
           position:"sticky", top:0, zIndex:9,
           transition: "background-color 0.2s, border-color 0.2s"
         }}>
@@ -443,7 +526,7 @@ export default function MonthlyUpdates() {
               background:"none", border:"none", fontFamily:"'DM Sans',sans-serif",
               fontSize:14.5, fontWeight:700, color: isDark ? "#3b82f6" : "#2563EB", cursor:"pointer",
               borderBottom: isDark ? "2px solid #3b82f6" : "2px solid #2563EB", paddingBottom:2,
-            }} className="sm:flex">April 2026 <ChevronDown /></button>
+            }} className="sm:flex">{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} <ChevronDown /></button>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
             <ThemeToggle />
@@ -454,7 +537,7 @@ export default function MonthlyUpdates() {
             </div>
             <button
               onClick={() => {
-                localStorage.removeItem("token");
+                dispatch(logoutUser());
                 localStorage.removeItem("companyName");
                 navigate("/auth");
               }}
@@ -529,8 +612,28 @@ export default function MonthlyUpdates() {
             ><EnterIcon /></button>
           </div>
 
-          {/* Quick action chips */}
+          {/* Quick action chips & Attendance Calendar Button */}
           <div style={{ display:"flex", gap:10, flexWrap:"wrap", justifyContent:"center", marginBottom:40, width:"100%", maxWidth:760 }}>
+            <button
+              className="chip-btn"
+              onClick={() => {
+                if (employees.length > 0) {
+                  setShowEmpPicker(true);
+                } else {
+                  // Fallback sample employee if empty
+                  setSelectedCalendarEmp({ fullName: "Employee 1" });
+                  setIsCalendarOpen(true);
+                }
+              }}
+              style={{
+                background: isDark ? "#1e293b" : "#EEF2FF",
+                borderColor: isDark ? "#3b82f6" : "#2563EB",
+                color: isDark ? "#60A5FA" : "#2563EB",
+                fontWeight: 700,
+              }}
+            >
+              📅 Open Attendance Calendar
+            </button>
             {QUICK_ACTIONS.map(a => (
               <button key={a.label} className="chip-btn" onClick={() => insertTemplate(a.template)}>
                 {a.icon} {a.label}
@@ -540,7 +643,7 @@ export default function MonthlyUpdates() {
 
           {/* Recent Activity */}
           <div style={{ width:"100%", maxWidth:760 }}>
-            <div style={{ display:"flex", justifycontent:"space-between", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
               <span style={{ fontSize:11.5, fontWeight:700, color: isDark ? "#cbd5e1" : "#9CA3AF", letterSpacing:"0.08em", textTransform:"uppercase" }}>
                 Recent Activity
               </span>
@@ -657,7 +760,7 @@ export default function MonthlyUpdates() {
             transition: "background-color 0.2s, border-color 0.2s"
           }}>
             <div className="bottom-cta-inner" style={{
-              display:"flex", alignItems:"center", justifycontent:"space-between", justifyContent:"space-between",
+              display:"flex", alignItems:"center", justifyContent:"space-between",
               width:"100%", maxWidth:760,
             }}>
               <div>
@@ -696,57 +799,6 @@ export default function MonthlyUpdates() {
             </div>
           </div>
 
-          {/* Settings Modal */}
-          {showSettings && (
-            <div className="modal-overlay" onClick={() => setShowSettings(false)}>
-              <div className="modal-box" style={{ maxWidth: 450 }} onClick={e => e.stopPropagation()}>
-                <div style={{ padding:"28px 28px 20px", borderBottom: isDark ? "1.5px solid #1e293b" : "1.5px solid #F0F1F3" }}>
-                  <h2 style={{ fontFamily:"'DM Serif Display',serif", fontSize:24, fontWeight:400, color: isDark ? "white" : "#111827" }}>
-                    Payroll Settings
-                  </h2>
-                  <p style={{ fontSize:14, color: isDark ? "#cbd5e1" : "#6B7280" }}>Set default rates for all employees.</p>
-                </div>
-                
-                <div style={{ padding:"24px 28px" }}>
-                  <label style={{ display:"block", marginBottom:20 }}>
-                    <span style={{ fontSize:11, fontWeight:700, color: isDark ? "#94a3b8" : "#9CA3AF", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:8, display:"block" }}>
-                      Default Overtime Rate (₹ / hr)
-                    </span>
-                    <input 
-                      type="number"
-                      value={settings.defaultOvertimeRate}
-                      onChange={(e) => setSettings({ ...settings, defaultOvertimeRate: parseFloat(e.target.value) || 0 })}
-                      style={{ width:"100%", padding:"12px 16px", background: isDark ? "#090d16" : "#F3F4F6", border: isDark ? "1.5px solid #1e293b" : "1.5px solid transparent", borderRadius:12, fontSize:15, fontWeight:600, color: isDark ? "white" : "#111827", outline:"none" }}
-                    />
-                  </label>
-
-                  <label style={{ display:"block", marginBottom:8 }}>
-                    <span style={{ fontSize:11, fontWeight:700, color: isDark ? "#94a3b8" : "#9CA3AF", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:8, display:"block" }}>
-                      Default Daily Deduction (₹ / day)
-                    </span>
-                    <input 
-                      type="number"
-                      value={settings.defaultDailyRate}
-                      onChange={(e) => setSettings({ ...settings, defaultDailyRate: parseFloat(e.target.value) || 0 })}
-                      style={{ width:"100%", padding:"12px 16px", background: isDark ? "#090d16" : "#F3F4F6", border: isDark ? "1.5px solid #1e293b" : "1.5px solid transparent", borderRadius:12, fontSize:15, fontWeight:600, color: isDark ? "white" : "#111827", outline:"none" }}
-                    />
-                  </label>
-                  <p style={{ fontSize:12, color:"#9CA3AF", fontStyle:"italic" }}>
-                    * Individual employee overtime rates will still take priority if set.
-                  </p>
-                </div>
-
-                <div style={{ padding:"16px 28px 24px", borderTop: isDark ? "1.5px solid #1e293b" : "1.5px solid #F0F1F3", display:"flex", gap:12, justifyContent:"flex-end" }}>
-                  <button onClick={() => setShowSettings(false)} className="chip-btn" style={{ borderRadius:10 }}>Cancel</button>
-                  <button onClick={saveSettings} disabled={updatingSettings} style={{
-                    padding:"11px 24px", borderRadius:10, border:"none", background:"#2563EB", color:"white", fontWeight:700, cursor: updatingSettings ? "not-allowed" : "pointer"
-                  }}>
-                    {updatingSettings ? "Saving..." : "Save Settings"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Payroll Results Modal */}
           {showResults && payrollResults && (
@@ -754,7 +806,7 @@ export default function MonthlyUpdates() {
               <div className="modal-box" onClick={e => e.stopPropagation()}>
                 {/* Modal Header */}
                 <div style={{ padding:"28px 28px 20px", borderBottom: isDark ? "1.5px solid #1e293b" : "1.5px solid #F0F1F3" }}>
-                  <div style={{ display:"flex", alignItems:"center", justifycontent:"space-between", justifyContent:"space-between", marginBottom:8 }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
                     <h2 style={{
                       fontFamily:"'DM Serif Display',serif",
                       fontSize:24, fontWeight:400, color: isDark ? "white" : "#111827",
@@ -777,6 +829,16 @@ export default function MonthlyUpdates() {
                       ))}
                     </div>
                   )}
+
+                  {bulkEmailMsg && (
+                    <div style={{
+                      marginTop:12, padding:"10px 14px", borderRadius:10,
+                      background: isDark ? "#1e293b" : "#EFF6FF", border: isDark ? "1px solid #334155" : "1px solid #BFDBFE",
+                      fontSize:13, color: isDark ? "#60A5FA" : "#1D4ED8", fontWeight:600,
+                    }}>
+                      📧 {bulkEmailMsg}
+                    </div>
+                  )}
                 </div>
 
                 {/* Results List */}
@@ -789,7 +851,24 @@ export default function MonthlyUpdates() {
                       <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:14 }}>
                         <Avatar name={r.employeeName} size={38} />
                         <div>
-                          <div style={{ fontWeight:700, fontSize:14.5, color: isDark ? "white" : "#111827" }}>{r.employeeName}</div>
+                          <div style={{ fontWeight:700, fontSize:14.5, color: isDark ? "white" : "#111827", display: "flex", alignItems: "center", gap: 8 }}>
+                            {r.employeeName}
+                            {emailStatuses[r.employeeName] === "sent" && (
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "#F0FDF4", color: "#16A34A" }}>
+                                Sent ✉️
+                              </span>
+                            )}
+                            {emailStatuses[r.employeeName] === "no_email" && (
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "#FFFBEB", color: "#D97706" }}>
+                                No Email ⚠️
+                              </span>
+                            )}
+                            {emailStatuses[r.employeeName] === "failed" && (
+                              <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "#FEF2F2", color: "#DC2626" }}>
+                                Failed ❌
+                              </span>
+                            )}
+                          </div>
                           <div style={{ fontSize:12, color:"#9CA3AF" }}>Base: {fmt(r.baseSalary)}</div>
                         </div>
                       </div>
@@ -834,7 +913,42 @@ export default function MonthlyUpdates() {
                 </div>
 
                 {/* Modal Footer */}
-                <div style={{ padding:"16px 28px 24px", borderTop: isDark ? "1.5px solid #1e293b" : "1.5px solid #F0F1F3", display:"flex", gap:12, justifyContent:"flex-end" }}>
+                <div style={{ padding:"16px 28px 24px", borderTop: isDark ? "1.5px solid #1e293b" : "1.5px solid #F0F1F3", display:"flex", gap:10, justifyContent:"flex-end", flexWrap: "wrap" }}>
+                  <button
+                    onClick={handleSendAllEmails}
+                    disabled={sendingBulkEmail}
+                    style={{
+                      padding:"11px 20px", borderRadius:10,
+                      border: "none", background: isDark ? "#8B5CF6" : "#7C3AED",
+                      fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:700,
+                      color: "white", cursor: sendingBulkEmail ? "not-allowed" : "pointer",
+                      opacity: sendingBulkEmail ? 0.7 : 1,
+                    }}
+                  >
+                    {sendingBulkEmail ? "Sending Emails... ⏳" : "📧 Email All Payslips"}
+                  </button>
+                  <button
+                    onClick={handleCopySummary}
+                    style={{
+                      padding:"11px 20px", borderRadius:10,
+                      border: isDark ? "1.5px solid #10B981" : "1.5px solid #059669",
+                      background: copiedSummary ? (isDark ? "#064E3B" : "#ECFDF5") : (isDark ? "#1e293b" : "white"),
+                      fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:700,
+                      color: isDark ? "#A7F3D0" : "#059669", cursor:"pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    {copiedSummary ? "Copied to Clipboard! ✅" : "📋 Copy Summary"}
+                  </button>
+                  <button
+                    onClick={handleExportCsv}
+                    style={{
+                      padding:"11px 20px", borderRadius:10,
+                      border: isDark ? "1.5px solid #334155" : "1.5px solid #E5E7EB", background: isDark ? "#1e293b" : "white",
+                      fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:600,
+                      color: isDark ? "#cbd5e1" : "#374151", cursor:"pointer",
+                    }}
+                  >Export CSV</button>
                   <button
                     onClick={() => setShowResults(false)}
                     style={{
@@ -857,6 +971,76 @@ export default function MonthlyUpdates() {
               </div>
             </div>
           )}
+
+          {/* Employee Picker Modal for Calendar (#137) */}
+          {showEmpPicker && (
+            <div className="modal-overlay" onClick={() => setShowEmpPicker(false)}>
+              <div className="modal-box" onClick={e => e.stopPropagation()} style={{ padding: "24px" }}>
+                <h3 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "6px" }}>Select Employee for Calendar</h3>
+                <p style={{ fontSize: "13.5px", color: isDark ? "#9CA3AF" : "#6B7280", marginBottom: "18px" }}>
+                  Choose an employee to open their 31-day muster roll attendance calendar grid:
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "300px", overflowY: "auto", marginBottom: "20px" }}>
+                  {employees.length === 0 ? (
+                    <div style={{ textAlign: "center", color: "#9CA3AF", padding: "16px" }}>No employees found.</div>
+                  ) : (
+                    employees.map(emp => (
+                      <button
+                        key={emp._id || emp.fullName}
+                        onClick={() => {
+                          setSelectedCalendarEmp(emp);
+                          setShowEmpPicker(false);
+                          setIsCalendarOpen(true);
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "12px 16px",
+                          borderRadius: "12px",
+                          border: isDark ? "1px solid #1e293b" : "1px solid #E5E7EB",
+                          background: isDark ? "#111827" : "#F9FAFB",
+                          color: isDark ? "white" : "#111827",
+                          fontSize: "14.5px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          textAlign: "left",
+                        }}
+                      >
+                        <span>👤 {emp.fullName}</span>
+                        <span style={{ fontSize: "12.5px", color: "#2563EB" }}>Select ➔</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    onClick={() => setShowEmpPicker(false)}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "#9CA3AF",
+                      color: "white",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Interactive Attendance & Leave Calendar Modal (#137) */}
+          <AttendanceCalendarModal
+            isOpen={isCalendarOpen}
+            onClose={() => setIsCalendarOpen(false)}
+            employee={selectedCalendarEmp}
+            onApply={handleApplyCalendar}
+            isDark={isDark}
+          />
 
         </main>
       </div>

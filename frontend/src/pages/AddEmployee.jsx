@@ -1,57 +1,58 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { logout } from "../features/auth/authSlice";
 import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const GridIcon = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-    <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+    <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+    <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
   </svg>
 );
 const PeopleIcon = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-    <circle cx="9" cy="7" r="4"/>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
 const PersonPlusIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-    <circle cx="8.5" cy="7" r="4"/>
-    <line x1="20" y1="8" x2="20" y2="14"/>
-    <line x1="23" y1="11" x2="17" y2="11"/>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="8.5" cy="7" r="4" />
+    <line x1="20" y1="8" x2="20" y2="14" />
+    <line x1="23" y1="11" x2="17" y2="11" />
   </svg>
 );
 const BellIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
   </svg>
 );
 const HelpCircleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
   </svg>
 );
 const SupportIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
   </svg>
 );
 const CheckCircleIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-    <polyline points="22 4 12 14.01 9 11.01"/>
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+    <polyline points="22 4 12 14.01 9 11.01" />
   </svg>
 );
 const ArrowRightIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="5" y1="12" x2="19" y2="12"/>
-    <polyline points="12 5 19 12 12 19"/>
+    <line x1="5" y1="12" x2="19" y2="12" />
+    <polyline points="12 5 19 12 12 19" />
   </svg>
 );
 
@@ -82,23 +83,24 @@ const Avatar = ({ name, size = 36 }) => {
 
 export default function AddEmployee() {
   const navigate = useNavigate();
-  const themeMode = useSelector((state) => state.ui.themeMode);
-  const isDark = themeMode === "dark";
+  const dispatch = useDispatch();
+
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
 
   // Form state
   const [fullName, setFullName] = useState("");
+  const [role, setRole] = useState("");
   const [monthlySalary, setMonthlySalary] = useState("");
   const [overtimeRate, setOvertimeRate] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [showSettings, setShowSettings] = useState(false);
-  const [settings, setSettings] = useState({ defaultOvertimeRate: 0, defaultDailyRate: 0 });
-  const [updatingSettings, setUpdatingSettings] = useState(false);
 
+  const [csvFile, setCsvFile] = useState(null);
+  const [uploadingCsv, setUploadingCsv] = useState(false);
+  const fileInputRef = useRef(null);
   // Recently added employees
   const [recentEmployees, setRecentEmployees] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
@@ -119,37 +121,54 @@ export default function AddEmployee() {
 
   useEffect(() => {
     if (token) {
-      fetchRecent();
+      setTimeout(() => { fetchRecent(); }, 0);
     } else {
-      setLoadingRecent(false);
+      setTimeout(() => setLoadingRecent(false), 0);
     }
   }, [token]);
 
-  // Fetch settings
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const res = await api.get(`/api/auth/settings`);
-        setSettings(res.data);
-      } catch (err) {
-        console.error("Failed to fetch settings:", err);
-      }
-    };
-    if (token) fetchSettings();
-  }, [token]);
 
-  const saveSettings = async () => {
-    setUpdatingSettings(true);
+
+  const handleCsvUpload = async () => {
+    if (!csvFile) {
+      setError("Please select a CSV file.");
+      return;
+    }
+
+    setUploadingCsv(true);
+    setError("");
+    setSuccess("");
+
     try {
-      await api.put(`/api/auth/settings`, settings);
-      setShowSettings(false);
+      const formData = new FormData();
+      formData.append("file", csvFile);
+
+      const res = await api.post(
+        "/api/employees/import",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      setSuccess(`${res.data.imported} employees imported successfully.`);
+
+      setCsvFile(null);
+
+      const recent = await api.get("/api/employees/recent");
+      setRecentEmployees(recent.data.employees);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     } catch (err) {
-      alert("Failed to save settings");
+      setError(err.response?.data?.message || "CSV import failed.");
     } finally {
-      setUpdatingSettings(false);
+      setUploadingCsv(false);
     }
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -159,8 +178,8 @@ export default function AddEmployee() {
     const salaryNum = parseFloat(monthlySalary.replace(/,/g, ""));
     const otNum = overtimeRate ? parseFloat(overtimeRate.replace(/,/g, "")) : undefined;
 
-    if (isNaN(salaryNum)) {
-      setError("Please enter a valid salary amount.");
+    if (isNaN(salaryNum) || salaryNum <= 0) {
+      setError("Monthly salary must be a positive number.");
       setLoading(false);
       return;
     }
@@ -168,12 +187,14 @@ export default function AddEmployee() {
     try {
       await api.post(`/api/employees`, {
         fullName,
+        role,
         monthlySalary: salaryNum,
         overtimeRate: otNum,
       });
 
       setSuccess("Employee added successfully!");
       setFullName("");
+      setRole("");
       setMonthlySalary("");
       setOvertimeRate("");
       fetchRecent(); // Refresh recent list
@@ -187,7 +208,7 @@ export default function AddEmployee() {
   const sidebarItems = [
     { id: "dashboard", label: "Dashboard", path: "/dashboard", icon: <GridIcon /> },
     { id: "employees", label: "Employees", path: "/dashboard?tab=employees", icon: <PeopleIcon /> },
-    { id: "settings", label: "Payroll Settings", path: "#", icon: <SupportIcon /> }, // will open modal
+    { id: "settings", label: "Settings", path: "/settings", icon: <SupportIcon /> },
   ];
 
   const getInitials = (name) =>
@@ -240,18 +261,13 @@ export default function AddEmployee() {
             <button
               key={item.id}
               onClick={() => {
-                if (item.id === "settings") {
-                  setShowSettings(true);
-                } else {
-                  navigate(item.path);
-                }
+                navigate(item.path);
                 setIsSidebarOpen(false);
               }}
-              className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${
-                item.id === "employees"
+              className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${item.id === "employees"
                   ? "bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold"
                   : "text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800/50"
-              }`}
+                }`}
             >
               {item.icon}
               {item.label}
@@ -284,7 +300,7 @@ export default function AddEmployee() {
             </button>
             <span className="font-bold text-blue-900 dark:text-blue-400 truncate">Ledger Payroll</span>
             <button className="hidden sm:block text-blue-600 dark:text-blue-400 font-semibold border-b-2 border-blue-600 dark:border-blue-400 pb-0.5 whitespace-nowrap">
-              April 2026
+              {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
             </button>
           </div>
 
@@ -297,7 +313,7 @@ export default function AddEmployee() {
             </div>
             <button
               onClick={() => {
-                localStorage.removeItem("token");
+                dispatch(logout());
                 localStorage.removeItem("companyName");
                 navigate("/auth");
               }}
@@ -335,7 +351,7 @@ export default function AddEmployee() {
                 </label>
 
                 {/* Salary Row */}
-                <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <div className="flex flex-col sm:flex-col gap-4 mb-6">
                   <label className="flex-1">
                     <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Monthly Salary (₹)</span>
                     <div className="relative">
@@ -368,6 +384,20 @@ export default function AddEmployee() {
                   </label>
                 </div>
 
+                {/* Role */}
+                <label className="block mb-5">
+                  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Role</span>
+                  <input
+                    id="employee-role"
+                    type="text"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    placeholder="e.g. Software Engineer"
+                    required
+                    className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
+                  />
+                </label>
+
                 {/* Messages */}
                 {error && (
                   <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm font-medium">
@@ -377,7 +407,7 @@ export default function AddEmployee() {
                 {success && (
                   <div className="mb-4 px-4 py-3 rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/50 text-green-600 dark:text-green-400 text-sm font-medium flex items-center gap-2">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12"/>
+                      <polyline points="20 6 9 17 4 12" />
                     </svg>
                     {success}
                   </div>
@@ -396,6 +426,91 @@ export default function AddEmployee() {
               </form>
             </div>
 
+
+            <div className="border-t border-gray-200 pt-6">
+              <h3 className="text-sm font-bold text-gray-900 mb-2">
+                Bulk Upload Employees
+              </h3>
+
+              <p className="text-xs text-gray-500 mb-4">
+                Upload a CSV file to add multiple employees at once.
+              </p>
+
+              <div
+                className={`border-2 border-dashed rounded-xl p-5 text-center transition ${csvFile
+                  ? "border-green-400 bg-green-50"
+                  : "border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50"
+                  }`}
+              >
+                {!csvFile ? (
+                  <>
+                    <div className="text-3xl mb-2">📄</div>
+
+                    <p className="text-sm font-semibold text-gray-700">
+                      Choose CSV file
+                    </p>
+
+                    <p className="text-xs text-gray-400 mt-1 mb-3">
+                      Only .csv files are supported
+                    </p>
+
+                    <label className="inline-block cursor-pointer px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition">
+                      Browse File
+
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv"
+                        hidden
+                        onChange={(e) =>
+                          setCsvFile(e.target.files?.[0] || null)
+                        }
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <div className="flex items-center justify-between bg-white rounded-lg px-3 py-3 border border-green-200">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="text-2xl">
+                        📄
+                      </div>
+
+                      <div className="text-left min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">
+                          {csvFile.name}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {(csvFile.size / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCsvFile(null);
+
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = "";
+                        }
+                      }}
+                      className="ml-3 w-7 h-7 rounded-full bg-red-100 text-red-600 hover:bg-red-200 font-bold"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCsvUpload}
+                disabled={!csvFile || uploadingCsv}
+                className="mt-4 w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                {uploadingCsv ? "Uploading..." : "Upload CSV"}
+              </button>
+            </div>
             {/* ── RIGHT: Sidebar Cards ── */}
             <div className="w-full lg:w-72 xl:w-80 flex flex-col gap-6">
 
@@ -406,7 +521,7 @@ export default function AddEmployee() {
                   <div>
                     <h3 className="font-bold text-gray-900 dark:text-white text-sm">Recently Added</h3>
                     <p className="text-xs text-gray-400 dark:text-slate-450 mt-0.5 leading-relaxed">
-                      Employees added here will automatically appear in your April 2026 payroll worksheet.
+                      Employees added here will automatically appear in your {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} payroll worksheet.
                     </p>
                   </div>
                 </div>
@@ -441,7 +556,7 @@ export default function AddEmployee() {
               </div>
 
               {/* Speed Tip Card */}
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800 via-gray-900 to-gray-950 p-6 text-white shadow-lg">
+              <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-gray-800 via-gray-900 to-gray-950 p-6 text-white shadow-lg">
                 {/* Decorative circles */}
                 <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/5" />
                 <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-white/5" />
@@ -452,6 +567,7 @@ export default function AddEmployee() {
                   <p className="text-gray-300 text-sm leading-relaxed">
                     You can bulk upload employees via CSV in the Settings menu for larger teams.
                   </p>
+
                 </div>
               </div>
             </div>
@@ -459,46 +575,6 @@ export default function AddEmployee() {
           </div>
         </main>
 
-        {/* Settings Modal */}
-        {showSettings && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-blur-sm" onClick={() => setShowSettings(false)}>
-            <div className="bg-white dark:bg-slate-900 rounded-2xl w-[92%] max-w-[450px] overflow-hidden shadow-2xl border border-transparent dark:border-slate-800" onClick={e => e.stopPropagation()}>
-              <div className="p-7 border-b border-gray-100 dark:border-slate-800">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Payroll Settings</h2>
-                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Set default rates for all employees.</p>
-              </div>
-              
-              <div className="p-7 space-y-6">
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-gray-400 dark:text-slate-400 tracking-wider mb-2 block">Default Overtime Rate (₹ / hr)</span>
-                  <input 
-                    type="number"
-                    value={settings.defaultOvertimeRate}
-                    onChange={(e) => setSettings({ ...settings, defaultOvertimeRate: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white font-semibold focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 border border-transparent dark:border-slate-800 outline-none transition"
-                  />
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-gray-400 dark:text-slate-400 tracking-wider mb-2 block">Default Daily Deduction (₹ / day)</span>
-                  <input 
-                    type="number"
-                    value={settings.defaultDailyRate}
-                    onChange={(e) => setSettings({ ...settings, defaultDailyRate: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white font-semibold focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 border border-transparent dark:border-slate-800 outline-none transition"
-                  />
-                </div>
-              </div>
-
-              <div className="p-6 border-t border-gray-100 dark:border-slate-800 flex gap-3 justify-end">
-                <button onClick={() => setShowSettings(false)} className="px-5 py-2.5 rounded-xl border border-gray-200 dark:border-slate-800 text-sm font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition">Cancel</button>
-                <button onClick={saveSettings} disabled={updatingSettings} className="px-6 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition disabled:opacity-50">
-                  {updatingSettings ? "Saving..." : "Save Settings"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
       </div>
     </div>

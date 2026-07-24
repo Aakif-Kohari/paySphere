@@ -37,7 +37,7 @@ export default function FAQS() {
               className="border border-gray-100 dark:border-slate-800 rounded-xl sm:rounded-2xl px-4 sm:px-6 py-4 sm:py-5 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all"
             >
               <button
-                className="flex justify-between items-center w-full text-left font-semibold text-base sm:text-lg text-gray-900 dark:text-white"
+                className="flex cursor-pointer justify-between items-center w-full text-left font-semibold text-base sm:text-lg text-gray-900 dark:text-white"
                 onClick={() => setOpenIndex(isOpen ? null : i)}
               >
                 {f.q}

@@ -1,273 +1,303 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
-import FileDownloadIcon from "@mui/icons-material/FileDownload";
+import Sidebar from '../components/Sidebar';
+import ThemeToggle from '../components/ThemeToggle';
+import api from '../services/api';
 
-import ReportFilters from "../components/reports/ReportFilters";
-import SummaryCards from "../components/reports/SummaryCards";
-import PayrollTrendChart from "../components/reports/PayrollTrendChart";
-import DepartmentChart from "../components/reports/DepartmentChart";
-import SalaryDistributionChart from "../components/reports/SalaryDistributionChart";
-import OvertimeChart from "../components/reports/OvertimeChart";
-import PayrollTable from "../components/reports/PayrollTable";
+// --- Recharts Components ---
+import SummaryCards from '../components/reports/SummaryCards';
+import PayrollTrendChart from '../components/reports/PayrollTrendChart';
+import DepartmentChart from '../components/reports/DepartmentChart';
+import SalaryDistributionChart from '../components/reports/SalaryDistributionChart';
+import OvertimeChart from '../components/reports/OvertimeChart';
+import PayrollTable from '../components/reports/PayrollTable';
 
-import { payrollTableData } from "../data/reportMockData";
+// --- Month-Year Selector ---
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const MonthYearSelector = ({ month, year, onChange }) => (
+  <div className="flex gap-3">
+    <select
+      value={month}
+      onChange={(e) => onChange(Number(e.target.value), year)}
+      className="px-4 py-2 border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+    >
+      {MONTH_NAMES.map((name, i) => (
+        <option key={i} value={i + 1}>{name}</option>
+      ))}
+    </select>
+    <select
+      value={year}
+      onChange={(e) => onChange(month, Number(e.target.value))}
+      className="px-4 py-2 border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+    >
+      {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map((y) => (
+        <option key={y} value={y}>{y}</option>
+      ))}
+    </select>
+  </div>
+);
+
+// --- Download Helper ---
+const downloadFile = (url, filename) => {
+  const token = localStorage.getItem('token');
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  fetch(`${baseUrl}${url}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error('No data to export');
+      return res.blob();
+    })
+    .then((blob) => {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    })
+    .catch((err) => {
+      console.error('Export failed:', err);
+      alert('Failed to download report. No data for the selected period.');
+    });
+};
 
 export default function Reports() {
   const navigate = useNavigate();
+  const token = useSelector((state) => state.auth.token);
+  const [activePage, setActivePage] = useState('Reports');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
- const parseAmount = (value) => {
-  if (value == null) return 0;
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
 
-  const amount = Number(
-    String(value).replace(/[₹,\s]/g, "")
-  );
+  const [loading, setLoading] = useState(true);
+  const [reportData, setReportData] = useState(null);
+  
+  const companyName = localStorage.getItem('companyName') || 'PaySphere';
 
-  return isNaN(amount) ? 0 : amount;
-  };
+  useEffect(() => {
+    if (!token) navigate('/auth');
+  }, [token, navigate]);
 
-  const calculateSummary = (data) => {
-    const totalPayroll = data.reduce(
-      (sum, emp) => sum + parseAmount(emp.net),
-      0
-    );
+  useEffect(() => {
+    const fetchReportsData = async () => {
+      setLoading(true);
+      try {
+        const [analyticsRes, summaryRes] = await Promise.all([
+          api.get('/api/reports/analytics?months=6'),
+          api.get(`/api/payroll/summary?month=${month}&year=${year}`)
+        ]);
 
-    const totalOvertime = data.reduce(
-     (sum, emp) => sum + parseAmount(emp.overtime),
-      0
-     );
-     
+        const analytics = analyticsRes.data;
+        const payrolls = summaryRes.data.payrolls || [];
 
-    const totalDeductions = data.reduce(
-      (sum, emp) => sum + parseAmount(emp.deduction),
-      0
-    );
+        // Format for Recharts components
+        const formattedData = {
+          summary: {
+            totalPayroll: `₹${analytics.summary.totalPayout.toLocaleString('en-IN')}`,
+            employeesPaid: analytics.summary.totalRecords, // Backend doesn't return Paid vs Draft count in analytics
+            averageSalary: `₹${(analytics.summary.totalRecords > 0 ? Math.round(analytics.summary.totalPayout / analytics.summary.totalRecords) : 0).toLocaleString('en-IN')}`,
+            overtime: `₹${analytics.summary.totalOvertime.toLocaleString('en-IN')}`,
+            deductions: `₹${analytics.summary.totalDeductions.toLocaleString('en-IN')}`,
+          },
+          trend: analytics.monthlyTrends.map(t => ({
+            month: t.label,
+            payroll: t.totalPayout
+          })),
+          department: analytics.roleBreakdown.map(r => ({
+            department: r.role,
+            payroll: r.totalPayout
+          })),
+          salary: [
+            { name: "Salary", value: analytics.summary.totalBase },
+            { name: "Bonus", value: analytics.summary.totalBonus },
+            { name: "Overtime", value: analytics.summary.totalOvertime }
+          ],
+          overtime: payrolls.map(p => ({
+            employee: p.employeeName,
+            overtime: p.overtimePay,
+            deductions: p.deductions + p.leaveDeduction
+          })),
+          table: payrolls.map(p => ({
+            id: p._id,
+            name: p.employeeName,
+            department: p.role,
+            salary: `₹${p.baseSalary.toLocaleString('en-IN')}`,
+            bonus: `₹${p.bonus.toLocaleString('en-IN')}`,
+            overtime: `₹${p.overtimePay.toLocaleString('en-IN')}`,
+            deduction: `₹${(p.deductions + p.leaveDeduction).toLocaleString('en-IN')}`,
+            net: `₹${p.netSalary.toLocaleString('en-IN')}`,
+            status: p.status || "Paid", // Backend uses Paid/Draft
+            date: p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : "-",
+          }))
+        };
 
-    const employeesPaid = data.filter(
-      (emp) => emp.status === "Paid"
-    ).length;
-
-    const averageSalary =
-      data.length > 0
-        ? Math.round(totalPayroll / data.length)
-        : 0;
-
-    return {
-      totalPayroll: `₹${totalPayroll.toLocaleString("en-IN")}`,
-      employeesPaid,
-      averageSalary: `₹${averageSalary.toLocaleString("en-IN")}`,
-      overtime: `₹${totalOvertime.toLocaleString("en-IN")}`,
-      deductions: `₹${totalDeductions.toLocaleString("en-IN")}`,
+        setReportData(formattedData);
+      } catch (err) {
+        console.error('Failed to fetch reports data:', err);
+      } finally {
+        setLoading(false);
+      }
     };
-  };
-  const calculateOvertime = (data) =>
-    data.map((emp) => ({
-      employee: emp.name,
-      overtime: parseAmount(emp.overtime),
-      deductions: parseAmount(emp.deduction),
-    })); 
 
-  const calculateDepartment = (data) => {
-    const departments = {};
+    if (token) fetchReportsData();
+  }, [token, month, year]);
 
-    data.forEach((emp) => {
-      if (!departments[emp.department]) {
-        departments[emp.department] = 0;
-      }
-
-      departments[emp.department] += parseAmount(emp.net);
-    });
-
-    return Object.keys(departments).map((dept) => ({
-      department: dept,
-      payroll: departments[dept],
-    }));
+  const handleMonthChange = (m, y) => {
+    setMonth(m);
+    setYear(y);
   };
 
- 
-
- const calculateSalaryDistribution = (data) => {
-  const totalSalary = data.reduce(
-    (sum, emp) => sum + parseAmount(emp.salary),
-    0
-  );
-
-  const totalBonus = data.reduce(
-    (sum, emp) => sum + parseAmount(emp.bonus),
-    0
-  );
-
-  const totalOvertime = data.reduce(
-    (sum, emp) => sum + parseAmount(emp.overtime),
-    0
-  );
-
-  return [
-    { name: "Salary", value: totalSalary },
-    { name: "Bonus", value: totalBonus },
-    { name: "Overtime", value: totalOvertime },
-  ];
-};
-
-  const calculateTrend = (data) => {
-  const months = [
-      "January",
-      "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-  ];
-
-  const parseAmount = (value) =>
-    Number(value.replace(/[₹,]/g, ""));
-
-  return months.map((month) => ({
-    month,
-    payroll: data
-      .filter((emp) => emp.month === month)
-      .reduce((sum, emp) => sum + parseAmount(emp.net), 0),
-  }));
-};
-
-  const [loading, setLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-
-  const [reportData, setReportData] = useState({
-    summary: calculateSummary(payrollTableData),
-    trend: calculateTrend(payrollTableData),
-    department: calculateDepartment(payrollTableData),
-    salary: calculateSalaryDistribution(payrollTableData),
-    overtime: calculateOvertime(payrollTableData),
-    table: payrollTableData,
-  });
-
-  const handleGenerate = (selectedFilters) => {
-    setLoading(true);
-    setSuccessMessage("");
-
-    setTimeout(() => {
-      let filtered = [...payrollTableData];
-
-      if (selectedFilters.month !== "All") {
-        filtered = filtered.filter(
-          (emp) => emp.month === selectedFilters.month
-        );
-      }
-
-      if (selectedFilters.year !== "All") {
-        filtered = filtered.filter(
-          (emp) => emp.year === selectedFilters.year
-        );
-      }
-
-      if (selectedFilters.department !== "All") {
-        filtered = filtered.filter(
-          (emp) => emp.department === selectedFilters.department
-        );
-      }
-
-      if (selectedFilters.employee !== "All") {
-        filtered = filtered.filter(
-          (emp) => emp.name === selectedFilters.employee
-        );
-      }
-
-      if (selectedFilters.status !== "All") {
-        filtered = filtered.filter(
-          (emp) => emp.status === selectedFilters.status
-        );
-      }
-      console.log(filtered);
-      console.log(calculateTrend(filtered));
-      console.log(calculateDepartment(filtered));
-      console.log(calculateOvertime(filtered));
-      console.log(calculateSalaryDistribution(filtered));
-      setReportData({
-        summary: calculateSummary(filtered),
-        trend: calculateTrend(filtered),
-        department: calculateDepartment(filtered),
-        salary: calculateSalaryDistribution(filtered),
-        overtime: calculateOvertime(filtered),
-        table: filtered,
-      });
-
-      setLoading(false);
-      setSuccessMessage("✓ Report generated successfully!");
-
-      setTimeout(() => {
-        setSuccessMessage("");
-      }, 3000);
-    }, 1000);
+  const handleDownloadPDF = () => {
+    downloadFile(`/api/reports/download-pdf?month=${month}&year=${year}`, `payroll-report-${MONTH_NAMES[month - 1]}-${year}.pdf`);
   };
+
+  const handleExportCSV = () => {
+    downloadFile(`/api/payroll/export-csv?month=${month}&year=${year}`, `payroll-export-${MONTH_NAMES[month - 1]}-${year}.csv`);
+  };
+
+  const getInitials = (name) =>
+    name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 
   return (
-         <div className="min-h-screen bg-gray-100 dark:bg-slate-950 p-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 mb-8">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="p-2 rounded-lg border border-gray-300 dark:border-slate-700 hover:bg-gray-100 dark:hover:bg-slate-800"
-          >
-            <ArrowBackIcon />
-          </button>
+    <div className="min-h-screen bg-gray-100 dark:bg-slate-950 flex font-sans text-slate-800 dark:text-slate-200 transition-colors duration-200">
+      <Helmet>
+        <title>Reports & Analytics | PaySphere</title>
+        <meta name="description" content={`View payroll analytics and generate reports for ${companyName}.`} />
+      </Helmet>
 
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Payroll Reports
-            </h1>
-
-            <p className="text-gray-500 dark:text-gray-400">
-              Payroll analytics and reporting dashboard
-            </p>
-          </div>
-        </div>
-
-      
-      </div>
-
-      <ReportFilters
-        onGenerate={handleGenerate}
-        loading={loading}
-        successMessage={successMessage}
+      <Sidebar
+        companyName={companyName}
+        activePage={activePage}
+        setActivePage={(page) => {
+          setActivePage(page);
+          if (page !== 'Reports') navigate(`/${page.toLowerCase()}`);
+        }}
+        isSidebarOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
 
-      <div className="h-6" />
+      <div className="flex-1 flex flex-col md:ml-56 transition-all duration-300">
+        {/* Topbar */}
+        <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 transition-colors">
+          <div className="flex items-center gap-4 sm:gap-6">
+            <button
+              className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"
+              onClick={() => setIsSidebarOpen(true)}
+            >
+              ☰
+            </button>
+            <span className="font-bold text-blue-900 dark:text-blue-400 truncate">Ledger Payroll</span>
+          </div>
+          <div className="flex items-center gap-3 text-gray-500 dark:text-slate-400">
+            <ThemeToggle />
+            <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+              {getInitials(companyName)}
+            </div>
+            <button
+              onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('companyName'); navigate('/'); }}
+              className="px-3 py-1.5 cursor-pointer text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"
+            >
+              Sign Out
+            </button>
+          </div>
+        </header>
 
-      <SummaryCards data={reportData.summary} />
+        {/* Content */}
+        <main className="p-4 sm:p-8">
+          {/* Page Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <button
+                  onClick={() => navigate("/dashboard")}
+                  className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition"
+                >
+                  <ArrowBackIcon fontSize="small" />
+                </button>
+                <p className="text-sm text-gray-400 dark:text-slate-400">Payroll Analytics</p>
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white">Reports</h1>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-4 sm:mt-0">
+              <MonthYearSelector month={month} year={year} onChange={handleMonthChange} />
+            </div>
+          </div>
 
-      <div className="h-6" />
+          {/* Export Action Bar */}
+          <div className="flex flex-wrap gap-3 mb-8">
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Download PDF Report
+            </button>
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export Accounting CSV
+            </button>
+          </div>
 
-      <PayrollTrendChart data={reportData.trend} />
-
-      <div className="h-6" />
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <DepartmentChart data={reportData.department} />
-        <SalaryDistributionChart data={reportData.salary} />
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-28 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 animate-pulse" />
+              ))}
+            </div>
+          ) : !reportData || reportData.table.length === 0 ? (
+            <div className="text-center py-20">
+              <svg className="w-20 h-20 mx-auto text-gray-300 dark:text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No payroll data yet</h3>
+              <p className="text-gray-400 dark:text-slate-400 text-sm mb-6 max-w-sm mx-auto">
+                Run payroll for at least one month to see analytics and generate reports.
+              </p>
+              <button
+                onClick={() => navigate('/monthly-updates')}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition shadow-md shadow-blue-200 dark:shadow-none"
+              >
+                Run Payroll
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Recharts Components from PR #245 */}
+              <SummaryCards data={reportData.summary} />
+              
+              <PayrollTrendChart data={reportData.trend} />
+              
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <DepartmentChart data={reportData.department} />
+                <SalaryDistributionChart data={reportData.salary} />
+              </div>
+              
+              <OvertimeChart data={reportData.overtime} />
+              
+              <PayrollTable data={reportData.table} />
+            </div>
+          )}
+        </main>
       </div>
-
-      <div className="h-6" />
-
-      <OvertimeChart data={reportData.overtime} />
-
-      <div className="h-6" />
-
-      <PayrollTable data={reportData.table} />
-            <div className="h-6" />
-
-      
-
-
     </div>
   );
 }

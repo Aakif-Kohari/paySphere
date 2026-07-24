@@ -1,51 +1,52 @@
-const nodemailer = require("nodemailer");
+const axios = require('axios');
+const logger = require('./logger');
 
-/**
- * Sends an email using Nodemailer. If SMTP variables are missing,
- * logs the details to the console as a local testing fallback.
- */
-const sendEmail = async ({ to, subject, text, html }) => {
-  const isSmtpConfigured = 
-    process.env.SMTP_HOST && 
-    process.env.SMTP_USER && 
-    process.env.SMTP_PASS;
+const sendEmail = async ({ to, subject, text, html, attachments }) => {
+  const frontendUrl = process.env.FRONTEND_URL;
 
-  if (!isSmtpConfigured) {
-    console.log("\n====================================================================");
-    console.log("📬 [EMAIL LOG FALLBACK] - SMTP not configured.");
-    console.log(`To:      ${to}`);
-    console.log(`Subject: ${subject}`);
-    console.log("--------------------------------------------------------------------");
-    console.log(`Text:\n${text}`);
-    if (html) {
-      console.log("--------------------------------------------------------------------");
-      console.log(`HTML:\n${html}`);
+  const formattedAttachments = attachments?.map((att) => {
+    let contentBase64 = att.content;
+    if (Buffer.isBuffer(att.content)) {
+      contentBase64 = att.content.toString('base64');
     }
-    console.log("====================================================================\n");
+    return {
+      filename: att.filename,
+      content: contentBase64,
+    };
+  });
+
+  if (!frontendUrl) {
+    logger.info('Email fallback - FRONTEND_URL not configured', { to, subject, attachmentCount: formattedAttachments?.length || 0 });
     return { success: true, logged: true };
   }
 
-  // Create transporter
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || "587"),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+  const proxyUrl = `${frontendUrl.replace(/\/+$/, '')}/api/send-email`;
+  const secret = process.env.EMAIL_PROXY_SECRET;
+  const headers = {};
+  if (secret) {
+    headers['Authorization'] = `Bearer ${secret}`;
+  }
 
-  const mailOptions = {
-    from: process.env.EMAIL_FROM || '"PaySphere" <no-reply@paysphere.com>',
-    to,
-    subject,
-    text,
-    html,
-  };
+  try {
+    const response = await axios.post(proxyUrl, {
+      to,
+      subject,
+      text,
+      html,
+      attachments: formattedAttachments,
+    }, { headers });
 
-  await transporter.sendMail(mailOptions);
-  return { success: true, logged: false };
+    if (response.status === 200) {
+      logger.info(`Email proxied to Vercel for ${to}`, { to, subject });
+      return { success: true, proxied: true };
+    }
+
+    throw new Error(`Unexpected response status: ${response.status}`);
+  } catch (error) {
+    const message = error.response?.data?.error || error.message;
+    logger.warn('Email Vercel proxy unavailable, falling back to console', { to, subject, reason: message });
+    return { success: true, logged: true };
+  }
 };
 
 module.exports = { sendEmail };

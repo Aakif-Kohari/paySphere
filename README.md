@@ -103,7 +103,11 @@ paysphere/
 ## 🚀 Installation & Setup
 
 ### 1. Backend Configuration
-Create a `.env` in `backend/`:
+Copy the `.env.example` file to create a `.env` file in `backend/`:
+```bash
+cp .env.example .env
+```
+Update the variables with your own values:
 ```env
 MONGO_URI=your_mongodb_uri
 JWT_SECRET=your_secret_key
@@ -112,7 +116,11 @@ GOOGLE_CLIENT_SECRET=your_google_secret
 ```
 
 ### 2. Frontend Configuration
-Create a `.env` in `frontend/`:
+Copy the `.env.example` file to create a `.env` file in `frontend/`:
+```bash
+cp .env.example .env
+```
+Update the variables with your own values:
 ```env
 VITE_API_URL=http://localhost:5000
 VITE_GOOGLE_CLIENT_ID=your_google_id

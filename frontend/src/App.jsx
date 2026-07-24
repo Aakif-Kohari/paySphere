@@ -8,8 +8,11 @@ import Dashboard from "./pages/Dashboard"
 import MonthlyUpdates from "./pages/MonthlyUpdates"
 import AddEmployee from "./pages/AddEmployee"
 import ResetPassword from "./pages/ResetPassword"
-import Reports from "./pages/Reports";
-
+import Settings from "./pages/Settings"
+import Reports from "./pages/Reports"
+import NotFound from "./pages/NotFound"
+import ProtectedRoute from "./components/ProtectedRoute"
+import ScrollToTop from "./components/common/ScrollToTop"
 function App() {
   const themeMode = useSelector((state) => state.ui.themeMode);
 
@@ -42,15 +45,18 @@ function App() {
     <ThemeProvider theme={muiTheme}>
       <CssBaseline />
       <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/auth" element={<LoginSignUp />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/monthly-updates" element={<MonthlyUpdates />} />
-        <Route path="/add-employee" element={<AddEmployee />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/reset-password/:token" element={<ResetPassword />} />
-      </Routes>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/auth" element={<LoginSignUp />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/monthly-updates" element={<ProtectedRoute><MonthlyUpdates /></ProtectedRoute>} />
+          <Route path="/add-employee" element={<ProtectedRoute><AddEmployee /></ProtectedRoute>} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+        <ScrollToTop />
       </BrowserRouter>
     </ThemeProvider>
   )
