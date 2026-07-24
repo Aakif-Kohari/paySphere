@@ -329,6 +329,13 @@ exports.updateEmployee = async (req, res, next) => {
     }
 
     // Validate fields if provided
+    if (fullName !== undefined && !isNonEmptyString(fullName)) {
+      return res.status(400).json({ message: "Full name must be a required non-empty string" });
+    }
+    if (role !== undefined && !isNonEmptyString(role)) {
+      return res.status(400).json({ message: "Role must be a required non-empty string" });
+    }
+
     if (monthlySalary !== undefined && (isNaN(monthlySalary) || !Number.isFinite(Number(monthlySalary)) || monthlySalary <= 0)) {
       return res.status(400).json({ message: "Monthly salary must be a positive number" });
     }
