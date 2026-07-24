@@ -3,6 +3,8 @@ const User = require("../models/user.model");
 const { parse } = require("csv-parse");
 const { isNonEmptyString, escapeRegex } = require("../utils/validators");
 const PayrollUpdate = require("../models/payroll.model");
+const logger = require("../utils/logger");
+const { createAuditLog } = require("../services/audit.service");
 // ADD EMPLOYEE
 exports.addEmployee = async (req, res, next) => {
   try {
@@ -39,6 +41,17 @@ exports.addEmployee = async (req, res, next) => {
     });
 
     await employee.save();
+
+    createAuditLog({
+      userId: req.userId,
+      action: "EMPLOYEE_CREATE",
+      resourceType: "Employee",
+      resourceIds: [employee._id],
+      details: { fullName: employee.fullName, role: employee.role, monthlySalary: employee.monthlySalary },
+      req,
+    });
+
+    logger.info(`Employee created`, { userId: req.userId, employeeId: employee._id, fullName: employee.fullName });
 
     res.status(201).json({ message: "Employee added successfully", employee });
   } catch (error) {
@@ -214,9 +227,25 @@ exports.importEmployees = async (req, res, next) => {
             });
           });
 
+          let createdIds = [];
           if (employees.length > 0) {
-            await Employee.insertMany(employees);
+            const created = await Employee.insertMany(employees);
+            createdIds = created.map(e => e._id);
           }
+
+          createAuditLog({
+            userId: req.userId,
+            action: "EMPLOYEE_IMPORT",
+            resourceType: "Employee",
+            resourceIds: createdIds,
+            details: { imported: employees.length, skipped, totalErrors: errors.length, fileName: req.file?.originalname },
+            result: employees.length > 0 ? (errors.length > 0 ? "partial" : "success") : "failure",
+            req,
+          });
+
+          logger.info(`Employee CSV import completed`, {
+            userId: req.userId, imported: employees.length, skipped, totalErrors: errors.length,
+          });
 
           return res.status(200).json({
             message: "Employee import completed",
@@ -268,6 +297,17 @@ exports.updateEmployee = async (req, res, next) => {
 
     await employee.save();
 
+    createAuditLog({
+      userId: req.userId,
+      action: "EMPLOYEE_UPDATE",
+      resourceType: "Employee",
+      resourceIds: [employee._id],
+      details: { fullName: employee.fullName, role: employee.role, changes: Object.keys(req.body).filter(k => k !== 'id') },
+      req,
+    });
+
+    logger.info(`Employee updated`, { userId: req.userId, employeeId: employee._id, fullName: employee.fullName });
+
     res.status(200).json({ message: "Employee updated successfully", employee });
   } catch (error) {
     next(error);
@@ -303,6 +343,17 @@ exports.deleteEmployee = async (req, res, next) => {
 
     // Delete employee
     await Employee.findByIdAndDelete(id);
+
+    createAuditLog({
+      userId: req.userId,
+      action: "EMPLOYEE_DELETE",
+      resourceType: "Employee",
+      resourceIds: [id],
+      details: { fullName: employee.fullName, role: employee.role },
+      req,
+    });
+
+    logger.info(`Employee deleted`, { userId: req.userId, employeeId: id, fullName: employee.fullName });
 
     res.status(200).json({
       message: "Employee and payroll records deleted successfully",

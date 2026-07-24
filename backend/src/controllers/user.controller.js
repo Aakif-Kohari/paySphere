@@ -9,6 +9,8 @@ const Employee = require("../models/employee.model");
 const PayrollUpdate = require("../models/payroll.model");
 const { sendEmail } = require("../utils/email");
 const { isNonEmptyString, isValidEmail } = require("../utils/validators");
+const logger = require("../utils/logger");
+const { createAuditLog } = require("../services/audit.service");
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
@@ -157,6 +159,16 @@ exports.updateSettings = async (req, res, next) => {
 
     await user.save();
 
+    createAuditLog({
+      userId: req.userId,
+      action: "SETTINGS_UPDATE",
+      resourceType: "User",
+      details: { updatedFields: Object.keys(req.body) },
+      req,
+    });
+
+    logger.info(`Settings updated`, { userId: req.userId, fields: Object.keys(req.body) });
+
     res.status(200).json({
       message: "Settings updated successfully",
       settings: user.settings,
@@ -198,6 +210,16 @@ exports.updatePassword = async (req, res, next) => {
     user.password = hashedPassword;
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
+
+    createAuditLog({
+      userId: req.userId,
+      action: "PASSWORD_UPDATE",
+      resourceType: "User",
+      details: {},
+      req,
+    });
+
+    logger.info(`Password updated`, { userId: req.userId });
 
     res.status(200).json({ message: "Password updated successfully" });
   } catch (error) {
@@ -429,6 +451,16 @@ exports.deleteAccount = async (req, res, next) => {
       await session.commitTransaction();
       session.endSession();
     }
+
+    createAuditLog({
+      userId: req.userId,
+      action: "ACCOUNT_DELETE",
+      resourceType: "User",
+      details: {},
+      req,
+    });
+
+    logger.info(`Account deleted`, { userId: req.userId });
 
     res.status(200).json({ message: "Account and associated data deleted successfully." });
   } catch (error) {

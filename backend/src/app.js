@@ -2,10 +2,12 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const multer = require("multer");
+const morgan = require("morgan");
 const userRoutes = require("./routes/user.routes");
 const employeeRoutes = require("./routes/employee.routes");
 const payrollRoutes = require("./routes/payroll.routes");
 const reportsRoutes = require("./routes/reports.routes");
+const logger = require("./utils/logger");
 
 const app = express();
 
@@ -16,6 +18,9 @@ app.use(helmet({ crossOriginOpenerPolicy: false }));
 
 // Rate limiting trust proxy configuration
 app.set("trust proxy", 1);
+
+// HTTP request logging via morgan + winston
+app.use(morgan("combined", { stream: logger.stream }));
 
 // CORS configuration — restrict to frontend origin
 const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
