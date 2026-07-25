@@ -399,13 +399,17 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
       return res.status(404).json({ message: "No payroll records found for the selected month and year." });
     }
 
+    const employeeIds = [...new Set(payrolls.map(p => p.employeeId))];
+    const employees = await Employee.find({ _id: { $in: employeeIds } });
+    const employeeMap = new Map(employees.map(e => [String(e._id), e]));
+
     const results = [];
     let sentCount = 0;
     let failedCount = 0;
     let skippedCount = 0;
 
     for (const payroll of payrolls) {
-      const employee = await Employee.findById(payroll.employeeId);
+      const employee = employeeMap.get(String(payroll.employeeId));
       if (!employee) {
         results.push({ payrollId: payroll._id, employeeName: payroll.employeeName, status: "failed", error: "Employee record not found" });
         failedCount++;
@@ -424,7 +428,7 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
         sentCount++;
       } catch (err) {
         logger.error(`Failed to send email to ${employee.fullName}`, { error: err.message, payrollId: payroll._id });
-        results.push({ payrollId: payroll._id, employeeName: employee.fullName, email: employee.email, status: "failed", error: err.message });
+        results.push({ payrollId: payroll._id, employeeName: employee.fullName, email: employee.email, status: "failed", error: "Email delivery failed" });
         failedCount++;
       }
     }
