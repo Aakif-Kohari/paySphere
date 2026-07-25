@@ -36,6 +36,10 @@ const employeeSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -43,6 +47,6 @@ const employeeSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-employeeSchema.index({ createdBy: 1 });
+employeeSchema.index({ createdBy: 1, fullName: 1, role: 1 }, { unique: true });
 
 module.exports = mongoose.model("Employee", employeeSchema);
