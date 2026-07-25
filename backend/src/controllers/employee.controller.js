@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const Employee = require("../models/employee.model");
 const User = require("../models/user.model");
 const { parse } = require("csv-parse");
-const { isNonEmptyString, escapeRegex, sanitizeText, MONTHLY_SALARY_MAX, OVERTIME_RATE_MAX, FULLNAME_MAX_LENGTH, ROLE_MAX_LENGTH } = require("../utils/validators");
+const { isNonEmptyString, isValidEmail, escapeRegex, sanitizeText, MONTHLY_SALARY_MAX, OVERTIME_RATE_MAX, FULLNAME_MAX_LENGTH, ROLE_MAX_LENGTH } = require("../utils/validators");
 const PayrollUpdate = require("../models/payroll.model");
 const logger = require("../utils/logger");
 const { createAuditLog } = require("../services/audit.service");
@@ -235,6 +235,13 @@ exports.importEmployees = async (req, res, next) => {
             if (overtimeRate > OVERTIME_RATE_MAX) {
               skipped++;
               errors.push({ row: index + 2, reason: `Overtime rate exceeds maximum of ${OVERTIME_RATE_MAX}` });
+              return;
+            }
+
+            const rawEmail = record.email?.trim();
+            if (rawEmail && !isValidEmail(rawEmail)) {
+              skipped++;
+              errors.push({ row: index + 2, reason: `Invalid email format: "${record.email}"` });
               return;
             }
 
