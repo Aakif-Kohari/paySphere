@@ -286,7 +286,6 @@ exports.importEmployees = async (req, res, next) => {
             } finally {
               if (session) session.endSession();
             }
-            }
           }
 
           createAuditLog({
