@@ -382,9 +382,10 @@ exports.forgotPassword = async (req, res, next) => {
     user.resetPasswordExpires = Date.now() + 3600000;
     await user.save();
 
-    // Reset link pointing to frontend
+    // Reset link pointing to frontend — always use server-side config,
+    // never the user-controlled Origin header (prevents token hijacking)
     const frontendUrl =
-      req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5173';
+      process.env.FRONTEND_URL || 'http://localhost:5173';
     const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
     const text =
