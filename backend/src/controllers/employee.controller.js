@@ -265,7 +265,17 @@ exports.importEmployees = async (req, res, next) => {
             try {
               session = await mongoose.startSession();
               session.startTransaction();
-              const created = await Employee.insertMany(employees, { session, ordered: false });
+              let created = [];
+              try {
+                created = await Employee.insertMany(employees, { session, ordered: false });
+              } catch (insertError) {
+                if (insertError.code === 11000) {
+                  skipped += insertError.writeErrors ? insertError.writeErrors.length : 1;
+                  created = insertError.insertedDocs || [];
+                } else {
+                  throw insertError;
+                }
+              }
               createdIds = created.map(e => e._id);
               await session.commitTransaction();
             } catch (txError) {
@@ -275,6 +285,7 @@ exports.importEmployees = async (req, res, next) => {
               throw txError;
             } finally {
               if (session) session.endSession();
+            }
             }
           }
 
@@ -294,7 +305,7 @@ exports.importEmployees = async (req, res, next) => {
 
           return res.status(200).json({
             message: "Employee import completed",
-            imported: employees.length,
+            imported: employees.length - (skipped - (records.length - employees.length)), // approximate imported count
             skipped,
             errors,
           });
