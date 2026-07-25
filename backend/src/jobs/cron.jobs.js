@@ -14,6 +14,24 @@ const startCronJobs = () => {
       const targetMonth = prevDate.getMonth() + 1;
       const targetYear = prevDate.getFullYear();
 
+      const lockId = `monthly_payslip_${targetYear}_${targetMonth}`;
+      
+      try {
+        // Attempt to acquire lock for this specific month
+        await require("../models/cronlock.model").create({
+          _id: lockId,
+          lockedAt: new Date(),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+        });
+      } catch (error) {
+        if (error.code === 11000) {
+          console.log(`Cron job lock already acquired by another instance for ${targetMonth}/${targetYear}. Skipping...`);
+          return;
+        }
+        console.error("Error acquiring cron lock:", error);
+        return;
+      }
+
       // Find all finalized payrolls for the previous month
       const payrolls = await PayrollUpdate.find({ month: targetMonth, year: targetYear, status: "finalized" });
       

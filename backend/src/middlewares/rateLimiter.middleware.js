@@ -22,7 +22,7 @@ const generalRateLimiter = rateLimit({
 
 const writeRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 20, // Limit each IP to 20 write requests per `window`
+  limit: 200, // Limit each IP to 200 write requests per `window`
   message: {
     message: "Too many write operations from this IP, please try again after 15 minutes."
   },
