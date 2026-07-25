@@ -342,6 +342,15 @@ exports.googleAuth = async (req, res, next) => {
 
 // Local Map to store cooldowns for password reset requests (5 minutes per email)
 const resetCooldowns = new Map();
+const COOLDOWN_MS = 5 * 60 * 1000;
+
+// Periodically clean up expired cooldown entries to prevent unbounded memory growth
+setInterval(() => {
+  const cutoff = Date.now() - COOLDOWN_MS;
+  for (const [email, timestamp] of resetCooldowns) {
+    if (timestamp < cutoff) resetCooldowns.delete(email);
+  }
+}, 60 * 1000);
 
 // FORGOT PASSWORD
 exports.forgotPassword = async (req, res, next) => {
@@ -358,7 +367,7 @@ exports.forgotPassword = async (req, res, next) => {
 
     // Check cooldown for this email (5 minutes)
     const lastRequest = resetCooldowns.get(cleanEmail);
-    if (lastRequest && Date.now() - lastRequest < 5 * 60 * 1000) {
+    if (lastRequest && Date.now() - lastRequest < COOLDOWN_MS) {
       // Still in cooldown period, return generic message without sending email
       return res.status(200).json({ message: "If an account with that email exists, a password reset link has been sent." });
     }
