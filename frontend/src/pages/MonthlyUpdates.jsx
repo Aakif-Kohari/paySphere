@@ -206,7 +206,14 @@ export default function MonthlyUpdates() {
   const [pendingParsed, setPendingParsed] = useState(null);
 
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
-  const token = localStorage.getItem("token");
+  const reduxToken = useSelector((state) => state.auth.token);
+  const token = reduxToken || localStorage.getItem("token");
+
+  useEffect(() => {
+    if (!token) {
+      navigate('/auth');
+    }
+  }, [token, navigate]);
 
   // Fetch real employees from API
   useEffect(() => {

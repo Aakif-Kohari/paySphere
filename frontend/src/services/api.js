@@ -35,17 +35,39 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
+const handleAuthFailure = () => {
+  localStorage.removeItem('token');
+  window.dispatchEvent(new Event('auth:logout'));
+  if (typeof window !== 'undefined' && window.location.pathname !== '/auth' && window.location.pathname !== '/') {
+    window.location.href = '/auth';
+  }
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
-    // Ignore if it's the refresh route itself or no response
-    if (originalRequest.url.includes('/api/auth/refresh') || !error.response) {
+
+    // Network or connection error without a server response
+    if (!error || !error.response) {
       return Promise.reject(error);
     }
 
-    if (error.response.status === 401 && !originalRequest._retry) {
+    // Handle authentication failure on refresh endpoint itself
+    if (originalRequest?.url?.includes('/api/auth/refresh')) {
+      if (error.response.status === 401 || error.response.status === 403) {
+        handleAuthFailure();
+      }
+      return Promise.reject(error);
+    }
+
+    if (error.response.status === 401) {
+      if (originalRequest._retry) {
+        // Retried request failed with 401 again -> clear session & redirect
+        handleAuthFailure();
+        return Promise.reject(error);
+      }
+
       if (isRefreshing) {
         return new Promise(function (resolve, reject) {
           failedQueue.push({ resolve, reject });
@@ -55,6 +77,7 @@ api.interceptors.response.use(
             return api(originalRequest);
           })
           .catch((err) => {
+            handleAuthFailure();
             return Promise.reject(err);
           });
       }
@@ -72,17 +95,20 @@ api.interceptors.response.use(
         localStorage.setItem('token', token);
         api.defaults.headers.common['Authorization'] = 'Bearer ' + token;
         originalRequest.headers['Authorization'] = 'Bearer ' + token;
-        
+
         processQueue(null, token);
         return api(originalRequest);
       } catch (err) {
         processQueue(err, null);
-        localStorage.removeItem('token');
-        window.location.href = '/auth'; // Simple redirect to clear state
+        handleAuthFailure();
         return Promise.reject(err);
       } finally {
         isRefreshing = false;
       }
+    }
+
+    if (error.response.status === 403) {
+      handleAuthFailure();
     }
 
     return Promise.reject(error);
