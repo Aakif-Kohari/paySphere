@@ -281,11 +281,11 @@ export default function Settings() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Full Name</label>
-                <input type="text" value={userProfile.fullName} onChange={(e) => setUserProfile({...userProfile, fullName: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm text-gray-900 dark:text-white transition" />
+                <input type="text" value={userProfile.fullName} onChange={(e) => setUserProfile({...userProfile, fullName: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-900 dark:text-white transition" />
               </div>
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Email Address</label>
-                <input type="email" value={userProfile.email} onChange={(e) => setUserProfile({...userProfile, email: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm text-gray-900 dark:text-white transition" />
+                <input type="email" value={userProfile.email} onChange={(e) => setUserProfile({...userProfile, email: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-900 dark:text-white transition" />
               </div>
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Payroll ID</label>
@@ -293,7 +293,7 @@ export default function Settings() {
               </div>
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Role / Designation</label>
-                <input type="text" defaultValue="Admin" className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm text-gray-900 dark:text-white transition" />
+                <input type="text" defaultValue="Admin" className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-900 dark:text-white transition" />
               </div>
             </div>
 
@@ -388,7 +388,7 @@ export default function Settings() {
               </div>
               <div className="p-5 border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm">
                 <h3 className="font-bold text-sm text-gray-900 dark:text-white mb-4">Language</h3>
-                <select value={settings.preferences.language} onChange={(e) => updateSettingsField('preferences', 'language', e.target.value)} className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold focus:border-blue-500 transition cursor-pointer">
+                <select value={settings.preferences.language} onChange={(e) => updateSettingsField('preferences', 'language', e.target.value)} className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
                   <option>English (US)</option>
                   <option>English (UK)</option>
                   <option>Hindi (IN)</option>
