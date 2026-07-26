@@ -557,11 +557,28 @@ exports.refresh = async (req, res, next) => {
 };
 
 // LOGOUT
-exports.logout = (req, res) => {
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict"
-  });
-  res.status(200).json({ message: "Logged out successfully" });
+exports.logout = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET, { ignoreExpiration: true });
+        if (decoded && decoded.id) {
+          await User.findByIdAndUpdate(decoded.id, { $inc: { tokenVersion: 1 } });
+        }
+      } catch (err) {
+        // Ignore token verification errors during logout
+      }
+    }
+
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict"
+    });
+    res.status(200).json({ message: "Logged out successfully" });
+  } catch (error) {
+    next(error);
+  }
 };
