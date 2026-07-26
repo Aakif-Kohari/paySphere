@@ -503,8 +503,11 @@ exports.deleteAccount = async (req, res, next) => {
 
     const deleteOptions = session ? { session } : {};
 
+    const AuditLog = require("../models/audit.model");
+
     await Employee.deleteMany({ createdBy: req.userId }, deleteOptions);
     await PayrollUpdate.deleteMany({ createdBy: req.userId }, deleteOptions);
+    await AuditLog.deleteMany({ userId: req.userId }, deleteOptions);
     await User.findByIdAndDelete(req.userId, deleteOptions);
 
     if (session) {
