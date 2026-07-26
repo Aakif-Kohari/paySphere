@@ -438,14 +438,30 @@ exports.deleteEmployee = async (req, res, next) => {
       });
     }
 
+    // Try to start a transaction
+    let session = null;
+    try {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    } catch (sessionErr) {
+      session = null;
+    }
+
+    const deleteOptions = session ? { session } : {};
+
     // Delete related payroll records
     await PayrollUpdate.deleteMany({
       employeeId: id,
       createdBy: req.userId,
-    });
+    }, deleteOptions);
 
     // Delete employee
-    await Employee.findByIdAndDelete(id);
+    await Employee.findByIdAndDelete(id, deleteOptions);
+
+    if (session) {
+      await session.commitTransaction();
+      session.endSession();
+    }
 
     createAuditLog({
       userId: req.userId,
