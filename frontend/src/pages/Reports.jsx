@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { Snackbar, Alert } from '@mui/material';
 
 import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
@@ -46,7 +47,7 @@ const MonthYearSelector = ({ month, year, onChange }) => (
 );
 
 // --- Download Helper ---
-const downloadFile = (url, filename) => {
+const downloadFile = (url, filename, onError) => {
   const token = localStorage.getItem('token');
   const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   fetch(`${baseUrl}${url}`, {
@@ -67,7 +68,7 @@ const downloadFile = (url, filename) => {
     })
     .catch((err) => {
       console.error('Export failed:', err);
-      alert('Failed to download report. No data for the selected period.');
+      if (onError) onError('Failed to download report. No data for the selected period.');
     });
 };
 
@@ -83,6 +84,7 @@ export default function Reports() {
 
   const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
   
   const companyName = localStorage.getItem('companyName') || 'PaySphere';
 
@@ -160,11 +162,16 @@ export default function Reports() {
   };
 
   const handleDownloadPDF = () => {
-    downloadFile(`/api/reports/download-pdf?month=${month}&year=${year}`, `payroll-report-${MONTH_NAMES[month - 1]}-${year}.pdf`);
+    downloadFile(`/api/reports/download-pdf?month=${month}&year=${year}`, `payroll-report-${MONTH_NAMES[month - 1]}-${year}.pdf`, (msg) => setSnackbar({ open: true, message: msg, severity: 'error' }));
   };
 
   const handleExportCSV = () => {
-    downloadFile(`/api/payroll/export-csv?month=${month}&year=${year}`, `payroll-export-${MONTH_NAMES[month - 1]}-${year}.csv`);
+    downloadFile(`/api/payroll/export-csv?month=${month}&year=${year}`, `payroll-export-${MONTH_NAMES[month - 1]}-${year}.csv`, (msg) => setSnackbar({ open: true, message: msg, severity: 'error' }));
+  };
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') return;
+    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   const getInitials = (name) =>
@@ -298,6 +305,12 @@ export default function Reports() {
           )}
         </main>
       </div>
+
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%', variant: 'filled' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </div>
   );
 }

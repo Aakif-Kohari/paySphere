@@ -6,6 +6,7 @@ import { logout, logoutUser } from "../features/auth/authSlice";
 import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
 import AttendanceCalendarModal from "../components/AttendanceCalendarModal";
+import { Snackbar, Alert } from '@mui/material';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const PayrollIcon = () => (
@@ -194,6 +195,7 @@ export default function MonthlyUpdates() {
 
   // Copy Payroll Summary state (#184)
   const [copiedSummary, setCopiedSummary] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
 
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
   const token = localStorage.getItem("token");
@@ -357,8 +359,13 @@ export default function MonthlyUpdates() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert('No data to export');
+      setSnackbar({ open: true, message: 'No data to export', severity: 'error' });
     }
+  };
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') return;
+    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   return (
@@ -1044,6 +1051,12 @@ export default function MonthlyUpdates() {
 
         </main>
       </div>
+
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%', variant: 'filled' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </div>
   );
 }
