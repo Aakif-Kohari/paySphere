@@ -441,10 +441,9 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
         monthlySalary: salary,
         overtimeRate: otRate,
       });
-    } catch (err) {
+} catch {
       setError('Failed to update employee details.');
-    } finally {
-      setSubmitting(false);
+    } finally {      setSubmitting(false);
     }
   };
 

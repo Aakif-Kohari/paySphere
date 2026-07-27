@@ -20,9 +20,8 @@ const auth = async (req, res, next) => {
     req.userId = decoded.id;
     req.user = user;
     next();
-  } catch (error) {
+} catch {
     res.status(401).json({ message: "Invalid or expired token" });
-  }
-};
+  }};
 
 module.exports = auth;

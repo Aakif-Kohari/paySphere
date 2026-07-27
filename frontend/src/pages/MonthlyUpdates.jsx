@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useSelector, useDispatch } from "react-redux";
-import { logout, logoutUser } from "../features/auth/authSlice";
-import ThemeToggle from "../components/ThemeToggle";
+import { logoutUser } from "../features/auth/authSlice";import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
 import AttendanceCalendarModal from "../components/AttendanceCalendarModal";
 import { Snackbar, Alert } from '@mui/material';
@@ -394,10 +393,9 @@ export default function MonthlyUpdates() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (err) {
+} catch {
       setSnackbar({ open: true, message: 'No data to export', severity: 'error' });
-    }
-  };
+    }  };
 
   const handleCloseSnackbar = (event, reason) => {
     if (reason === 'clickaway') return;
