@@ -462,7 +462,7 @@ export default function PaySphereDashboard() {
       setEmployeeToDelete(null);
     } catch (error) {
       console.error('Delete failed:', error);
-      alert('Failed to delete employee');
+      alert(error.response?.data?.message || 'Failed to delete employee');
     } finally {
       setDeleting(false);
     }
