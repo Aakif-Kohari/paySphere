@@ -45,6 +45,7 @@ app.use(cors(corsOptions));
 
 const { generalRateLimiter } = require("./middlewares/rateLimiter.middleware");
 const requireBody = require("./middlewares/requireBody.middleware");
+const { MAX_FILE_SIZE } = require("./middlewares/upload.middleware");
 
 // Require request body for state-changing methods
 app.use("/api", requireBody);
@@ -69,7 +70,8 @@ app.use((err, req, res, next) => {
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({ message: "File too large. Maximum size is 5MB." });
+      const maxMB = MAX_FILE_SIZE / (1024 * 1024);
+      return res.status(400).json({ message: `File too large. Maximum size is ${maxMB}MB.` });
     }
     return res.status(400).json({ message: "File upload error" });
   }

@@ -7,13 +7,16 @@ const mongoose = require("mongoose");
 jest.mock("../../models/employee.model");
 jest.mock("../../models/payroll.model");
 jest.mock("../../models/user.model");
+jest.mock("../../services/audit.service", () => ({
+  createAuditLog: jest.fn(),
+}));
 
 describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit Tests (#106)", () => {
   let req, res, mockSession;
 
   beforeEach(() => {
     req = {
-      userId: "user123",
+      userId: "507f1f77bcf86cd799439011",
       body: {},
     };
     res = {
@@ -60,7 +63,7 @@ describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit
     req.body = {
       activities: [
         {
-          employeeId: "emp1",
+          employeeId: "507f1f77bcf86cd799439011",
           name: "Alice Smith",
           tags: [
             { label: "deduction" }, // unparseable tag value
@@ -94,7 +97,7 @@ describe("finalizePayroll month/year validation tests (#79)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     req = {
-      userId: "user123",
+      userId: "507f1f77bcf86cd799439011",
       body: {
         activities: [
           {

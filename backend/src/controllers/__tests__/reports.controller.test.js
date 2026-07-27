@@ -1,9 +1,35 @@
-const { getAnalytics, downloadPDFReport } = require("../reports.controller");
+const { getAnalytics, downloadPDFReport, exportExcelReport, downloadPayslipsZip } = require("../reports.controller");
 const PayrollUpdate = require("../../models/payroll.model");
 const Employee = require("../../models/employee.model");
 
 jest.mock("../../models/payroll.model");
 jest.mock("../../models/employee.model");
+jest.mock("../../services/audit.service", () => ({
+  createAuditLog: jest.fn(),
+}));
+
+jest.mock("archiver", () => {
+  return jest.fn().mockReturnValue({
+    pipe: jest.fn(),
+    append: jest.fn(),
+    finalize: jest.fn().mockResolvedValue(true),
+  });
+});
+
+jest.mock("worker_threads", () => {
+  const EventEmitter = require("events");
+  class MockWorker extends EventEmitter {
+    postMessage() {}
+    on(event, cb) {
+      super.on(event, cb);
+      if (event === "message") {
+        cb({ success: true, pdfData: Buffer.from("dummy pdf data") });
+      }
+    }
+    terminate() {}
+  }
+  return { Worker: MockWorker };
+});
 jest.mock("pdfkit", () => {
   const doc = {
     pipe: jest.fn(),
@@ -24,6 +50,10 @@ jest.mock("pdfkit", () => {
     switchToPage: jest.fn().mockReturnThis(),
     bufferedPageRange: jest.fn().mockReturnValue({ count: 1 }),
     page: { height: 842 },
+    on: jest.fn((event, callback) => {
+      if (event === "data") callback(Buffer.from("dummy pdf data"));
+      if (event === "end") callback();
+    }),
   };
   return jest.fn().mockImplementation(() => doc);
 });
@@ -33,12 +63,18 @@ describe("Reports Controller - getAnalytics", () => {
 
   beforeEach(() => {
     req = {
-      userId: "user123",
+      userId: "507f1f77bcf86cd799439011",
       query: {},
     };
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis(),
+      setHeader: jest.fn(),
+      send: jest.fn(),
+      end: jest.fn(),
+      write: jest.fn(),
+      on: jest.fn(),
+      emit: jest.fn(),
     };
     next = jest.fn();
     jest.clearAllMocks();
@@ -160,13 +196,18 @@ describe("Reports Controller - downloadPDFReport", () => {
 
   beforeEach(() => {
     req = {
-      userId: "user123",
+      userId: "507f1f77bcf86cd799439011",
       query: { month: "6", year: "2026" },
     };
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis(),
       setHeader: jest.fn(),
+      send: jest.fn(),
+      end: jest.fn(),
+      write: jest.fn(),
+      on: jest.fn(),
+      emit: jest.fn(),
     };
     next = jest.fn();
     jest.clearAllMocks();
@@ -257,3 +298,134 @@ describe("Reports Controller - downloadPDFReport", () => {
     expect(res.status).toHaveBeenCalledWith(404);
   });
 });
+
+describe("Reports Controller - exportExcelReport", () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    req = {
+      userId: "507f1f77bcf86cd799439011",
+      query: { month: "6", year: "2026" },
+    };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+      setHeader: jest.fn(),
+      send: jest.fn(),
+      end: jest.fn(),
+      write: jest.fn(),
+      on: jest.fn(),
+      emit: jest.fn(),
+    };
+    next = jest.fn();
+    jest.clearAllMocks();
+  });
+
+  test("should return 400 for invalid month", async () => {
+    req.query.month = "15";
+    await exportExcelReport(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  test("should return 404 when no payroll data exists for period", async () => {
+    PayrollUpdate.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
+    await exportExcelReport(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test("should generate and stream XLSX file when payroll data exists", async () => {
+    const mockPayrolls = [
+      {
+        employeeId: "emp1",
+        employeeName: "Alice Smith",
+        baseSalary: 50000,
+        overtimePay: 5000,
+        bonus: 2000,
+        deductions: 1000,
+        leaveDeduction: 500,
+        leaveDays: 1,
+        netSalary: 55500,
+        status: "finalized",
+      },
+    ];
+    PayrollUpdate.find.mockReturnValue({ sort: jest.fn().mockResolvedValue(mockPayrolls) });
+    Employee.find.mockResolvedValue([{ _id: "emp1", role: "Developer" }]);
+
+    await exportExcelReport(req, res, next);
+
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Content-Disposition",
+      expect.stringContaining("payroll-summary-June-2026.xlsx")
+    );
+    expect(res.end).toHaveBeenCalled();
+  });
+});
+
+describe("Reports Controller - downloadPayslipsZip", () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    req = {
+      userId: "507f1f77bcf86cd799439011",
+      query: { month: "6", year: "2026" },
+    };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+      setHeader: jest.fn(),
+      send: jest.fn(),
+      end: jest.fn(),
+      write: jest.fn(),
+      on: jest.fn(),
+      emit: jest.fn(),
+    };
+    next = jest.fn();
+    jest.clearAllMocks();
+  });
+
+  test("should return 400 for invalid month", async () => {
+    req.query.month = "0";
+    await downloadPayslipsZip(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  test("should return 404 when no payroll data exists for period", async () => {
+    PayrollUpdate.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
+    await downloadPayslipsZip(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test("should generate and stream ZIP file when payroll data exists", async () => {
+    const mockPayrolls = [
+      {
+        employeeId: "emp1",
+        employeeName: "Alice Smith",
+        month: 6,
+        year: 2026,
+        baseSalary: 50000,
+        overtimeHours: 2,
+        overtimePay: 5000,
+        bonus: 2000,
+        deductions: 1000,
+        leaveDays: 1,
+        leaveDeduction: 500,
+        netSalary: 55500,
+      },
+    ];
+    PayrollUpdate.find.mockReturnValue({ sort: jest.fn().mockResolvedValue(mockPayrolls) });
+    Employee.find.mockResolvedValue([{ _id: "emp1", fullName: "Alice Smith", role: "Developer", companyName: "TestCorp" }]);
+
+    await downloadPayslipsZip(req, res, next);
+
+    expect(res.setHeader).toHaveBeenCalledWith("Content-Type", "application/zip");
+    expect(res.setHeader).toHaveBeenCalledWith(
+      "Content-Disposition",
+      expect.stringContaining("payslips-June-2026.zip")
+    );
+  });
+});
+
