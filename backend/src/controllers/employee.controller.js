@@ -285,12 +285,11 @@ exports.importEmployees = async (req, res, next) => {
               }
               createdIds = created.map(e => e._id);
               await session.commitTransaction();
-            } catch (txError) {
+} catch (txError) {
               if (session) {
-                try { await session.abortTransaction(); } catch (e) { }
+                try { await session.abortTransaction(); } catch { }
               }
-              throw txError;
-            } finally {
+              throw txError;            } finally {
               if (session) session.endSession();
             }
           }
@@ -441,14 +440,13 @@ exports.deleteEmployee = async (req, res, next) => {
     // Try to start a transaction
     let session = null;
     try {
-      session = await mongoose.startSession();
+session = await mongoose.startSession();
       session.startTransaction();
-    } catch (sessionErr) {
+    } catch {
       session = null;
     }
 
     const deleteOptions = session ? { session } : {};
-
     // Delete related payroll records
     await PayrollUpdate.deleteMany({
       employeeId: id,
