@@ -55,8 +55,8 @@ describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit
       .mockResolvedValueOnce([]) // Guard query — no existing paid records
       .mockResolvedValueOnce([   // Phase 3 query — return created payroll
         {
-          _id: "507f1f77bcf86cd799439011",
-          employeeId: "507f1f77bcf86cd799439011",
+          _id: "payroll1",
+          employeeId: "emp1",
         }
       ]);
 
