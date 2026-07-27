@@ -459,10 +459,23 @@ exports.deleteEmployee = async (req, res, next) => {
       });
     }
 
+    // Check if employee has historical "paid" payroll records (#345)
+    const hasPaidPayroll = await PayrollUpdate.exists({
+      employeeId: id,
+      createdBy: req.userId,
+      status: "paid",
+    });
+
+    if (hasPaidPayroll) {
+      return res.status(400).json({
+        message: "Cannot delete employee with historical paid payroll records",
+      });
+    }
+
     // Try to start a transaction
     let session = null;
     try {
-session = await mongoose.startSession();
+      session = await mongoose.startSession();
       session.startTransaction();
     } catch {
       session = null;

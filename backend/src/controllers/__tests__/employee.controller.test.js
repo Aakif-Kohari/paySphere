@@ -1,18 +1,124 @@
-const { updateEmployee, importEmployees } = require("../employee.controller");
+const { deleteEmployee, updateEmployee, importEmployees } = require("../employee.controller");
 const Employee = require("../../models/employee.model");
+const PayrollUpdate = require("../../models/payroll.model");
 const User = require("../../models/user.model");
 const mongoose = require("mongoose");
 
 jest.mock("../../models/employee.model");
+jest.mock("../../models/payroll.model");
 jest.mock("../../models/user.model");
+jest.mock("../../services/audit.service", () => ({ createAuditLog: jest.fn() }));
 
 // Mock csv-parse so we can assert on options passed
 jest.mock("csv-parse", () => ({ parse: jest.fn() }));
 const { parse: mockParse } = require("csv-parse");
 
+describe("Employee Controller - deleteEmployee (#345)", () => {
+  let req, res, mockSession;
+
+  beforeEach(() => {
+    req = {
+      params: { id: "507f1f77bcf86cd799439011" },
+      userId: "507f1f77bcf86cd799439012",
+    };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    };
+    mockSession = {
+      startTransaction: jest.fn(),
+      commitTransaction: jest.fn(),
+      abortTransaction: jest.fn(),
+      endSession: jest.fn(),
+    };
+    jest.spyOn(mongoose, "startSession").mockResolvedValue(mockSession);
+    jest.clearAllMocks();
+  });
+
+  test("should return 404 if employee is not found", async () => {
+    Employee.findById.mockResolvedValue(null);
+
+    await deleteEmployee(req, res);
+
+    expect(Employee.findById).toHaveBeenCalledWith("507f1f77bcf86cd799439011");
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ message: "Employee not found" });
+  });
+
+  test("should return 403 if user is not authorized to delete employee", async () => {
+    const mockEmployee = {
+      _id: "507f1f77bcf86cd799439011",
+      createdBy: "507f1f77bcf86cd799439099",
+      fullName: "John Doe",
+      role: "Developer",
+    };
+    Employee.findById.mockResolvedValue(mockEmployee);
+
+    await deleteEmployee(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "Not authorized to delete this employee",
+    });
+  });
+
+  test("should block deletion and return 400 if employee has historical 'paid' payroll records", async () => {
+    const mockEmployee = {
+      _id: "507f1f77bcf86cd799439011",
+      createdBy: "507f1f77bcf86cd799439012",
+      fullName: "John Doe",
+      role: "Developer",
+    };
+    Employee.findById.mockResolvedValue(mockEmployee);
+    PayrollUpdate.exists.mockResolvedValue(true);
+
+    await deleteEmployee(req, res);
+
+    expect(PayrollUpdate.exists).toHaveBeenCalledWith({
+      employeeId: "507f1f77bcf86cd799439011",
+      createdBy: "507f1f77bcf86cd799439012",
+      status: "paid",
+    });
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "Cannot delete employee with historical paid payroll records",
+    });
+    expect(PayrollUpdate.deleteMany).not.toHaveBeenCalled();
+    expect(Employee.findByIdAndDelete).not.toHaveBeenCalled();
+  });
+
+  test("should delete employee and unpaid payroll records if no 'paid' payroll records exist", async () => {
+    const mockEmployee = {
+      _id: "507f1f77bcf86cd799439011",
+      createdBy: "507f1f77bcf86cd799439012",
+      fullName: "John Doe",
+      role: "Developer",
+    };
+    Employee.findById.mockResolvedValue(mockEmployee);
+    PayrollUpdate.exists.mockResolvedValue(null);
+    PayrollUpdate.deleteMany.mockResolvedValue({ deletedCount: 2 });
+    Employee.findByIdAndDelete.mockResolvedValue(mockEmployee);
+
+    await deleteEmployee(req, res);
+
+    expect(PayrollUpdate.exists).toHaveBeenCalledWith({
+      employeeId: "507f1f77bcf86cd799439011",
+      createdBy: "507f1f77bcf86cd799439012",
+      status: "paid",
+    });
+    expect(PayrollUpdate.deleteMany).toHaveBeenCalledWith({
+      employeeId: "507f1f77bcf86cd799439011",
+      createdBy: "507f1f77bcf86cd799439012",
+    }, { session: mockSession });
+    expect(Employee.findByIdAndDelete).toHaveBeenCalledWith("507f1f77bcf86cd799439011", { session: mockSession });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "Employee and payroll records deleted successfully",
+    });
+  });
+});
+
 // ---- Direct csv-parse BOM tests (real parser) ----
-// These verify that the `bom: true` option actually strips UTF-8 BOM headers.
-// They use jest.requireActual to bypass the mock and test the real csv-parse.
 describe("csv-parse BOM behavior", () => {
   test("bom: true strips UTF-8 BOM from header names", async () => {
     const { parse } = jest.requireActual("csv-parse");
@@ -68,13 +174,11 @@ describe("Employee Controller - importEmployees", () => {
     };
     jest.spyOn(mongoose, "startSession").mockResolvedValue(mockSession);
     User.findById.mockResolvedValue({ _id: "user123", companyName: "Acme Corp" });
-    // Employee.find().select() chain: mock find to return an object with select()
     Employee.find.mockReturnValue({
       select: jest.fn().mockResolvedValue([]),
     });
     Employee.insertMany.mockResolvedValue([{ _id: "emp1" }]);
 
-    // Default mockParse: call callback synchronously with mock records
     mockParse.mockImplementation((_data, _options, callback) => {
       callback(null, [
         { fullName: "John Doe", role: "Developer", monthlySalary: "50000", overtimeRate: "100" },
@@ -270,7 +374,6 @@ describe("Employee Controller - updateEmployee name propagation to PayrollUpdate
 
     await updateEmployee(req, res, next);
 
-    // SanitizeText on "Original Name" equals "Original Name" which equals oldName
     expect(PayrollUpdate.updateMany).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
   });
