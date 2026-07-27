@@ -6,6 +6,9 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 
+jest.mock('../../services/audit.service', () => ({
+  createAuditLog: jest.fn(),
+}));
 jest.mock('jsonwebtoken');
 jest.mock('bcryptjs');
 jest.mock('google-auth-library', () => {
