@@ -367,6 +367,9 @@ exports.updateEmployee = async (req, res, next) => {
       return res.status(400).json({ message: `Overtime rate cannot exceed ${OVERTIME_RATE_MAX}` });
     }
 
+    // Capture old name for payroll propagation check (#253)
+    const oldName = employee.fullName;
+
     // Apply updates only for provided fields
     if (fullName !== undefined) employee.fullName = sanitizeText(fullName);
     if (role !== undefined) employee.role = sanitizeText(role);
@@ -375,6 +378,24 @@ exports.updateEmployee = async (req, res, next) => {
     if (isActive !== undefined) employee.isActive = isActive;
 
     await employee.save();
+
+    // Propagate name change to finalized (unpaid) PayrollUpdate records (#253)
+    if (fullName !== undefined && employee.fullName !== oldName) {
+      try {
+        const result = await PayrollUpdate.updateMany(
+          { employeeId: id, createdBy: req.userId, status: "finalized" },
+          { $set: { employeeName: employee.fullName } }
+        );
+        logger.info(`PayrollUpdate employeeName propagated`, {
+          userId: req.userId, employeeId: id, oldName, newName: employee.fullName,
+          modifiedCount: result.modifiedCount,
+        });
+      } catch (propagateErr) {
+        logger.error(`Failed to propagate employeeName to PayrollUpdate`, {
+          userId: req.userId, employeeId: id, error: propagateErr.message,
+        });
+      }
+    }
 
     createAuditLog({
       userId: req.userId,
