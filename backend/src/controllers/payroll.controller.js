@@ -141,6 +141,26 @@ exports.finalizePayroll = async (req, res, next) => {
       });
     }
 
+    // Guard: prevent overwriting already-paid payroll records (#251)
+    const employeeIds = preparedItems.map((item) => item.employee._id);
+    const existingPaidRecords = await PayrollUpdate.find({
+      employeeId: { $in: employeeIds },
+      month: currentMonth,
+      year: currentYear,
+      createdBy: req.userId,
+      status: "paid",
+    });
+
+    if (existingPaidRecords.length > 0) {
+      const paidEmployeeNames = existingPaidRecords.map(
+        (p) => p.employeeName
+      );
+      return res.status(400).json({
+        message: `Payroll has already been paid for: ${paidEmployeeNames.join(", ")}. Cannot re-finalize paid records.`,
+        paidEmployees: paidEmployeeNames,
+      });
+    }
+
     // Try starting a session for transaction atomicity
     try {
       session = await mongoose.startSession();
