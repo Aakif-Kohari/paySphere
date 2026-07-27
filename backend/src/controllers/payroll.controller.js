@@ -316,7 +316,8 @@ exports.getPayrollSummary = async (req, res, next) => {
       year,
     }).sort({ employeeName: 1 });
 
-    const totalPayout = payrolls.reduce((sum, p) => sum + p.netSalary, 0);
+    const rawTotal = payrolls.reduce((sum, p) => sum + (p.netSalary || 0), 0);
+    const totalPayout = Math.round(rawTotal * 100) / 100;
 
     res.status(200).json({
       month,
