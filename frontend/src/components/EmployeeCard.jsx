@@ -1,4 +1,5 @@
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined'; // <-- Added Edit Icon
 
 /**
  * EmployeeCard
@@ -19,6 +20,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
  *   onAddUpdate     - callback fired by the action button (overview variant only)
  *   onDeleteEmployee - optional callback fired by the "Delete Employee" button
  *                      (breakdown variant only). When omitted, the button is not rendered.
+ *   onEdit           - callback fired by the edit (pen) button in the header // <-- Added
  */
 const AVATAR_COLORS = [
   '#6366F1',
@@ -50,7 +52,7 @@ const fmt = (n) => '₹' + Math.abs(n).toLocaleString('en-IN');
 
 const StatusBadge = ({ finalized }) => (
   <span
-    className={`text-xs font-bold px-2 py-1 rounded-md border ${
+    className={`text-xs font-bold px-2 py-2 rounded-md border ${
       finalized
         ? 'bg-green-50 dark:bg-green-950/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-900/50'
         : 'bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-900/50'
@@ -60,7 +62,8 @@ const StatusBadge = ({ finalized }) => (
   </span>
 );
 
-const CardHeader = ({ emp, finalized }) => (
+// <-- Added onEdit prop and Edit Button next to StatusBadge
+const CardHeader = ({ emp, finalized, onEdit }) => (
   <div className="flex justify-between items-center">
     <div className="flex items-center gap-3">
       <div
@@ -78,7 +81,18 @@ const CardHeader = ({ emp, finalized }) => (
         </p>
       </div>
     </div>
-    <StatusBadge finalized={finalized} />
+    <div className="flex items-center gap-2">
+      <StatusBadge finalized={finalized} />
+      {onEdit && (
+        <button
+          onClick={onEdit}
+          className="pt-2 px-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 bg-gray-50 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md transition-colors"
+          title="Edit Employee"
+        >
+          <EditOutlinedIcon fontSize="small" className='mb-2'/>
+        </button>
+      )}
+    </div>
   </div>
 );
 
@@ -88,6 +102,7 @@ export default function EmployeeCard({
   variant = 'overview',
   onAddUpdate,
   onDeleteEmployee,
+  onEdit, // <-- Added
 }) {
   const p = payroll;
 
@@ -95,7 +110,7 @@ export default function EmployeeCard({
     return (
       <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-gray-200 dark:border-slate-800 shadow-sm hover:shadow-md transition duration-200">
         <div className="flex justify-between items-center mb-5">
-          <CardHeader emp={emp} finalized={!!p} />
+          <CardHeader emp={emp} finalized={!!p} onEdit={onEdit} /> {/* <-- Passed onEdit */}
         </div>
 
         {/* Breakdown */}
@@ -181,8 +196,7 @@ export default function EmployeeCard({
           </span>
         </div>
 
-        {/* Delete Employee — only rendered when a delete handler is provided
-            (i.e. in the Employee Management breakdown view). */}
+        {/* Delete Employee */}
         {onDeleteEmployee && (
           <button
             onClick={() => onDeleteEmployee(emp)}
@@ -198,7 +212,7 @@ export default function EmployeeCard({
   // variant === 'overview'
   return (
     <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm hover:shadow-md transition flex flex-col gap-4 duration-200">
-      <CardHeader emp={emp} finalized={!!p} />
+      <CardHeader emp={emp} finalized={!!p} onEdit={onEdit} />
 
       {/* Salary */}
       <div className="bg-gray-50 dark:bg-slate-950 p-3 rounded-lg transition-colors">

@@ -21,6 +21,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Verify proxy secret key if configured
+  const secret = process.env.EMAIL_PROXY_SECRET;
+  if (secret) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== secret) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid proxy secret' });
+    }
+  }
+
   const { to, subject, text, html, attachments } = req.body || {};
 
   // Validate required fields

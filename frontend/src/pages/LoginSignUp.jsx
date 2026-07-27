@@ -351,7 +351,7 @@ export default function PaySphereLogin() {
                 <button
                   onClick={onGoogleClick}
                   disabled={loading}
-                  className="w-full border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-850 hover:shadow transition disabled:opacity-50"
+                  className="w-full border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50"
                 >
                   <GoogleIcon />
                   Sign in with Google
@@ -427,7 +427,7 @@ export default function PaySphereLogin() {
                 <button
                   onClick={onGoogleClick}
                   disabled={loading}
-                  className="w-full border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-850 hover:shadow transition disabled:opacity-50"
+                  className="w-full border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50"
                 >
                   <GoogleIcon />
                   Sign Up with Google

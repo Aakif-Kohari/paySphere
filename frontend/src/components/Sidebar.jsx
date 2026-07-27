@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import GridViewIcon from '@mui/icons-material/GridView';
 import PeopleIcon from '@mui/icons-material/People';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
 
 const Sidebar = ({
@@ -14,6 +15,7 @@ const Sidebar = ({
     () => [
       { id: 'Dashboard', label: 'Dashboard', icon: <GridViewIcon /> },
       { id: 'Employees', label: 'Employees', icon: <PeopleIcon /> },
+      { id: 'Reports', label: 'Reports', icon: <AssessmentIcon /> },
     ],
     [],
   );

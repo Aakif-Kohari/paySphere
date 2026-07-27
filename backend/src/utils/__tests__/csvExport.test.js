@@ -104,4 +104,25 @@ describe("generatePayrollCSV", () => {
     // Double quotes inside a field should be doubled
     expect(result).toContain('"Rahul ""The Boss"" Sharma"');
   });
+
+  test("should neutralize formula-injection payloads in employee name", () => {
+    const payrollsWithFormula = [
+      {
+        employeeName: '=HYPERLINK("http://evil.example/steal","Click")',
+        baseSalary: 30000,
+        leaveDays: 0,
+        leaveDeduction: 0,
+        overtimeHours: 0,
+        overtimePay: 0,
+        bonus: 0,
+        deductions: 0,
+        netSalary: 30000,
+        status: "finalized",
+      },
+    ];
+    const result = generatePayrollCSV(payrollsWithFormula, 4, 2026);
+    // A leading apostrophe forces spreadsheet apps to treat it as text, not a formula
+    expect(result).toContain("'=HYPERLINK");
+    expect(result).not.toMatch(/,=HYPERLINK/);
+  });
 });

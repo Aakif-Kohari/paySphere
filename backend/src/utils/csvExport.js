@@ -22,7 +22,12 @@ function generatePayrollCSV(payrolls, month, year) {
   ];
 
   const escapeCsvField = (value) => {
-    const str = String(value);
+    let str = String(value);
+    // Neutralize formula injection: spreadsheet apps treat a leading =, +, -, or @
+    // as the start of a formula, which can execute arbitrary commands/exfiltrate data.
+    if (/^[=+\-@\t\r]/.test(str)) {
+      str = "'" + str;
+    }
     // If the value contains a comma, newline, or double-quote, wrap it in double-quotes
     if (str.includes(",") || str.includes("\n") || str.includes("\"")) {
       return `"${str.replace(/"/g, '""')}"`;

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { logout } from "../features/auth/authSlice";
 import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
 
@@ -81,6 +83,7 @@ const Avatar = ({ name, size = 36 }) => {
 
 export default function AddEmployee() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -175,8 +178,8 @@ export default function AddEmployee() {
     const salaryNum = parseFloat(monthlySalary.replace(/,/g, ""));
     const otNum = overtimeRate ? parseFloat(overtimeRate.replace(/,/g, "")) : undefined;
 
-    if (isNaN(salaryNum)) {
-      setError("Please enter a valid salary amount.");
+    if (isNaN(salaryNum) || salaryNum <= 0) {
+      setError("Monthly salary must be a positive number.");
       setLoading(false);
       return;
     }
@@ -310,7 +313,7 @@ export default function AddEmployee() {
             </div>
             <button
               onClick={() => {
-                localStorage.removeItem("token");
+                dispatch(logout());
                 localStorage.removeItem("companyName");
                 navigate("/auth");
               }}
@@ -379,24 +382,21 @@ export default function AddEmployee() {
                       />
                     </div>
                   </label>
-
-                  {/* Role */}
-                  <label className="block mb-5">
-                    <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">
-                      Role
-                    </span>
-
-                    <input
-                      id="employee-role"
-                      type="text"
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                      placeholder="e.g. Software Engineer"
-                      required
-                      className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
-                    />
-                  </label>
                 </div>
+
+                {/* Role */}
+                <label className="block mb-5">
+                  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Role</span>
+                  <input
+                    id="employee-role"
+                    type="text"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    placeholder="e.g. Software Engineer"
+                    required
+                    className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
+                  />
+                </label>
 
                 {/* Messages */}
                 {error && (

@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-
+import React, { useState } from "react";
 // Status configuration definitions
 const STATUS_CONFIG = {
   PRESENT: { label: "Present", code: "P", bg: "#10B981", lightBg: "#ECFDF5", text: "#065F46", darkBg: "#064E3B", darkText: "#A7F3D0" },
@@ -21,25 +20,26 @@ export default function AttendanceCalendarModal({ isOpen, onClose, employee, onA
   // Map of day Number (1..daysInMonth) => { status, otHours }
   const [dayStates, setDayStates] = useState({});
   const [selectedDayForOt, setSelectedDayForOt] = useState(null);
-  const [otInput, setOtInput] = useState("2");
+const [otInput, setOtInput] = useState("2");
+  const [initializedKey, setInitializedKey] = useState(null);
+// Reset or initialize when modal opens or employee changes
+  // (calculated directly during render instead of inside a useEffect)
+  const initKey = isOpen && employee ? `${employee.id || employee.fullName}-${year}-${month}` : null;
 
-  // Reset or initialize when modal opens or employee changes
-  useEffect(() => {
-    if (isOpen && employee) {
-      const initial = {};
-      for (let d = 1; d <= daysInMonth; d++) {
-        // Default to PRESENT for working days (Mon-Sat, Sun absent/off optional)
-        const dateObj = new Date(year, month, d);
-        const isSunday = dateObj.getDay() === 0;
-        initial[d] = {
-          status: isSunday ? "PAID_LEAVE" : "PRESENT",
-          otHours: 0,
-        };
-      }
-      setDayStates(initial);
+  if (initKey && initKey !== initializedKey) {
+    setInitializedKey(initKey);
+    const initial = {};
+    for (let d = 1; d <= daysInMonth; d++) {
+      // Default to PRESENT for working days (Mon-Sat, Sun absent/off optional)
+      const dateObj = new Date(year, month, d);
+      const isSunday = dateObj.getDay() === 0;
+      initial[d] = {
+        status: isSunday ? "PAID_LEAVE" : "PRESENT",
+        otHours: 0,
+      };
     }
-  }, [isOpen, employee, year, month, daysInMonth]);
-
+    setDayStates(initial);
+  }
   if (!isOpen || !employee) return null;
 
   // Cycle through statuses on tile click
@@ -101,7 +101,7 @@ export default function AttendanceCalendarModal({ isOpen, onClose, employee, onA
     if (selectedDayForOt) {
       setDayStates((prev) => ({
         ...prev,
-        [selectedDayForOt]: { status: "OVERTIME", otHours: Math.max(0.5, parseFloat(otInput) || 0) },
+        [selectedDayForOt]: { status: "OVERTIME", otHours: Math.min(24, Math.max(0.5, parseFloat(otInput) || 0)) },
       }));
       setSelectedDayForOt(null);
     }
