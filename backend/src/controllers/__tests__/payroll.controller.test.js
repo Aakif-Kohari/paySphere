@@ -1,4 +1,4 @@
-const { finalizePayroll } = require("../payroll.controller");
+const { finalizePayroll, getPayrollSummary } = require("../payroll.controller");
 const Employee = require("../../models/employee.model");
 const PayrollUpdate = require("../../models/payroll.model");
 const User = require("../../models/user.model");
@@ -11,10 +11,20 @@ jest.mock("../../services/audit.service", () => ({
   createAuditLog: jest.fn(),
 }));
 
+// Helper to construct query mock supporting both direct await and .sort() chaining
+const createQueryMock = (data) => ({
+  sort: jest.fn().mockReturnThis(),
+  exec: jest.fn().mockResolvedValue(data),
+  then: (resolve, reject) => Promise.resolve(data).then(resolve, reject),
+  catch: (reject) => Promise.resolve(data).catch(reject),
+});
+
 describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit Tests (#106)", () => {
   let req, res, mockSession;
 
   beforeEach(() => {
+    jest.resetAllMocks();
+
     req = {
       userId: "507f1f77bcf86cd799439011",
       body: {},
@@ -31,8 +41,6 @@ describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit
       endSession: jest.fn(),
     };
     jest.spyOn(mongoose, "startSession").mockResolvedValue(mockSession);
-
-    jest.clearAllMocks();
   });
 
   afterEach(() => {
@@ -41,7 +49,7 @@ describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit
 
   test("should default unparseable tags like 'deduction' without a number to 0 instead of NaN", async () => {
     const mockEmployee = {
-      _id: "emp1",
+      _id: "507f1f77bcf86cd799439011",
       fullName: "Alice Smith",
       monthlySalary: 50000,
       overtimeRate: 200,
@@ -52,13 +60,8 @@ describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit
 
     PayrollUpdate.bulkWrite.mockResolvedValue({});
     PayrollUpdate.find
-      .mockResolvedValueOnce([]) // Guard query — no existing paid records
-      .mockResolvedValueOnce([   // Phase 3 query — return created payroll
-        {
-          _id: "payroll1",
-          employeeId: "emp1",
-        }
-      ]);
+      .mockImplementationOnce(() => createQueryMock([])) // Guard query — no existing paid records
+      .mockImplementationOnce(() => createQueryMock([{ _id: "payroll1", employeeId: "emp1" }])); // Phase 3 query
 
     req.body = {
       activities: [
@@ -95,7 +98,7 @@ describe("finalizePayroll month/year validation tests (#79)", () => {
   let req, res;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     req = {
       userId: "507f1f77bcf86cd799439011",
       body: {
@@ -185,7 +188,7 @@ describe("finalizePayroll paid-record guard (#251)", () => {
   let req, res, mockEmployees, mockUserSettings, mockSession;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
 
     mockSession = {
       startTransaction: jest.fn(),
@@ -247,11 +250,12 @@ describe("finalizePayroll paid-record guard (#251)", () => {
   });
 
   test("should return 400 when paid payroll records exist for the same month/year", async () => {
-    PayrollUpdate.find
-      .mockResolvedValueOnce([
+    PayrollUpdate.find.mockImplementationOnce(() =>
+      createQueryMock([
         { employeeName: "Alice Smith", status: "paid" },
         { employeeName: "Bob Jones", status: "paid" },
-      ]);
+      ])
+    );
 
     await finalizePayroll(req, res);
 
@@ -265,11 +269,13 @@ describe("finalizePayroll paid-record guard (#251)", () => {
 
   test("should succeed when some employees have no payroll records yet", async () => {
     PayrollUpdate.find
-      .mockResolvedValueOnce([]) // Guard — no paid records
-      .mockResolvedValueOnce([   // Phase 3
-        { _id: "payroll1", employeeId: "emp1" },
-        { _id: "payroll2", employeeId: "emp2" },
-      ]);
+      .mockImplementationOnce(() => createQueryMock([])) // Guard — no paid records
+      .mockImplementationOnce(() =>
+        createQueryMock([
+          { _id: "payroll1", employeeId: "emp1" },
+          { _id: "payroll2", employeeId: "emp2" },
+        ])
+      );
 
     PayrollUpdate.bulkWrite.mockResolvedValue({});
 
@@ -282,11 +288,13 @@ describe("finalizePayroll paid-record guard (#251)", () => {
 
   test("should succeed when existing payroll records have status 'finalized' (not 'paid')", async () => {
     PayrollUpdate.find
-      .mockResolvedValueOnce([]) // Guard — no paid records (only 'finalized' ones exist)
-      .mockResolvedValueOnce([   // Phase 3
-        { _id: "payroll1", employeeId: "emp1" },
-        { _id: "payroll2", employeeId: "emp2" },
-      ]);
+      .mockImplementationOnce(() => createQueryMock([])) // Guard — no paid records
+      .mockImplementationOnce(() =>
+        createQueryMock([
+          { _id: "payroll1", employeeId: "emp1" },
+          { _id: "payroll2", employeeId: "emp2" },
+        ])
+      );
 
     PayrollUpdate.bulkWrite.mockResolvedValue({});
 
@@ -298,7 +306,6 @@ describe("finalizePayroll paid-record guard (#251)", () => {
   });
 
   test("should still validate activity data before paid-record guard", async () => {
-    // No guard check needed — validation happens first
     req.body.activities = [];
 
     await finalizePayroll(req, res);
@@ -307,7 +314,44 @@ describe("finalizePayroll paid-record guard (#251)", () => {
     expect(res.json).toHaveBeenCalledWith({
       message: "No activities to process",
     });
-    // Guard's find should never be called since validation fails first
     expect(PayrollUpdate.find).not.toHaveBeenCalled();
+  });
+});
+
+describe("getPayrollSummary floating-point precision unit test (#347)", () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    req = {
+      userId: "507f1f77bcf86cd799439011",
+      query: { month: "7", year: "2026" },
+    };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    };
+    next = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test("should round totalPayout to 2 decimal places to prevent floating-point precision errors", async () => {
+    const mockPayrolls = [
+      { employeeName: "Alice", netSalary: 1250.55 },
+      { employeeName: "Bob", netSalary: 3410.80 },
+    ];
+
+    PayrollUpdate.find.mockImplementation(() => createQueryMock(mockPayrolls));
+
+    await getPayrollSummary(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    const responsePayload = res.json.mock.calls[0][0];
+    expect(responsePayload.totalPayout).toBe(4661.35);
+    expect(responsePayload.totalPayout).not.toBe(4661.350000000001);
   });
 });
