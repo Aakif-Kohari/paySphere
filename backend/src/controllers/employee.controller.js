@@ -157,6 +157,7 @@ exports.importEmployees = async (req, res, next) => {
         columns: true,
         skip_empty_lines: true,
         trim: true,
+        bom: true,
       },
       async (err, records) => {
         try {
