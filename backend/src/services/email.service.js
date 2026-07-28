@@ -51,6 +51,9 @@ exports.sendPayslipEmail = async (employee, payroll) => {
 
           try {
             const info = await sendEmail(mailOptions);
+            if (!info.success) {
+              throw new Error(info.error || 'Email delivery failed');
+            }
             logger.info(`Payslip email sent to ${employee.email}`);
             resolve(info);
           } catch (err) {
