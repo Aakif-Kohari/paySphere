@@ -1,4 +1,4 @@
-const { finalizePayroll, getPayrollSummary } = require("../payroll.controller");
+const { finalizePayroll, getPayrollSummary, sendAllPayslipsEmailHandler } = require("../payroll.controller");
 const Employee = require("../../models/employee.model");
 const PayrollUpdate = require("../../models/payroll.model");
 const User = require("../../models/user.model");
@@ -9,6 +9,9 @@ jest.mock("../../models/payroll.model");
 jest.mock("../../models/user.model");
 jest.mock("../../services/audit.service", () => ({
   createAuditLog: jest.fn(),
+}));
+jest.mock("../../services/email.service", () => ({
+  sendPayslipEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Helper to construct query mock supporting both direct await and .sort() chaining
@@ -353,5 +356,84 @@ describe("getPayrollSummary floating-point precision unit test (#347)", () => {
     const responsePayload = res.json.mock.calls[0][0];
     expect(responsePayload.totalPayout).toBe(4661.35);
     expect(responsePayload.totalPayout).not.toBe(4661.350000000001);
+  });
+});
+
+describe("sendAllPayslipsEmailHandler — req.body.year undefined guard (#352)", () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    };
+    next = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test("should NOT throw TypeError when req.body is undefined and year is in query params", async () => {
+    req = {
+      userId: "user123",
+      body: undefined,
+      query: { month: "7", year: "2026" },
+    };
+
+    PayrollUpdate.find.mockResolvedValue([]);
+
+    // Must resolve without throwing — pre-fix this would crash with
+    // TypeError: Cannot read properties of undefined (reading 'year')
+    await expect(sendAllPayslipsEmailHandler(req, res, next)).resolves.not.toThrow();
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test("should NOT throw TypeError when req.body is null and year is in query params", async () => {
+    req = {
+      userId: "user123",
+      body: null,
+      query: { month: "6", year: "2025" },
+    };
+
+    PayrollUpdate.find.mockResolvedValue([]);
+
+    await expect(sendAllPayslipsEmailHandler(req, res, next)).resolves.not.toThrow();
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test("should fall back to current year when req.body is undefined and no query year", async () => {
+    const currentYear = new Date().getFullYear();
+    req = {
+      userId: "user123",
+      body: undefined,
+      query: { month: "7" }, // no year in query
+    };
+
+    PayrollUpdate.find.mockResolvedValue([]);
+
+    await sendAllPayslipsEmailHandler(req, res, next);
+
+    // Should have fallen back to current year, not crashed
+    expect(res.status).toHaveBeenCalledWith(404);
+    const jsonArg = res.json.mock.calls[0][0];
+    expect(jsonArg).toHaveProperty("message");
+  });
+
+  test("should correctly parse year from req.body when body and year are both present", async () => {
+    req = {
+      userId: "user123",
+      body: { month: 7, year: 2026 },
+      query: {},
+    };
+
+    PayrollUpdate.find.mockResolvedValue([]);
+
+    await sendAllPayslipsEmailHandler(req, res, next);
+
+    // Valid body — should reach the 404 "no payroll records" path cleanly
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(next).not.toHaveBeenCalled();
   });
 });

@@ -409,7 +409,7 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
 exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
   try {
     let month = req.body && req.body.month ? Number(req.body.month) : (req.query.month ? Number(req.query.month) : new Date().getMonth() + 1);
-    let year = req.body.year ? Number(req.body.year) : (req.query.year ? Number(req.query.year) : new Date().getFullYear());
+    let year = req.body && req.body.year ? Number(req.body.year) : (req.query.year ? Number(req.query.year) : new Date().getFullYear());
 
     if (isNaN(month) || month < 1 || month > 12) {
       return res.status(400).json({ message: "Invalid month parameter" });
