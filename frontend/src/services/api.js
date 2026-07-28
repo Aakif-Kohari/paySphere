@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -18,7 +18,7 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 let isRefreshing = false;
@@ -38,7 +38,11 @@ const processQueue = (error, token = null) => {
 const handleAuthFailure = () => {
   localStorage.removeItem('token');
   window.dispatchEvent(new Event('auth:logout'));
-  if (typeof window !== 'undefined' && window.location.pathname !== '/auth' && window.location.pathname !== '/') {
+  if (
+    typeof window !== 'undefined' &&
+    window.location.pathname !== '/auth' &&
+    window.location.pathname !== '/'
+  ) {
     window.location.href = '/auth';
   }
 };
@@ -53,9 +57,17 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Handle authentication failure on refresh endpoint itself
-    if (originalRequest?.url?.includes('/api/auth/refresh')) {
-      if (error.response.status === 401 || error.response.status === 403) {
+    // Skip token refresh for auth endpoints where 401 is expected (e.g., wrong password)
+    if (
+      originalRequest?.url?.includes('/api/auth/login') ||
+      originalRequest?.url?.includes('/api/auth/signup') ||
+      originalRequest?.url?.includes('/api/auth/google') ||
+      originalRequest?.url?.includes('/api/auth/refresh')
+    ) {
+      if (
+        originalRequest?.url?.includes('/api/auth/refresh') &&
+        (error.response.status === 401 || error.response.status === 403)
+      ) {
         handleAuthFailure();
       }
       return Promise.reject(error);
@@ -89,7 +101,7 @@ api.interceptors.response.use(
         const res = await axios.post(
           `${API_BASE_URL}/api/auth/refresh`,
           {},
-          { withCredentials: true }
+          { withCredentials: true },
         );
         const { token } = res.data;
         localStorage.setItem('token', token);
@@ -112,7 +124,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

@@ -404,7 +404,6 @@ describe("sendAllPayslipsEmailHandler — req.body.year undefined guard (#352)",
   });
 
   test("should fall back to current year when req.body is undefined and no query year", async () => {
-    const currentYear = new Date().getFullYear();
     req = {
       userId: "user123",
       body: undefined,
@@ -435,5 +434,38 @@ describe("sendAllPayslipsEmailHandler — req.body.year undefined guard (#352)",
     // Valid body — should reach the 404 "no payroll records" path cleanly
     expect(res.status).toHaveBeenCalledWith(404);
     expect(next).not.toHaveBeenCalled();
+  });
+
+  test("should filter by payslipEmailed: false and mark true after sending", async () => {
+    req = {
+      userId: "user123",
+      body: { month: 7, year: 2026 },
+      query: {},
+    };
+
+    const mockPayroll = {
+      _id: "payroll1",
+      employeeId: "emp1",
+      month: 7,
+      year: 2026,
+      status: "finalized",
+    };
+    PayrollUpdate.find.mockResolvedValue([mockPayroll]);
+
+    const mockEmployee = { _id: "emp1", fullName: "Test User", email: "test@example.com" };
+    const Employee = require("../../models/employee.model");
+    const { sendPayslipEmail } = require("../../services/email.service");
+    Employee.find.mockResolvedValue([mockEmployee]);
+
+    await sendAllPayslipsEmailHandler(req, res, next);
+
+    expect(PayrollUpdate.find).toHaveBeenCalledWith(
+      expect.objectContaining({ payslipEmailed: false })
+    );
+    expect(sendPayslipEmail).toHaveBeenCalledWith(mockEmployee, mockPayroll);
+    expect(PayrollUpdate.updateOne).toHaveBeenCalledWith(
+      { _id: "payroll1" },
+      { payslipEmailed: true }
+    );
   });
 });
