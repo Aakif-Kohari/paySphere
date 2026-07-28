@@ -235,8 +235,16 @@ exports.getPayrollSummary = async (req, res, next) => {
 // EXPORT PAYROLL AS CSV
 exports.exportPayrollCSV = async (req, res, next) => {
   try {
-    const month = parseInt(req.query.month) || new Date().getMonth() + 1;
-    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const month = req.query.month ? parseInt(req.query.month, 10) : new Date().getMonth() + 1;
+    const year = req.query.year ? parseInt(req.query.year, 10) : new Date().getFullYear();
+
+    if (isNaN(month) || !Number.isInteger(month) || month < 1 || month > 12) {
+      return res.status(400).json({ message: "Invalid month parameter. Must be an integer between 1 and 12." });
+    }
+
+    if (isNaN(year) || !Number.isInteger(year) || year < 2000 || year > 2100) {
+      return res.status(400).json({ message: "Invalid year parameter. Must be a valid year integer." });
+    }
 
     const payrolls = await PayrollUpdate.find({
       createdBy: req.userId,
