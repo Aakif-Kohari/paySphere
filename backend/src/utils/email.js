@@ -44,8 +44,8 @@ const sendEmail = async ({ to, subject, text, html, attachments }) => {
     throw new Error(`Unexpected response status: ${response.status}`);
   } catch (error) {
     const message = error.response?.data?.error || error.message;
-    logger.warn('Email Vercel proxy unavailable, falling back to console', { to, subject, reason: message });
-    return { success: true, logged: true };
+    logger.error('Email delivery failed', { to, subject, error: message });
+    return { success: false, error: message };
   }
 };
 
