@@ -54,11 +54,12 @@ const sendEmail = async ({ to, subject, text, html, attachments }) => {
     }
   }
 
-    throw new Error(`Unexpected response status: ${response.status}`);
+    await transporter.sendMail(mailOptions);
+    logger.info(`Email sent via SMTP to ${to}`, { to, subject });
+    return { success: true, smtp: true };
   } catch (error) {
-    const message = error.response?.data?.error || error.message;
-    logger.error('Email delivery failed', { to, subject, error: message });
-    return { success: false, error: message };
+    logger.error('Email delivery failed', { to, subject, error: error.message });
+    return { success: false, error: error.message };
   }
 
   logger.info('Email fallback - logging to console', { to, subject, attachmentCount: formattedAttachments?.length || 0 });
