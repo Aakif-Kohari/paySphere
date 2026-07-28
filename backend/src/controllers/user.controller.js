@@ -287,10 +287,19 @@ exports.googleAuth = async (req, res, next) => {
       });
       googleData = ticket.getPayload();
     } else if (accessToken) {
-      const response = await axios.get(
+      const tokenInfoResponse = await axios.get(
+        `https://oauth2.googleapis.com/tokeninfo?access_token=${accessToken}`,
+      );
+      const tokenInfo = tokenInfoResponse.data;
+
+      if (tokenInfo.aud !== process.env.GOOGLE_CLIENT_ID) {
+        return res.status(401).json({ message: "Invalid Google access token: audience mismatch" });
+      }
+
+      const userInfoResponse = await axios.get(
         `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`,
       );
-      googleData = response.data;
+      googleData = userInfoResponse.data;
     } else {
       return res
         .status(400)
