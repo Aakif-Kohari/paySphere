@@ -18,7 +18,10 @@ const {
 const logger = require('../utils/logger');
 const { createAuditLog } = require('../services/audit.service');
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const GOOGLE_CLIENT_ID =
+  process.env.GOOGLE_CLIENT_ID ||
+  '250441239388-ldget7kv1v1hvf6vm1r6b0p48fassv43.apps.googleusercontent.com';
+const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
 
 const generateTokens = (user, res) => {
@@ -58,12 +61,10 @@ exports.signup = async (req, res, next) => {
       !isNonEmptyString(companyName) ||
       !isNonEmptyString(password)
     ) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Full name, email, company name, and password are required non-empty strings',
-        });
+      return res.status(400).json({
+        message:
+          'Full name, email, company name, and password are required non-empty strings',
+      });
     }
 
     if (!isValidEmail(email)) {
@@ -71,12 +72,10 @@ exports.signup = async (req, res, next) => {
     }
 
     if (!passwordRegex.test(password)) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character',
-        });
+      return res.status(400).json({
+        message:
+          'Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character',
+      });
     }
 
     const cleanEmail = email.trim().toLowerCase();
@@ -200,18 +199,14 @@ exports.updateSettings = async (req, res, next) => {
       defaultOvertimeRate !== undefined &&
       defaultOvertimeRate > OVERTIME_RATE_MAX
     ) {
-      return res
-        .status(400)
-        .json({
-          message: `Default overtime rate cannot exceed ${OVERTIME_RATE_MAX}`,
-        });
+      return res.status(400).json({
+        message: `Default overtime rate cannot exceed ${OVERTIME_RATE_MAX}`,
+      });
     }
     if (defaultDailyRate !== undefined && defaultDailyRate > DAILY_RATE_MAX) {
-      return res
-        .status(400)
-        .json({
-          message: `Default daily rate cannot exceed ${DAILY_RATE_MAX}`,
-        });
+      return res.status(400).json({
+        message: `Default daily rate cannot exceed ${DAILY_RATE_MAX}`,
+      });
     }
 
     if (fullName) user.fullName = sanitizeText(fullName);
@@ -317,12 +312,10 @@ exports.updatePassword = async (req, res, next) => {
     }
 
     if (!passwordRegex.test(newPassword)) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character',
-        });
+      return res.status(400).json({
+        message:
+          'Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character',
+      });
     }
 
     if (!user.password) {
@@ -367,7 +360,7 @@ exports.googleAuth = async (req, res, next) => {
     if (credential) {
       const ticket = await client.verifyIdToken({
         idToken: credential,
-        audience: process.env.GOOGLE_CLIENT_ID,
+        audience: GOOGLE_CLIENT_ID,
       });
       googleData = ticket.getPayload();
     } else if (accessToken) {
@@ -377,8 +370,8 @@ exports.googleAuth = async (req, res, next) => {
       const tokenInfo = tokenInfoResponse.data;
 
       if (
-        tokenInfo.aud !== process.env.GOOGLE_CLIENT_ID &&
-        tokenInfo.azp !== process.env.GOOGLE_CLIENT_ID
+        tokenInfo.aud !== GOOGLE_CLIENT_ID &&
+        tokenInfo.azp !== GOOGLE_CLIENT_ID
       ) {
         return res
           .status(401)
@@ -469,12 +462,10 @@ exports.forgotPassword = async (req, res, next) => {
     const lastRequest = resetCooldowns.get(cleanEmail);
     if (lastRequest && Date.now() - lastRequest < COOLDOWN_MS) {
       // Still in cooldown period, return generic message without sending email
-      return res
-        .status(200)
-        .json({
-          message:
-            'If an account with that email exists, a password reset link has been sent.',
-        });
+      return res.status(200).json({
+        message:
+          'If an account with that email exists, a password reset link has been sent.',
+      });
     }
 
     // Update cooldown
@@ -482,12 +473,10 @@ exports.forgotPassword = async (req, res, next) => {
 
     const user = await User.findOne({ email: cleanEmail });
     if (!user) {
-      return res
-        .status(200)
-        .json({
-          message:
-            'If an account with that email exists, a password reset link has been sent.',
-        });
+      return res.status(200).json({
+        message:
+          'If an account with that email exists, a password reset link has been sent.',
+      });
     }
 
     // Generate token
@@ -528,12 +517,10 @@ exports.forgotPassword = async (req, res, next) => {
       html,
     });
 
-    res
-      .status(200)
-      .json({
-        message:
-          'If an account with that email exists, a password reset link has been sent.',
-      });
+    res.status(200).json({
+      message:
+        'If an account with that email exists, a password reset link has been sent.',
+    });
   } catch (error) {
     next(error);
   }
@@ -549,12 +536,10 @@ exports.resetPassword = async (req, res, next) => {
     const { password } = req.body;
 
     if (!isNonEmptyString(password) || !passwordRegex.test(password)) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character',
-        });
+      return res.status(400).json({
+        message:
+          'Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character',
+      });
     }
 
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
@@ -593,12 +578,10 @@ exports.disconnectGoogle = async (req, res, next) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     if (!user.password) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'You must set a password before disconnecting your Google account.',
-        });
+      return res.status(400).json({
+        message:
+          'You must set a password before disconnecting your Google account.',
+      });
     }
 
     user.googleId = undefined;
