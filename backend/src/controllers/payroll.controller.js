@@ -165,7 +165,7 @@ exports.finalizePayroll = async (req, res, next) => {
     try {
       session = await mongoose.startSession();
       session.startTransaction();
-    } catch (sessionErr) {
+      } catch {
       session = null;
     }
 
@@ -278,7 +278,7 @@ exports.finalizePayroll = async (req, res, next) => {
       try {
         await session.abortTransaction();
         session.endSession();
-      } catch (e) {
+    } catch {
         // ignore session cleanup error
       }
     }
@@ -387,6 +387,7 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
     }
 
     await sendPayslipEmail(employee, payroll);
+    await PayrollUpdate.updateOne({ _id: payroll._id }, { payslipEmailed: true });
 
     createAuditLog({
       userId: req.userId,
@@ -422,6 +423,7 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
       createdBy: req.userId,
       month,
       year,
+      payslipEmailed: false,
     });
 
     if (payrolls.length === 0) {
@@ -453,6 +455,7 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
 
       try {
         await sendPayslipEmail(employee, payroll);
+        await PayrollUpdate.updateOne({ _id: payroll._id }, { payslipEmailed: true });
         results.push({ payrollId: payroll._id, employeeName: employee.fullName, email: employee.email, status: "sent" });
         sentCount++;
       } catch (err) {
