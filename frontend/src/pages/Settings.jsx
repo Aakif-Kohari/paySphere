@@ -91,6 +91,8 @@ export default function Settings() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
+  const [profileErrors, setProfileErrors] = useState({ fullName: "", email: "" });
+
   useEffect(() => {
     api.get("/api/auth/settings")
       .then(res => {
@@ -125,12 +127,33 @@ export default function Settings() {
       .finally(() => setLoading(false));
   }, [localCompanyName, dispatch]);
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   const handleSaveSettings = async () => {
+    // Client-side validation before making the API call (#356)
+    const errors = { fullName: "", email: "" };
+
+    if (!userProfile.fullName || !userProfile.fullName.trim()) {
+      errors.fullName = "Full name cannot be empty.";
+    }
+
+    if (!userProfile.email || !emailRegex.test(userProfile.email.trim())) {
+      errors.email = "Please enter a valid email address.";
+    }
+
+    if (errors.fullName || errors.email) {
+      setProfileErrors(errors);
+      return;
+    }
+
+    // Clear any previous errors
+    setProfileErrors({ fullName: "", email: "" });
+
     try {
       await api.patch("/api/auth/settings", {
         settings,
-        fullName: userProfile.fullName,
-        email: userProfile.email,
+        fullName: userProfile.fullName.trim(),
+        email: userProfile.email.trim(),
         companyName: userProfile.companyName,
         avatar: userProfile.avatar,
         defaultOvertimeRate,
@@ -139,7 +162,7 @@ export default function Settings() {
       alert("Settings updated successfully!");
     } catch (err) {
       console.error(err);
-      alert("Error saving settings.");
+      alert(err.response?.data?.message || "Error saving settings.");
     }
   };
 
@@ -256,11 +279,35 @@ export default function Settings() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Full Name</label>
-                <input type="text" value={userProfile.fullName} onChange={(e) => setUserProfile({...userProfile, fullName: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm text-gray-900 dark:text-white transition" />
+                <input
+                  type="text"
+                  value={userProfile.fullName}
+                  onChange={(e) => setUserProfile({...userProfile, fullName: e.target.value})}
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
+                    profileErrors.fullName
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
+                      : "border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20"
+                  }`}
+                />
+                {profileErrors.fullName && (
+                  <p className="text-xs text-red-500 mt-1.5 font-medium">{profileErrors.fullName}</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Email Address</label>
-                <input type="email" value={userProfile.email} onChange={(e) => setUserProfile({...userProfile, email: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm text-gray-900 dark:text-white transition" />
+                <input
+                  type="email"
+                  value={userProfile.email}
+                  onChange={(e) => setUserProfile({...userProfile, email: e.target.value})}
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
+                    profileErrors.email
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
+                      : "border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20"
+                  }`}
+                />
+                {profileErrors.email && (
+                  <p className="text-xs text-red-500 mt-1.5 font-medium">{profileErrors.email}</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Payroll ID</label>
