@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { logout } from "../features/auth/authSlice";
 import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
 
@@ -81,6 +83,7 @@ const Avatar = ({ name, size = 36 }) => {
 
 export default function AddEmployee() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -175,8 +178,8 @@ export default function AddEmployee() {
     const salaryNum = parseFloat(monthlySalary.replace(/,/g, ""));
     const otNum = overtimeRate ? parseFloat(overtimeRate.replace(/,/g, "")) : undefined;
 
-    if (isNaN(salaryNum)) {
-      setError("Please enter a valid salary amount.");
+    if (isNaN(salaryNum) || salaryNum <= 0) {
+      setError("Monthly salary must be a positive number.");
       setLoading(false);
       return;
     }
@@ -310,7 +313,7 @@ export default function AddEmployee() {
             </div>
             <button
               onClick={() => {
-                localStorage.removeItem("token");
+                dispatch(logout());
                 localStorage.removeItem("companyName");
                 navigate("/auth");
               }}

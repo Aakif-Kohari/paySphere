@@ -1,7 +1,8 @@
 import { useEffect, useMemo } from "react"
-import { useSelector } from "react-redux"
+import { useSelector, useDispatch } from "react-redux"
 import { ThemeProvider, createTheme, CssBaseline } from "@mui/material"
 import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { logout } from "./features/auth/authSlice"
 import Landing from "./pages/Landing"
 import LoginSignUp from "./pages/LoginSignUp"
 import Dashboard from "./pages/Dashboard"
@@ -11,9 +12,20 @@ import ResetPassword from "./pages/ResetPassword"
 import Settings from "./pages/Settings"
 import Reports from "./pages/Reports"
 import NotFound from "./pages/NotFound"
+import ProtectedRoute from "./components/ProtectedRoute"
 import ScrollToTop from "./components/common/ScrollToTop"
 function App() {
+  const dispatch = useDispatch();
   const themeMode = useSelector((state) => state.ui.themeMode);
+
+  // Synchronize Redux auth state when API interceptor detects expired/invalid auth
+  useEffect(() => {
+    const handleAuthLogout = () => {
+      dispatch(logout());
+    };
+    window.addEventListener("auth:logout", handleAuthLogout);
+    return () => window.removeEventListener("auth:logout", handleAuthLogout);
+  }, [dispatch]);
 
   // Sync dark class on html document element for Tailwind v4 custom dark variant
   useEffect(() => {
@@ -47,16 +59,17 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<LoginSignUp />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/monthly-updates" element={<MonthlyUpdates />} />
-          <Route path="/add-employee" element={<AddEmployee />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/monthly-updates" element={<ProtectedRoute><MonthlyUpdates /></ProtectedRoute>} />
+          <Route path="/add-employee" element={<ProtectedRoute><AddEmployee /></ProtectedRoute>} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/reports" element={<Reports />} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
-</Routes>
+        </Routes>
         <ScrollToTop />
-      </BrowserRouter>    </ThemeProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
 

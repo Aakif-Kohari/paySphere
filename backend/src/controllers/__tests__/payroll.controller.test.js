@@ -1,4 +1,4 @@
-const { finalizePayroll } = require("../payroll.controller");
+const { finalizePayroll, getPayrollSummary, sendAllPayslipsEmailHandler } = require("../payroll.controller");
 const Employee = require("../../models/employee.model");
 const PayrollUpdate = require("../../models/payroll.model");
 const User = require("../../models/user.model");
@@ -7,13 +7,29 @@ const mongoose = require("mongoose");
 jest.mock("../../models/employee.model");
 jest.mock("../../models/payroll.model");
 jest.mock("../../models/user.model");
+jest.mock("../../services/audit.service", () => ({
+  createAuditLog: jest.fn(),
+}));
+jest.mock("../../services/email.service", () => ({
+  sendPayslipEmail: jest.fn().mockResolvedValue(undefined),
+}));
+
+// Helper to construct query mock supporting both direct await and .sort() chaining
+const createQueryMock = (data) => ({
+  sort: jest.fn().mockReturnThis(),
+  exec: jest.fn().mockResolvedValue(data),
+  then: (resolve, reject) => Promise.resolve(data).then(resolve, reject),
+  catch: (reject) => Promise.resolve(data).catch(reject),
+});
 
 describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit Tests (#106)", () => {
   let req, res, mockSession;
 
   beforeEach(() => {
+    jest.resetAllMocks();
+
     req = {
-      userId: "user123",
+      userId: "507f1f77bcf86cd799439011",
       body: {},
     };
     res = {
@@ -28,8 +44,6 @@ describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit
       endSession: jest.fn(),
     };
     jest.spyOn(mongoose, "startSession").mockResolvedValue(mockSession);
-
-    jest.clearAllMocks();
   });
 
   afterEach(() => {
@@ -38,23 +52,24 @@ describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit
 
   test("should default unparseable tags like 'deduction' without a number to 0 instead of NaN", async () => {
     const mockEmployee = {
-      _id: "emp1",
+      _id: "507f1f77bcf86cd799439011",
       fullName: "Alice Smith",
       monthlySalary: 50000,
       overtimeRate: 200,
+      isActive: true,
     };
     Employee.find.mockResolvedValue([mockEmployee]);
     User.findById.mockResolvedValue({ defaultDailyRate: 0, defaultOvertimeRate: 0 });
 
-    PayrollUpdate.findOneAndUpdate.mockImplementation((query, data) => ({
-      _id: "payroll1",
-      ...data,
-    }));
+    PayrollUpdate.bulkWrite.mockResolvedValue({});
+    PayrollUpdate.find
+      .mockImplementationOnce(() => createQueryMock([])) // Guard query — no existing paid records
+      .mockImplementationOnce(() => createQueryMock([{ _id: "payroll1", employeeId: "emp1" }])); // Phase 3 query
 
     req.body = {
       activities: [
         {
-          employeeId: "emp1",
+          employeeId: "507f1f77bcf86cd799439011",
           name: "Alice Smith",
           tags: [
             { label: "deduction" }, // unparseable tag value
@@ -86,9 +101,9 @@ describe("finalizePayroll month/year validation tests (#79)", () => {
   let req, res;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     req = {
-      userId: "user123",
+      userId: "507f1f77bcf86cd799439011",
       body: {
         activities: [
           {
@@ -169,5 +184,256 @@ describe("finalizePayroll month/year validation tests (#79)", () => {
     expect(res.json).toHaveBeenCalledWith({
       message: "Invalid year. Must be a valid year integer",
     });
+  });
+});
+
+describe("finalizePayroll paid-record guard (#251)", () => {
+  let req, res, mockEmployees, mockUserSettings, mockSession;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+
+    mockSession = {
+      startTransaction: jest.fn(),
+      commitTransaction: jest.fn(),
+      abortTransaction: jest.fn(),
+      endSession: jest.fn(),
+    };
+    jest.spyOn(mongoose, "startSession").mockResolvedValue(mockSession);
+
+    mockEmployees = [
+      {
+        _id: "emp1",
+        fullName: "Alice Smith",
+        monthlySalary: 50000,
+        overtimeRate: 200,
+        isActive: true,
+      },
+      {
+        _id: "emp2",
+        fullName: "Bob Jones",
+        monthlySalary: 60000,
+        overtimeRate: 250,
+        isActive: true,
+      },
+    ];
+
+    mockUserSettings = { defaultDailyRate: 0, defaultOvertimeRate: 0 };
+
+    req = {
+      userId: "user123",
+      body: {
+        activities: [
+          {
+            employeeId: "emp1",
+            name: "Alice Smith",
+            tags: [],
+          },
+          {
+            employeeId: "emp2",
+            name: "Bob Jones",
+            tags: [],
+          },
+        ],
+        month: 7,
+        year: 2026,
+      },
+    };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    };
+
+    Employee.find.mockResolvedValue(mockEmployees);
+    User.findById.mockResolvedValue(mockUserSettings);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test("should return 400 when paid payroll records exist for the same month/year", async () => {
+    PayrollUpdate.find.mockImplementationOnce(() =>
+      createQueryMock([
+        { employeeName: "Alice Smith", status: "paid" },
+        { employeeName: "Bob Jones", status: "paid" },
+      ])
+    );
+
+    await finalizePayroll(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "Payroll has already been paid for: Alice Smith, Bob Jones. Cannot re-finalize paid records.",
+      paidEmployees: ["Alice Smith", "Bob Jones"],
+    });
+    expect(PayrollUpdate.bulkWrite).not.toHaveBeenCalled();
+  });
+
+  test("should succeed when some employees have no payroll records yet", async () => {
+    PayrollUpdate.find
+      .mockImplementationOnce(() => createQueryMock([])) // Guard — no paid records
+      .mockImplementationOnce(() =>
+        createQueryMock([
+          { _id: "payroll1", employeeId: "emp1" },
+          { _id: "payroll2", employeeId: "emp2" },
+        ])
+      );
+
+    PayrollUpdate.bulkWrite.mockResolvedValue({});
+
+    await finalizePayroll(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const jsonCall = res.json.mock.calls[0][0];
+    expect(jsonCall.results).toHaveLength(2);
+  });
+
+  test("should succeed when existing payroll records have status 'finalized' (not 'paid')", async () => {
+    PayrollUpdate.find
+      .mockImplementationOnce(() => createQueryMock([])) // Guard — no paid records
+      .mockImplementationOnce(() =>
+        createQueryMock([
+          { _id: "payroll1", employeeId: "emp1" },
+          { _id: "payroll2", employeeId: "emp2" },
+        ])
+      );
+
+    PayrollUpdate.bulkWrite.mockResolvedValue({});
+
+    await finalizePayroll(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const jsonCall = res.json.mock.calls[0][0];
+    expect(jsonCall.results).toHaveLength(2);
+  });
+
+  test("should still validate activity data before paid-record guard", async () => {
+    req.body.activities = [];
+
+    await finalizePayroll(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "No activities to process",
+    });
+    expect(PayrollUpdate.find).not.toHaveBeenCalled();
+  });
+});
+
+describe("getPayrollSummary floating-point precision unit test (#347)", () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    req = {
+      userId: "507f1f77bcf86cd799439011",
+      query: { month: "7", year: "2026" },
+    };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    };
+    next = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test("should round totalPayout to 2 decimal places to prevent floating-point precision errors", async () => {
+    const mockPayrolls = [
+      { employeeName: "Alice", netSalary: 1250.55 },
+      { employeeName: "Bob", netSalary: 3410.80 },
+    ];
+
+    PayrollUpdate.find.mockImplementation(() => createQueryMock(mockPayrolls));
+
+    await getPayrollSummary(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    const responsePayload = res.json.mock.calls[0][0];
+    expect(responsePayload.totalPayout).toBe(4661.35);
+    expect(responsePayload.totalPayout).not.toBe(4661.350000000001);
+  });
+});
+
+describe("sendAllPayslipsEmailHandler — req.body.year undefined guard (#352)", () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    };
+    next = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test("should NOT throw TypeError when req.body is undefined and year is in query params", async () => {
+    req = {
+      userId: "user123",
+      body: undefined,
+      query: { month: "7", year: "2026" },
+    };
+
+    PayrollUpdate.find.mockResolvedValue([]);
+
+    // Must resolve without throwing — pre-fix this would crash with
+    // TypeError: Cannot read properties of undefined (reading 'year')
+    await expect(sendAllPayslipsEmailHandler(req, res, next)).resolves.not.toThrow();
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test("should NOT throw TypeError when req.body is null and year is in query params", async () => {
+    req = {
+      userId: "user123",
+      body: null,
+      query: { month: "6", year: "2025" },
+    };
+
+    PayrollUpdate.find.mockResolvedValue([]);
+
+    await expect(sendAllPayslipsEmailHandler(req, res, next)).resolves.not.toThrow();
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test("should fall back to current year when req.body is undefined and no query year", async () => {
+    const currentYear = new Date().getFullYear();
+    req = {
+      userId: "user123",
+      body: undefined,
+      query: { month: "7" }, // no year in query
+    };
+
+    PayrollUpdate.find.mockResolvedValue([]);
+
+    await sendAllPayslipsEmailHandler(req, res, next);
+
+    // Should have fallen back to current year, not crashed
+    expect(res.status).toHaveBeenCalledWith(404);
+    const jsonArg = res.json.mock.calls[0][0];
+    expect(jsonArg).toHaveProperty("message");
+  });
+
+  test("should correctly parse year from req.body when body and year are both present", async () => {
+    req = {
+      userId: "user123",
+      body: { month: 7, year: 2026 },
+      query: {},
+    };
+
+    PayrollUpdate.find.mockResolvedValue([]);
+
+    await sendAllPayslipsEmailHandler(req, res, next);
+
+    // Valid body — should reach the 404 "no payroll records" path cleanly
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(next).not.toHaveBeenCalled();
   });
 });

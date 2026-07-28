@@ -4,6 +4,8 @@ const PayrollUpdate = require("../models/payroll.model");
 const User = require("../models/user.model");
 const { calculateNetSalary } = require("../utils/salaryCalculator");
 const { generatePayrollCSV } = require("../utils/csvExport");
+const logger = require("../utils/logger");
+const { createAuditLog } = require("../services/audit.service");
 
 // Helper: parse tag labels back into structured numbers
 function parseTagValue(label) {
@@ -18,6 +20,9 @@ function parseTagValue(label) {
 exports.finalizePayroll = async (req, res, next) => {
   let session = null;
   try {
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({ message: "Request body is required" });
+    }
     const { activities, month, year } = req.body;
 
     if (!activities || !Array.isArray(activities) || activities.length === 0) {
@@ -55,15 +60,28 @@ exports.finalizePayroll = async (req, res, next) => {
         continue;
       }
 
-      if (!act.employeeId) {
+      let employeeId = act.employeeId;
+      if (!employeeId && act.name) {
+        const matchedEmp = employees.find(emp => emp.fullName.toLowerCase() === act.name.toLowerCase());
+        if (matchedEmp) {
+          employeeId = matchedEmp._id;
+        }
+      }
+
+      if (!employeeId) {
         errors.push(`employeeId is required but missing for activity involving "${act.name || 'unnamed'}"`);
         continue;
       }
 
-      const employee = employees.find(emp => String(emp._id) === String(act.employeeId));
+      const employee = employees.find(emp => String(emp._id) === String(employeeId));
 
       if (!employee) {
-        errors.push(`Could not find employee with ID: ${act.employeeId}`);
+        errors.push(`Could not find employee with ID: ${employeeId}`);
+        continue;
+      }
+
+      if (!employee.isActive) {
+        errors.push(`Employee ${employee.fullName} is inactive and cannot be included in payroll`);
         continue;
       }
 
@@ -123,6 +141,26 @@ exports.finalizePayroll = async (req, res, next) => {
       });
     }
 
+    // Guard: prevent overwriting already-paid payroll records (#251)
+    const employeeIds = preparedItems.map((item) => item.employee._id);
+    const existingPaidRecords = await PayrollUpdate.find({
+      employeeId: { $in: employeeIds },
+      month: currentMonth,
+      year: currentYear,
+      createdBy: req.userId,
+      status: "paid",
+    });
+
+    if (existingPaidRecords.length > 0) {
+      const paidEmployeeNames = existingPaidRecords.map(
+        (p) => p.employeeName
+      );
+      return res.status(400).json({
+        message: `Payroll has already been paid for: ${paidEmployeeNames.join(", ")}. Cannot re-finalize paid records.`,
+        paidEmployees: paidEmployeeNames,
+      });
+    }
+
     // Try starting a session for transaction atomicity
     try {
       session = await mongoose.startSession();
@@ -131,12 +169,8 @@ exports.finalizePayroll = async (req, res, next) => {
       session = null;
     }
 
-    // Phase 2: Write all calculated records atomically within transaction
-    const results = [];
-    const writeOptions = { upsert: true, new: true, setDefaultsOnInsert: true };
-    if (session) writeOptions.session = session;
-
-    for (const item of preparedItems) {
+    // Phase 2: Write all calculated records atomically within transaction using bulkWrite
+    const bulkOps = preparedItems.map((item) => {
       const payrollData = {
         employeeId: item.employee._id,
         employeeName: item.employee.fullName,
@@ -155,30 +189,84 @@ exports.finalizePayroll = async (req, res, next) => {
         status: "finalized",
       };
 
-      const payroll = await PayrollUpdate.findOneAndUpdate(
-        { employeeId: item.employee._id, month: currentMonth, year: currentYear, createdBy: req.userId },
-        payrollData,
-        writeOptions
-      );
+      return {
+        updateOne: {
+          filter: {
+            employeeId: item.employee._id,
+            month: currentMonth,
+            year: currentYear,
+            createdBy: req.userId,
+          },
+          update: { $set: payrollData },
+          upsert: true,
+        },
+      };
+    });
 
-      results.push({
-        employeeName: item.employee.fullName,
-        baseSalary: item.baseSalary,
-        leaveDays: item.leaveDays,
-        leaveDeduction: item.leaveDeduction,
-        overtimeHours: item.overtimeHours,
-        overtimePay: item.overtimePay,
-        bonus: item.bonus,
-        deductions: item.deductions,
-        netSalary: item.netSalary,
-        payrollId: payroll._id,
-      });
-    }
+    const bulkWriteOptions = session ? { session } : {};
+    await PayrollUpdate.bulkWrite(bulkOps, bulkWriteOptions);
+
+    // Phase 3: Fetch updated payrolls to construct response
+    const fetchOptions = session ? { session } : {};
+    const updatedPayrolls = await PayrollUpdate.find(
+      {
+        createdBy: req.userId,
+        month: currentMonth,
+        year: currentYear,
+        employeeId: { $in: preparedItems.map((item) => item.employee._id) },
+      },
+      null,
+      fetchOptions
+    );
+
+    const payrollMap = {};
+    updatedPayrolls.forEach((p) => {
+      payrollMap[p.employeeId.toString()] = p._id;
+    });
+
+    const results = preparedItems.map((item) => ({
+      employeeName: item.employee.fullName,
+      baseSalary: item.baseSalary,
+      leaveDays: item.leaveDays,
+      leaveDeduction: item.leaveDeduction,
+      overtimeHours: item.overtimeHours,
+      overtimePay: item.overtimePay,
+      bonus: item.bonus,
+      deductions: item.deductions,
+      netSalary: item.netSalary,
+      payrollId: payrollMap[item.employee._id.toString()],
+    }));
 
     if (session) {
       await session.commitTransaction();
       session.endSession();
     }
+
+    const resourceIds = results.map(r => r.payrollId).filter(Boolean);
+
+    createAuditLog({
+      userId: req.userId,
+      action: "PAYROLL_FINALIZE",
+      resourceType: "Payroll",
+      resourceIds,
+      details: {
+        month: currentMonth,
+        year: currentYear,
+        employeeCount: results.length,
+        totalNetSalary: results.reduce((sum, r) => sum + r.netSalary, 0),
+        errorCount: errors.length,
+      },
+      result: errors.length > 0 ? "partial" : "success",
+      req,
+    });
+
+    logger.info(`Payroll finalized for ${results.length} employees`, {
+      userId: req.userId,
+      month: currentMonth,
+      year: currentYear,
+      employeeCount: results.length,
+      errorCount: errors.length,
+    });
 
     res.status(200).json({
       message: `Payroll finalized for ${results.length} employee${results.length !== 1 ? "s" : ""}`,
@@ -194,6 +282,16 @@ exports.finalizePayroll = async (req, res, next) => {
         // ignore session cleanup error
       }
     }
+
+    createAuditLog({
+      userId: req.userId,
+      action: "PAYROLL_FINALIZE",
+      resourceType: "Payroll",
+      details: { month: req.body?.month, year: req.body?.year, error: error.message },
+      result: "failure",
+      req,
+    });
+
     next(error);
   }
 };
@@ -218,7 +316,8 @@ exports.getPayrollSummary = async (req, res, next) => {
       year,
     }).sort({ employeeName: 1 });
 
-    const totalPayout = payrolls.reduce((sum, p) => sum + p.netSalary, 0);
+    const rawTotal = payrolls.reduce((sum, p) => sum + (p.netSalary || 0), 0);
+    const totalPayout = Math.round(rawTotal * 100) / 100;
 
     res.status(200).json({
       month,
@@ -235,8 +334,16 @@ exports.getPayrollSummary = async (req, res, next) => {
 // EXPORT PAYROLL AS CSV
 exports.exportPayrollCSV = async (req, res, next) => {
   try {
-    const month = parseInt(req.query.month) || new Date().getMonth() + 1;
-    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const month = req.query.month ? parseInt(req.query.month, 10) : new Date().getMonth() + 1;
+    const year = req.query.year ? parseInt(req.query.year, 10) : new Date().getFullYear();
+
+    if (isNaN(month) || !Number.isInteger(month) || month < 1 || month > 12) {
+      return res.status(400).json({ message: "Invalid month parameter. Must be an integer between 1 and 12." });
+    }
+
+    if (isNaN(year) || !Number.isInteger(year) || year < 2000 || year > 2100) {
+      return res.status(400).json({ message: "Invalid year parameter. Must be a valid year integer." });
+    }
 
     const payrolls = await PayrollUpdate.find({
       createdBy: req.userId,
@@ -280,6 +387,18 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
     }
 
     await sendPayslipEmail(employee, payroll);
+
+    createAuditLog({
+      userId: req.userId,
+      action: "PAYSLIP_EMAIL",
+      resourceType: "Payroll",
+      resourceIds: [payroll._id],
+      details: { employeeName: employee.fullName, employeeEmail: employee.email, month: payroll.month, year: payroll.year },
+      req,
+    });
+
+    logger.info(`Payslip email sent`, { userId: req.userId, payrollId: payroll._id, employee: employee.fullName });
+
     res.status(200).json({ message: "Payslip email sent successfully" });
   } catch (error) {
     next(error);
@@ -289,8 +408,8 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
 // BULK SEND PAYSLIP EMAILS (#140)
 exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
   try {
-    let month = req.body.month ? Number(req.body.month) : (req.query.month ? Number(req.query.month) : new Date().getMonth() + 1);
-    let year = req.body.year ? Number(req.body.year) : (req.query.year ? Number(req.query.year) : new Date().getFullYear());
+    let month = req.body && req.body.month ? Number(req.body.month) : (req.query.month ? Number(req.query.month) : new Date().getMonth() + 1);
+    let year = req.body && req.body.year ? Number(req.body.year) : (req.query.year ? Number(req.query.year) : new Date().getFullYear());
 
     if (isNaN(month) || month < 1 || month > 12) {
       return res.status(400).json({ message: "Invalid month parameter" });
@@ -309,13 +428,17 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
       return res.status(404).json({ message: "No payroll records found for the selected month and year." });
     }
 
+    const employeeIds = [...new Set(payrolls.map(p => p.employeeId))];
+    const employees = await Employee.find({ _id: { $in: employeeIds } });
+    const employeeMap = new Map(employees.map(e => [String(e._id), e]));
+
     const results = [];
     let sentCount = 0;
     let failedCount = 0;
     let skippedCount = 0;
 
     for (const payroll of payrolls) {
-      const employee = await Employee.findById(payroll.employeeId);
+      const employee = employeeMap.get(String(payroll.employeeId));
       if (!employee) {
         results.push({ payrollId: payroll._id, employeeName: payroll.employeeName, status: "failed", error: "Employee record not found" });
         failedCount++;
@@ -333,11 +456,25 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
         results.push({ payrollId: payroll._id, employeeName: employee.fullName, email: employee.email, status: "sent" });
         sentCount++;
       } catch (err) {
-        console.error(`Failed to send email to ${employee.fullName}:`, err);
-        results.push({ payrollId: payroll._id, employeeName: employee.fullName, email: employee.email, status: "failed", error: err.message });
+        logger.error(`Failed to send email to ${employee.fullName}`, { error: err.message, payrollId: payroll._id });
+        results.push({ payrollId: payroll._id, employeeName: employee.fullName, email: employee.email, status: "failed", error: "Email delivery failed" });
         failedCount++;
       }
     }
+
+    createAuditLog({
+      userId: req.userId,
+      action: "PAYSLIP_BULK_EMAIL",
+      resourceType: "Payroll",
+      resourceIds: payrolls.map(p => p._id),
+      details: { month, year, sentCount, failedCount, skippedCount, total: payrolls.length },
+      result: failedCount > 0 ? (sentCount > 0 ? "partial" : "failure") : "success",
+      req,
+    });
+
+    logger.info(`Bulk payslip email dispatch complete`, {
+      userId: req.userId, month, year, sentCount, failedCount, skippedCount, total: payrolls.length,
+    });
 
     res.status(200).json({
       message: `Bulk email dispatch complete. Sent: ${sentCount}, Skipped: ${skippedCount}, Failed: ${failedCount}`,

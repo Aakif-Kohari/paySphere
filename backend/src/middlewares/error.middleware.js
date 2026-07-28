@@ -1,6 +1,14 @@
+const logger = require("../utils/logger");
+
 const errorHandler = (err, req, res, next) => {
-  // Log the error securely on the server
-  console.error("Internal Error:", err);
+  logger.error("Internal Error", {
+    error: err.message,
+    stack: err.stack,
+    method: req?.method,
+    url: req?.originalUrl,
+    userId: req?.userId,
+    ip: req?.ip,
+  });
 
   // Mongoose validation error
   if (err.name === 'ValidationError') {
