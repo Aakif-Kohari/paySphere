@@ -441,10 +441,9 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
         monthlySalary: salary,
         overtimeRate: otRate,
       });
-    } catch (err) {
+} catch {
       setError('Failed to update employee details.');
-    } finally {
-      setSubmitting(false);
+    } finally {      setSubmitting(false);
     }
   };
 
@@ -563,8 +562,8 @@ export default function PaySphereDashboard() {
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const [employeeToEdit, setEmployeeToEdit] = useState(null); 
-
+const [employeeToEdit, setEmployeeToEdit] = useState(null); 
+  const [prevDebouncedSearch, setPrevDebouncedSearch] = useState(debouncedSearch);
   const companyName = localStorage.getItem('companyName') || 'Acme Corp';
   const token = useSelector((state) => state.auth.token);
 
@@ -581,10 +580,11 @@ export default function PaySphereDashboard() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => {
+// Reset to page 1 when the search term changes (adjusted during render, not in an effect)
+  if (debouncedSearch !== prevDebouncedSearch) {
+    setPrevDebouncedSearch(debouncedSearch);
     setCurrentPage(1);
-  }, [debouncedSearch]);
-
+  }
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -645,19 +645,24 @@ export default function PaySphereDashboard() {
       setEmployeeToDelete(null);
     } catch (error) {
       console.error('Delete failed:', error);
-      alert('Failed to delete employee');
+      alert(error.response?.data?.message || 'Failed to delete employee');
     } finally {
       setDeleting(false);
     }
   };
 
   const handleEditSubmit = async (id, updatedData) => {
-    await api.put(`/api/employees/${id}`, updatedData);
-    
-    setEmployees((prev) =>
-      prev.map((emp) => (emp._id === id ? { ...emp, ...updatedData } : emp))
-    );
-    setEmployeeToEdit(null);
+    try {
+      await api.put(`/api/employees/${id}`, updatedData);
+      
+      setEmployees((prev) =>
+        prev.map((emp) => (emp._id === id ? { ...emp, ...updatedData } : emp))
+      );
+      setEmployeeToEdit(null);
+    } catch (error) {
+      console.error('Failed to update employee:', error);
+      alert('Failed to update employee. Please try again.');
+    }
   };
   
   const getInitials = (name) =>
