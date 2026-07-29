@@ -82,12 +82,9 @@ export default function Settings() {
   const [settings, setSettings] = useState({
     preferences: { language: "English (US)", theme: "system" },
     companyInfo: { payrollCycle: "monthly" },
-    payrollConfig: { currency: "INR (₹)", leaveDeductionPolicy: "basic_only", processingDate: "Last working day" },
+    payrollConfig: { currency: "INR (₹)", leaveDeductionPolicy: "basic_only", processingDate: "Last working day", defaultOvertimeRate: 0, defaultDailyRate: 0 },
     notifications: { emailReminders: true, systemAlerts: true, payrollCompletion: true, featureAnnouncements: false }
   });
-  
-  const [defaultOvertimeRate, setDefaultOvertimeRate] = useState(0);
-  const [defaultDailyRate, setDefaultDailyRate] = useState(0);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -113,7 +110,11 @@ export default function Settings() {
           setSettings(prev => ({
             preferences: res.data.settings.preferences || prev.preferences,
             companyInfo: res.data.settings.companyInfo || prev.companyInfo,
-            payrollConfig: res.data.settings.payrollConfig || prev.payrollConfig,
+            payrollConfig: {
+              ...(res.data.settings.payrollConfig || prev.payrollConfig),
+              defaultOvertimeRate: res.data.defaultOvertimeRate || 0,
+              defaultDailyRate: res.data.defaultDailyRate || 0
+            },
             notifications: res.data.settings.notifications || prev.notifications,
           }));
           
@@ -122,9 +123,16 @@ export default function Settings() {
             const newMode = t === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
             dispatch(setThemeMode(newMode));
           }
+        } else {
+          setSettings(prev => ({
+            ...prev,
+            payrollConfig: {
+              ...prev.payrollConfig,
+              defaultOvertimeRate: res.data.defaultOvertimeRate || 0,
+              defaultDailyRate: res.data.defaultDailyRate || 0
+            }
+          }));
         }
-        setDefaultOvertimeRate(res.data.defaultOvertimeRate || 0);
-        setDefaultDailyRate(res.data.defaultDailyRate || 0);
       })
       .catch(err => console.error("Failed to fetch settings", err))
       .finally(() => setLoading(false));
@@ -158,9 +166,7 @@ export default function Settings() {
         fullName: userProfile.fullName.trim(),
         email: userProfile.email.trim(),
         companyName: userProfile.companyName,
-        avatar: userProfile.avatar,
-        defaultOvertimeRate,
-        defaultDailyRate
+        avatar: userProfile.avatar
       });
       alert("Settings updated successfully!");
     } catch (err) {
@@ -519,10 +525,17 @@ export default function Settings() {
                   </select>
                 </div>
                 <div>
+                  <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Default Daily Rate</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 font-bold text-sm">₹</span>
+                    <input type="number" value={settings.payrollConfig.defaultDailyRate} onChange={(e) => updateSettingsField('payrollConfig', 'defaultDailyRate', Number(e.target.value))} className="w-full pl-8 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold transition" />
+                  </div>
+                </div>
+                <div>
                   <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Default Overtime Rate (per hr)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 font-bold text-sm">₹</span>
-                    <input type="number" value={defaultOvertimeRate} onChange={(e) => setDefaultOvertimeRate(Number(e.target.value))} className="w-full pl-8 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold transition" />
+                    <input type="number" value={settings.payrollConfig.defaultOvertimeRate} onChange={(e) => updateSettingsField('payrollConfig', 'defaultOvertimeRate', Number(e.target.value))} className="w-full pl-8 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold transition" />
                   </div>
                 </div>
                 <div>
