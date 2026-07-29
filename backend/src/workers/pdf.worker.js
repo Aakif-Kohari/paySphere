@@ -144,6 +144,8 @@ parentPort.on("message", async (data) => {
 
       doc.fontSize(14).text(`Net Salary: Rs. ${payroll.netSalary.toFixed(2)}`, { underline: true });
       doc.end();
+    } else {
+      parentPort.postMessage({ success: false, error: `Unknown message type: ${type}` });
     }
   } catch (error) {
     parentPort.postMessage({ success: false, error: error.message });
