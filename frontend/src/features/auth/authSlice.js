@@ -4,10 +4,9 @@ import api from '../../services/api';
 export const logoutUser = createAsyncThunk('auth/logoutUser', async (_, { dispatch }) => {
   try {
     await api.post('/api/auth/logout');
-  } catch (err) {
+} catch {
     // ignore
-  } finally {
-    dispatch(logout());
+  } finally {    dispatch(logout());
   }
 });
 
