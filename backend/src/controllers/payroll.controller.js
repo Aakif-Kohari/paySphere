@@ -5,7 +5,7 @@ const User = require("../models/user.model");
 const { calculateNetSalary } = require("../utils/salaryCalculator");
 const { generatePayrollCSV } = require("../utils/csvExport");
 const logger = require("../utils/logger");
-const { createAuditLog } = require("../services/audit.service");
+const eventBus = require("../services/event.service");
 
 // Helper: parse tag labels back into structured numbers
 function parseTagValue(label) {
@@ -224,7 +224,7 @@ exports.finalizePayroll = async (req, res, next) => {
 
     const resourceIds = results.map(r => r.payrollId).filter(Boolean);
 
-    createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "PAYROLL_FINALIZE",
       resourceType: "Payroll",
@@ -263,7 +263,7 @@ exports.finalizePayroll = async (req, res, next) => {
       }
     }
 
-    createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "PAYROLL_FINALIZE",
       resourceType: "Payroll",
@@ -359,7 +359,7 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
 
     await sendPayslipEmail(employee, payroll);
 
-    createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "PAYSLIP_EMAIL",
       resourceType: "Payroll",
@@ -429,7 +429,7 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
       }
     }
 
-    createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "PAYSLIP_BULK_EMAIL",
       resourceType: "Payroll",

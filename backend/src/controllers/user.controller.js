@@ -10,7 +10,7 @@ const PayrollUpdate = require("../models/payroll.model");
 const { sendEmail } = require("../utils/email");
 const { isNonEmptyString, isValidEmail, sanitizeText, DAILY_RATE_MAX, OVERTIME_RATE_MAX } = require("../utils/validators");
 const logger = require("../utils/logger");
-const { createAuditLog } = require("../services/audit.service");
+const eventBus = require("../services/event.service");
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
@@ -201,7 +201,7 @@ exports.updateSettings = async (req, res, next) => {
 
     await user.save();
 
-    createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "SETTINGS_UPDATE",
       resourceType: "User",
@@ -256,7 +256,7 @@ exports.updatePassword = async (req, res, next) => {
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
 
-    createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "PASSWORD_UPDATE",
       resourceType: "User",
@@ -503,7 +503,7 @@ exports.deleteAccount = async (req, res, next) => {
       session.endSession();
     }
 
-    createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "ACCOUNT_DELETE",
       resourceType: "User",

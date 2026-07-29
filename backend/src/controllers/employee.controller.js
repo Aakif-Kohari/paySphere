@@ -5,7 +5,7 @@ const { parse } = require("csv-parse");
 const { isNonEmptyString, escapeRegex, sanitizeText, MONTHLY_SALARY_MAX, OVERTIME_RATE_MAX, FULLNAME_MAX_LENGTH, ROLE_MAX_LENGTH } = require("../utils/validators");
 const PayrollUpdate = require("../models/payroll.model");
 const logger = require("../utils/logger");
-const { createAuditLog } = require("../services/audit.service");
+const eventBus = require("../services/event.service");
 // ADD EMPLOYEE
 exports.addEmployee = async (req, res, next) => {
   try {
@@ -52,7 +52,7 @@ exports.addEmployee = async (req, res, next) => {
 
     await employee.save();
 
-    createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "EMPLOYEE_CREATE",
       resourceType: "Employee",
@@ -278,7 +278,7 @@ exports.importEmployees = async (req, res, next) => {
             }
           }
 
-          createAuditLog({
+          eventBus.emit("AUDIT_LOG", {
             userId: req.userId,
             action: "EMPLOYEE_IMPORT",
             resourceType: "Employee",
@@ -359,7 +359,7 @@ exports.updateEmployee = async (req, res, next) => {
 
     await employee.save();
 
-    createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "EMPLOYEE_UPDATE",
       resourceType: "Employee",
@@ -430,7 +430,7 @@ exports.deleteEmployee = async (req, res, next) => {
     // Delete employee
     await Employee.findByIdAndDelete(id);
 
-    createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "EMPLOYEE_DELETE",
       resourceType: "Employee",

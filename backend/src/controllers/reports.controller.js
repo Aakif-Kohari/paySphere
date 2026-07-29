@@ -2,7 +2,7 @@ const PDFDocument = require("pdfkit");
 const PayrollUpdate = require("../models/payroll.model");
 const Employee = require("../models/employee.model");
 const logger = require("../utils/logger");
-const { createAuditLog } = require("../services/audit.service");
+const eventBus = require("../services/event.service");
 
 // GET /api/reports/analytics
 // Returns aggregated financial stats for the authenticated user's company
@@ -360,7 +360,7 @@ exports.downloadPDFReport = async (req, res, next) => {
         );
     }
 
-    createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "REPORT_DOWNLOAD",
       resourceType: "Report",
