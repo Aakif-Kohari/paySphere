@@ -85,7 +85,7 @@ exports.addEmployee = async (req, res, next) => {
 
     await employee.save();
 
-    createAuditLog({
+    await createAuditLog({
       userId: req.userId,
       action: 'EMPLOYEE_CREATE',
       resourceType: 'Employee',
@@ -379,7 +379,7 @@ exports.importEmployees = async (req, res, next) => {
 
           const importedCount = createdIds.length;
 
-          createAuditLog({
+          await createAuditLog({
             userId: req.userId,
             action: 'EMPLOYEE_IMPORT',
             resourceType: 'Employee',
@@ -531,7 +531,7 @@ exports.updateEmployee = async (req, res, next) => {
       }
     }
 
-    createAuditLog({
+    await createAuditLog({
       userId: req.userId,
       action: 'EMPLOYEE_UPDATE',
       resourceType: 'Employee',
@@ -644,7 +644,7 @@ exports.deleteEmployee = async (req, res, next) => {
       session.endSession();
     }
 
-    createAuditLog({
+    await createAuditLog({
       userId: req.userId,
       action: 'EMPLOYEE_DELETE',
       resourceType: 'Employee',

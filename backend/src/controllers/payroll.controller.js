@@ -248,7 +248,7 @@ exports.finalizePayroll = async (req, res, next) => {
 
     const resourceIds = results.map(r => r.payrollId).filter(Boolean);
 
-    createAuditLog({
+    await createAuditLog({
       userId: req.userId,
       action: "PAYROLL_FINALIZE",
       resourceType: "Payroll",
@@ -287,7 +287,7 @@ exports.finalizePayroll = async (req, res, next) => {
       }
     }
 
-    createAuditLog({
+    await createAuditLog({
       userId: req.userId,
       action: "PAYROLL_FINALIZE",
       resourceType: "Payroll",
@@ -393,7 +393,7 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
     await sendPayslipEmail(employee, payroll);
     await PayrollUpdate.updateOne({ _id: payroll._id }, { payslipEmailed: true });
 
-    createAuditLog({
+    await createAuditLog({
       userId: req.userId,
       action: "PAYSLIP_EMAIL",
       resourceType: "Payroll",
@@ -469,7 +469,7 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
       }
     }
 
-    createAuditLog({
+    await createAuditLog({
       userId: req.userId,
       action: "PAYSLIP_BULK_EMAIL",
       resourceType: "Payroll",
