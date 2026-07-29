@@ -6,7 +6,7 @@ const { payrollQueue } = require("../jobs/queue.service");
 const { calculateNetSalary } = require("../utils/salaryCalculator");
 const exportService = require("../services/export.service");
 const logger = require("../utils/logger");
-const { createAuditLog } = require("../services/audit.service");
+const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
 
 // Helper: parse tag labels back into structured numbers
@@ -250,7 +250,7 @@ exports.finalizePayroll = async (req, res, next) => {
 
     const resourceIds = results.map(r => r.payrollId).filter(Boolean);
 
-    await createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "PAYROLL_FINALIZE",
       resourceType: "Payroll",
@@ -289,7 +289,7 @@ exports.finalizePayroll = async (req, res, next) => {
       }
     }
 
-    await createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "PAYROLL_FINALIZE",
       resourceType: "Payroll",
@@ -395,7 +395,7 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
     await sendPayslipEmail(employee, payroll);
     await PayrollUpdate.updateOne({ _id: payroll._id }, { payslipEmailed: true });
 
-    await createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "PAYSLIP_EMAIL",
       resourceType: "Payroll",
@@ -471,7 +471,7 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
       }
     }
 
-    await createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "PAYSLIP_BULK_EMAIL",
       resourceType: "Payroll",
