@@ -285,6 +285,18 @@ const generatePayslipBuffer = (employee, payroll) => {
     doc.moveDown(1);
 
     doc.fontSize(12).font("Helvetica-Bold").fillColor("#1e3a5f").text(`Net Salary: Rs. ${(payroll.netSalary || 0).toFixed(2)}`, { underline: true });
+
+    // Bank Details section (if available)
+    const bd = employee.bankDetails;
+    if (bd && (bd.bankName || bd.accountNumber || bd.routingCode)) {
+      doc.moveDown(1.5);
+      doc.fontSize(11).font("Helvetica-Bold").fillColor("#333333").text("Bank Details");
+      doc.fontSize(10).font("Helvetica").fillColor("#555555");
+      if (bd.bankName) doc.text(`Bank Name: ${bd.bankName}`);
+      if (bd.accountNumber) doc.text(`Account Number: ${bd.accountNumber}`);
+      if (bd.routingCode) doc.text(`Routing / IFSC Code: ${bd.routingCode}`);
+    }
+
     doc.end();
   });
 };
