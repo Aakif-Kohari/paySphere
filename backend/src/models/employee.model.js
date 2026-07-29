@@ -56,5 +56,6 @@ const employeeSchema = new mongoose.Schema(
 );
 
 employeeSchema.index({ createdBy: 1, fullName: 1, role: 1 }, { unique: true });
+employeeSchema.index({ email: 1, createdBy: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model('Employee', employeeSchema);
