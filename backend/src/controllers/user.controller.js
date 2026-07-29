@@ -167,7 +167,7 @@ exports.updateSettings = async (req, res, next) => {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ message: 'Request body is required' });
     }
-    const {
+    let {
       settings,
       fullName,
       email,
@@ -176,6 +176,15 @@ exports.updateSettings = async (req, res, next) => {
       defaultDailyRate,
       avatar,
     } = req.body;
+
+    if (settings && settings.payrollConfig) {
+      if (defaultDailyRate === undefined && settings.payrollConfig.defaultDailyRate !== undefined) {
+        defaultDailyRate = Number(settings.payrollConfig.defaultDailyRate);
+      }
+      if (defaultOvertimeRate === undefined && settings.payrollConfig.defaultOvertimeRate !== undefined) {
+        defaultOvertimeRate = Number(settings.payrollConfig.defaultOvertimeRate);
+      }
+    }
 
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
