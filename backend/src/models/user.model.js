@@ -14,6 +14,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  role: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Role"
+  },
   password: {
     type: String,
     required: false,

@@ -64,6 +64,10 @@ const payrollUpdateSchema = new mongoose.Schema({
     enum: ["finalized", "paid"],
     default: "finalized",
   },
+  payslipEmailed: {
+    type: Boolean,
+    default: false,
+  },
 }, { timestamps: true });
 
 // Ensure one payroll record per employee per month
