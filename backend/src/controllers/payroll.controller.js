@@ -6,6 +6,7 @@ const { calculateNetSalary } = require("../utils/salaryCalculator");
 const { generatePayrollCSV } = require("../utils/csvExport");
 const logger = require("../utils/logger");
 const { createAuditLog } = require("../services/audit.service");
+const cacheService = require("../services/cache.service");
 
 // Helper: parse tag labels back into structured numbers
 function parseTagValue(label) {

@@ -6,6 +6,7 @@ const { isNonEmptyString, escapeRegex, sanitizeText, MONTHLY_SALARY_MAX, OVERTIM
 const PayrollUpdate = require("../models/payroll.model");
 const logger = require("../utils/logger");
 const { createAuditLog } = require("../services/audit.service");
+const cacheService = require("../services/cache.service");
 // ADD EMPLOYEE
 exports.addEmployee = async (req, res, next) => {
   try {
@@ -63,6 +64,7 @@ exports.addEmployee = async (req, res, next) => {
 
     logger.info(`Employee created`, { userId: req.userId, employeeId: employee._id, fullName: employee.fullName });
 
+    await cacheService.invalidatePattern(`analytics:${req.userId}`);
     res.status(201).json({ message: "Employee added successfully", employee });
   } catch (error) {
     next(error);
@@ -370,6 +372,7 @@ exports.updateEmployee = async (req, res, next) => {
 
     logger.info(`Employee updated`, { userId: req.userId, employeeId: employee._id, fullName: employee.fullName });
 
+    await cacheService.invalidatePattern(`analytics:${req.userId}`);
     res.status(200).json({ message: "Employee updated successfully", employee });
   } catch (error) {
     next(error);
