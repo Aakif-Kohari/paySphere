@@ -1,20 +1,12 @@
-const mongoose = require('mongoose');
-const Employee = require('../models/employee.model');
-const User = require('../models/user.model');
-const { parse } = require('csv-parse');
-const {
-  isNonEmptyString,
-  isValidEmail,
-  escapeRegex,
-  sanitizeText,
-  MONTHLY_SALARY_MAX,
-  OVERTIME_RATE_MAX,
-  FULLNAME_MAX_LENGTH,
-  ROLE_MAX_LENGTH,
-} = require('../utils/validators');
-const PayrollUpdate = require('../models/payroll.model');
-const logger = require('../utils/logger');
-const { createAuditLog } = require('../services/audit.service');
+const mongoose = require("mongoose");
+const Employee = require("../models/employee.model");
+const User = require("../models/user.model");
+const { parse } = require("csv-parse");
+const { isNonEmptyString, escapeRegex, sanitizeText, MONTHLY_SALARY_MAX, OVERTIME_RATE_MAX, FULLNAME_MAX_LENGTH, ROLE_MAX_LENGTH } = require("../utils/validators");
+const PayrollUpdate = require("../models/payroll.model");
+const logger = require("../utils/logger");
+const { createAuditLog } = require("../services/audit.service");
+const cacheService = require("../services/cache.service");
 // ADD EMPLOYEE
 exports.addEmployee = async (req, res, next) => {
   try {
@@ -113,7 +105,8 @@ exports.addEmployee = async (req, res, next) => {
       fullName: employee.fullName,
     });
 
-    res.status(201).json({ message: 'Employee added successfully', employee });
+    await cacheService.invalidatePattern(`analytics:${req.userId}`);
+    res.status(201).json({ message: "Employee added successfully", employee });
   } catch (error) {
     next(error);
   }
@@ -568,9 +561,8 @@ exports.updateEmployee = async (req, res, next) => {
       fullName: employee.fullName,
     });
 
-    res
-      .status(200)
-      .json({ message: 'Employee updated successfully', employee });
+    await cacheService.invalidatePattern(`analytics:${req.userId}`);
+    res.status(200).json({ message: "Employee updated successfully", employee });
   } catch (error) {
     next(error);
   }

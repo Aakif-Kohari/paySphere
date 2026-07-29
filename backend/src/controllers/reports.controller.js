@@ -3,6 +3,7 @@ const PayrollUpdate = require("../models/payroll.model");
 const Employee = require("../models/employee.model");
 const logger = require("../utils/logger");
 const { createAuditLog } = require("../services/audit.service");
+const cacheService = require("../services/cache.service");
 
 // GET /api/reports/analytics
 // Returns aggregated financial stats for the authenticated user's company
@@ -10,6 +11,13 @@ exports.getAnalytics = async (req, res, next) => {
   try {
     const userId = req.userId;
     const monthsBack = Math.min(Math.max(parseInt(req.query.months) || 6, 1), 12);
+    const cacheKey = `analytics:${userId}:${monthsBack}`;
+
+    // 1. Check cache first
+    const cachedData = await cacheService.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json(cachedData);
+    }
 
     // Calculate date range
     const now = new Date();
@@ -97,7 +105,7 @@ exports.getAnalytics = async (req, res, next) => {
     );
     const totalNet = payrolls.reduce((sum, p) => sum + p.netSalary, 0);
 
-    res.status(200).json({
+    const responseData = {
       summary: {
         totalPayout: totalNet,
         totalBase,
@@ -109,7 +117,12 @@ exports.getAnalytics = async (req, res, next) => {
       },
       monthlyTrends,
       roleBreakdown,
-    });
+    };
+
+    // 2. Store in cache for 1 hour (3600 seconds)
+    await cacheService.setEx(cacheKey, 3600, responseData);
+
+    res.status(200).json(responseData);
   } catch (error) {
     next(error);
   }
