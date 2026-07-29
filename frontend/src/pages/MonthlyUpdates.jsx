@@ -289,7 +289,7 @@ export default function MonthlyUpdates() {
 
   const pendingCount = activity.filter(a => a.pending).length;
 
-  const fmt = (n) => "₹" + Math.abs(n).toLocaleString("en-IN");
+  const fmt = (n, c = "INR") => new Intl.NumberFormat('en-IN', { style: 'currency', currency: c }).format(n);
 
   // Finalize payroll
   const handleFinalize = async () => {
@@ -356,11 +356,11 @@ export default function MonthlyUpdates() {
     let summaryText = `💰 PaySphere Payroll Summary (${monthName} ${year})\n`;
     summaryText += `-----------------------------------\n`;
     summaryText += `👥 Total Employees: ${payrollResults.results.length}\n`;
-    summaryText += `💵 Total Payout: ${fmt(totalPayout)}\n`;
+    summaryText += `💵 Total Payout: ${fmt(totalPayout, 'INR')} (Base Currency)\n`;
     summaryText += `-----------------------------------\n`;
 
     payrollResults.results.forEach((r) => {
-      summaryText += `• ${r.employeeName}: ${fmt(r.netSalary)}\n`;
+      summaryText += `• ${r.employeeName}: ${fmt(r.netSalary, r.currency)}\n`;
     });
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -910,7 +910,7 @@ export default function MonthlyUpdates() {
                               </span>
                             )}
                           </div>
-                          <div style={{ fontSize:12, color:"#9CA3AF" }}>Base: {fmt(r.baseSalary)}</div>
+                          <div style={{ fontSize:12, color:"#9CA3AF" }}>Base: {fmt(r.baseSalary, r.currency)}</div>
                         </div>
                       </div>
 
@@ -918,25 +918,25 @@ export default function MonthlyUpdates() {
                         {r.leaveDays > 0 && (
                           <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
                             <span style={{ color: isDark ? "#cbd5e1" : "#6B7280" }}>{r.leaveDays} day{r.leaveDays > 1 ? "s" : ""} leave</span>
-                            <span style={{ color:"#DC2626", fontWeight:600 }}>- {fmt(r.leaveDeduction)}</span>
+                            <span style={{ color:"#DC2626", fontWeight:600 }}>- {fmt(r.leaveDeduction, r.currency)}</span>
                           </div>
                         )}
                         {r.overtimeHours > 0 && (
                           <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
                             <span style={{ color: isDark ? "#cbd5e1" : "#6B7280" }}>{r.overtimeHours} hr{r.overtimeHours > 1 ? "s" : ""} overtime</span>
-                            <span style={{ color: isDark ? "#3b82f6" : "#2563EB", fontWeight:600 }}>+ {fmt(r.overtimePay)}</span>
+                            <span style={{ color: isDark ? "#3b82f6" : "#2563EB", fontWeight:600 }}>+ {fmt(r.overtimePay, r.currency)}</span>
                           </div>
                         )}
                         {r.bonus > 0 && (
                           <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
                             <span style={{ color: isDark ? "#cbd5e1" : "#6B7280" }}>Bonus</span>
-                            <span style={{ color:"#16A34A", fontWeight:600 }}>+ {fmt(r.bonus)}</span>
+                            <span style={{ color:"#16A34A", fontWeight:600 }}>+ {fmt(r.bonus, r.currency)}</span>
                           </div>
                         )}
                         {r.deductions > 0 && (
                           <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
                             <span style={{ color: isDark ? "#cbd5e1" : "#6B7280" }}>Deductions</span>
-                            <span style={{ color:"#DC2626", fontWeight:600 }}>- {fmt(r.deductions)}</span>
+                            <span style={{ color:"#DC2626", fontWeight:600 }}>- {fmt(r.deductions, r.currency)}</span>
                           </div>
                         )}
                       </div>
@@ -947,7 +947,7 @@ export default function MonthlyUpdates() {
                         background: isDark ? "#1e293b" : "#EEF2FF",
                       }}>
                         <span style={{ fontSize:12, fontWeight:700, color: isDark ? "#cbd5e1" : "#6B7280", textTransform:"uppercase", letterSpacing:"0.05em" }}>Net Salary</span>
-                        <span style={{ fontSize:20, fontWeight:700, color: isDark ? "#3b82f6" : "#2563EB" }}>{fmt(r.netSalary)}</span>
+                        <span style={{ fontSize:20, fontWeight:700, color: isDark ? "#3b82f6" : "#2563EB" }}>{fmt(r.netSalary, r.currency)}</span>
                       </div>
                     </div>
                   ))}

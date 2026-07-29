@@ -48,7 +48,7 @@ const getInitials = (name) =>
     .slice(0, 2)
     .toUpperCase();
 
-const fmt = (n) => '₹' + Math.abs(n).toLocaleString('en-IN');
+const fmt = (n, c = "INR") => new Intl.NumberFormat('en-IN', { style: 'currency', currency: c }).format(n);
 
 const StatusBadge = ({ finalized }) => (
   <span
@@ -118,7 +118,7 @@ export default function EmployeeCard({
           <div className="flex justify-between">
             <span className="text-gray-500 dark:text-slate-400">Base Salary</span>
             <span className="font-semibold text-gray-950 dark:text-white">
-              {fmt(emp.monthlySalary)}
+              {fmt(emp.monthlySalary, emp.currency)}
             </span>
           </div>
 
@@ -128,7 +128,7 @@ export default function EmployeeCard({
                 − {p.leaveDays} day{p.leaveDays > 1 ? 's' : ''} leave
               </span>
               <span className="text-red-600 dark:text-red-400 font-semibold">
-                - {fmt(p.leaveDeduction)}
+                - {fmt(p.leaveDeduction, emp.currency)}
               </span>
             </div>
           )}
@@ -151,7 +151,7 @@ export default function EmployeeCard({
                   </p>
                   <div className="space-y-1 text-xs text-gray-600 dark:text-slate-400">
                     <p>Hours Worked: {p.overtimeHours}</p>
-                    <p>Overtime Pay: {fmt(p.overtimePay)}</p>
+                    <p>Overtime Pay: {fmt(p.overtimePay, emp.currency)}</p>
                     <p className="font-semibold text-gray-800 dark:text-white mt-2 mb-1">
                       Formula
                     </p>
@@ -160,7 +160,7 @@ export default function EmployeeCard({
                 </div>
               </div>
               <span className="text-blue-600 dark:text-blue-400 font-semibold">
-                + {fmt(p.overtimePay)}
+                + {fmt(p.overtimePay, emp.currency)}
               </span>
             </div>
           )}
@@ -169,7 +169,7 @@ export default function EmployeeCard({
             <div className="flex justify-between">
               <span className="text-green-600 dark:text-green-400">+ Bonus</span>
               <span className="text-green-600 dark:text-green-400 font-semibold">
-                + {fmt(p.bonus)}
+                + {fmt(p.bonus, emp.currency)}
               </span>
             </div>
           )}
@@ -178,7 +178,7 @@ export default function EmployeeCard({
             <div className="flex justify-between">
               <span className="text-red-600 dark:text-red-400">− Deductions</span>
               <span className="text-red-600 dark:text-red-400 font-semibold">
-                - {fmt(p.deductions)}
+                - {fmt(p.deductions, emp.currency)}
               </span>
             </div>
           )}
@@ -192,7 +192,7 @@ export default function EmployeeCard({
             {p ? 'Net Salary' : 'Monthly Salary'}
           </span>
           <span className="text-2xl font-semibold text-blue-600 dark:text-blue-400">
-            {fmt(p ? p.netSalary : emp.monthlySalary)}
+            {fmt(p ? p.netSalary : emp.monthlySalary, emp.currency)}
           </span>
         </div>
 
@@ -227,7 +227,7 @@ export default function EmployeeCard({
           )}
         </div>
         <p className="text-lg font-bold text-slate-900 dark:text-white">
-          {fmt(p ? p.netSalary : emp.monthlySalary)}
+          {fmt(p ? p.netSalary : emp.monthlySalary, emp.currency)}
         </p>
       </div>
 

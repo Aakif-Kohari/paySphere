@@ -46,6 +46,10 @@ const employeeSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    currency: {
+      type: String,
+      default: "INR",
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
