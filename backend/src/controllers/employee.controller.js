@@ -6,40 +6,65 @@ const { isNonEmptyString, escapeRegex, sanitizeText, MONTHLY_SALARY_MAX, OVERTIM
 const PayrollUpdate = require("../models/payroll.model");
 const logger = require("../utils/logger");
 const { createAuditLog } = require("../services/audit.service");
+const cacheService = require("../services/cache.service");
 // ADD EMPLOYEE
 exports.addEmployee = async (req, res, next) => {
   try {
-    if (!req.body || typeof req.body !== "object") {
-      return res.status(400).json({ message: "Request body is required" });
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ message: 'Request body is required' });
     }
-    const { fullName, role, monthlySalary, overtimeRate } = req.body;
+    const { fullName, role, monthlySalary, overtimeRate, email, bankDetails } = req.body;
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(role)) {
-      return res.status(400).json({ message: "Full name and role are required non-empty strings" });
+      return res
+        .status(400)
+        .json({ message: 'Full name and role are required non-empty strings' });
     }
 
     const numSalary = Number(monthlySalary);
-    if (monthlySalary === undefined || monthlySalary === null || isNaN(numSalary) || !Number.isFinite(numSalary) || numSalary <= 0) {
-      return res.status(400).json({ message: "Monthly salary must be a positive number" });
+    if (
+      monthlySalary === undefined ||
+      monthlySalary === null ||
+      isNaN(numSalary) ||
+      !Number.isFinite(numSalary) ||
+      numSalary <= 0
+    ) {
+      return res
+        .status(400)
+        .json({ message: 'Monthly salary must be a positive number' });
     }
     if (numSalary > MONTHLY_SALARY_MAX) {
-      return res.status(400).json({ message: `Monthly salary cannot exceed ${MONTHLY_SALARY_MAX}` });
+      return res
+        .status(400)
+        .json({
+          message: `Monthly salary cannot exceed ${MONTHLY_SALARY_MAX}`,
+        });
     }
 
     let numOvertime = 0;
     if (overtimeRate !== undefined && overtimeRate !== null) {
       numOvertime = Number(overtimeRate);
-      if (isNaN(numOvertime) || !Number.isFinite(numOvertime) || numOvertime < 0) {
-        return res.status(400).json({ message: "Overtime rate must be a non-negative number" });
+      if (
+        isNaN(numOvertime) ||
+        !Number.isFinite(numOvertime) ||
+        numOvertime < 0
+      ) {
+        return res
+          .status(400)
+          .json({ message: 'Overtime rate must be a non-negative number' });
       }
       if (numOvertime > OVERTIME_RATE_MAX) {
-        return res.status(400).json({ message: `Overtime rate cannot exceed ${OVERTIME_RATE_MAX}` });
+        return res
+          .status(400)
+          .json({
+            message: `Overtime rate cannot exceed ${OVERTIME_RATE_MAX}`,
+          });
       }
     }
 
     // Get the user's company name
     const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     const employee = new Employee({
       fullName: sanitizeText(fullName),
@@ -50,19 +75,37 @@ exports.addEmployee = async (req, res, next) => {
       createdBy: req.userId,
     });
 
+    // Optionally store bank details if provided
+    if (bankDetails && typeof bankDetails === 'object') {
+      employee.bankDetails = {
+        bankName: sanitizeText(bankDetails.bankName || ''),
+        accountNumber: sanitizeText(bankDetails.accountNumber || ''),
+        routingCode: sanitizeText(bankDetails.routingCode || ''),
+      };
+    }
+
     await employee.save();
 
-    createAuditLog({
+    await createAuditLog({
       userId: req.userId,
-      action: "EMPLOYEE_CREATE",
-      resourceType: "Employee",
+      action: 'EMPLOYEE_CREATE',
+      resourceType: 'Employee',
       resourceIds: [employee._id],
-      details: { fullName: employee.fullName, role: employee.role, monthlySalary: employee.monthlySalary },
+      details: {
+        fullName: employee.fullName,
+        role: employee.role,
+        monthlySalary: employee.monthlySalary,
+      },
       req,
     });
 
-    logger.info(`Employee created`, { userId: req.userId, employeeId: employee._id, fullName: employee.fullName });
+    logger.info(`Employee created`, {
+      userId: req.userId,
+      employeeId: employee._id,
+      fullName: employee.fullName,
+    });
 
+    await cacheService.invalidatePattern(`analytics:${req.userId}`);
     res.status(201).json({ message: "Employee added successfully", employee });
   } catch (error) {
     next(error);
@@ -76,10 +119,10 @@ exports.getEmployees = async (req, res, next) => {
     if (isNaN(page) || page < 1) page = 1;
     let limit = parseInt(req.query.limit, 10);
     if (isNaN(limit) || limit < 1 || limit > 100) limit = 10;
-    const includeInactive = req.query.includeInactive === "true";
+    const includeInactive = req.query.includeInactive === 'true';
 
     let search = req.query.search;
-    if (typeof search !== "string") search = "";
+    if (typeof search !== 'string') search = '';
     search = sanitizeText(search);
 
     const skip = (page - 1) * limit;
@@ -95,8 +138,8 @@ exports.getEmployees = async (req, res, next) => {
     if (search) {
       const safeSearch = escapeRegex(search);
       query.$or = [
-        { fullName: { $regex: safeSearch, $options: "i" } },
-        { role: { $regex: safeSearch, $options: "i" } },
+        { fullName: { $regex: safeSearch, $options: 'i' } },
+        { role: { $regex: safeSearch, $options: 'i' } },
       ];
     }
 
@@ -137,7 +180,7 @@ exports.importEmployees = async (req, res, next) => {
   try {
     if (!req.file) {
       return res.status(400).json({
-        message: "No CSV file uploaded",
+        message: 'No CSV file uploaded',
       });
     }
 
@@ -145,11 +188,11 @@ exports.importEmployees = async (req, res, next) => {
 
     if (!user) {
       return res.status(404).json({
-        message: "User not found",
+        message: 'User not found',
       });
     }
 
-    const csvData = req.file.buffer.toString("utf-8");
+    const csvData = req.file.buffer.toString('utf-8');
 
     parse(
       csvData,
@@ -157,31 +200,44 @@ exports.importEmployees = async (req, res, next) => {
         columns: true,
         skip_empty_lines: true,
         trim: true,
+        bom: true,
       },
       async (err, records) => {
         try {
           if (err) {
             return res.status(400).json({
-              message: "Invalid CSV format",
+              message: 'Invalid CSV format',
             });
           }
 
           // Fetch existing employees to detect duplicates by fullName + role
           // Extract unique names from the CSV to minimize database query size
-          const csvNames = Array.from(new Set(records.map(r => r.fullName?.trim()).filter(Boolean)));
-          
-          // Use case-insensitive regex for the $in query to guarantee matching without specific collation
-          const nameRegexes = csvNames.map(name => new RegExp('^' + name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + '$', 'i'));
+          const csvNames = Array.from(
+            new Set(records.map((r) => r.fullName?.trim()).filter(Boolean)),
+          );
 
-          const existingEmployees = nameRegexes.length > 0
-            ? await Employee.find({ 
-                createdBy: req.userId,
-                fullName: { $in: nameRegexes }
-              }).select('fullName role')
-            : [];
+          // Use case-insensitive regex for the $in query to guarantee matching without specific collation
+          const nameRegexes = csvNames.map(
+            (name) =>
+              new RegExp(
+                '^' + name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + '$',
+                'i',
+              ),
+          );
+
+          const existingEmployees =
+            nameRegexes.length > 0
+              ? await Employee.find({
+                  createdBy: req.userId,
+                  fullName: { $in: nameRegexes },
+                }).select('fullName role')
+              : [];
 
           const existingKeys = new Set(
-            existingEmployees.map(e => `${sanitizeText(e.fullName).toLowerCase()}|${sanitizeText(e.role).toLowerCase()}`)
+            existingEmployees.map(
+              (e) =>
+                `${sanitizeText(e.fullName).toLowerCase()}|${sanitizeText(e.role).toLowerCase()}`,
+            ),
           );
 
           const employees = [];
@@ -196,45 +252,67 @@ exports.importEmployees = async (req, res, next) => {
 
             if (!rawName) {
               skipped++;
-              errors.push({ row: index + 2, reason: "Full name is required" });
+              errors.push({ row: index + 2, reason: 'Full name is required' });
               return;
             }
             if (rawName.length > FULLNAME_MAX_LENGTH) {
               skipped++;
-              errors.push({ row: index + 2, reason: `Full name exceeds maximum of ${FULLNAME_MAX_LENGTH} characters` });
+              errors.push({
+                row: index + 2,
+                reason: `Full name exceeds maximum of ${FULLNAME_MAX_LENGTH} characters`,
+              });
               return;
             }
 
             if (!rawRole) {
               skipped++;
-              errors.push({ row: index + 2, reason: "Role is required" });
+              errors.push({ row: index + 2, reason: 'Role is required' });
               return;
             }
             if (rawRole.length > ROLE_MAX_LENGTH) {
               skipped++;
-              errors.push({ row: index + 2, reason: `Role exceeds maximum of ${ROLE_MAX_LENGTH} characters` });
+              errors.push({
+                row: index + 2,
+                reason: `Role exceeds maximum of ${ROLE_MAX_LENGTH} characters`,
+              });
               return;
             }
 
             if (!Number.isFinite(monthlySalary) || monthlySalary <= 0) {
               skipped++;
-              errors.push({ row: index + 2, reason: "Invalid monthly salary" });
+              errors.push({ row: index + 2, reason: 'Invalid monthly salary' });
               return;
             }
             if (monthlySalary > MONTHLY_SALARY_MAX) {
               skipped++;
-              errors.push({ row: index + 2, reason: `Monthly salary exceeds maximum of ${MONTHLY_SALARY_MAX}` });
+              errors.push({
+                row: index + 2,
+                reason: `Monthly salary exceeds maximum of ${MONTHLY_SALARY_MAX}`,
+              });
               return;
             }
 
             if (!Number.isFinite(overtimeRate) || overtimeRate < 0) {
               skipped++;
-              errors.push({ row: index + 2, reason: "Invalid overtime rate" });
+              errors.push({ row: index + 2, reason: 'Invalid overtime rate' });
               return;
             }
             if (overtimeRate > OVERTIME_RATE_MAX) {
               skipped++;
-              errors.push({ row: index + 2, reason: `Overtime rate exceeds maximum of ${OVERTIME_RATE_MAX}` });
+              errors.push({
+                row: index + 2,
+                reason: `Overtime rate exceeds maximum of ${OVERTIME_RATE_MAX}`,
+              });
+              return;
+            }
+
+            const rawEmail = record.email?.trim();
+            if (rawEmail && !isValidEmail(rawEmail)) {
+              skipped++;
+              errors.push({
+                row: index + 2,
+                reason: `Invalid email format: "${record.email}"`,
+              });
               return;
             }
 
@@ -243,7 +321,11 @@ exports.importEmployees = async (req, res, next) => {
             const key = `${sanitizedName.toLowerCase()}|${sanitizedRole.toLowerCase()}`;
             if (existingKeys.has(key)) {
               skipped++;
-              errors.push({ row: index + 2, reason: "Duplicate employee (same name and role already exists)" });
+              errors.push({
+                row: index + 2,
+                reason:
+                  'Duplicate employee (same name and role already exists)',
+              });
               return;
             }
 
@@ -265,12 +347,31 @@ exports.importEmployees = async (req, res, next) => {
             try {
               session = await mongoose.startSession();
               session.startTransaction();
-              const created = await Employee.insertMany(employees, { session, ordered: false });
-              createdIds = created.map(e => e._id);
+              let created = [];
+              try {
+                created = await Employee.insertMany(employees, {
+                  session,
+                  ordered: false,
+                });
+              } catch (insertError) {
+                if (insertError.code === 11000) {
+                  skipped += insertError.writeErrors
+                    ? insertError.writeErrors.length
+                    : 1;
+                  created = insertError.insertedDocs || [];
+                } else {
+                  throw insertError;
+                }
+              }
+              createdIds = created.map((e) => e._id);
               await session.commitTransaction();
             } catch (txError) {
               if (session) {
-                try { await session.abortTransaction(); } catch (e) { }
+                try {
+                  await session.abortTransaction();
+                } catch {
+                  /* ignore */
+                }
               }
               throw txError;
             } finally {
@@ -278,30 +379,45 @@ exports.importEmployees = async (req, res, next) => {
             }
           }
 
-          createAuditLog({
+          const importedCount = createdIds.length;
+
+          await createAuditLog({
             userId: req.userId,
-            action: "EMPLOYEE_IMPORT",
-            resourceType: "Employee",
+            action: 'EMPLOYEE_IMPORT',
+            resourceType: 'Employee',
             resourceIds: createdIds,
-            details: { imported: employees.length, skipped, totalErrors: errors.length, fileName: req.file?.originalname },
-            result: employees.length > 0 ? (errors.length > 0 ? "partial" : "success") : "failure",
+            details: {
+              imported: importedCount,
+              skipped,
+              totalErrors: errors.length,
+              fileName: req.file?.originalname,
+            },
+            result:
+              importedCount > 0
+                ? errors.length > 0
+                  ? 'partial'
+                  : 'success'
+                : 'failure',
             req,
           });
 
           logger.info(`Employee CSV import completed`, {
-            userId: req.userId, imported: employees.length, skipped, totalErrors: errors.length,
+            userId: req.userId,
+            imported: importedCount,
+            skipped,
+            totalErrors: errors.length,
           });
 
           return res.status(200).json({
-            message: "Employee import completed",
-            imported: employees.length,
+            message: 'Employee import completed',
+            imported: importedCount,
             skipped,
             errors,
           });
         } catch (dbError) {
           next(dbError);
         }
-      }
+      },
     );
   } catch (error) {
     next(error);
@@ -311,44 +427,79 @@ exports.importEmployees = async (req, res, next) => {
 // UPDATE EMPLOYEE
 exports.updateEmployee = async (req, res, next) => {
   try {
-    if (!req.body || typeof req.body !== "object") {
-      return res.status(400).json({ message: "Request body is required" });
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ message: 'Request body is required' });
     }
     const { id } = req.params;
-    const { fullName, role, monthlySalary, overtimeRate, isActive } = req.body;
+    const { fullName, role, monthlySalary, overtimeRate, isActive, email, bankDetails } = req.body;
 
     const employee = await Employee.findById(id);
 
     if (!employee) {
-      return res.status(404).json({ message: "Employee not found" });
+      return res.status(404).json({ message: 'Employee not found' });
     }
 
     // Ensure the logged-in user is the creator of this employee
     if (employee.createdBy.toString() !== req.userId) {
-      return res.status(403).json({ message: "Not authorized to update this employee" });
+      return res
+        .status(403)
+        .json({ message: 'Not authorized to update this employee' });
     }
 
     // Validate fields if provided
     if (fullName !== undefined && !isNonEmptyString(fullName)) {
-      return res.status(400).json({ message: "Full name must be a required non-empty string" });
+      return res
+        .status(400)
+        .json({ message: 'Full name must be a required non-empty string' });
     }
     if (role !== undefined && !isNonEmptyString(role)) {
-      return res.status(400).json({ message: "Role must be a required non-empty string" });
+      return res
+        .status(400)
+        .json({ message: 'Role must be a required non-empty string' });
     }
 
-    if (monthlySalary !== undefined && (isNaN(monthlySalary) || !Number.isFinite(Number(monthlySalary)) || monthlySalary <= 0)) {
-      return res.status(400).json({ message: "Monthly salary must be a positive number" });
+    if (
+      monthlySalary !== undefined &&
+      (isNaN(monthlySalary) ||
+        !Number.isFinite(Number(monthlySalary)) ||
+        monthlySalary <= 0)
+    ) {
+      return res
+        .status(400)
+        .json({ message: 'Monthly salary must be a positive number' });
     }
-    if (monthlySalary !== undefined && Number(monthlySalary) > MONTHLY_SALARY_MAX) {
-      return res.status(400).json({ message: `Monthly salary cannot exceed ${MONTHLY_SALARY_MAX}` });
+    if (
+      monthlySalary !== undefined &&
+      Number(monthlySalary) > MONTHLY_SALARY_MAX
+    ) {
+      return res
+        .status(400)
+        .json({
+          message: `Monthly salary cannot exceed ${MONTHLY_SALARY_MAX}`,
+        });
     }
 
-    if (overtimeRate !== undefined && (isNaN(overtimeRate) || !Number.isFinite(Number(overtimeRate)) || overtimeRate < 0)) {
-      return res.status(400).json({ message: "Overtime rate must be a non-negative number" });
+    if (
+      overtimeRate !== undefined &&
+      (isNaN(overtimeRate) ||
+        !Number.isFinite(Number(overtimeRate)) ||
+        overtimeRate < 0)
+    ) {
+      return res
+        .status(400)
+        .json({ message: 'Overtime rate must be a non-negative number' });
     }
-    if (overtimeRate !== undefined && Number(overtimeRate) > OVERTIME_RATE_MAX) {
-      return res.status(400).json({ message: `Overtime rate cannot exceed ${OVERTIME_RATE_MAX}` });
+    if (
+      overtimeRate !== undefined &&
+      Number(overtimeRate) > OVERTIME_RATE_MAX
+    ) {
+      return res
+        .status(400)
+        .json({ message: `Overtime rate cannot exceed ${OVERTIME_RATE_MAX}` });
     }
+
+    // Capture old name for payroll propagation check (#253)
+    const oldName = employee.fullName;
 
     // Apply updates only for provided fields
     if (fullName !== undefined) employee.fullName = sanitizeText(fullName);
@@ -357,19 +508,60 @@ exports.updateEmployee = async (req, res, next) => {
     if (overtimeRate !== undefined) employee.overtimeRate = overtimeRate;
     if (isActive !== undefined) employee.isActive = isActive;
 
+    // Patch bank details: merge only the provided sub-fields
+    if (bankDetails && typeof bankDetails === 'object') {
+      employee.bankDetails = {
+        bankName: sanitizeText(bankDetails.bankName ?? employee.bankDetails?.bankName ?? ''),
+        accountNumber: sanitizeText(bankDetails.accountNumber ?? employee.bankDetails?.accountNumber ?? ''),
+        routingCode: sanitizeText(bankDetails.routingCode ?? employee.bankDetails?.routingCode ?? ''),
+      };
+    }
+
     await employee.save();
 
-    createAuditLog({
+    // Propagate name change to finalized (unpaid) PayrollUpdate records (#253)
+    if (fullName !== undefined && employee.fullName !== oldName) {
+      try {
+        const result = await PayrollUpdate.updateMany(
+          { employeeId: id, createdBy: req.userId, status: 'finalized' },
+          { $set: { employeeName: employee.fullName } },
+        );
+        logger.info(`PayrollUpdate employeeName propagated`, {
+          userId: req.userId,
+          employeeId: id,
+          oldName,
+          newName: employee.fullName,
+          modifiedCount: result.modifiedCount,
+        });
+      } catch (propagateErr) {
+        logger.error(`Failed to propagate employeeName to PayrollUpdate`, {
+          userId: req.userId,
+          employeeId: id,
+          error: propagateErr.message,
+        });
+      }
+    }
+
+    await createAuditLog({
       userId: req.userId,
-      action: "EMPLOYEE_UPDATE",
-      resourceType: "Employee",
+      action: 'EMPLOYEE_UPDATE',
+      resourceType: 'Employee',
       resourceIds: [employee._id],
-      details: { fullName: employee.fullName, role: employee.role, changes: Object.keys(req.body).filter(k => k !== 'id') },
+      details: {
+        fullName: employee.fullName,
+        role: employee.role,
+        changes: Object.keys(req.body).filter((k) => k !== 'id'),
+      },
       req,
     });
 
-    logger.info(`Employee updated`, { userId: req.userId, employeeId: employee._id, fullName: employee.fullName });
+    logger.info(`Employee updated`, {
+      userId: req.userId,
+      employeeId: employee._id,
+      fullName: employee.fullName,
+    });
 
+    await cacheService.invalidatePattern(`analytics:${req.userId}`);
     res.status(200).json({ message: "Employee updated successfully", employee });
   } catch (error) {
     next(error);
@@ -384,22 +576,23 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
     const employee = await Employee.findById(id);
 
     if (!employee) {
-      return res.status(404).json({ message: "Employee not found" });
+      return res.status(404).json({ message: 'Employee not found' });
     }
 
     if (employee.createdBy.toString() !== req.userId) {
-      return res.status(403).json({ message: "Not authorized to update this employee" });
+      return res
+        .status(403)
+        .json({ message: 'Not authorized to update this employee' });
     }
 
     employee.isActive = !employee.isActive;
     await employee.save();
 
-    res.status(200).json({ message: "Employee status updated", employee });
+    res.status(200).json({ message: 'Employee status updated', employee });
   } catch (error) {
     next(error);
   }
 };
-
 
 // DELETE EMPLOYEE
 exports.deleteEmployee = async (req, res, next) => {
@@ -410,41 +603,75 @@ exports.deleteEmployee = async (req, res, next) => {
 
     if (!employee) {
       return res.status(404).json({
-        message: "Employee not found",
+        message: 'Employee not found',
       });
     }
 
     // Check ownership
     if (employee.createdBy.toString() !== req.userId) {
       return res.status(403).json({
-        message: "Not authorized to delete this employee",
+        message: 'Not authorized to delete this employee',
       });
     }
 
-    // Delete related payroll records
-    await PayrollUpdate.deleteMany({
+    // Check if employee has historical "paid" payroll records (#345)
+    const hasPaidPayroll = await PayrollUpdate.exists({
       employeeId: id,
       createdBy: req.userId,
+      status: 'paid',
     });
 
-    // Delete employee
-    await Employee.findByIdAndDelete(id);
+    if (hasPaidPayroll) {
+      return res.status(400).json({
+        message: 'Cannot delete employee with historical paid payroll records',
+      });
+    }
 
-    createAuditLog({
+    // Try to start a transaction
+    let session = null;
+    try {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    } catch {
+      session = null;
+    }
+
+    const deleteOptions = session ? { session } : {};
+    // Delete related payroll records
+    await PayrollUpdate.deleteMany(
+      {
+        employeeId: id,
+        createdBy: req.userId,
+      },
+      deleteOptions,
+    );
+
+    // Delete employee
+    await Employee.findByIdAndDelete(id, deleteOptions);
+
+    if (session) {
+      await session.commitTransaction();
+      session.endSession();
+    }
+
+    await createAuditLog({
       userId: req.userId,
-      action: "EMPLOYEE_DELETE",
-      resourceType: "Employee",
+      action: 'EMPLOYEE_DELETE',
+      resourceType: 'Employee',
       resourceIds: [id],
       details: { fullName: employee.fullName, role: employee.role },
       req,
     });
 
-    logger.info(`Employee deleted`, { userId: req.userId, employeeId: id, fullName: employee.fullName });
-
-    res.status(200).json({
-      message: "Employee and payroll records deleted successfully",
+    logger.info(`Employee deleted`, {
+      userId: req.userId,
+      employeeId: id,
+      fullName: employee.fullName,
     });
 
+    res.status(200).json({
+      message: 'Employee and payroll records deleted successfully',
+    });
   } catch (error) {
     next(error);
   }

@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useSelector, useDispatch } from "react-redux";
-import { logout, logoutUser } from "../features/auth/authSlice";
-import ThemeToggle from "../components/ThemeToggle";
+import { logoutUser } from "../features/auth/authSlice";import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
 import AttendanceCalendarModal from "../components/AttendanceCalendarModal";
+import { Snackbar, Alert } from '@mui/material';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const PayrollIcon = () => (
@@ -115,7 +115,19 @@ const QUICK_ACTIONS = [
 
 function parseInput(text, employeeList) {
   const lower = text.toLowerCase();
-  
+
+  // Parse tags early so they're available even in ambiguous cases
+  const tags = [];
+  const leaveMatch = lower.match(/(\d+)\s*day[s]?\s*leave/);
+  if (leaveMatch) tags.push({ label: `\u2013 ${leaveMatch[1]} day${leaveMatch[1]>1?"s":""} leave`, bg: "#FEF2F2", color: "#DC2626" });
+  const overtimeMatch = lower.match(/(\d+)\s*hour[s]?\s*overtime/);
+  if (overtimeMatch) tags.push({ label: `+ ${overtimeMatch[1]} hr overtime`, bg: "#EFF6FF", color: "#2563EB" });
+  const bonusMatch = lower.match(/\u20b9?([\d,]+)\s*bonus/);
+  if (bonusMatch) tags.push({ label: `+ \u20b9${bonusMatch[1]} bonus`, bg: "#F0FDF4", color: "#16A34A" });
+  const dedMatch = lower.match(/\u20b9?([\d,]+)\s*deduction/);
+  if (dedMatch) tags.push({ label: `\u2013 \u20b9${dedMatch[1]} deduction`, bg: "#FEF2F2", color: "#DC2626" });
+  if (tags.length === 0) tags.push({ label: text.slice(0,30), bg: "#F3F4F6", color: "#374151" });
+
   // 1. Try exact full-name match
   let name = null;
   let employeeId = null;
@@ -127,16 +139,20 @@ function parseInput(text, employeeList) {
     }
   }
 
-  // 2. Try first-name match: "Ravi took..." → matches "Ravi Kumar"
+  // 2. Try first-name match: "Ravi took..." -> matches "Ravi Kumar" / "Ravi Singh"
   if (!name) {
+    const firstMatches = [];
     for (const emp of employeeList) {
       const firstName = emp.fullName.split(" ")[0].toLowerCase();
-      // Check if input starts with the first name followed by a space or action word
       if (lower.startsWith(firstName + " ")) {
-        name = emp.fullName;
-        employeeId = emp._id;
-        break;
+        firstMatches.push({ fullName: emp.fullName, _id: emp._id });
       }
+    }
+    if (firstMatches.length === 1) {
+      name = firstMatches[0].fullName;
+      employeeId = firstMatches[0]._id;
+    } else if (firstMatches.length > 1) {
+      return { employeeId: null, name: null, tags, note: null, pending: true, ambiguousMatches: firstMatches, rawInput: text };
     }
   }
 
@@ -148,16 +164,6 @@ function parseInput(text, employeeList) {
     employeeId = matchedEmp ? matchedEmp._id : null;
   }
 
-  const tags = [];
-  const leaveMatch = lower.match(/(\d+)\s*day[s]?\s*leave/);
-  if (leaveMatch) tags.push({ label: `– ${leaveMatch[1]} day${leaveMatch[1]>1?"s":""} leave`, bg: "#FEF2F2", color: "#DC2626" });
-  const overtimeMatch = lower.match(/(\d+)\s*hour[s]?\s*overtime/);
-  if (overtimeMatch) tags.push({ label: `+ ${overtimeMatch[1]} hr overtime`, bg: "#EFF6FF", color: "#2563EB" });
-  const bonusMatch = lower.match(/₹?([\d,]+)\s*bonus/);
-  if (bonusMatch) tags.push({ label: `+ ₹${bonusMatch[1]} bonus`, bg: "#F0FDF4", color: "#16A34A" });
-  const dedMatch = lower.match(/₹?([\d,]+)\s*deduction/);
-  if (dedMatch) tags.push({ label: `– ₹${dedMatch[1]} deduction`, bg: "#FEF2F2", color: "#DC2626" });
-  if (tags.length === 0) tags.push({ label: text.slice(0,30), bg: "#F3F4F6", color: "#374151" });
   return { employeeId, name, tags, note: null, pending: true };
 }
 
@@ -194,9 +200,21 @@ export default function MonthlyUpdates() {
 
   // Copy Payroll Summary state (#184)
   const [copiedSummary, setCopiedSummary] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
+
+  // Disambiguation state for first-name collision (#274)
+  const [disambiguationMatches, setDisambiguationMatches] = useState([]);
+  const [pendingParsed, setPendingParsed] = useState(null);
 
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
-  const token = localStorage.getItem("token");
+  const reduxToken = useSelector((state) => state.auth.token);
+  const token = reduxToken || localStorage.getItem("token");
+
+  useEffect(() => {
+    if (!token) {
+      navigate('/auth');
+    }
+  }, [token, navigate]);
 
   // Fetch real employees from API
   useEffect(() => {
@@ -227,10 +245,29 @@ export default function MonthlyUpdates() {
   const handleSubmit = () => {
     if (!input.trim()) return;
     const parsed = parseInput(input.trim(), employees);
+    if (parsed.ambiguousMatches && parsed.ambiguousMatches.length > 1) {
+      setDisambiguationMatches(parsed.ambiguousMatches);
+      setPendingParsed(parsed);
+      return;
+    }
     const color = COLORS[nextId % COLORS.length];
     setActivity(prev => [{ ...parsed, id: nextId, color }, ...prev]);
     setNextId(n => n + 1);
     setInput("");
+  };
+
+  const handleDisambiguationSelect = (emp) => {
+    const color = COLORS[nextId % COLORS.length];
+    setActivity(prev => [{ ...pendingParsed, employeeId: emp._id, name: emp.fullName, id: nextId, color }, ...prev]);
+    setNextId(n => n + 1);
+    setInput("");
+    setDisambiguationMatches([]);
+    setPendingParsed(null);
+  };
+
+  const handleDisambiguationCancel = () => {
+    setDisambiguationMatches([]);
+    setPendingParsed(null);
   };
 
   const handleDelete = (id) => setActivity(prev => prev.filter(a => a.id !== id));
@@ -356,9 +393,13 @@ export default function MonthlyUpdates() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (err) {
-      alert('No data to export');
-    }
+} catch {
+      setSnackbar({ open: true, message: 'No data to export', severity: 'error' });
+    }  };
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') return;
+    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   return (
@@ -972,6 +1013,63 @@ export default function MonthlyUpdates() {
             </div>
           )}
 
+          {/* Disambiguation Picker Modal (#274) */}
+          {disambiguationMatches.length > 0 && (
+            <div className="modal-overlay" onClick={handleDisambiguationCancel}>
+              <div className="modal-box" onClick={e => e.stopPropagation()} style={{ padding: "24px" }}>
+                <h3 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "6px" }}>
+                  {pendingParsed && pendingParsed.rawInput
+                    ? `Which employee did you mean?`
+                    : "Multiple matches found"}
+                </h3>
+                <p style={{ fontSize: "13.5px", color: isDark ? "#9CA3AF" : "#6B7280", marginBottom: "18px" }}>
+                  Multiple employees share this first name. Please select the correct one:
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "300px", overflowY: "auto", marginBottom: "20px" }}>
+                  {disambiguationMatches.map(emp => (
+                    <button
+                      key={emp._id}
+                      onClick={() => handleDisambiguationSelect(emp)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "12px 16px",
+                        borderRadius: "12px",
+                        border: isDark ? "1px solid #1e293b" : "1px solid #E5E7EB",
+                        background: isDark ? "#111827" : "#F9FAFB",
+                        color: isDark ? "white" : "#111827",
+                        fontSize: "14.5px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <span>{emp.fullName}</span>
+                      <span style={{ fontSize: "12.5px", color: "#2563EB" }}>Select</span>
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    onClick={handleDisambiguationCancel}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "#9CA3AF",
+                      color: "white",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Employee Picker Modal for Calendar (#137) */}
           {showEmpPicker && (
             <div className="modal-overlay" onClick={() => setShowEmpPicker(false)}>
@@ -1044,6 +1142,12 @@ export default function MonthlyUpdates() {
 
         </main>
       </div>
+
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%', variant: 'filled' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </div>
   );
 }

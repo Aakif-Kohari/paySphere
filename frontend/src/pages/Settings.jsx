@@ -82,16 +82,14 @@ export default function Settings() {
   const [settings, setSettings] = useState({
     preferences: { language: "English (US)", theme: "system" },
     companyInfo: { payrollCycle: "monthly" },
-    payrollConfig: { currency: "INR (₹)", leaveDeductionPolicy: "basic_only", processingDate: "Last working day" },
+    payrollConfig: { currency: "INR (₹)", leaveDeductionPolicy: "basic_only", processingDate: "Last working day", defaultOvertimeRate: 0, defaultDailyRate: 0 },
     notifications: { emailReminders: true, systemAlerts: true, payrollCompletion: true, featureAnnouncements: false }
   });
-  
-  const [defaultOvertimeRate, setDefaultOvertimeRate] = useState(0);
-  const [defaultDailyRate, setDefaultDailyRate] = useState(0);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
+  const [profileErrors, setProfileErrors] = useState({ fullName: "", email: "" });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
 
@@ -112,7 +110,11 @@ export default function Settings() {
           setSettings(prev => ({
             preferences: res.data.settings.preferences || prev.preferences,
             companyInfo: res.data.settings.companyInfo || prev.companyInfo,
-            payrollConfig: res.data.settings.payrollConfig || prev.payrollConfig,
+            payrollConfig: {
+              ...(res.data.settings.payrollConfig || prev.payrollConfig),
+              defaultOvertimeRate: res.data.defaultOvertimeRate || 0,
+              defaultDailyRate: res.data.defaultDailyRate || 0
+            },
             notifications: res.data.settings.notifications || prev.notifications,
           }));
           
@@ -121,29 +123,55 @@ export default function Settings() {
             const newMode = t === 'system' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
             dispatch(setThemeMode(newMode));
           }
+        } else {
+          setSettings(prev => ({
+            ...prev,
+            payrollConfig: {
+              ...prev.payrollConfig,
+              defaultOvertimeRate: res.data.defaultOvertimeRate || 0,
+              defaultDailyRate: res.data.defaultDailyRate || 0
+            }
+          }));
         }
-        setDefaultOvertimeRate(res.data.defaultOvertimeRate || 0);
-        setDefaultDailyRate(res.data.defaultDailyRate || 0);
       })
       .catch(err => console.error("Failed to fetch settings", err))
       .finally(() => setLoading(false));
   }, [localCompanyName, dispatch]);
 
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   const handleSaveSettings = async () => {
+    // Client-side validation before making the API call (#356)
+    const errors = { fullName: "", email: "" };
+
+    if (!userProfile.fullName || !userProfile.fullName.trim()) {
+      errors.fullName = "Full name cannot be empty.";
+    }
+
+    if (!userProfile.email || !emailRegex.test(userProfile.email.trim())) {
+      errors.email = "Please enter a valid email address.";
+    }
+
+    if (errors.fullName || errors.email) {
+      setProfileErrors(errors);
+      return;
+    }
+
+    // Clear any previous errors
+    setProfileErrors({ fullName: "", email: "" });
+
     try {
       await api.patch("/api/auth/settings", {
         settings,
-        fullName: userProfile.fullName,
-        email: userProfile.email,
+        fullName: userProfile.fullName.trim(),
+        email: userProfile.email.trim(),
         companyName: userProfile.companyName,
-        avatar: userProfile.avatar,
-        defaultOvertimeRate,
-        defaultDailyRate
+        avatar: userProfile.avatar
       });
       alert("Settings updated successfully!");
     } catch (err) {
       console.error(err);
-      alert("Error saving settings.");
+      alert(err.response?.data?.message || "Error saving settings.");
     }
   };
 
@@ -281,11 +309,35 @@ export default function Settings() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Full Name</label>
-                <input type="text" value={userProfile.fullName} onChange={(e) => setUserProfile({...userProfile, fullName: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm text-gray-900 dark:text-white transition" />
+                <input
+                  type="text"
+                  value={userProfile.fullName}
+                  onChange={(e) => setUserProfile({...userProfile, fullName: e.target.value})}
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
+                    profileErrors.fullName
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
+                      : "border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20"
+                  }`}
+                />
+                {profileErrors.fullName && (
+                  <p className="text-xs text-red-500 mt-1.5 font-medium">{profileErrors.fullName}</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Email Address</label>
-                <input type="email" value={userProfile.email} onChange={(e) => setUserProfile({...userProfile, email: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm text-gray-900 dark:text-white transition" />
+                <input
+                  type="email"
+                  value={userProfile.email}
+                  onChange={(e) => setUserProfile({...userProfile, email: e.target.value})}
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
+                    profileErrors.email
+                      ? "border-red-500 focus:border-red-500 focus:ring-red-500/20"
+                      : "border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20"
+                  }`}
+                />
+                {profileErrors.email && (
+                  <p className="text-xs text-red-500 mt-1.5 font-medium">{profileErrors.email}</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Payroll ID</label>
@@ -293,7 +345,7 @@ export default function Settings() {
               </div>
               <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Role / Designation</label>
-                <input type="text" defaultValue="Admin" className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm text-gray-900 dark:text-white transition" />
+                <input type="text" defaultValue="Admin" className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-900 dark:text-white transition" />
               </div>
             </div>
 
@@ -388,7 +440,7 @@ export default function Settings() {
               </div>
               <div className="p-5 border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm">
                 <h3 className="font-bold text-sm text-gray-900 dark:text-white mb-4">Language</h3>
-                <select value={settings.preferences.language} onChange={(e) => updateSettingsField('preferences', 'language', e.target.value)} className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold focus:border-blue-500 transition cursor-pointer">
+                <select value={settings.preferences.language} onChange={(e) => updateSettingsField('preferences', 'language', e.target.value)} className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer">
                   <option>English (US)</option>
                   <option>English (UK)</option>
                   <option>Hindi (IN)</option>
@@ -473,10 +525,17 @@ export default function Settings() {
                   </select>
                 </div>
                 <div>
+                  <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Default Daily Rate</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 font-bold text-sm">₹</span>
+                    <input type="number" value={settings.payrollConfig.defaultDailyRate} onChange={(e) => updateSettingsField('payrollConfig', 'defaultDailyRate', Number(e.target.value))} className="w-full pl-8 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold transition" />
+                  </div>
+                </div>
+                <div>
                   <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Default Overtime Rate (per hr)</label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 font-bold text-sm">₹</span>
-                    <input type="number" value={defaultOvertimeRate} onChange={(e) => setDefaultOvertimeRate(Number(e.target.value))} className="w-full pl-8 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold transition" />
+                    <input type="number" value={settings.payrollConfig.defaultOvertimeRate} onChange={(e) => updateSettingsField('payrollConfig', 'defaultOvertimeRate', Number(e.target.value))} className="w-full pl-8 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold transition" />
                   </div>
                 </div>
                 <div>

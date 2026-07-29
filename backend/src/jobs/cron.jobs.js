@@ -33,7 +33,7 @@ const startCronJobs = () => {
       }
 
       // Find all finalized payrolls for the previous month
-      const payrolls = await PayrollUpdate.find({ month: targetMonth, year: targetYear, status: "finalized" });
+      const payrolls = await PayrollUpdate.find({ month: targetMonth, year: targetYear, status: "finalized", payslipEmailed: false });
       
       logger.info(`Found ${payrolls.length} finalized payrolls for ${targetMonth}/${targetYear}`);
 
@@ -42,6 +42,7 @@ const startCronJobs = () => {
           const employee = await Employee.findById(payroll.employeeId);
           if (employee && employee.email) {
             await sendPayslipEmail(employee, payroll);
+            await PayrollUpdate.updateOne({ _id: payroll._id }, { payslipEmailed: true });
           }
         } catch (err) {
           logger.error(`Error sending payslip for payroll ${payroll._id}`, { error: err.message });
