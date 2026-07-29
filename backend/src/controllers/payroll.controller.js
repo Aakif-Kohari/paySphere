@@ -93,14 +93,18 @@ exports.finalizePayroll = async (req, res, next) => {
         const lower = tag.label.toLowerCase();
         const value = parseTagValue(tag.label);
 
-        if (lower.includes("leave") || lower.includes("day")) {
-          leaveDays += value;
-        } else if (lower.includes("overtime") || lower.includes("hr")) {
+        if (lower.includes("overtime") || lower.includes("ot")) {
           overtimeHours += value;
         } else if (lower.includes("bonus")) {
           bonus += value;
-        } else if (lower.includes("deduction")) {
+        } else if (lower.includes("deduct")) {
           deductions += value;
+        } else if (lower.includes("leave") || lower.includes("unpaid") || lower.includes("absence")) {
+          leaveDays += value;
+        } else if (lower.includes("day")) {
+          leaveDays += value;
+        } else if (lower.includes("hr") || lower.includes("hour")) {
+          overtimeHours += value;
         }
       }
 
