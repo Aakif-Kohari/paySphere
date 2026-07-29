@@ -202,7 +202,7 @@ exports.downloadPDFReport = async (req, res, next) => {
       }
     });
 
-    pdfWorker.on("message", (result) => {
+    pdfWorker.on("message", async (result) => {
       if (isHandled) return;
       isHandled = true;
       clearTimeout(workerTimeout);
@@ -216,7 +216,7 @@ exports.downloadPDFReport = async (req, res, next) => {
         );
         res.send(Buffer.from(result.pdfData));
 
-        createAuditLog({
+        await createAuditLog({
           userId: req.userId,
           action: "REPORT_DOWNLOAD",
           resourceType: "Report",
@@ -418,7 +418,7 @@ exports.exportExcelReport = async (req, res, next) => {
     await workbook.xlsx.write(res);
     res.end();
 
-    createAuditLog({
+    await createAuditLog({
       userId: req.userId,
       action: "REPORT_DOWNLOAD",
       resourceType: "Report",
@@ -492,7 +492,7 @@ exports.downloadPayslipsZip = async (req, res, next) => {
 
     await archive.finalize();
 
-    createAuditLog({
+    await createAuditLog({
       userId: req.userId,
       action: "REPORT_DOWNLOAD",
       resourceType: "Report",
