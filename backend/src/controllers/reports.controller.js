@@ -177,6 +177,15 @@ exports.downloadPDFReport = async (req, res, next) => {
 
     const pdfWorker = new Worker(path.join(__dirname, "../workers/pdf.worker.js"));
     
+    let isHandled = false;
+    const workerTimeout = setTimeout(() => {
+      if (!isHandled) {
+        isHandled = true;
+        pdfWorker.terminate();
+        next(new Error("PDF generation timed out after 30 seconds."));
+      }
+    }, 30000);
+
     pdfWorker.postMessage({
       type: "GENERATE_COMPANY_REPORT",
       payload: {
@@ -194,6 +203,10 @@ exports.downloadPDFReport = async (req, res, next) => {
     });
 
     pdfWorker.on("message", (result) => {
+      if (isHandled) return;
+      isHandled = true;
+      clearTimeout(workerTimeout);
+
       if (result.success) {
         // Set response headers for PDF download
         res.setHeader("Content-Type", "application/pdf");
@@ -219,8 +232,22 @@ exports.downloadPDFReport = async (req, res, next) => {
     });
 
     pdfWorker.on("error", (err) => {
+      if (isHandled) return;
+      isHandled = true;
+      clearTimeout(workerTimeout);
+
       next(err);
       pdfWorker.terminate();
+    });
+
+    pdfWorker.on("exit", (code) => {
+      if (isHandled) return;
+      isHandled = true;
+      clearTimeout(workerTimeout);
+
+      if (code !== 0) {
+        next(new Error(`PDF Worker stopped with exit code ${code}`));
+      }
     });
   } catch (error) {
     next(error);
