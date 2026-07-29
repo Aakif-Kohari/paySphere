@@ -1,88 +1,92 @@
-const nodemailer = require('nodemailer');
-const PDFDocument = require('pdfkit');
-const fs = require('fs');
 const { sendEmail } = require('../utils/email');
 const logger = require('../utils/logger');
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_SECURE === 'true',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
-
 exports.sendPayslipEmail = async (employee, payroll) => {
   if (!employee.email) {
-    logger.warn(`No email found for employee`, { employeeName: employee.fullName });
+    logger.warn(`No email found for employee`, {
+      employeeName: employee.fullName,
+    });
     return;
   }
 
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({ margin: 50 });
-      let buffers = [];
-      doc.on('data', buffers.push.bind(buffers));
-      doc.on('end', async () => {
-        const pdfData = Buffer.concat(buffers);
+      const { Worker } = require('worker_threads');
+      const path = require('path');
 
-        const mailOptions = {
-          from:
-            process.env.EMAIL_FROM || '"PaySphere" <no-reply@paysphere.com>',
-          to: employee.email,
-          subject: `Payslip for ${payroll.month}/${payroll.year}`,
-          text: `Hello ${employee.fullName},\n\nPlease find attached your payslip for ${payroll.month}/${payroll.year}.\n\nBest Regards,\nPaySphere Team`,
-          attachments: [
-            {
-              filename: `Payslip_${payroll.month}_${payroll.year}.pdf`,
-              content: pdfData,
-            },
-          ],
-        };
+      const pdfWorker = new Worker(
+        path.join(__dirname, '../workers/pdf.worker.js'),
+      );
 
+      pdfWorker.postMessage({
+        type: 'GENERATE_PAYSLIP',
+        payload: { employee, payroll },
+      });
+
+      // Track whether the promise has already been settled to avoid
+      // double-resolve/reject if multiple events fire.
+      let settled = false;
+      const settle = (fn) => (...args) => {
+        if (!settled) {
+          settled = true;
+          fn(...args);
+        }
+      };
+
+      pdfWorker.on('message', async (result) => {
         try {
-          const info = await sendEmail(mailOptions);
-          logger.info(`Payslip email sent to ${employee.email}`);
-          resolve(info);
+          if (result.success) {
+            const pdfData = Buffer.from(result.pdfData);
+
+            const mailOptions = {
+              from:
+                process.env.EMAIL_FROM || '"PaySphere" <no-reply@paysphere.com>',
+              to: employee.email,
+              subject: `Payslip for ${payroll.month}/${payroll.year}`,
+              text: `Hello ${employee.fullName},\n\nPlease find attached your payslip for ${payroll.month}/${payroll.year}.\n\nBest Regards,\nPaySphere Team`,
+              attachments: [
+                {
+                  filename: `Payslip_${payroll.month}_${payroll.year}.pdf`,
+                  content: pdfData,
+                },
+              ],
+            };
+
+            const info = await sendEmail(mailOptions);
+            if (!info.success) {
+              throw new Error(info.error || 'Email delivery failed');
+            }
+            logger.info(`Payslip email sent to ${employee.email}`);
+            settle(resolve)(info);
+          } else {
+            settle(reject)(new Error('PDF Generation failed: ' + result.error));
+          }
         } catch (err) {
-          logger.error('Error sending email', { error: err.message, employee: employee.email });
-          reject(err);
+          logger.error('Error sending email', {
+            error: err.message,
+            employee: employee.email,
+          });
+          settle(reject)(err);
+        } finally {
+          // Always terminate — even if sendEmail() throws or PDF generation fails
+          pdfWorker.terminate();
         }
       });
 
-      doc.fontSize(20).text('PaySphere', { align: 'center' });
-      doc.moveDown();
-      doc
-        .fontSize(16)
-        .text(`Payslip for ${payroll.month}/${payroll.year}`, {
-          align: 'center',
-        });
-      doc.moveDown(2);
+      pdfWorker.on('error', (err) => {
+        settle(reject)(err);
+        pdfWorker.terminate();
+      });
 
-      doc.fontSize(12).text(`Employee Name: ${employee.fullName}`);
-      doc.text(`Role: ${employee.role || 'N/A'}`);
-      doc.text(`Company: ${employee.companyName}`);
-      doc.moveDown();
-
-      doc.text(`Base Salary: Rs. ${payroll.baseSalary.toFixed(2)}`);
-      doc.text(
-        `Leave Days: ${payroll.leaveDays} (Rs. -${payroll.leaveDeduction.toFixed(2)})`,
-      );
-      doc.text(
-        `Overtime Hours: ${payroll.overtimeHours} (Rs. +${payroll.overtimePay.toFixed(2)})`,
-      );
-      doc.text(`Bonus: Rs. +${payroll.bonus.toFixed(2)}`);
-      doc.text(`Deductions: Rs. -${payroll.deductions.toFixed(2)}`);
-      doc.moveDown();
-
-      doc
-        .fontSize(14)
-        .text(`Net Salary: Rs. ${payroll.netSalary.toFixed(2)}`, {
-          underline: true,
-        });
-      doc.end();
+      // Guard against silent worker crash: if the worker exits without ever
+      // emitting 'message' or 'error', the Promise would hang forever.
+      pdfWorker.on('exit', (code) => {
+        if (code !== 0) {
+          settle(reject)(
+            new Error(`PDF worker exited unexpectedly with code ${code}`)
+          );
+        }
+      });
     } catch (error) {
       logger.error('Error generating PDF', { error: error.message });
       reject(error);

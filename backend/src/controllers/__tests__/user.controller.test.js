@@ -5,9 +5,14 @@ const PayrollUpdate = require('../../models/payroll.model');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
+const axios = require('axios');
 
+jest.mock('../../services/audit.service', () => ({
+  createAuditLog: jest.fn(),
+}));
 jest.mock('jsonwebtoken');
 jest.mock('bcryptjs');
+jest.mock('axios');
 jest.mock('google-auth-library', () => {
   return {
     OAuth2Client: jest.fn().mockImplementation(() => {
@@ -65,6 +70,7 @@ describe('Google Authentication Controller tests', () => {
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
+      cookie: jest.fn(),
     };
     jwt.sign.mockReturnValue('dummy_jwt_token');
   });
@@ -103,6 +109,47 @@ describe('Google Authentication Controller tests', () => {
       companyName: 'Test Company',
       message: 'Logged in successfully',
     });
+  });
+
+  test('should authenticate successfully using accessToken with valid audience', async () => {
+    process.env.GOOGLE_CLIENT_ID = 'test-client-id';
+    req.body = { accessToken: 'dummy_access_token', companyName: 'Test Company' };
+
+    axios.get
+      .mockResolvedValueOnce({ data: { aud: 'test-client-id' } })
+      .mockResolvedValueOnce({ data: { sub: 'google456', email: 'tokenuser@example.com', name: 'Token User', picture: 'avatar2.png' } });
+
+    User.findOne.mockResolvedValueOnce(null);
+
+    await googleAuth(req, res);
+
+    expect(axios.get).toHaveBeenCalledWith(expect.stringContaining('oauth2.googleapis.com/tokeninfo'));
+    expect(axios.get).toHaveBeenCalledWith(expect.stringContaining('googleapis.com/oauth2/v3/userinfo'));
+    expect(User.findOne).toHaveBeenCalledWith({ email: 'tokenuser@example.com' });
+    expect(res.status).toHaveBeenCalledWith(200);
+    delete process.env.GOOGLE_CLIENT_ID;
+  });
+
+  test('should reject accessToken with mismatched audience', async () => {
+    process.env.GOOGLE_CLIENT_ID = 'test-client-id';
+    req.body = { accessToken: 'dummy_access_token' };
+
+    axios.get.mockResolvedValueOnce({ data: { aud: 'wrong-client-id' } });
+
+    await googleAuth(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Invalid Google access token: audience mismatch' });
+    delete process.env.GOOGLE_CLIENT_ID;
+  });
+
+  test('should reject request when no credentials are provided', async () => {
+    req.body = {};
+
+    await googleAuth(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: 'No Google credentials provided' });
   });
 });
 

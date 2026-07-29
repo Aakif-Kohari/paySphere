@@ -1,6 +1,7 @@
 const express = require("express");
 const { finalizePayroll, getPayrollSummary, exportPayrollCSV, sendPayslipEmailHandler, sendAllPayslipsEmailHandler } = require("../controllers/payroll.controller");
 const auth = require("../middlewares/auth.middleware");
+const { requirePermission } = require("../middlewares/rbac.middleware");
 const { writeRateLimiter } = require("../middlewares/rateLimiter.middleware");
 const router = express.Router();
 
