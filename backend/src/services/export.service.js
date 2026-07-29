@@ -28,7 +28,7 @@ class ExportService {
 
       worker.on("exit", (code) => {
         if (code !== 0) {
-          reject(new Error(\`PDF Worker stopped with exit code \${code}\`));
+          reject(new Error(`Worker stopped with exit code ${code}`));
         }
       });
     });
@@ -59,7 +59,7 @@ class ExportService {
 
       worker.on("exit", (code) => {
         if (code !== 0) {
-          reject(new Error(\`CSV Worker stopped with exit code \${code}\`));
+          reject(new Error(`CSV Worker stopped with exit code ${code}`));
         }
       });
     });
