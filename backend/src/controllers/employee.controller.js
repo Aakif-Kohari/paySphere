@@ -21,7 +21,7 @@ exports.addEmployee = async (req, res, next) => {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ message: 'Request body is required' });
     }
-    const { fullName, role, monthlySalary, overtimeRate } = req.body;
+    const { fullName, role, monthlySalary, overtimeRate, email, bankDetails } = req.body;
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(role)) {
       return res
@@ -82,6 +82,15 @@ exports.addEmployee = async (req, res, next) => {
       companyName: sanitizeText(user.companyName),
       createdBy: req.userId,
     });
+
+    // Optionally store bank details if provided
+    if (bankDetails && typeof bankDetails === 'object') {
+      employee.bankDetails = {
+        bankName: sanitizeText(bankDetails.bankName || ''),
+        accountNumber: sanitizeText(bankDetails.accountNumber || ''),
+        routingCode: sanitizeText(bankDetails.routingCode || ''),
+      };
+    }
 
     await employee.save();
 
@@ -429,7 +438,7 @@ exports.updateEmployee = async (req, res, next) => {
       return res.status(400).json({ message: 'Request body is required' });
     }
     const { id } = req.params;
-    const { fullName, role, monthlySalary, overtimeRate, isActive } = req.body;
+    const { fullName, role, monthlySalary, overtimeRate, isActive, email, bankDetails } = req.body;
 
     const employee = await Employee.findById(id);
 
@@ -505,6 +514,15 @@ exports.updateEmployee = async (req, res, next) => {
     if (monthlySalary !== undefined) employee.monthlySalary = monthlySalary;
     if (overtimeRate !== undefined) employee.overtimeRate = overtimeRate;
     if (isActive !== undefined) employee.isActive = isActive;
+
+    // Patch bank details: merge only the provided sub-fields
+    if (bankDetails && typeof bankDetails === 'object') {
+      employee.bankDetails = {
+        bankName: sanitizeText(bankDetails.bankName ?? employee.bankDetails?.bankName ?? ''),
+        accountNumber: sanitizeText(bankDetails.accountNumber ?? employee.bankDetails?.accountNumber ?? ''),
+        routingCode: sanitizeText(bankDetails.routingCode ?? employee.bankDetails?.routingCode ?? ''),
+      };
+    }
 
     await employee.save();
 

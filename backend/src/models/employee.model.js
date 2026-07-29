@@ -51,6 +51,23 @@ const employeeSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    bankDetails: {
+      bankName: {
+        type: String,
+        default: '',
+        maxlength: [100, 'Bank name cannot exceed 100 characters'],
+      },
+      accountNumber: {
+        type: String,
+        default: '',
+        maxlength: [30, 'Account number cannot exceed 30 characters'],
+      },
+      routingCode: {
+        type: String,
+        default: '',
+        maxlength: [20, 'Routing/IFSC code cannot exceed 20 characters'],
+      },
+    },
   },
   { timestamps: true },
 );
