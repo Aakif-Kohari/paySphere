@@ -276,7 +276,7 @@ exports.updateSettings = async (req, res, next) => {
 
     await user.save();
 
-    createAuditLog({
+    await createAuditLog({
       userId: req.userId,
       action: 'SETTINGS_UPDATE',
       resourceType: 'User',
@@ -342,7 +342,7 @@ exports.updatePassword = async (req, res, next) => {
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
 
-    createAuditLog({
+    await createAuditLog({
       userId: req.userId,
       action: 'PASSWORD_UPDATE',
       resourceType: 'User',
@@ -633,7 +633,7 @@ exports.deleteAccount = async (req, res, next) => {
       session.endSession();
     }
 
-    createAuditLog({
+    await createAuditLog({
       userId: req.userId,
       action: 'ACCOUNT_DELETE',
       resourceType: 'User',
