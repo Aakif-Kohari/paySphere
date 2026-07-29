@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Employee = require("../models/employee.model");
 const PayrollUpdate = require("../models/payroll.model");
 const User = require("../models/user.model");
+const { payrollQueue } = require("../jobs/queue.service");
 const { calculateNetSalary } = require("../utils/salaryCalculator");
 const { generatePayrollCSV } = require("../utils/csvExport");
 const logger = require("../utils/logger");
