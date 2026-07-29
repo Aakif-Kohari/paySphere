@@ -3,7 +3,7 @@ const Employee = require("../models/employee.model");
 const PayrollUpdate = require("../models/payroll.model");
 const User = require("../models/user.model");
 const { calculateNetSalary } = require("../utils/salaryCalculator");
-const { generatePayrollCSV } = require("../utils/csvExport");
+const exportService = require("../services/export.service");
 const logger = require("../utils/logger");
 const { createAuditLog } = require("../services/audit.service");
 
