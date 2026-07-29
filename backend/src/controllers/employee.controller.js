@@ -377,19 +377,21 @@ exports.importEmployees = async (req, res, next) => {
             }
           }
 
+          const importedCount = createdIds.length;
+
           createAuditLog({
             userId: req.userId,
             action: 'EMPLOYEE_IMPORT',
             resourceType: 'Employee',
             resourceIds: createdIds,
             details: {
-              imported: employees.length,
+              imported: importedCount,
               skipped,
               totalErrors: errors.length,
               fileName: req.file?.originalname,
             },
             result:
-              employees.length > 0
+              importedCount > 0
                 ? errors.length > 0
                   ? 'partial'
                   : 'success'
@@ -399,16 +401,14 @@ exports.importEmployees = async (req, res, next) => {
 
           logger.info(`Employee CSV import completed`, {
             userId: req.userId,
-            imported: employees.length,
+            imported: importedCount,
             skipped,
             totalErrors: errors.length,
           });
 
           return res.status(200).json({
             message: 'Employee import completed',
-            imported:
-              employees.length -
-              (skipped - (records.length - employees.length)), // approximate imported count
+            imported: importedCount,
             skipped,
             errors,
           });

@@ -269,6 +269,89 @@ describe("Employee Controller - importEmployees", () => {
       }),
     );
   });
+
+  test("should return actual inserted count when all inserts succeed (#378)", async () => {
+    Employee.insertMany.mockResolvedValue([
+      { _id: "e1", fullName: "Alice" },
+      { _id: "e2", fullName: "Bob" },
+    ]);
+    mockParse.mockImplementation((_data, _options, callback) => {
+      callback(null, [
+        { fullName: "Alice", role: "Dev", monthlySalary: "50000", overtimeRate: "200" },
+        { fullName: "Bob", role: "QA", monthlySalary: "40000", overtimeRate: "150" },
+      ]);
+    });
+
+    importEmployees(req, res, next);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const response = res.json.mock.calls[0][0];
+    expect(response.imported).toBe(2);
+    expect(response.skipped).toBe(0);
+  });
+
+  test("should return 0 imported when insertMany fails with duplicate key error and no docs inserted (#378)", async () => {
+    const insertError = new Error("E11000 duplicate key error");
+    insertError.code = 11000;
+    insertError.insertedDocs = [];
+    insertError.writeErrors = [{}, {}]; // mock 2 duplicate key errors
+    Employee.insertMany.mockRejectedValue(insertError);
+    mockParse.mockImplementation((_data, _options, callback) => {
+      callback(null, [
+        { fullName: "Alice", role: "Dev", monthlySalary: "50000", overtimeRate: "200" },
+        { fullName: "Bob", role: "QA", monthlySalary: "40000", overtimeRate: "150" },
+      ]);
+    });
+
+    importEmployees(req, res, next);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const response = res.json.mock.calls[0][0];
+    expect(response.imported).toBe(0);
+    expect(response.skipped).toBe(2);
+  });
+
+  test("should return partial count when insertMany partially succeeds with duplicate key error (#378)", async () => {
+    const insertError = new Error("E11000 duplicate key error");
+    insertError.code = 11000;
+    insertError.insertedDocs = [{ _id: "e1", fullName: "Alice" }];
+    insertError.writeErrors = [{}, {}]; // mock 2 duplicate key errors
+    Employee.insertMany.mockRejectedValue(insertError);
+    mockParse.mockImplementation((_data, _options, callback) => {
+      callback(null, [
+        { fullName: "Alice", role: "Dev", monthlySalary: "50000", overtimeRate: "200" },
+        { fullName: "Bob", role: "QA", monthlySalary: "40000", overtimeRate: "150" },
+        { fullName: "Charlie", role: "PM", monthlySalary: "60000", overtimeRate: "300" },
+      ]);
+    });
+
+    importEmployees(req, res, next);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const response = res.json.mock.calls[0][0];
+    expect(response.imported).toBe(1);
+    expect(response.skipped).toBe(2);
+  });
+
+  test("should propagate non-duplicate-key errors to next() (#378)", async () => {
+    const dbError = new Error("Connection lost");
+    dbError.code = 999;
+    Employee.insertMany.mockRejectedValue(dbError);
+    mockParse.mockImplementation((_data, _options, callback) => {
+      callback(null, [
+        { fullName: "Alice", role: "Dev", monthlySalary: "50000", overtimeRate: "200" },
+      ]);
+    });
+
+    importEmployees(req, res, next);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(next).toHaveBeenCalledWith(dbError);
+    expect(res.status).not.toHaveBeenCalled();
+  });
 });
 
 describe("Employee Controller - updateEmployee", () => {

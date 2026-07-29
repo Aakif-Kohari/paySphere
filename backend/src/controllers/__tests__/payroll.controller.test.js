@@ -87,13 +87,55 @@ describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit
     expect(res.status).toHaveBeenCalledWith(200);
     const jsonCall = res.json.mock.calls[0][0];
     expect(jsonCall.results).toHaveLength(1);
-
     const result = jsonCall.results[0];
     expect(result.deductions).toBe(0);
     expect(result.leaveDays).toBe(0);
     expect(result.bonus).toBe(500);
     expect(isNaN(result.netSalary)).toBe(false);
     expect(result.netSalary).toBe(50500);
+  });
+
+  test("should correctly classify tags containing 'days' or 'hrs' such as 'Overtime 2 days' and 'Deduction 3 days' (#377)", async () => {
+    const mockEmployee = {
+      _id: "507f1f77bcf86cd799439011",
+      fullName: "Alice Smith",
+      monthlySalary: 50000,
+      overtimeRate: 200,
+      isActive: true,
+    };
+    Employee.find.mockResolvedValue([mockEmployee]);
+    User.findById.mockResolvedValue({ defaultDailyRate: 1000, defaultOvertimeRate: 200 });
+
+    PayrollUpdate.bulkWrite.mockResolvedValue({});
+    PayrollUpdate.find
+      .mockImplementationOnce(() => createQueryMock([]))
+      .mockImplementationOnce(() => createQueryMock([{ _id: "payroll1", employeeId: "emp1" }]));
+
+    req.body = {
+      activities: [
+        {
+          employeeId: "507f1f77bcf86cd799439011",
+          name: "Alice Smith",
+          tags: [
+            { label: "Overtime 2 days" }, // should be overtime (2 hrs/units), NOT leaveDays
+            { label: "Deduction 300" },   // should be deduction
+            { label: "Leave 1 day" },     // should be leaveDays
+          ],
+        },
+      ],
+      month: 7,
+      year: 2026,
+    };
+
+    await finalizePayroll(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const jsonCall = res.json.mock.calls[0][0];
+    const result = jsonCall.results[0];
+
+    expect(result.overtimeHours).toBe(2);
+    expect(result.leaveDays).toBe(1);
+    expect(result.deductions).toBe(300);
   });
 });
 
