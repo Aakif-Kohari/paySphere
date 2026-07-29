@@ -375,6 +375,9 @@ const { sendPayslipEmail } = require("../services/email.service");
 exports.sendPayslipEmailHandler = async (req, res, next) => {
   try {
     const payrollId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(payrollId)) {
+      return res.status(400).json({ message: 'Invalid ID format' });
+    }
     const payroll = await PayrollUpdate.findOne({ _id: payrollId, createdBy: req.userId });
     
     if (!payroll) {

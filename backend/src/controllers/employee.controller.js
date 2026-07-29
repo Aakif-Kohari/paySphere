@@ -429,6 +429,9 @@ exports.updateEmployee = async (req, res, next) => {
       return res.status(400).json({ message: 'Request body is required' });
     }
     const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid ID format' });
+    }
     const { fullName, role, monthlySalary, overtimeRate, isActive } = req.body;
 
     const employee = await Employee.findById(id);
@@ -562,6 +565,9 @@ exports.updateEmployee = async (req, res, next) => {
 exports.toggleEmployeeStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid ID format' });
+    }
 
     const employee = await Employee.findById(id);
 
@@ -588,6 +594,9 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
 exports.deleteEmployee = async (req, res, next) => {
   try {
     const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid ID format' });
+    }
 
     const employee = await Employee.findById(id);
 

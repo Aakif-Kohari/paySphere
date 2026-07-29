@@ -368,7 +368,7 @@ describe("Employee Controller - updateEmployee", () => {
     };
 
     req = {
-      params: { id: "emp1" },
+      params: { id: "507f1f77bcf86cd799439011" },
       userId: "user123",
       body: {},
     };
@@ -415,7 +415,7 @@ describe("Employee Controller - updateEmployee name propagation to PayrollUpdate
 
   beforeEach(() => {
     employeeDoc = {
-      _id: "emp1",
+      _id: "507f1f77bcf86cd799439011",
       createdBy: { toString: () => "user123" },
       fullName: "Original Name",
       role: "Engineer",
@@ -425,7 +425,7 @@ describe("Employee Controller - updateEmployee name propagation to PayrollUpdate
     };
 
     req = {
-      params: { id: "emp1" },
+      params: { id: "507f1f77bcf86cd799439011" },
       userId: "user123",
       body: {},
     };
@@ -446,7 +446,7 @@ describe("Employee Controller - updateEmployee name propagation to PayrollUpdate
 
     expect(employeeDoc.fullName).toBe("New Name");
     expect(PayrollUpdate.updateMany).toHaveBeenCalledWith(
-      { employeeId: "emp1", createdBy: "user123", status: "finalized" },
+      { employeeId: "507f1f77bcf86cd799439011", createdBy: "user123", status: "finalized" },
       { $set: { employeeName: "New Name" } }
     );
     expect(res.status).toHaveBeenCalledWith(200);
@@ -489,7 +489,7 @@ describe("Employee Controller - updateEmployee name propagation to PayrollUpdate
     expect(employeeDoc.role).toBe("Senior Engineer");
     expect(employeeDoc.monthlySalary).toBe(50000);
     expect(PayrollUpdate.updateMany).toHaveBeenCalledWith(
-      { employeeId: "emp1", createdBy: "user123", status: "finalized" },
+      { employeeId: "507f1f77bcf86cd799439011", createdBy: "user123", status: "finalized" },
       { $set: { employeeName: "New Name" } }
     );
     expect(res.status).toHaveBeenCalledWith(200);
