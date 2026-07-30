@@ -17,6 +17,7 @@ const {
 } = require('../utils/validators');
 const logger = require('../utils/logger');
 const { createAuditLog } = require('../services/audit.service');
+const { getDefaultRole } = require('../seeds/rbac.seed');
 
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
@@ -85,14 +86,25 @@ exports.signup = async (req, res, next) => {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // Assign the owner role at creation. Without this the account is locked out
+    // of every permission-guarded route the moment it is created (#413).
+    const defaultRole = await getDefaultRole();
+
     const newUser = new User({
       fullName: sanitizeText(fullName),
       email: cleanEmail,
       companyName: sanitizeText(companyName),
       password: hashedPassword,
+      ...(defaultRole ? { role: defaultRole._id } : {}),
     });
 
     await newUser.save();
+
+    if (!defaultRole) {
+      logger.warn('Signed up a user without a role: RBAC roles are not seeded', {
+        userId: newUser._id,
+      });
+    }
 
     const token = generateTokens(newUser, res);
 
@@ -411,12 +423,17 @@ exports.googleAuth = async (req, res, next) => {
         });
       }
 
+      // Same as the password signup path: a Google-registered owner needs the
+      // default role or they are locked out of the app they just created (#413).
+      const defaultRole = await getDefaultRole();
+
       user = new User({
         fullName: sanitizeText(name),
         email,
         companyName: sanitizeText(companyName),
         googleId: googleId || googleData.sub,
         avatar: picture || googleData.picture,
+        ...(defaultRole ? { role: defaultRole._id } : {}),
       });
 
       await user.save();

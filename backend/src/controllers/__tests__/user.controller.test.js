@@ -10,6 +10,11 @@ const axios = require('axios');
 jest.mock('../../services/audit.service', () => ({
   createAuditLog: jest.fn(),
 }));
+// signup/googleAuth now resolve the default RBAC role when creating an account
+// (#413). Stubbed here so these specs do not reach for a real Role document.
+jest.mock('../../seeds/rbac.seed', () => ({
+  getDefaultRole: jest.fn().mockResolvedValue({ _id: 'role-SuperAdmin' }),
+}));
 jest.mock('jsonwebtoken');
 jest.mock('bcryptjs');
 jest.mock('axios');
