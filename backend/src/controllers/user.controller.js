@@ -16,7 +16,7 @@ const {
   OVERTIME_RATE_MAX,
 } = require('../utils/validators');
 const logger = require('../utils/logger');
-const { createAuditLog } = require('../services/audit.service');
+const eventBus = require('../services/event.service');
 
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
@@ -276,7 +276,7 @@ exports.updateSettings = async (req, res, next) => {
 
     await user.save();
 
-    eventBus.emit("AUDIT_LOG", {
+    eventBus.emitAuditLog({
       userId: req.userId,
       action: 'SETTINGS_UPDATE',
       resourceType: 'User',
@@ -342,7 +342,7 @@ exports.updatePassword = async (req, res, next) => {
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
 
-    eventBus.emit("AUDIT_LOG", {
+    eventBus.emitAuditLog({
       userId: req.userId,
       action: 'PASSWORD_UPDATE',
       resourceType: 'User',
@@ -633,7 +633,7 @@ exports.deleteAccount = async (req, res, next) => {
       session.endSession();
     }
 
-    eventBus.emit("AUDIT_LOG", {
+    eventBus.emitAuditLog({
       userId: req.userId,
       action: 'ACCOUNT_DELETE',
       resourceType: 'User',
