@@ -92,6 +92,16 @@ const DashboardOverview = ({
           </h1>
         </div>
 
+        
+        <div className="w-full sm:w-auto mt-4 md:mt-0">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search employees..."
+            className="w-full sm:w-auto px-4 py-3 border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-sm focus:border-blue-500 outline-none transition-colors"
+          />
+        </div>
+
         <div className="flex gap-3 w-full sm:w-auto">
           <button 
             onClick={() => navigate('/reports')}
@@ -276,6 +286,8 @@ const DashboardOverview = ({
 
 // --- Employee Management Component ---
 const EmployeeManagement = ({
+  search,
+  setSearch,
   employees,
   loading,
   onAddEmployee,
@@ -759,6 +771,8 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
           />
         ) : (
           <EmployeeManagement
+            search={search}
+            setSearch={setSearch}
             employees={employees}
             loading={loading}
             onAddEmployee={() => navigate('/add-employee')}
