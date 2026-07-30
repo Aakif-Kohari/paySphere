@@ -1,6 +1,7 @@
 const PDFDocument = require("pdfkit");
 const PayrollUpdate = require("../models/payroll.model");
 const Employee = require("../models/employee.model");
+const User = require("../models/user.model");
 const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
@@ -205,6 +206,7 @@ exports.downloadPDFReport = async (req, res, next) => {
         payrolls,
         employeeMap,
         companyName,
+      companyLogoData,
         monthName,
         year,
         totalBase,

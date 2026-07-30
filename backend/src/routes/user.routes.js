@@ -1,6 +1,7 @@
 const express = require("express");
-const { signup, login, getSettings, updateSettings, updatePassword, googleAuth, forgotPassword, resetPassword, disconnectGoogle, deleteAccount } = require("../controllers/user.controller");
+const {  signup, login, getSettings, updateSettings, uploadLogo, updatePassword, googleAuth, forgotPassword, resetPassword, disconnectGoogle, deleteAccount } = require("../controllers/user.controller");
 const auth = require("../middlewares/auth.middleware");
+const upload = require("../middlewares/upload.middleware");
 const { authRateLimiter, writeRateLimiter } = require("../middlewares/rateLimiter.middleware");
 const router = express.Router();
 

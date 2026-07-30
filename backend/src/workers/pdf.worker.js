@@ -3,7 +3,7 @@ const PDFDocument = require("pdfkit");
 
 async function generatePDF() {
   try {
-    const { payrolls, companyName, monthName, year } = workerData;
+    const { payrolls, companyName, companyLogoData, monthName, year } = workerData;
 
     // We will collect the PDF chunks in an array to send back as a buffer
     const chunks = [];
@@ -21,6 +21,18 @@ async function generatePDF() {
       const result = Buffer.concat(chunks);
       parentPort.postMessage({ success: true, buffer: result });
     });
+
+    
+    // --- Company Logo ---
+    if (companyLogoData && companyLogoData.startsWith("data:image")) {
+      try {
+        const base64Data = companyLogoData.split(',')[1];
+        const imgBuffer = Buffer.from(base64Data, 'base64');
+        doc.image(imgBuffer, 40, 40, { width: 50 });
+      } catch (e) {
+        console.error("Failed to draw logo:", e);
+      }
+    }
 
     // --- Company Header ---
     doc
