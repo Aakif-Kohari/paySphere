@@ -2,7 +2,7 @@ const PDFDocument = require("pdfkit");
 const PayrollUpdate = require("../models/payroll.model");
 const Employee = require("../models/employee.model");
 const logger = require("../utils/logger");
-const { createAuditLog } = require("../services/audit.service");
+const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
 
 // GET /api/reports/analytics
@@ -229,7 +229,7 @@ exports.downloadPDFReport = async (req, res, next) => {
         );
         res.send(Buffer.from(result.pdfData));
 
-        await createAuditLog({
+        eventBus.emit("AUDIT_LOG", {
           userId: req.userId,
           action: "REPORT_DOWNLOAD",
           resourceType: "Report",
@@ -443,7 +443,7 @@ exports.exportExcelReport = async (req, res, next) => {
     await workbook.xlsx.write(res);
     res.end();
 
-    await createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "REPORT_DOWNLOAD",
       resourceType: "Report",
@@ -517,7 +517,7 @@ exports.downloadPayslipsZip = async (req, res, next) => {
 
     await archive.finalize();
 
-    await createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "REPORT_DOWNLOAD",
       resourceType: "Report",

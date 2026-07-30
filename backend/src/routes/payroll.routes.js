@@ -4,6 +4,7 @@ const auth = require("../middlewares/auth.middleware");
 const { requirePermission } = require("../middlewares/rbac.middleware");
 const upload = require("../middlewares/upload.middleware");
 const { writeRateLimiter } = require("../middlewares/rateLimiter.middleware");
+const { PERMISSIONS } = require("../config/permissions");
 const router = express.Router();
 
 router.post("/parse-csv", auth, requirePermission("WRITE_PAYROLL"), writeRateLimiter, upload.single("file"), parsePayrollCSV);
@@ -14,4 +15,3 @@ router.post("/send-email/:id", auth, writeRateLimiter, sendPayslipEmailHandler);
 router.post("/send-all-emails", auth, writeRateLimiter, sendAllPayslipsEmailHandler);
 
 module.exports = router;
-
