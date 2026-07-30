@@ -329,12 +329,13 @@ describe('Delete Account Controller tests', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    req = { userId: 'user123' };
+    req = { userId: 'user123', body: { currentPassword: 'correctPassword' } };
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn(),
     };
     next = jest.fn();
+    bcrypt.compare.mockResolvedValue(true);
     mockSession = {
       startTransaction: jest.fn(),
       commitTransaction: jest.fn(),
@@ -348,8 +349,37 @@ describe('Delete Account Controller tests', () => {
     jest.restoreAllMocks();
   });
 
+  test('should require current password', async () => {
+    req.body = {};
+    User.findById.mockResolvedValue({ _id: 'user123', password: 'hashedPassword' });
+
+    await deleteAccount(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Current password is required' });
+  });
+
+  test('should reject incorrect current password', async () => {
+    bcrypt.compare.mockResolvedValue(false);
+    User.findById.mockResolvedValue({ _id: 'user123', password: 'hashedPassword' });
+
+    await deleteAccount(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Current password is incorrect' });
+  });
+
+  test('should reject if user has no password set', async () => {
+    User.findById.mockResolvedValue({ _id: 'user123', password: null });
+
+    await deleteAccount(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: 'No password set on this account' });
+  });
+
   test('should delete account atomically within a transaction', async () => {
-    User.findById.mockResolvedValue({ _id: 'user123' });
+    User.findById.mockResolvedValue({ _id: 'user123', password: 'hashedPassword' });
     Employee.deleteMany.mockReturnValue({ session: jest.fn().mockResolvedValue({}) });
     PayrollUpdate.deleteMany.mockReturnValue({ session: jest.fn().mockResolvedValue({}) });
     User.findByIdAndDelete.mockReturnValue({ session: jest.fn().mockResolvedValue({}) });
@@ -376,7 +406,7 @@ describe('Delete Account Controller tests', () => {
 
   test('should abort transaction and call next(error) on failure', async () => {
     const error = new Error('Database failure');
-    User.findById.mockResolvedValue({ _id: 'user123' });
+    User.findById.mockResolvedValue({ _id: 'user123', password: 'hashedPassword' });
     Employee.deleteMany.mockImplementation(() => { throw error; });
 
     await deleteAccount(req, res, next);
@@ -390,7 +420,7 @@ describe('Delete Account Controller tests', () => {
   test('should fall back to non-transactional delete when transactions are not supported', async () => {
     jest.spyOn(mongoose, 'startSession').mockRejectedValue(new Error('Transactions not supported'));
 
-    User.findById.mockResolvedValue({ _id: 'user123' });
+    User.findById.mockResolvedValue({ _id: 'user123', password: 'hashedPassword' });
     Employee.deleteMany.mockResolvedValue({ deletedCount: 3 });
     PayrollUpdate.deleteMany.mockResolvedValue({ deletedCount: 5 });
     User.findByIdAndDelete.mockResolvedValue({ deletedCount: 1 });

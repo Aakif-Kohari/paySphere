@@ -628,6 +628,18 @@ exports.deleteAccount = async (req, res, next) => {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    const { currentPassword } = req.body;
+    if (!currentPassword) {
+      return res.status(400).json({ message: 'Current password is required' });
+    }
+    if (!user.password) {
+      return res.status(400).json({ message: 'No password set on this account' });
+    }
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(403).json({ message: 'Current password is incorrect' });
+    }
+
     // Try to start a transaction (gracefully fallback if not supported)
     try {
       session = await mongoose.startSession();
