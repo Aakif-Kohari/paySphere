@@ -96,6 +96,35 @@ class CacheService {
     }
   }
 
+  /**
+   * Invalidate every cached analytics response for a user.
+   *
+   * `getAnalytics` caches under `analytics:<userId>:<monthsBack>` for an hour,
+   * so a single user has one entry per range they have viewed. This clears all
+   * of them.
+   *
+   * Call this from anything that changes payroll aggregates — finalizing
+   * payroll, deleting an employee, toggling one inactive. Before #415 only
+   * addEmployee and updateEmployee did, so running payroll left the Reports
+   * page showing stale figures for up to an hour.
+   *
+   * Never throws: a cache outage must not fail a payroll write.
+   *
+   * @param {string} userId
+   * @returns {Promise<boolean>} whether invalidation completed cleanly
+   */
+  async invalidateAnalytics(userId) {
+    if (!userId) return false;
+
+    try {
+      await this.invalidatePattern(`analytics:${userId}`);
+      return true;
+    } catch (error) {
+      logger.error(`Analytics cache invalidation failed for user ${userId}:`, error);
+      return false;
+    }
+  }
+
   async invalidatePattern(pattern) {
     // In production with real Redis, you'd use SCAN
     // For this simple mock/fallback, we'll iterate

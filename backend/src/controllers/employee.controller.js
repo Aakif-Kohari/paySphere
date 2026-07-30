@@ -105,7 +105,7 @@ exports.addEmployee = async (req, res, next) => {
       fullName: employee.fullName,
     });
 
-    await cacheService.invalidatePattern(`analytics:${req.userId}`);
+    await cacheService.invalidateAnalytics(req.userId);
     res.status(201).json({ message: "Employee added successfully", employee });
   } catch (error) {
     next(error);
@@ -561,7 +561,7 @@ exports.updateEmployee = async (req, res, next) => {
       fullName: employee.fullName,
     });
 
-    await cacheService.invalidatePattern(`analytics:${req.userId}`);
+    await cacheService.invalidateAnalytics(req.userId);
     res.status(200).json({ message: "Employee updated successfully", employee });
   } catch (error) {
     next(error);
@@ -587,6 +587,30 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
 
     employee.isActive = !employee.isActive;
     await employee.save();
+
+    // Inactive employees are excluded from payroll (#260), so flipping this
+    // changes the analytics aggregates and must clear the cache (#415).
+    await cacheService.invalidateAnalytics(req.userId);
+
+    // This was the only employee mutation with no audit event, unlike its
+    // create/update/delete siblings.
+    eventBus.emit("AUDIT_LOG", {
+      userId: req.userId,
+      action: 'EMPLOYEE_STATUS_TOGGLE',
+      resourceType: 'Employee',
+      resourceIds: [employee._id],
+      details: {
+        fullName: employee.fullName,
+        isActive: employee.isActive,
+      },
+      req,
+    });
+
+    logger.info(`Employee status toggled`, {
+      userId: req.userId,
+      employeeId: employee._id,
+      isActive: employee.isActive,
+    });
 
     res.status(200).json({ message: 'Employee status updated', employee });
   } catch (error) {
@@ -668,6 +692,11 @@ exports.deleteEmployee = async (req, res, next) => {
       employeeId: id,
       fullName: employee.fullName,
     });
+
+    // Deletion cascades a PayrollUpdate.deleteMany, so it shifts the aggregates
+    // more than an edit does — yet it was the one mutation with no invalidation
+    // while addEmployee and updateEmployee both had it (#415).
+    await cacheService.invalidateAnalytics(req.userId);
 
     res.status(200).json({
       message: 'Employee and payroll records deleted successfully',
