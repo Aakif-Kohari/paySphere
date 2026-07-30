@@ -650,7 +650,7 @@ exports.deleteAccount = async (req, res, next) => {
 
     const deleteOptions = session ? { session } : {};
 
-    const AuditLog = require('../models/audit.model');
+    const AuditLog = require('../models/auditLog.model');
 
     await Employee.deleteMany({ createdBy: req.userId }, deleteOptions);
     await PayrollUpdate.deleteMany({ createdBy: req.userId }, deleteOptions);
