@@ -6,6 +6,8 @@ const { calculateNetSalary } = require("../utils/salaryCalculator");
 const { generatePayrollCSV } = require("../utils/csvExport");
 const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
+const cacheService = require("../services/cache.service");
+
 
 // Helper: parse tag labels back into structured numbers
 function parseTagValue(label) {
@@ -245,6 +247,11 @@ exports.finalizePayroll = async (req, res, next) => {
       await session.commitTransaction();
       session.endSession();
     }
+
+    // Finalizing payroll is the single biggest change to the analytics figures,
+    // and it was the one mutation that never cleared the cache — so Reports kept
+    // serving pre-run totals for up to an hour afterwards (#415).
+    await cacheService.invalidateAnalytics(req.userId);
 
     const resourceIds = results.map(r => r.payrollId).filter(Boolean);
 
