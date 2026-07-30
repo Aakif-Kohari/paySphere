@@ -1,10 +1,15 @@
-const Redis = require("ioredis");
+let Redis;
+try {
+  Redis = require("ioredis");
+} catch {
+  Redis = null;
+}
 const logger = require("../utils/logger");
 
 // Use a mock cache if REDIS_URL is not provided so it doesn't crash environments without Redis
 class CacheService {
   constructor() {
-    this.isRedisEnabled = !!process.env.REDIS_URL;
+    this.isRedisEnabled = !!process.env.REDIS_URL && !!Redis;
     
     if (this.isRedisEnabled) {
       this.client = new Redis(process.env.REDIS_URL, {
@@ -93,7 +98,11 @@ class CacheService {
           cursor = res[0];
           const keys = res[1];
           if (keys.length > 0) {
-            await this.client.del(...keys);
+            const BATCH_SIZE = 500;
+            for (let i = 0; i < keys.length; i += BATCH_SIZE) {
+              const batch = keys.slice(i, i + BATCH_SIZE);
+              await this.client.del(batch);
+            }
           }
         } while (cursor !== "0");
       } catch (error) {
@@ -103,4 +112,6 @@ class CacheService {
   }
 }
 
-module.exports = new CacheService();
+const instance = new CacheService();
+instance.CacheService = CacheService;
+module.exports = instance;
