@@ -1,13 +1,4 @@
-
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              style={{ padding: "8px 16px", borderRadius: "8px", border: isDark ? "1px solid #334155" : "1px solid #E5E7EB", background: isDark ? "#1e293b" : "white", color: isDark ? "#cbd5e1" : "#374151", fontSize: "14px", fontWeight: 600, cursor: "pointer", marginLeft: "12px" }}
-            >
-              Import Adjustments
-            </button>
-            <input type="file" ref={fileInputRef} onChange={handleCsvUpload} accept=".csv" style={{ display: "none" }} />
-
-            <button onClick={handleFinalize} disabled={activity.length === 0 || finalizing}import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useSelector, useDispatch } from "react-redux";
@@ -196,7 +187,7 @@ export default function MonthlyUpdates() {
   const [showResults, setShowResults] = useState(false);
   const [payrollResults, setPayrollResults] = useState(null);
   const [finalizeError, setFinalizeError] = useState("");
-  const fileInputRef = React.useRef(null);
+
 
   // Attendance Calendar Modal states (#137)
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
