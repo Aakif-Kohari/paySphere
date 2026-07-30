@@ -16,7 +16,7 @@ const {
   OVERTIME_RATE_MAX,
 } = require('../utils/validators');
 const logger = require('../utils/logger');
-const { createAuditLog } = require('../services/audit.service');
+const eventBus = require('../services/event.service');
 const { getDefaultRole } = require('../seeds/rbac.seed');
 
 const GOOGLE_CLIENT_ID =
