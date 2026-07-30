@@ -30,7 +30,23 @@ class CacheService {
     } else {
       logger.info("Redis is disabled (no REDIS_URL). Using in-memory fallback.");
       this.memoryCache = new Map();
+      
+      // Prevent memory leak by periodically cleaning up expired keys
+      this.cleanupInterval = setInterval(() => {
+        const now = Date.now();
+        for (const [key, item] of this.memoryCache.entries()) {
+          if (now > item.expiresAt) {
+            this.memoryCache.delete(key);
+          }
+        }
+      }, 60000); // Check every minute
+      this.cleanupInterval.unref(); // Don't block Node.js from exiting
     }
+  }
+
+  destroy() {
+    if (this.cleanupInterval) clearInterval(this.cleanupInterval);
+    if (this.isRedisEnabled && this.client) this.client.disconnect();
   }
 
   async get(key) {
