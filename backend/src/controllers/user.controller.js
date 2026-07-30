@@ -162,6 +162,25 @@ exports.getSettings = async (req, res, next) => {
 };
 
 // UPDATE USER SETTINGS
+
+exports.uploadLogo = async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No image provided" });
+    
+    // Store as base64 string
+    const base64Data = req.file.buffer.toString("base64");
+    const mimeType = req.file.mimetype;
+    const logoDataUrl = `data:${mimeType};base64,${base64Data}`;
+
+    await User.findByIdAndUpdate(req.userId, { companyLogoData: logoDataUrl });
+    
+    // Also invalidate settings cache if we had one
+    res.status(200).json({ message: "Logo updated successfully", logo: logoDataUrl });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.updateSettings = async (req, res, next) => {
   try {
     if (!req.body || typeof req.body !== 'object') {
