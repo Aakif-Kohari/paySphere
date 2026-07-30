@@ -70,7 +70,8 @@ export default function Settings() {
   const [userProfile, setUserProfile] = useState({ 
     fullName: "", 
     email: "", 
-    companyName: localCompanyName, 
+    companyName: localCompanyName,
+    companyLogoUrl: "", 
     avatar: "", 
     isGoogleLinked: false,
     payrollId: "",
@@ -101,6 +102,7 @@ export default function Settings() {
           fullName: res.data.fullName || "",
           email: res.data.email || "",
           companyName: res.data.companyName || localCompanyName,
+          companyLogoUrl: res.data.companyLogoData || "",
           avatar: res.data.avatar || "",
           isGoogleLinked: res.data.isGoogleLinked || false,
           payrollId: res.data.payrollId || "",
@@ -142,6 +144,24 @@ export default function Settings() {
 
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("logo", file);
+    try {
+      // It is in user routes, which is mounted at /api/users
+      const res = await api.post("/api/users/settings/logo", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      setUserProfile(prev => ({ ...prev, companyLogoUrl: res.data.logo }));
+      alert("Logo uploaded successfully");
+    } catch (err) {
+      alert("Failed to upload logo");
+    }
+  };
 
   const handleSaveSettings = async () => {
     // Client-side validation before making the API call (#356)

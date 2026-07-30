@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  companyLogoData: { type: String, default: "" },
   companyName: {
     type: String,
     required: true,
