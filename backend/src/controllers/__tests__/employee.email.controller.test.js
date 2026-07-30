@@ -1,27 +1,25 @@
-const {
-  addEmployee,
-  updateEmployee,
-} = require("../employee.controller");
-const Employee = require("../../models/employee.model");
-const User = require("../../models/user.model");
+const { addEmployee, updateEmployee } = require('../employee.controller');
+const Employee = require('../../models/employee.model');
+const User = require('../../models/user.model');
 
-jest.mock("../../models/payroll.model", () => ({
+jest.mock('../../models/payroll.model', () => ({
   updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
   exists: jest.fn().mockResolvedValue(false),
   deleteMany: jest.fn().mockResolvedValue({}),
 }));
-jest.mock("../../models/user.model");
-jest.mock("../../services/event.service", () => ({
+jest.mock('../../models/user.model');
+jest.mock('../../services/event.service', () => ({
   emit: jest.fn(),
   emitAuditLog: jest.fn(),
   on: jest.fn(),
 }));
-jest.mock("../../services/cache.service", () => ({
+jest.mock('../../services/cache.service', () => ({
   invalidatePattern: jest.fn().mockResolvedValue(undefined),
+  invalidateAnalytics: jest.fn().mockResolvedValue(undefined),
   get: jest.fn(),
   setEx: jest.fn(),
 }));
-jest.mock("../../utils/logger", () => ({
+jest.mock('../../utils/logger', () => ({
   info: jest.fn(),
   warn: jest.fn(),
   error: jest.fn(),
@@ -29,10 +27,10 @@ jest.mock("../../utils/logger", () => ({
 }));
 
 let constructed;
-jest.mock("../../models/employee.model", () => {
+jest.mock('../../models/employee.model', () => {
   const mockConstructor = jest.fn().mockImplementation(function (data) {
     Object.assign(this, data);
-    this._id = "emp-1";
+    this._id = 'emp-1';
     this.save = jest.fn().mockResolvedValue(this);
     return this;
   });
@@ -40,7 +38,7 @@ jest.mock("../../models/employee.model", () => {
   return mockConstructor;
 });
 
-describe("addEmployee — email persistence (#414)", () => {
+describe('addEmployee — email persistence (#414)', () => {
   let req;
   let res;
   let next;
@@ -48,10 +46,10 @@ describe("addEmployee — email persistence (#414)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     req = {
-      userId: "user123",
+      userId: 'user123',
       body: {
-        fullName: "Asha R",
-        role: "Designer",
+        fullName: 'Asha R',
+        role: 'Designer',
         monthlySalary: 40000,
       },
     };
@@ -61,57 +59,57 @@ describe("addEmployee — email persistence (#414)", () => {
     };
     next = jest.fn();
 
-    User.findById.mockResolvedValue({ companyName: "Acme Ltd" });
+    User.findById.mockResolvedValue({ companyName: 'Acme Ltd' });
     Employee.mockImplementation(function (data) {
       Object.assign(this, data);
-      this._id = "emp-1";
+      this._id = 'emp-1';
       this.save = jest.fn().mockResolvedValue(this);
       constructed = this;
       return this;
     });
   });
 
-  test("persists a supplied email instead of discarding it", async () => {
+  test('persists a supplied email instead of discarding it', async () => {
     // `email` was destructured out of req.body and never referenced again, so
     // the API accepted an address, returned 201, and stored nothing. Payslip
     // email delivery could therefore never find an address to send to.
-    req.body.email = "asha@acme.com";
+    req.body.email = 'asha@acme.com';
 
     await addEmployee(req, res, next);
 
-    expect(constructed.email).toBe("asha@acme.com");
+    expect(constructed.email).toBe('asha@acme.com');
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
-  test("normalizes the address to lowercase and trims it", async () => {
-    req.body.email = "  Asha@ACME.com  ";
+  test('normalizes the address to lowercase and trims it', async () => {
+    req.body.email = '  Asha@ACME.com  ';
 
     await addEmployee(req, res, next);
 
-    expect(constructed.email).toBe("asha@acme.com");
+    expect(constructed.email).toBe('asha@acme.com');
   });
 
-  test("rejects a malformed address with 400 instead of accepting and dropping it", async () => {
-    req.body.email = "not-an-email";
+  test('rejects a malformed address with 400 instead of accepting and dropping it', async () => {
+    req.body.email = 'not-an-email';
 
     await addEmployee(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
-      message: "Invalid email address format",
+      message: 'Invalid email address format',
     });
     expect(Employee).not.toHaveBeenCalled();
   });
 
-  test("rejects a non-string address (NoSQL injection vector)", async () => {
-    req.body.email = { $gt: "" };
+  test('rejects a non-string address (NoSQL injection vector)', async () => {
+    req.body.email = { $gt: '' };
 
     await addEmployee(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  test("omits the field entirely when no email is given", async () => {
+  test('omits the field entirely when no email is given', async () => {
     // Storing "" would put every email-less employee into the same bucket of
     // the unique index and re-create the collision.
     await addEmployee(req, res, next);
@@ -120,8 +118,8 @@ describe("addEmployee — email persistence (#414)", () => {
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
-  test("treats a blank string as no email rather than rejecting it", async () => {
-    req.body.email = "   ";
+  test('treats a blank string as no email rather than rejecting it', async () => {
+    req.body.email = '   ';
 
     await addEmployee(req, res, next);
 
@@ -129,9 +127,9 @@ describe("addEmployee — email persistence (#414)", () => {
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
-  test("returns 409 on a duplicate-email index violation", async () => {
-    req.body.email = "asha@acme.com";
-    const duplicateError = Object.assign(new Error("E11000"), {
+  test('returns 409 on a duplicate-email index violation', async () => {
+    req.body.email = 'asha@acme.com';
+    const duplicateError = Object.assign(new Error('E11000'), {
       code: 11000,
       keyPattern: { email: 1, createdBy: 1 },
     });
@@ -145,13 +143,13 @@ describe("addEmployee — email persistence (#414)", () => {
 
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith({
-      message: "An employee with this email address already exists",
+      message: 'An employee with this email address already exists',
     });
     expect(next).not.toHaveBeenCalled();
   });
 
-  test("forwards a duplicate violation on a different index to next()", async () => {
-    const nameClash = Object.assign(new Error("E11000"), {
+  test('forwards a duplicate violation on a different index to next()', async () => {
+    const nameClash = Object.assign(new Error('E11000'), {
       code: 11000,
       keyPattern: { createdBy: 1, fullName: 1, role: 1 },
     });
@@ -167,22 +165,22 @@ describe("addEmployee — email persistence (#414)", () => {
     expect(res.status).not.toHaveBeenCalledWith(409);
   });
 
-  test("still stores bank details alongside the email", async () => {
-    req.body.email = "asha@acme.com";
+  test('still stores bank details alongside the email', async () => {
+    req.body.email = 'asha@acme.com';
     req.body.bankDetails = {
-      bankName: "HDFC",
-      accountNumber: "12345",
-      routingCode: "HDFC0001",
+      bankName: 'HDFC',
+      accountNumber: '12345',
+      routingCode: 'HDFC0001',
     };
 
     await addEmployee(req, res, next);
 
-    expect(constructed.email).toBe("asha@acme.com");
-    expect(constructed.bankDetails.bankName).toBe("HDFC");
+    expect(constructed.email).toBe('asha@acme.com');
+    expect(constructed.bankDetails.bankName).toBe('HDFC');
   });
 });
 
-describe("updateEmployee — email persistence (#414)", () => {
+describe('updateEmployee — email persistence (#414)', () => {
   let req;
   let res;
   let next;
@@ -191,18 +189,18 @@ describe("updateEmployee — email persistence (#414)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     employee = {
-      _id: "emp-1",
-      fullName: "Asha R",
-      role: "Designer",
+      _id: 'emp-1',
+      fullName: 'Asha R',
+      role: 'Designer',
       monthlySalary: 40000,
-      email: "asha@acme.com",
-      createdBy: { toString: () => "user123" },
+      email: 'asha@acme.com',
+      createdBy: { toString: () => 'user123' },
       bankDetails: {},
       save: jest.fn().mockResolvedValue(true),
       markModified: jest.fn(),
     };
 
-    req = { userId: "user123", params: { id: "emp-1" }, body: {} };
+    req = { userId: 'user123', params: { id: 'emp-1' }, body: {} };
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis(),
@@ -212,25 +210,25 @@ describe("updateEmployee — email persistence (#414)", () => {
     Employee.findById.mockResolvedValue(employee);
   });
 
-  test("applies a new email instead of discarding it", async () => {
-    req.body.email = "asha.r@acme.com";
+  test('applies a new email instead of discarding it', async () => {
+    req.body.email = 'asha.r@acme.com';
 
     await updateEmployee(req, res, next);
 
-    expect(employee.email).toBe("asha.r@acme.com");
+    expect(employee.email).toBe('asha.r@acme.com');
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test("normalizes the updated address", async () => {
-    req.body.email = "  ASHA.R@Acme.COM ";
+  test('normalizes the updated address', async () => {
+    req.body.email = '  ASHA.R@Acme.COM ';
 
     await updateEmployee(req, res, next);
 
-    expect(employee.email).toBe("asha.r@acme.com");
+    expect(employee.email).toBe('asha.r@acme.com');
   });
 
-  test("rejects a malformed address with 400", async () => {
-    req.body.email = "broken@";
+  test('rejects a malformed address with 400', async () => {
+    req.body.email = 'broken@';
 
     await updateEmployee(req, res, next);
 
@@ -238,17 +236,17 @@ describe("updateEmployee — email persistence (#414)", () => {
     expect(employee.save).not.toHaveBeenCalled();
   });
 
-  test("clears the address when an empty string is sent", async () => {
-    req.body.email = "";
+  test('clears the address when an empty string is sent', async () => {
+    req.body.email = '';
 
     await updateEmployee(req, res, next);
 
     expect(employee.email).toBeUndefined();
-    expect(employee.markModified).toHaveBeenCalledWith("email");
+    expect(employee.markModified).toHaveBeenCalledWith('email');
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test("clears the address when null is sent", async () => {
+  test('clears the address when null is sent', async () => {
     req.body.email = null;
 
     await updateEmployee(req, res, next);
@@ -257,19 +255,19 @@ describe("updateEmployee — email persistence (#414)", () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test("leaves the existing address untouched when email is omitted", async () => {
-    req.body = { role: "Senior Designer" };
+  test('leaves the existing address untouched when email is omitted', async () => {
+    req.body = { role: 'Senior Designer' };
 
     await updateEmployee(req, res, next);
 
-    expect(employee.email).toBe("asha@acme.com");
-    expect(employee.markModified).not.toHaveBeenCalledWith("email");
+    expect(employee.email).toBe('asha@acme.com');
+    expect(employee.markModified).not.toHaveBeenCalledWith('email');
   });
 
-  test("returns 409 on a duplicate-email violation", async () => {
-    req.body.email = "taken@acme.com";
+  test('returns 409 on a duplicate-email violation', async () => {
+    req.body.email = 'taken@acme.com';
     employee.save.mockRejectedValue(
-      Object.assign(new Error("E11000"), {
+      Object.assign(new Error('E11000'), {
         code: 11000,
         keyPattern: { email: 1, createdBy: 1 },
       }),
@@ -280,9 +278,9 @@ describe("updateEmployee — email persistence (#414)", () => {
     expect(res.status).toHaveBeenCalledWith(409);
   });
 
-  test("still enforces ownership before touching the email", async () => {
-    employee.createdBy = { toString: () => "someone-else" };
-    req.body.email = "attacker@evil.com";
+  test('still enforces ownership before touching the email', async () => {
+    employee.createdBy = { toString: () => 'someone-else' };
+    req.body.email = 'attacker@evil.com';
 
     await updateEmployee(req, res, next);
 

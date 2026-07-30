@@ -1,7 +1,13 @@
-const { googleAuth, updatePassword, deleteAccount } = require('../user.controller');
+process.env.GOOGLE_CLIENT_ID = 'test-client-id';
+const {
+  googleAuth,
+  updatePassword,
+  deleteAccount,
+} = require('../user.controller');
 const User = require('../../models/user.model');
 const Employee = require('../../models/employee.model');
 const PayrollUpdate = require('../../models/payroll.model');
+const AuditLog = require('../../models/auditLog.model');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
@@ -55,6 +61,12 @@ jest.mock('../../models/employee.model', () => {
 });
 
 jest.mock('../../models/payroll.model', () => {
+  return {
+    deleteMany: jest.fn(),
+  };
+});
+
+jest.mock('../../models/auditLog.model', () => {
   return {
     deleteMany: jest.fn(),
   };
@@ -118,19 +130,35 @@ describe('Google Authentication Controller tests', () => {
 
   test('should authenticate successfully using accessToken with valid audience', async () => {
     process.env.GOOGLE_CLIENT_ID = 'test-client-id';
-    req.body = { accessToken: 'dummy_access_token', companyName: 'Test Company' };
+    req.body = {
+      accessToken: 'dummy_access_token',
+      companyName: 'Test Company',
+    };
 
     axios.get
       .mockResolvedValueOnce({ data: { aud: 'test-client-id' } })
-      .mockResolvedValueOnce({ data: { sub: 'google456', email: 'tokenuser@example.com', name: 'Token User', picture: 'avatar2.png' } });
+      .mockResolvedValueOnce({
+        data: {
+          sub: 'google456',
+          email: 'tokenuser@example.com',
+          name: 'Token User',
+          picture: 'avatar2.png',
+        },
+      });
 
     User.findOne.mockResolvedValueOnce(null);
 
     await googleAuth(req, res);
 
-    expect(axios.get).toHaveBeenCalledWith(expect.stringContaining('oauth2.googleapis.com/tokeninfo'));
-    expect(axios.get).toHaveBeenCalledWith(expect.stringContaining('googleapis.com/oauth2/v3/userinfo'));
-    expect(User.findOne).toHaveBeenCalledWith({ email: 'tokenuser@example.com' });
+    expect(axios.get).toHaveBeenCalledWith(
+      expect.stringContaining('oauth2.googleapis.com/tokeninfo'),
+    );
+    expect(axios.get).toHaveBeenCalledWith(
+      expect.stringContaining('googleapis.com/oauth2/v3/userinfo'),
+    );
+    expect(User.findOne).toHaveBeenCalledWith({
+      email: 'tokenuser@example.com',
+    });
     expect(res.status).toHaveBeenCalledWith(200);
     delete process.env.GOOGLE_CLIENT_ID;
   });
@@ -144,7 +172,9 @@ describe('Google Authentication Controller tests', () => {
     await googleAuth(req, res);
 
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Invalid Google access token: audience mismatch' });
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Invalid Google access token: audience mismatch',
+    });
     delete process.env.GOOGLE_CLIENT_ID;
   });
 
@@ -154,7 +184,9 @@ describe('Google Authentication Controller tests', () => {
     await googleAuth(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ message: 'No Google credentials provided' });
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'No Google credentials provided',
+    });
   });
 });
 
@@ -197,7 +229,9 @@ describe('Update Password Controller tests', () => {
     expect(mockUser.password).toBe('hashed_new_password');
     expect(mockUser.save).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Password updated successfully' });
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Password updated successfully',
+    });
   });
 
   test('should increment tokenVersion from undefined to 1', async () => {
@@ -225,7 +259,9 @@ describe('Update Password Controller tests', () => {
     await updatePassword(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Current password and new password are required' });
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Current password and new password are required',
+    });
   });
 
   test('should return 400 if newPassword is missing', async () => {
@@ -234,7 +270,9 @@ describe('Update Password Controller tests', () => {
     await updatePassword(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Current password and new password are required' });
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Current password and new password are required',
+    });
   });
 
   test('should return 400 if newPassword is too short', async () => {
@@ -243,7 +281,10 @@ describe('Update Password Controller tests', () => {
     await updatePassword(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character' });
+    expect(res.json).toHaveBeenCalledWith({
+      message:
+        'Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character',
+    });
   });
 
   test('should return 400 if newPassword lacks uppercase', async () => {
@@ -276,7 +317,10 @@ describe('Update Password Controller tests', () => {
     await updatePassword(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character' });
+    expect(res.json).toHaveBeenCalledWith({
+      message:
+        'Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character',
+    });
   });
 
   test('should return 404 if user not found', async () => {
@@ -302,7 +346,9 @@ describe('Update Password Controller tests', () => {
     await updatePassword(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Incorrect current password' });
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Incorrect current password',
+    });
     expect(mockUser.save).not.toHaveBeenCalled();
   });
 
@@ -317,7 +363,9 @@ describe('Update Password Controller tests', () => {
     await updatePassword(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ message: 'No password set. Please use password recovery.' });
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'No password set. Please use password recovery.',
+    });
   });
 });
 
@@ -351,22 +399,32 @@ describe('Delete Account Controller tests', () => {
 
   test('should require current password', async () => {
     req.body = {};
-    User.findById.mockResolvedValue({ _id: 'user123', password: 'hashedPassword' });
+    User.findById.mockResolvedValue({
+      _id: 'user123',
+      password: 'hashedPassword',
+    });
 
     await deleteAccount(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Current password is required' });
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Current password is required',
+    });
   });
 
   test('should reject incorrect current password', async () => {
     bcrypt.compare.mockResolvedValue(false);
-    User.findById.mockResolvedValue({ _id: 'user123', password: 'hashedPassword' });
+    User.findById.mockResolvedValue({
+      _id: 'user123',
+      password: 'hashedPassword',
+    });
 
     await deleteAccount(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Current password is incorrect' });
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Current password is incorrect',
+    });
   });
 
   test('should reject if user has no password set', async () => {
@@ -375,14 +433,20 @@ describe('Delete Account Controller tests', () => {
     await deleteAccount(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ message: 'No password set on this account' });
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'No password set on this account',
+    });
   });
 
   test('should delete account atomically within a transaction', async () => {
-    User.findById.mockResolvedValue({ _id: 'user123', password: 'hashedPassword' });
-    Employee.deleteMany.mockReturnValue({ session: jest.fn().mockResolvedValue({}) });
-    PayrollUpdate.deleteMany.mockReturnValue({ session: jest.fn().mockResolvedValue({}) });
-    User.findByIdAndDelete.mockReturnValue({ session: jest.fn().mockResolvedValue({}) });
+    User.findById.mockResolvedValue({
+      _id: 'user123',
+      password: 'hashedPassword',
+    });
+    Employee.deleteMany.mockResolvedValue({});
+    PayrollUpdate.deleteMany.mockResolvedValue({});
+    AuditLog.deleteMany.mockResolvedValue({});
+    User.findByIdAndDelete.mockResolvedValue({});
 
     await deleteAccount(req, res, next);
 
@@ -391,7 +455,9 @@ describe('Delete Account Controller tests', () => {
     expect(mockSession.commitTransaction).toHaveBeenCalled();
     expect(mockSession.endSession).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Account and associated data deleted successfully.' });
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Account and associated data deleted successfully.',
+    });
   });
 
   test('should return 404 if user not found', async () => {
@@ -406,8 +472,13 @@ describe('Delete Account Controller tests', () => {
 
   test('should abort transaction and call next(error) on failure', async () => {
     const error = new Error('Database failure');
-    User.findById.mockResolvedValue({ _id: 'user123', password: 'hashedPassword' });
-    Employee.deleteMany.mockImplementation(() => { throw error; });
+    User.findById.mockResolvedValue({
+      _id: 'user123',
+      password: 'hashedPassword',
+    });
+    Employee.deleteMany.mockImplementation(() => {
+      throw error;
+    });
 
     await deleteAccount(req, res, next);
 
@@ -418,19 +489,34 @@ describe('Delete Account Controller tests', () => {
   });
 
   test('should fall back to non-transactional delete when transactions are not supported', async () => {
-    jest.spyOn(mongoose, 'startSession').mockRejectedValue(new Error('Transactions not supported'));
+    jest
+      .spyOn(mongoose, 'startSession')
+      .mockRejectedValue(new Error('Transactions not supported'));
 
-    User.findById.mockResolvedValue({ _id: 'user123', password: 'hashedPassword' });
+    User.findById.mockResolvedValue({
+      _id: 'user123',
+      password: 'hashedPassword',
+    });
     Employee.deleteMany.mockResolvedValue({ deletedCount: 3 });
     PayrollUpdate.deleteMany.mockResolvedValue({ deletedCount: 5 });
+    AuditLog.deleteMany.mockResolvedValue({ deletedCount: 1 });
     User.findByIdAndDelete.mockResolvedValue({ deletedCount: 1 });
 
     await deleteAccount(req, res, next);
 
-    expect(Employee.deleteMany).toHaveBeenCalledWith({ createdBy: 'user123' }, {});
-    expect(PayrollUpdate.deleteMany).toHaveBeenCalledWith({ createdBy: 'user123' }, {});
+    expect(Employee.deleteMany).toHaveBeenCalledWith(
+      { createdBy: 'user123' },
+      {},
+    );
+    expect(PayrollUpdate.deleteMany).toHaveBeenCalledWith(
+      { createdBy: 'user123' },
+      {},
+    );
+    expect(AuditLog.deleteMany).toHaveBeenCalledWith({ userId: 'user123' }, {});
     expect(User.findByIdAndDelete).toHaveBeenCalledWith('user123', {});
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ message: 'Account and associated data deleted successfully.' });
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Account and associated data deleted successfully.',
+    });
   });
 });

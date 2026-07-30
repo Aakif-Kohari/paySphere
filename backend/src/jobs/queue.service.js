@@ -1,14 +1,17 @@
-const { Queue, Worker } = require("bullmq");
-const Redis = require("ioredis");
-const logger = require("../utils/logger");
+const { Queue } = require('bullmq');
+const Redis = require('ioredis');
+const logger = require('../utils/logger');
 
-const connection = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
-  maxRetriesPerRequest: null,
-});
+const connection = new Redis(
+  process.env.REDIS_URL || 'redis://localhost:6379',
+  {
+    maxRetriesPerRequest: null,
+  },
+);
 
-const payrollQueue = new Queue("payroll-processing", { connection });
+const payrollQueue = new Queue('payroll-processing', { connection });
 
-logger.info("BullMQ payroll-processing queue initialized");
+logger.info('BullMQ payroll-processing queue initialized');
 
 module.exports = {
   payrollQueue,
