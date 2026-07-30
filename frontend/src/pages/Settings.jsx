@@ -91,9 +91,7 @@ export default function Settings() {
 
   const [profileErrors, setProfileErrors] = useState({ fullName: "", email: "" });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [auditLogs, setAuditLogs] = useState([]);
-  const [auditPage, setAuditPage] = useState(1);
-  const [auditTotalPages, setAuditTotalPages] = useState(1);
+
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
 
   useEffect(() => {
@@ -141,17 +139,7 @@ export default function Settings() {
       .finally(() => setLoading(false));
   }, [localCompanyName, dispatch]);
 
-  
-  useEffect(() => {
-    if (activeTab === "audit") {
-      api.get(`/api/audit-logs?page=${auditPage}&limit=15`)
-        .then(res => {
-          setAuditLogs(res.data.logs);
-          setAuditTotalPages(res.data.totalPages);
-        })
-        .catch(err => console.error("Failed to fetch audit logs", err));
-    }
-  }, [activeTab, auditPage]);
+
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
