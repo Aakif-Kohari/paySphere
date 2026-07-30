@@ -2,12 +2,10 @@ const mongoose = require("mongoose");
 const Employee = require("../models/employee.model");
 const PayrollUpdate = require("../models/payroll.model");
 const User = require("../models/user.model");
-const { payrollQueue } = require("../jobs/queue.service");
 const { calculateNetSalary } = require("../utils/salaryCalculator");
-const exportService = require("../services/export.service");
+const { generatePayrollCSV } = require("../utils/csvExport");
 const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
-const cacheService = require("../services/cache.service");
 
 // Helper: parse tag labels back into structured numbers
 function parseTagValue(label) {
@@ -363,9 +361,26 @@ exports.exportPayrollCSV = async (req, res, next) => {
 
     const csvData = generatePayrollCSV(payrolls, month, year);
 
-    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename=payroll-${month}-${year}.csv`);
     res.status(200).send(csvData);
+
+    // Salary data leaving the system is an auditable event, consistent with how
+    // downloadPDFReport / exportExcelReport already record REPORT_DOWNLOAD (#228).
+    eventBus.emit("AUDIT_LOG", {
+      userId: req.userId,
+      action: "REPORT_DOWNLOAD",
+      resourceType: "Report",
+      details: { month, year, type: "payroll-csv", employeeCount: payrolls.length },
+      req,
+    });
+
+    logger.info(`Payroll CSV exported`, {
+      userId: req.userId,
+      month,
+      year,
+      employeeCount: payrolls.length,
+    });
   } catch (error) {
     next(error);
   }
