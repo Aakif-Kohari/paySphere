@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const mongoose = require("mongoose");
 const Employee = require("../models/employee.model");
 const PayrollUpdate = require("../models/payroll.model");
@@ -7,11 +8,30 @@ const { generatePayrollCSV } = require("../utils/csvExport");
 const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
+// Restored: dropped when #464 was merged into main via the GitHub conflict
+// editor, leaving PAYROLL_STATUS, payableStatusFilter and friends undefined
+// (#458).
+const {
+  PAYROLL_STATUS,
+  canTransition,
+  describeTransition,
+  isEmailable,
+  normalizeStatus,
+  payableStatusFilter,
+  excludeRejectedFilter,
+} = require("../config/payrollStatus");
+const Attendance = require("../models/attendance.model");
+const { derivePayrollInputs } = require("../utils/attendanceGrid");
 const SalaryStructure = require("../models/salaryStructure.model");
 const {
   resolveStructureForPeriod,
   computeComponentAmounts,
 } = require("../utils/salaryStructure");
+
+// Also dropped by the #464 merge: both are referenced by parsePayrollIdBatch
+// and rejectPayroll (#458).
+const MAX_BATCH_SIZE = 200;
+const MAX_REJECTION_REASON_LENGTH = 500;
 
 
 // Helper: parse tag labels back into structured numbers
@@ -23,71 +43,423 @@ function parseTagValue(label) {
   return (isNaN(parsed) || !Number.isFinite(parsed) || parsed < 0) ? 0 : parsed;
 }
 
+/**
+ * Validate a batch of payroll ids supplied in a request body.
+ *
+ * The approval handlers took `payrollIds` straight from the body and fed it to
+ * `updateMany`. A non-ObjectId string throws a CastError that surfaces as a
+ * 500, and an unbounded array lets a single request rewrite the entire
+ * collection — so both are checked here before anything touches the database.
+ *
+ * @param {*} value raw `payrollIds` from the body
+ * @returns {{ ok: true, ids: string[] } | { ok: false, message: string }}
+ */
+function parsePayrollIdBatch(value) {
+  if (!Array.isArray(value) || value.length === 0) {
+    return {
+      ok: false,
+      message: "payrollIds must be a non-empty array of payroll record ids",
+    };
+  }
+
+  if (value.length > MAX_BATCH_SIZE) {
+    return {
+      ok: false,
+      message: `Cannot process more than ${MAX_BATCH_SIZE} payroll records in a single request`,
+    };
+  }
+
+  const invalid = value.filter((id) => !mongoose.Types.ObjectId.isValid(id));
+  if (invalid.length > 0) {
+    return {
+      ok: false,
+      message: `Invalid payroll id format: ${invalid.slice(0, 5).join(", ")}`,
+    };
+  }
+
+  // De-duplicate so a repeated id in the payload cannot be counted twice in the
+  // response tallies.
+  return { ok: true, ids: [...new Set(value.map(String))] };
+}
+
+/**
+ * Apply a status transition to a batch of payroll records owned by the caller.
+ *
+ * This is the whole fix for the cross-tenant hole in #458 concentrated in one
+ * place: the query is *always* scoped by `createdBy`, and every id is
+ * classified so the response can tell the client precisely which records moved,
+ * which were not theirs, and which were in a state the transition table
+ * forbids. The previous implementation issued a blind `updateMany` keyed only
+ * on `_id`, which both leaked other companies' records and reported success for
+ * ids that matched nothing.
+ *
+ * @param {object} params
+ * @param {string} params.userId caller — the ownership scope
+ * @param {string[]} params.ids payroll ids to transition
+ * @param {string} params.targetStatus a PAYROLL_STATUS value
+ * @param {object} params.extraFields fields to $set alongside the status
+ * @returns {Promise<{applied: object[], notFound: string[], invalidTransition: object[]}>}
+ */
+async function transitionPayrollBatch({
+  userId,
+  ids,
+  targetStatus,
+  extraFields = {},
+}) {
+  // Scoped read first. Anything the caller does not own simply never appears in
+  // this result set, and therefore lands in `notFound` — the caller cannot tell
+  // "does not exist" from "belongs to someone else", which is the correct
+  // answer to give.
+  const owned = await PayrollUpdate.find({
+    _id: { $in: ids },
+    createdBy: userId,
+  }).select("_id status employeeName month year netSalary");
+
+  const ownedById = new Map(owned.map((p) => [String(p._id), p]));
+
+  const notFound = ids.filter((id) => !ownedById.has(String(id)));
+  const transitionable = [];
+  const invalidTransition = [];
+
+  for (const record of owned) {
+    const current = normalizeStatus(record.status) || record.status;
+
+    if (!canTransition(current, targetStatus)) {
+      invalidTransition.push({
+        payrollId: String(record._id),
+        employeeName: record.employeeName,
+        currentStatus: current,
+        reason: describeTransition(current, targetStatus),
+      });
+      continue;
+    }
+
+    transitionable.push(record);
+  }
+
+  let applied = [];
+
+  if (transitionable.length > 0) {
+    const targetIds = transitionable.map((r) => r._id);
+
+    await PayrollUpdate.updateMany(
+      // Re-assert ownership and the source states on the write itself, so a
+      // concurrent approval between the read above and this update cannot slip
+      // a record through a transition that was legal a moment ago.
+      {
+        _id: { $in: targetIds },
+        createdBy: userId,
+      },
+      { $set: { status: targetStatus, ...extraFields } },
+      { runValidators: true },
+    );
+
+    applied = transitionable.map((r) => ({
+      payrollId: String(r._id),
+      employeeName: r.employeeName,
+      month: r.month,
+      year: r.year,
+      netSalary: r.netSalary,
+      previousStatus: normalizeStatus(r.status) || r.status,
+      status: targetStatus,
+    }));
+  }
+
+  return { applied, notFound, invalidTransition };
+}
+
 // FINALIZE PAYROLL — process activity entries and save payroll records
 
 
+/**
+ * GET /api/payroll/approvals — the checker's queue.
+ *
+ * The original implementation ran `PayrollUpdate.find({ status:
+ * "PENDING_APPROVAL" })` with the comment "Admin sees all in this demo". On a
+ * shared deployment that returns every company's employee names, base salaries
+ * and net salaries to any logged-in account. Scoped by `createdBy` like every
+ * other read in the codebase (#458).
+ */
 exports.getPendingApprovals = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    let page = parseInt(req.query.page, 10);
+    if (isNaN(page) || page < 1) page = 1;
+
+    let limit = parseInt(req.query.limit, 10);
+    if (isNaN(limit) || limit < 1 || limit > 100) limit = 20;
+
     const skip = (page - 1) * limit;
 
-    const query = { status: "PENDING_APPROVAL" }; // Admin sees all in this demo
+    const query = {
+      createdBy: req.userId,
+      status: PAYROLL_STATUS.PENDING_APPROVAL,
+    };
 
-    const pending = await PayrollUpdate.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate("createdBy", "fullName email")
-      .populate("employeeId", "fullName role");
-      
-    const totalCount = await PayrollUpdate.countDocuments(query);
+    // Optional period narrowing, so a checker can review one month at a time
+    // rather than paging through the entire backlog.
+    if (req.query.month !== undefined) {
+      const month = Number(req.query.month);
+      if (!Number.isInteger(month) || month < 1 || month > 12) {
+        return res.status(400).json({ message: "Invalid month parameter" });
+      }
+      query.month = month;
+    }
+
+    if (req.query.year !== undefined) {
+      const year = Number(req.query.year);
+      if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+        return res.status(400).json({ message: "Invalid year parameter" });
+      }
+      query.year = year;
+    }
+
+    const [pending, totalCount] = await Promise.all([
+      PayrollUpdate.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("submittedBy", "fullName email")
+        .populate("employeeId", "fullName role email"),
+      PayrollUpdate.countDocuments(query),
+    ]);
+
+    // The checker needs the size of what they are signing off, not just the
+    // page in front of them.
+    const [totals] = await PayrollUpdate.aggregate([
+      { $match: query },
+      {
+        $group: {
+          _id: null,
+          totalNetSalary: { $sum: "$netSalary" },
+          employeeCount: { $sum: 1 },
+        },
+      },
+    ]);
 
     res.status(200).json({
       pending,
       currentPage: page,
-      totalPages: Math.ceil(totalCount / limit),
-      totalCount
+      totalPages: Math.ceil(totalCount / limit) || 0,
+      totalCount,
+      pendingTotalNetSalary: totals ? Math.round(totals.totalNetSalary * 100) / 100 : 0,
+      pendingEmployeeCount: totals ? totals.employeeCount : 0,
     });
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * POST /api/payroll/approve — checker signs off a batch.
+ *
+ * Previously an unscoped `updateMany` keyed on `_id` alone: any authenticated
+ * account could approve any other company's payroll by guessing or harvesting
+ * ids, and the handler reported success regardless of whether anything matched.
+ */
 exports.approvePayroll = async (req, res, next) => {
   try {
-    const { payrollIds } = req.body;
-    if (!payrollIds || !Array.isArray(payrollIds)) {
-      return res.status(400).json({ message: "payrollIds array required" });
+    const batch = parsePayrollIdBatch(req.body && req.body.payrollIds);
+    if (!batch.ok) {
+      return res.status(400).json({ message: batch.message });
     }
 
-    await PayrollUpdate.updateMany(
-      { _id: { $in: payrollIds }, status: "PENDING_APPROVAL" },
-      { $set: { status: "APPROVED", approvedBy: req.userId, approvedAt: new Date() } }
-    );
+    const approvedAt = new Date();
 
-    res.status(200).json({ message: "Payroll approved successfully" });
+    const { applied, notFound, invalidTransition } = await transitionPayrollBatch({
+      userId: req.userId,
+      ids: batch.ids,
+      targetStatus: PAYROLL_STATUS.APPROVED,
+      extraFields: {
+        approvedBy: req.userId,
+        approvedAt,
+        // Clear any prior rejection so a resubmitted-then-approved row does not
+        // keep showing a stale reason on the payslip screen.
+        rejectionReason: undefined,
+        rejectedBy: undefined,
+        rejectedAt: undefined,
+      },
+    });
+
+    if (applied.length === 0) {
+      // Nothing moved. A 409 rather than a 200 so the UI does not tell the user
+      // an approval happened when it did not.
+      return res.status(409).json({
+        message: "No payroll records were approved",
+        approvedCount: 0,
+        notFound,
+        invalidTransition,
+      });
+    }
+
+    // Approved rows enter every payable total, so the cached analytics are now
+    // stale — the same invalidation contract the finalize path follows (#415).
+    await cacheService.invalidateAnalytics(req.userId);
+
+    eventBus.emit("AUDIT_LOG", {
+      userId: req.userId,
+      action: "PAYROLL_APPROVE",
+      resourceType: "Payroll",
+      resourceIds: applied.map((a) => a.payrollId),
+      details: {
+        approvedCount: applied.length,
+        notFoundCount: notFound.length,
+        invalidTransitionCount: invalidTransition.length,
+        totalNetSalary: applied.reduce((sum, a) => sum + (a.netSalary || 0), 0),
+      },
+      result:
+        notFound.length > 0 || invalidTransition.length > 0 ? "partial" : "success",
+      req,
+    });
+
+    logger.info("Payroll approved", {
+      userId: req.userId,
+      approvedCount: applied.length,
+      notFoundCount: notFound.length,
+      invalidTransitionCount: invalidTransition.length,
+    });
+
+    res.status(200).json({
+      message: `Approved ${applied.length} payroll record${applied.length !== 1 ? "s" : ""}`,
+      approvedCount: applied.length,
+      approved: applied,
+      notFound,
+      invalidTransition,
+    });
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * POST /api/payroll/reject — checker sends a batch back to the maker.
+ *
+ * Same ownership fix as approve, plus the rejection reason is now actually
+ * persisted: `rejectionReason` was not on the schema, so mongoose strict mode
+ * discarded it and the maker was told "rejected" with no indication why (#458).
+ */
 exports.rejectPayroll = async (req, res, next) => {
   try {
-    const { payrollIds, reason } = req.body;
-    if (!payrollIds || !Array.isArray(payrollIds)) {
-      return res.status(400).json({ message: "payrollIds array required" });
-    }
-    if (!reason) {
-      return res.status(400).json({ message: "Rejection reason required" });
+    const batch = parsePayrollIdBatch(req.body && req.body.payrollIds);
+    if (!batch.ok) {
+      return res.status(400).json({ message: batch.message });
     }
 
-    await PayrollUpdate.updateMany(
-      { _id: { $in: payrollIds }, status: "PENDING_APPROVAL" },
-      { $set: { status: "REJECTED", rejectionReason: reason } }
-    );
+    const rawReason = req.body && req.body.reason;
+    if (typeof rawReason !== "string" || rawReason.trim() === "") {
+      return res
+        .status(400)
+        .json({ message: "A rejection reason is required" });
+    }
 
-    res.status(200).json({ message: "Payroll rejected successfully" });
+    const reason = rawReason.trim().slice(0, MAX_REJECTION_REASON_LENGTH);
+    const rejectedAt = new Date();
+
+    const { applied, notFound, invalidTransition } = await transitionPayrollBatch({
+      userId: req.userId,
+      ids: batch.ids,
+      targetStatus: PAYROLL_STATUS.REJECTED,
+      extraFields: {
+        rejectionReason: reason,
+        rejectedBy: req.userId,
+        rejectedAt,
+        approvedBy: undefined,
+        approvedAt: undefined,
+      },
+    });
+
+    if (applied.length === 0) {
+      return res.status(409).json({
+        message: "No payroll records were rejected",
+        rejectedCount: 0,
+        notFound,
+        invalidTransition,
+      });
+    }
+
+    await cacheService.invalidateAnalytics(req.userId);
+
+    eventBus.emit("AUDIT_LOG", {
+      userId: req.userId,
+      action: "PAYROLL_REJECT",
+      resourceType: "Payroll",
+      resourceIds: applied.map((a) => a.payrollId),
+      details: {
+        rejectedCount: applied.length,
+        notFoundCount: notFound.length,
+        invalidTransitionCount: invalidTransition.length,
+        reason,
+      },
+      result:
+        notFound.length > 0 || invalidTransition.length > 0 ? "partial" : "success",
+      req,
+    });
+
+    logger.info("Payroll rejected", {
+      userId: req.userId,
+      rejectedCount: applied.length,
+      notFoundCount: notFound.length,
+    });
+
+    res.status(200).json({
+      message: `Rejected ${applied.length} payroll record${applied.length !== 1 ? "s" : ""}`,
+      rejectedCount: applied.length,
+      rejected: applied,
+      notFound,
+      invalidTransition,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/payroll/mark-paid — record disbursement.
+ *
+ * The lifecycle had no way to reach `paid` at all: `submitPayrollForReview`
+ * writes `pending_approval`, approve writes `approved`, and nothing ever moved
+ * a record on from there — yet `deleteEmployee` (#345) and the re-finalise
+ * guard (#251) both key off `paid`. Without this endpoint those protections
+ * could never trigger.
+ */
+exports.markPayrollPaid = async (req, res, next) => {
+  try {
+    const batch = parsePayrollIdBatch(req.body && req.body.payrollIds);
+    if (!batch.ok) {
+      return res.status(400).json({ message: batch.message });
+    }
+
+    const paidAt = new Date();
+
+    const { applied, notFound, invalidTransition } = await transitionPayrollBatch({
+      userId: req.userId,
+      ids: batch.ids,
+      targetStatus: PAYROLL_STATUS.PAID,
+      extraFields: { paidAt },
+    });
+
+    if (applied.length === 0) {
+      return res.status(409).json({
+        message: "No payroll records were marked as paid",
+        paidCount: 0,
+        notFound,
+        invalidTransition,
+      });
+    }
+
+    await cacheService.invalidateAnalytics(req.userId);
+
+    logger.info("Payroll marked paid", {
+      userId: req.userId,
+      paidCount: applied.length,
+    });
+
+    res.status(200).json({
+      message: `Marked ${applied.length} payroll record${applied.length !== 1 ? "s" : ""} as paid`,
+      paidCount: applied.length,
+      paid: applied,
+      notFound,
+      invalidTransition,
+    });
   } catch (error) {
     next(error);
   }
@@ -115,7 +487,12 @@ exports.parsePayrollCSV = async (req, res, next) => {
 
     const employees = await Employee.find({ createdBy: req.userId });
     const activities = [];
-    const v4 = require('uuid').v4 || (() => Math.random().toString(36).substring(7));
+    // `require('uuid')` threw MODULE_NOT_FOUND — uuid is not a dependency of
+    // this package — and because the throw happens while evaluating the left
+    // operand, the `|| fallback` could never run. Every call to this endpoint
+    // was a guaranteed 500 on a clean install. `crypto.randomUUID` is in the
+    // Node standard library and needs no dependency at all (#458).
+    const v4 = () => crypto.randomUUID();
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -204,10 +581,40 @@ exports.submitPayrollForReview = async (req, res, next) => {
     // Fetch user settings for default rates
     const user = await User.findById(req.userId);
 
-    // Load every salary revision for the run, grouped by employee, so the row
-    // can snapshot the component breakdown that was actually in force. Without
-    // the snapshot, regenerating a payslip after a later raise would show the
-    // new split against the old total (#461).
+    // Two independent lookups feed the run, and neither is a prerequisite for
+    // paying people — both degrade loudly rather than failing the run.
+
+    // Where a month has been recorded, its validated totals are a better
+    // source for leaveDays/overtimeHours than re-parsing the display strings
+    // the client sends — see the comment on the resolver below (#459).
+    let attendanceByEmployee = new Map();
+
+    try {
+      const attendanceRecords = await Attendance.find({
+        createdBy: req.userId,
+        year: currentYear,
+        month: currentMonth,
+      }).select("employeeId totals");
+
+      attendanceByEmployee = new Map(
+        (attendanceRecords || []).map((record) => [
+          String(record.employeeId),
+          record,
+        ]),
+      );
+    } catch (attendanceError) {
+      logger.warn("Could not read the attendance ledger; falling back to activity tags", {
+        userId: req.userId,
+        month: currentMonth,
+        year: currentYear,
+        error: attendanceError.message,
+      });
+    }
+
+    // Every salary revision for the run, grouped by employee, so the row can
+    // snapshot the component breakdown that was actually in force. Without the
+    // snapshot, regenerating a payslip after a later raise would show the new
+    // split against the old total (#461).
     let revisionsByEmployee = new Map();
 
     try {
@@ -222,7 +629,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
       });
     } catch (structureError) {
       // The breakdown is presentational; the gross on the employee record is
-      // still authoritative. Losing the split must not stop people being paid.
+      // still authoritative.
       logger.warn("Could not read salary structures; payroll will run without a breakdown", {
         userId: req.userId,
         error: structureError.message,
@@ -293,6 +700,28 @@ exports.submitPayrollForReview = async (req, res, next) => {
       bonus = (isNaN(bonus) || !Number.isFinite(bonus) || bonus < 0) ? 0 : bonus;
       deductions = (isNaN(deductions) || !Number.isFinite(deductions) || deductions < 0) ? 0 : deductions;
 
+      // Prefer the persisted ledger over the parsed tag strings.
+      //
+      // The tag path reaches these numbers by stripping non-digits out of a
+      // label like "– 3 days leave" and disambiguating with substring matching,
+      // so "2 days unpaid leave (overtime adjusted)" hits the `includes("overtime")`
+      // branch first and is booked as overtime hours. It also cannot represent
+      // a half day and cannot tell paid leave from unpaid.
+      //
+      // The ledger has none of those problems: it was validated at write time,
+      // half days contribute 0.5, and only *unpaid* absence reaches leaveDays.
+      // Bonus and deductions still come from the tags — they are ad-hoc
+      // monetary adjustments with no attendance equivalent.
+      let attendanceSource = "manual";
+      const ledger = attendanceByEmployee.get(String(employee._id));
+
+      if (ledger && ledger.totals) {
+        const derived = derivePayrollInputs(ledger.totals);
+        leaveDays = derived.leaveDays;
+        overtimeHours = derived.overtimeHours;
+        attendanceSource = "ledger";
+      }
+
       const {
         baseSalary,
         leaveDeduction,
@@ -355,6 +784,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
         leaveDeduction,
         overtimePay,
         netSalary,
+        attendanceSource,
         salarySnapshot
       });
     }
@@ -366,23 +796,47 @@ exports.submitPayrollForReview = async (req, res, next) => {
       });
     }
 
-    // Guard: prevent overwriting already-paid payroll records (#251)
+    // Guard: prevent overwriting already-paid payroll records (#251) and, now
+    // that a checker exists, already-approved ones too.
+    //
+    // The bulkWrite below upserts with `$set: { status: pending_approval }`, so
+    // without this guard a maker could re-run payroll on an approved row and
+    // silently walk it back to pending with new figures *after* sign-off —
+    // which is precisely the abuse a maker–checker flow exists to prevent. The
+    // transition table already declares `approved -> pending_approval` illegal;
+    // this enforces it on the write path (#458).
     const employeeIds = preparedItems.map((item) => item.employee._id);
-    const existingPaidRecords = await PayrollUpdate.find({
+    const lockedRecords = await PayrollUpdate.find({
       employeeId: { $in: employeeIds },
       month: currentMonth,
       year: currentYear,
       createdBy: req.userId,
-      status: "paid",
+      status: { $in: [PAYROLL_STATUS.PAID, PAYROLL_STATUS.APPROVED, "finalized"] },
     });
 
-    if (existingPaidRecords.length > 0) {
-      const paidEmployeeNames = existingPaidRecords.map(
-        (p) => p.employeeName
-      );
-      return res.status(400).json({
-        message: `Payroll has already been paid for: ${paidEmployeeNames.join(", ")}. Cannot re-finalize paid records.`,
-        paidEmployees: paidEmployeeNames,
+    if (lockedRecords.length > 0) {
+      const paidEmployees = lockedRecords
+        .filter((p) => normalizeStatus(p.status) === PAYROLL_STATUS.PAID)
+        .map((p) => p.employeeName);
+      const approvedEmployees = lockedRecords
+        .filter((p) => normalizeStatus(p.status) === PAYROLL_STATUS.APPROVED)
+        .map((p) => p.employeeName);
+
+      const parts = [];
+      if (paidEmployees.length > 0) {
+        parts.push(`already paid for: ${paidEmployees.join(", ")}`);
+      }
+      if (approvedEmployees.length > 0) {
+        parts.push(
+          `already approved for: ${approvedEmployees.join(", ")} (reject the run first to re-submit)`,
+        );
+      }
+
+      return res.status(409).json({
+        message: `Payroll is ${parts.join("; ")}.`,
+        paidEmployees,
+        approvedEmployees,
+        lockedEmployees: lockedRecords.map((p) => p.employeeName),
       });
     }
 
@@ -411,9 +865,22 @@ exports.submitPayrollForReview = async (req, res, next) => {
         leaveDeduction: item.leaveDeduction,
         overtimePay: item.overtimePay,
         netSalary: item.netSalary,
+        // Recorded so a later audit can tell whether the leave figure came
+        // from the validated ledger or from a parsed display string (#459).
+        attendanceSource: item.attendanceSource,
         salarySnapshot: item.salarySnapshot,
         createdBy: req.userId,
-        status: "PENDING_APPROVAL",
+        status: PAYROLL_STATUS.PENDING_APPROVAL,
+        submittedBy: req.userId,
+        submittedAt: new Date(),
+        // A resubmission after a rejection must not carry the old verdict
+        // forward, or the checker sees a row that is simultaneously pending and
+        // rejected.
+        approvedBy: null,
+        approvedAt: null,
+        rejectedBy: null,
+        rejectedAt: null,
+        rejectionReason: null,
       };
 
       return {
@@ -462,6 +929,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
       bonus: item.bonus,
       deductions: item.deductions,
       netSalary: item.netSalary,
+      attendanceSource: item.attendanceSource,
       payrollId: payrollMap[item.employee._id.toString()],
     }));
 
@@ -543,20 +1011,40 @@ exports.getPayrollSummary = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
+    // The summary now has to distinguish "submitted" from "signed off". Before
+    // #458 it summed every row for the month regardless of status, so a run
+    // sitting in pending_approval — or one a checker had explicitly rejected —
+    // was reported to the owner as money owed this month.
+    //
+    // `totalPayout` therefore counts payable rows only. The pending figure is
+    // returned alongside it rather than folded in, so the review screen can
+    // still show what is in flight without overstating the payout.
     const payrolls = await PayrollUpdate.find({
       createdBy: req.userId,
       month,
       year,
+      ...excludeRejectedFilter(),
     }).sort({ employeeName: 1 });
 
-    const rawTotal = payrolls.reduce((sum, p) => sum + (p.netSalary || 0), 0);
-    const totalPayout = Math.round(rawTotal * 100) / 100;
+    const payableRows = payrolls.filter((p) =>
+      [PAYROLL_STATUS.APPROVED, PAYROLL_STATUS.PAID].includes(
+        normalizeStatus(p.status),
+      ),
+    );
+    const pendingRows = payrolls.filter(
+      (p) => normalizeStatus(p.status) === PAYROLL_STATUS.PENDING_APPROVAL,
+    );
+
+    const round2 = (n) => Math.round(n * 100) / 100;
+    const sumNet = (rows) => rows.reduce((sum, p) => sum + (p.netSalary || 0), 0);
 
     res.status(200).json({
       month,
       year,
-      totalPayout,
-      employeeCount: payrolls.length,
+      totalPayout: round2(sumNet(payableRows)),
+      employeeCount: payableRows.length,
+      pendingApprovalTotal: round2(sumNet(pendingRows)),
+      pendingApprovalCount: pendingRows.length,
       payrolls,
     });
   } catch (error) {
@@ -578,14 +1066,21 @@ exports.exportPayrollCSV = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter. Must be a valid year integer." });
     }
 
+    // An exported payroll register is a financial record — it must contain what
+    // was actually approved for payment, not a mixture of approved rows,
+    // unreviewed drafts and rows a checker threw out (#458).
     const payrolls = await PayrollUpdate.find({
       createdBy: req.userId,
       month,
       year,
+      ...payableStatusFilter(),
     }).sort({ employeeName: 1 });
 
     if (payrolls.length === 0) {
-      return res.status(404).json({ message: "No payroll data found for the selected month." });
+      return res.status(404).json({
+        message:
+          "No approved payroll data found for the selected month. Approve the run before exporting.",
+      });
     }
 
     const csvData = generatePayrollCSV(payrolls, month, year);
@@ -639,6 +1134,16 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
       return res.status(400).json({ message: "Employee does not have an email address set" });
     }
 
+    // Emailing a payslip for a row that has not cleared the checker tells the
+    // employee they have been paid a figure nobody signed off on — and for a
+    // rejected row, a figure that was explicitly thrown out (#458).
+    if (!isEmailable(payroll.status)) {
+      return res.status(409).json({
+        message: `Cannot email a payslip for a payroll record that is "${normalizeStatus(payroll.status) || payroll.status}". It must be approved first.`,
+        status: normalizeStatus(payroll.status) || payroll.status,
+      });
+    }
+
     await sendPayslipEmail(employee, payroll);
     await PayrollUpdate.updateOne({ _id: payroll._id }, { payslipEmailed: true });
 
@@ -672,15 +1177,22 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
+    // Same rule as the single-send path: only approved/paid rows are
+    // dispatchable. Previously this swept up every unemailed row for the month
+    // including pending and rejected ones (#458).
     const payrolls = await PayrollUpdate.find({
       createdBy: req.userId,
       month,
       year,
       payslipEmailed: false,
+      ...payableStatusFilter(),
     });
 
     if (payrolls.length === 0) {
-      return res.status(404).json({ message: "No payroll records found for the selected month and year." });
+      return res.status(404).json({
+        message:
+          "No approved payroll records awaiting a payslip email for the selected month and year.",
+      });
     }
 
     const employeeIds = [...new Set(payrolls.map(p => p.employeeId))];
