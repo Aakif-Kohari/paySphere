@@ -29,10 +29,15 @@ jest.mock("../../utils/logger", () => ({
   stream: { write: jest.fn() },
 }));
 
+// submitPayrollForReview now consults the attendance ledger (#459).
+jest.mock("../../models/attendance.model", () => ({
+  find: jest.fn(() => ({ select: jest.fn().mockResolvedValue([]) })),
+}));
+
 // deleteEmployee now refuses to destroy an employee with a settled F&F, the
 // same protection #345 added for paid payroll (#462). Stubbed so the employee
 // unit tests stay free of the settlement collection; the guard has its own
-// coverage below and in settlement.controller.test.js.
+// coverage in settlement.controller.test.js.
 jest.mock("../../models/settlement.model", () => ({
   exists: jest.fn().mockResolvedValue(null),
 }));
@@ -135,13 +140,15 @@ describe("analytics cache invalidation (#415)", () => {
     test("does not invalidate when the period is already paid", async () => {
       PayrollUpdate.find.mockReset();
       PayrollUpdate.find.mockImplementationOnce(() =>
-        createQueryMock([{ employeeName: "Alice Smith" }]),
+        createQueryMock([{ employeeName: "Alice Smith", status: "paid" }]),
       );
 
       await submitPayrollForReview(req, res, next);
 
       expect(cacheService.invalidateAnalytics).not.toHaveBeenCalled();
-      expect(res.status).toHaveBeenCalledWith(400);
+      // 409 since #458: the request is well formed, it is the record's state
+      // that forbids re-submitting it.
+      expect(res.status).toHaveBeenCalledWith(409);
     });
   });
 

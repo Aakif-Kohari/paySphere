@@ -11,10 +11,20 @@ const auditLogSchema = new mongoose.Schema({
     required: true,
     enum: [
       "PAYROLL_FINALIZE",
+      // #438 shipped approve/reject handlers that emitted no audit event at
+      // all, so the one action a maker–checker flow exists to record was the
+      // one action left untracked (#458).
+      "PAYROLL_APPROVE",
+      "PAYROLL_REJECT",
       "EMPLOYEE_CREATE",
       "EMPLOYEE_UPDATE",
       "EMPLOYEE_DELETE",
       "EMPLOYEE_IMPORT",
+      // Attendance drives leaveDays and overtimeHours into the salary
+      // calculation, so editing it is a financial mutation and is audited
+      // like one (#459).
+      "ATTENDANCE_UPDATE",
+      "ATTENDANCE_BULK_UPDATE",
       // Offboarding is a financial event: it produces a final payout and
       // removes someone from the headcount (#462).
       "EMPLOYEE_EXIT_INITIATED",
@@ -30,7 +40,7 @@ const auditLogSchema = new mongoose.Schema({
   },
   resourceType: {
     type: String,
-    enum: ["Payroll", "Employee", "User", "Report", "Settlement"],
+    enum: ["Payroll", "Employee", "User", "Report", "Attendance", "Settlement"],
     required: true,
   },
   resourceIds: [
