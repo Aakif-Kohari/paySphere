@@ -15,6 +15,10 @@ const PERMISSIONS = {
   DELETE_EMPLOYEE: "DELETE_EMPLOYEE",
   READ_PAYROLL: "READ_PAYROLL",
   WRITE_PAYROLL: "WRITE_PAYROLL",
+  // Maker–checker: the account that submits a payroll run should not be the
+  // only thing standing between a figure and a bank transfer. Kept separate
+  // from WRITE_PAYROLL so the two can be held by different people (#458).
+  APPROVE_PAYROLL: "APPROVE_PAYROLL",
   READ_REPORT: "READ_REPORT",
 };
 
@@ -38,6 +42,11 @@ const PERMISSION_DEFINITIONS = [
   {
     name: PERMISSIONS.WRITE_PAYROLL,
     description: "Finalize payroll runs and dispatch payslip emails",
+  },
+  {
+    name: PERMISSIONS.APPROVE_PAYROLL,
+    description:
+      "Approve or reject a submitted payroll run before it can be paid",
   },
   {
     name: PERMISSIONS.READ_REPORT,
@@ -73,12 +82,15 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.DELETE_EMPLOYEE,
       PERMISSIONS.READ_PAYROLL,
       PERMISSIONS.WRITE_PAYROLL,
+      PERMISSIONS.APPROVE_PAYROLL,
       PERMISSIONS.READ_REPORT,
     ],
   },
   {
     name: ROLES.HR_MANAGER,
-    // Can run payroll day to day, but cannot destroy an employee's history.
+    // Can run payroll day to day, but cannot destroy an employee's history —
+    // and deliberately cannot approve its own submissions. The HR manager is
+    // the maker; the owner is the checker (#458).
     permissions: [
       PERMISSIONS.READ_EMPLOYEE,
       PERMISSIONS.WRITE_EMPLOYEE,

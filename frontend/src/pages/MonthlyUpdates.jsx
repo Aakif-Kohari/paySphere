@@ -280,10 +280,13 @@ export default function MonthlyUpdates() {
   };
 
   // Handle Attendance Calendar Apply (#137)
-  const handleApplyCalendar = ({ employeeName, tags }) => {
+  const handleApplyCalendar = ({ employeeName, employeeId, tags }) => {
     const color = COLORS[nextId % COLORS.length];
+    // Prefer the id the calendar already resolved. Falling back to a
+    // case-insensitive name match reproduces #93/#274, where two employees
+    // sharing a name silently attributed one's attendance to the other.
     const matchedEmp = employees.find(emp => emp.fullName.toLowerCase() === employeeName.toLowerCase());
-    const empId = matchedEmp ? matchedEmp._id : null;
+    const empId = employeeId || (matchedEmp ? matchedEmp._id : null);
     setActivity(prev => [{ employeeId: empId, name: employeeName, tags, pending: true, id: nextId, color }, ...prev]);
     setNextId(n => n + 1);
   };

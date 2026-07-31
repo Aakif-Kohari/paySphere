@@ -9,6 +9,7 @@ const employeeRoutes = require("./routes/employee.routes");
 const payrollRoutes = require("./routes/payroll.routes");
 const reportsRoutes = require("./routes/reports.routes");
 const auditRoutes = require("./routes/audit.routes");
+const attendanceRoutes = require("./routes/attendance.routes");
 const logger = require("./utils/logger");
 
 const app = express();
@@ -59,6 +60,7 @@ app.use("/api/employees", employeeRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/reports", reportsRoutes);
 app.use("/api/audit-logs", auditRoutes);
+app.use("/api/attendance", attendanceRoutes);
 
 // CORS error handler — return 403 for blocked origins
 app.use((err, req, res, next) => {
