@@ -94,9 +94,7 @@ export default function AddEmployee() {
   const [role, setRole] = useState("");
   const [monthlySalary, setMonthlySalary] = useState("");
   const [overtimeRate, setOvertimeRate] = useState("");
-  const [bankName, setBankName] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [routingCode, setRoutingCode] = useState("");
+  const [currency, setCurrency] = useState("INR");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -193,11 +191,7 @@ export default function AddEmployee() {
         role,
         monthlySalary: salaryNum,
         overtimeRate: otNum,
-        bankDetails: {
-          bankName: bankName.trim(),
-          accountNumber: accountNumber.trim(),
-          routingCode: routingCode.trim(),
-        },
+        currency,
       });
 
       setSuccess("Employee added successfully!");
@@ -230,7 +224,7 @@ export default function AddEmployee() {
       .slice(0, 2)
       .toUpperCase();
 
-  const fmt = (n) => "₹" + Math.abs(n).toLocaleString("en-IN");
+  const fmt = (n, c = "INR") => new Intl.NumberFormat('en-IN', { style: 'currency', currency: c }).format(n);
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-slate-950 flex font-sans text-slate-800 dark:text-slate-200 transition-colors duration-200">
@@ -364,35 +358,51 @@ export default function AddEmployee() {
                 {/* Salary Row */}
                 <div className="flex flex-col sm:flex-col gap-4 mb-6">
                   <label className="flex-1">
-                    <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Monthly Salary (₹)</span>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 font-semibold text-sm">₹</span>
-                      <input
-                        id="employee-salary"
-                        type="text"
-                        value={monthlySalary}
-                        onChange={(e) => setMonthlySalary(e.target.value.replace(/[^0-9,]/g, ""))}
-                        placeholder="45,000"
-                        required
-                        className="w-full pl-8 pr-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
-                      />
-                    </div>
+                    <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Currency</span>
+                    <select
+                      value={currency}
+                      onChange={(e) => setCurrency(e.target.value)}
+                      className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white border border-transparent dark:border-slate-800 outline-none transition text-sm focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                      <option value="INR">INR (₹)</option>
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="GBP">GBP (£)</option>
+                    </select>
                   </label>
 
-                  <label className="flex-1">
-                    <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Overtime Rate (Optional)</span>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 font-semibold text-sm">₹</span>
-                      <input
-                        id="employee-overtime"
-                        type="text"
-                        value={overtimeRate}
-                        onChange={(e) => setOvertimeRate(e.target.value.replace(/[^0-9,]/g, ""))}
-                        placeholder="250 / hr"
-                        className="w-full pl-8 pr-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
-                      />
-                    </div>
-                  </label>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <label className="flex-1">
+                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Monthly Salary</span>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 font-semibold text-sm">{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'}</span>
+                        <input
+                          id="employee-salary"
+                          type="text"
+                          value={monthlySalary}
+                          onChange={(e) => setMonthlySalary(e.target.value.replace(/[^0-9,]/g, ""))}
+                          placeholder="45,000"
+                          required
+                          className="w-full pl-8 pr-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
+                        />
+                      </div>
+                    </label>
+
+                    <label className="flex-1">
+                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Overtime Rate (Optional)</span>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 font-semibold text-sm">{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'}</span>
+                        <input
+                          id="employee-overtime"
+                          type="text"
+                          value={overtimeRate}
+                          onChange={(e) => setOvertimeRate(e.target.value.replace(/[^0-9,]/g, ""))}
+                          placeholder="250 / hr"
+                          className="w-full pl-8 pr-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
+                        />
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 {/* Role */}
@@ -584,7 +594,7 @@ export default function AddEmployee() {
                           <p className="text-xs text-gray-400 dark:text-slate-400 truncate">{emp.role || "Employee"}</p>
                         </div>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
-                          {fmt(emp.monthlySalary)}
+                          {fmt(emp.monthlySalary, emp.currency)}
                         </span>
                       </div>
                     ))

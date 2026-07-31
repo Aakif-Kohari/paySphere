@@ -14,6 +14,10 @@ const payrollUpdateSchema = new mongoose.Schema({
     type: Number, // 1-12
     required: true,
   },
+  currency: {
+    type: String,
+    default: "INR",
+  },
   year: {
     type: Number,
     required: true,

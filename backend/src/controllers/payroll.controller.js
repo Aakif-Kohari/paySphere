@@ -259,6 +259,7 @@ exports.finalizePayroll = async (req, res, next) => {
       const payrollData = {
         employeeId: item.employee._id,
         employeeName: item.employee.fullName,
+        currency: item.employee.currency || "INR",
         month: currentMonth,
         year: currentYear,
         baseSalary: item.baseSalary,
@@ -311,6 +312,7 @@ exports.finalizePayroll = async (req, res, next) => {
 
     const results = preparedItems.map((item) => ({
       employeeName: item.employee.fullName,
+      currency: item.employee.currency || "INR",
       baseSalary: item.baseSalary,
       leaveDays: item.leaveDays,
       leaveDeduction: item.leaveDeduction,
