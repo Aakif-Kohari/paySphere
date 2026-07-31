@@ -1,6 +1,6 @@
 const express = require('express');
 const {
-  finalizePayroll,
+  submitPayrollForReview,
   parsePayrollCSV,
   getPayrollSummary,
   exportPayrollCSV,
@@ -21,7 +21,7 @@ router.post(
   upload.single('file'),
   parsePayrollCSV,
 );
-router.post('/finalize', auth, writeRateLimiter, finalizePayroll);
+router.post('/finalize', auth, writeRateLimiter, submitPayrollForReview);
 router.get('/summary', auth, getPayrollSummary);
 router.get('/export-csv', auth, exportPayrollCSV);
 router.post('/send-email/:id', auth, writeRateLimiter, sendPayslipEmailHandler);

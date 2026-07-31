@@ -1,4 +1,4 @@
-const { finalizePayroll, getPayrollSummary, sendAllPayslipsEmailHandler } = require("../payroll.controller");
+const { submitPayrollForReview, getPayrollSummary, sendAllPayslipsEmailHandler } = require("../payroll.controller");
 const Employee = require("../../models/employee.model");
 const PayrollUpdate = require("../../models/payroll.model");
 const User = require("../../models/user.model");
@@ -22,7 +22,7 @@ const createQueryMock = (data) => ({
   catch: (reject) => Promise.resolve(data).catch(reject),
 });
 
-describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit Tests (#106)", () => {
+describe("Payroll Controller - submitPayrollForReview parseTagValue & Transactions Unit Tests (#106)", () => {
   let req, res, mockSession;
 
   beforeEach(() => {
@@ -82,7 +82,7 @@ describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit
       year: 2026,
     };
 
-    await finalizePayroll(req, res);
+    await submitPayrollForReview(req, res);
 
     expect(res.status).toHaveBeenCalledWith(200);
     const jsonCall = res.json.mock.calls[0][0];
@@ -127,7 +127,7 @@ describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit
       year: 2026,
     };
 
-    await finalizePayroll(req, res);
+    await submitPayrollForReview(req, res);
 
     expect(res.status).toHaveBeenCalledWith(200);
     const jsonCall = res.json.mock.calls[0][0];
@@ -139,7 +139,7 @@ describe("Payroll Controller - finalizePayroll parseTagValue & Transactions Unit
   });
 });
 
-describe("finalizePayroll month/year validation tests (#79)", () => {
+describe("submitPayrollForReview month/year validation tests (#79)", () => {
   let req, res;
 
   beforeEach(() => {
@@ -165,7 +165,7 @@ describe("finalizePayroll month/year validation tests (#79)", () => {
   test("should return 400 if month is out of range (13)", async () => {
     req.body.month = 13;
 
-    await finalizePayroll(req, res);
+    await submitPayrollForReview(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
@@ -176,7 +176,7 @@ describe("finalizePayroll month/year validation tests (#79)", () => {
   test("should return 400 if month is a float (5.5)", async () => {
     req.body.month = 5.5;
 
-    await finalizePayroll(req, res);
+    await submitPayrollForReview(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
@@ -187,7 +187,7 @@ describe("finalizePayroll month/year validation tests (#79)", () => {
   test("should return 400 if month is 0 (not silently fall back to current month)", async () => {
     req.body.month = 0;
 
-    await finalizePayroll(req, res);
+    await submitPayrollForReview(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
@@ -198,7 +198,7 @@ describe("finalizePayroll month/year validation tests (#79)", () => {
   test("should return 400 if month is negative", async () => {
     req.body.month = -5;
 
-    await finalizePayroll(req, res);
+    await submitPayrollForReview(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
@@ -209,7 +209,7 @@ describe("finalizePayroll month/year validation tests (#79)", () => {
   test("should return 400 if year is out of range (1999)", async () => {
     req.body.year = 1999;
 
-    await finalizePayroll(req, res);
+    await submitPayrollForReview(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
@@ -220,7 +220,7 @@ describe("finalizePayroll month/year validation tests (#79)", () => {
   test("should return 400 if year is a float (2024.5)", async () => {
     req.body.year = 2024.5;
 
-    await finalizePayroll(req, res);
+    await submitPayrollForReview(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
@@ -229,7 +229,7 @@ describe("finalizePayroll month/year validation tests (#79)", () => {
   });
 });
 
-describe("finalizePayroll paid-record guard (#251)", () => {
+describe("submitPayrollForReview paid-record guard (#251)", () => {
   let req, res, mockEmployees, mockUserSettings, mockSession;
 
   beforeEach(() => {
@@ -302,7 +302,7 @@ describe("finalizePayroll paid-record guard (#251)", () => {
       ])
     );
 
-    await finalizePayroll(req, res);
+    await submitPayrollForReview(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
@@ -324,7 +324,7 @@ describe("finalizePayroll paid-record guard (#251)", () => {
 
     PayrollUpdate.bulkWrite.mockResolvedValue({});
 
-    await finalizePayroll(req, res);
+    await submitPayrollForReview(req, res);
 
     expect(res.status).toHaveBeenCalledWith(200);
     const jsonCall = res.json.mock.calls[0][0];
@@ -343,7 +343,7 @@ describe("finalizePayroll paid-record guard (#251)", () => {
 
     PayrollUpdate.bulkWrite.mockResolvedValue({});
 
-    await finalizePayroll(req, res);
+    await submitPayrollForReview(req, res);
 
     expect(res.status).toHaveBeenCalledWith(200);
     const jsonCall = res.json.mock.calls[0][0];
@@ -353,7 +353,7 @@ describe("finalizePayroll paid-record guard (#251)", () => {
   test("should still validate activity data before paid-record guard", async () => {
     req.body.activities = [];
 
-    await finalizePayroll(req, res);
+    await submitPayrollForReview(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({
