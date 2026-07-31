@@ -20,6 +20,74 @@ function parseTagValue(label) {
 
 // FINALIZE PAYROLL — process activity entries and save payroll records
 
+
+exports.getPendingApprovals = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const query = { status: "PENDING_APPROVAL" }; // Admin sees all in this demo
+
+    const pending = await PayrollUpdate.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("createdBy", "fullName email")
+      .populate("employeeId", "fullName role");
+      
+    const totalCount = await PayrollUpdate.countDocuments(query);
+
+    res.status(200).json({
+      pending,
+      currentPage: page,
+      totalPages: Math.ceil(totalCount / limit),
+      totalCount
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.approvePayroll = async (req, res, next) => {
+  try {
+    const { payrollIds } = req.body;
+    if (!payrollIds || !Array.isArray(payrollIds)) {
+      return res.status(400).json({ message: "payrollIds array required" });
+    }
+
+    await PayrollUpdate.updateMany(
+      { _id: { $in: payrollIds }, status: "PENDING_APPROVAL" },
+      { $set: { status: "APPROVED", approvedBy: req.userId, approvedAt: new Date() } }
+    );
+
+    res.status(200).json({ message: "Payroll approved successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.rejectPayroll = async (req, res, next) => {
+  try {
+    const { payrollIds, reason } = req.body;
+    if (!payrollIds || !Array.isArray(payrollIds)) {
+      return res.status(400).json({ message: "payrollIds array required" });
+    }
+    if (!reason) {
+      return res.status(400).json({ message: "Rejection reason required" });
+    }
+
+    await PayrollUpdate.updateMany(
+      { _id: { $in: payrollIds }, status: "PENDING_APPROVAL" },
+      { $set: { status: "REJECTED", rejectionReason: reason } }
+    );
+
+    res.status(200).json({ message: "Payroll rejected successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.parsePayrollCSV = async (req, res, next) => {
   try {
     if (!req.file) {
@@ -98,7 +166,7 @@ exports.parsePayrollCSV = async (req, res, next) => {
   }
 };
 
-exports.finalizePayroll = async (req, res, next) => {
+exports.submitPayrollForReview = async (req, res, next) => {
   let session = null;
   try {
     if (!req.body || typeof req.body !== "object") {
@@ -272,7 +340,7 @@ exports.finalizePayroll = async (req, res, next) => {
         overtimePay: item.overtimePay,
         netSalary: item.netSalary,
         createdBy: req.userId,
-        status: "finalized",
+        status: "PENDING_APPROVAL",
       };
 
       return {
@@ -361,7 +429,7 @@ exports.finalizePayroll = async (req, res, next) => {
     });
 
     res.status(200).json({
-      message: `Payroll finalized for ${results.length} employee${results.length !== 1 ? "s" : ""}`,
+      message: `Payroll submitted for review for ${results.length} employee${results.length !== 1 ? "s" : ""}`,
       results,
       errors: errors.length > 0 ? errors : undefined,
     });
