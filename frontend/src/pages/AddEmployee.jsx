@@ -199,6 +199,9 @@ export default function AddEmployee() {
       setRole("");
       setMonthlySalary("");
       setOvertimeRate("");
+      setBankName("");
+      setAccountNumber("");
+      setRoutingCode("");
       fetchRecent(); // Refresh recent list
     } catch (err) {
       setError(err.response?.data?.message || "Failed to add employee.");
@@ -415,6 +418,39 @@ export default function AddEmployee() {
                     className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
                   />
                 </label>
+
+                {/* Bank Details */}
+                <div className="mb-5">
+                  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-3 block">
+                    Bank Details <span className="font-normal normal-case text-gray-400 dark:text-slate-500">(optional — printed on payslip)</span>
+                  </span>
+                  <div className="flex flex-col gap-3">
+                    <input
+                      id="employee-bank-name"
+                      type="text"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      placeholder="Bank Name (e.g. State Bank of India)"
+                      className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
+                    />
+                    <input
+                      id="employee-account-number"
+                      type="text"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      placeholder="Account Number"
+                      className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
+                    />
+                    <input
+                      id="employee-routing-code"
+                      type="text"
+                      value={routingCode}
+                      onChange={(e) => setRoutingCode(e.target.value)}
+                      placeholder="Routing / IFSC Code (e.g. SBIN0001234)"
+                      className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
+                    />
+                  </div>
+                </div>
 
                 {/* Messages */}
                 {error && (
