@@ -3,6 +3,9 @@ const app = require("./app");
 const connectDB = require("./config/db");
 const { startCronJobs } = require("./jobs/cron.jobs");
 const { seedRbac } = require("./seeds/rbac.seed");
+const {
+  backfillSalaryStructures,
+} = require("./migrations/backfillSalaryStructures");
 const logger = require("./utils/logger");
 
 const startServer = async () => {
@@ -11,6 +14,12 @@ const startServer = async () => {
   // Ensure the RBAC roles/permissions exist and that no account is left without
   // a role. Idempotent, and never throws — see seeds/rbac.seed.js (#413).
   await seedRbac();
+
+  // Give every existing employee an `initial` salary revision derived from the
+  // figure already on their record, so the history starts from a true
+  // statement. Never changes anyone's pay, idempotent, and never throws — see
+  // migrations/backfillSalaryStructures.js (#461).
+  await backfillSalaryStructures();
 
   // Start background jobs
   startCronJobs();

@@ -7,6 +7,12 @@ const mongoose = require("mongoose");
 jest.mock("../../models/employee.model");
 jest.mock("../../models/payroll.model");
 jest.mock("../../models/user.model");
+// submitPayrollForReview now snapshots the salary component breakdown (#461).
+// Stubbed so the payroll unit tests stay free of the structure collection;
+// resolution is covered in salaryStructure.test.js.
+jest.mock("../../models/salaryStructure.model", () => ({
+  find: jest.fn(() => ({ sort: jest.fn().mockResolvedValue([]) })),
+}));
 jest.mock("../../services/audit.service", () => ({
   createAuditLog: jest.fn(),
 }));

@@ -7,6 +7,11 @@ const { generatePayrollCSV } = require("../utils/csvExport");
 const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
+const SalaryStructure = require("../models/salaryStructure.model");
+const {
+  resolveStructureForPeriod,
+  computeComponentAmounts,
+} = require("../utils/salaryStructure");
 
 
 // Helper: parse tag labels back into structured numbers
@@ -199,6 +204,32 @@ exports.submitPayrollForReview = async (req, res, next) => {
     // Fetch user settings for default rates
     const user = await User.findById(req.userId);
 
+    // Load every salary revision for the run, grouped by employee, so the row
+    // can snapshot the component breakdown that was actually in force. Without
+    // the snapshot, regenerating a payslip after a later raise would show the
+    // new split against the old total (#461).
+    let revisionsByEmployee = new Map();
+
+    try {
+      const revisions = await SalaryStructure.find({
+        createdBy: req.userId,
+      }).sort({ effectiveFrom: 1 });
+
+      (revisions || []).forEach((revision) => {
+        const key = String(revision.employeeId);
+        if (!revisionsByEmployee.has(key)) revisionsByEmployee.set(key, []);
+        revisionsByEmployee.get(key).push(revision);
+      });
+    } catch (structureError) {
+      // The breakdown is presentational; the gross on the employee record is
+      // still authoritative. Losing the split must not stop people being paid.
+      logger.warn("Could not read salary structures; payroll will run without a breakdown", {
+        userId: req.userId,
+        error: structureError.message,
+      });
+      revisionsByEmployee = new Map();
+    }
+
     const preparedItems = [];
     const errors = [];
 
@@ -274,6 +305,46 @@ exports.submitPayrollForReview = async (req, res, next) => {
         continue;
       }
 
+      // Snapshot the component split in force for this period. A mid-month
+      // revision produces more than one segment, and `effectiveGross` is the
+      // day-weighted blend of the rates that actually applied.
+      let salarySnapshot = null;
+
+      try {
+        const employeeRevisions = revisionsByEmployee.get(String(employee._id)) || [];
+
+        if (employeeRevisions.length > 0) {
+          const period = resolveStructureForPeriod(
+            employeeRevisions,
+            currentMonth,
+            currentYear,
+          );
+
+          if (period.segments.length > 0) {
+            const primary = period.segments[period.segments.length - 1].structure;
+            const breakdown = computeComponentAmounts(primary);
+
+            salarySnapshot = {
+              effectiveGross: period.effectiveGross,
+              isProrated: period.segments.length > 1,
+              segmentCount: period.segments.length,
+              components: breakdown.components.map((c) => ({
+                code: c.code,
+                label: c.label,
+                type: c.type,
+                amount: c.amount,
+              })),
+            };
+          }
+        }
+      } catch (snapshotError) {
+        logger.warn("Could not snapshot the salary breakdown for a payroll row", {
+          userId: req.userId,
+          employeeId: String(employee._id),
+          error: snapshotError.message,
+        });
+      }
+
       preparedItems.push({
         employee,
         baseSalary,
@@ -283,7 +354,8 @@ exports.submitPayrollForReview = async (req, res, next) => {
         deductions,
         leaveDeduction,
         overtimePay,
-        netSalary
+        netSalary,
+        salarySnapshot
       });
     }
 
@@ -339,6 +411,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
         leaveDeduction: item.leaveDeduction,
         overtimePay: item.overtimePay,
         netSalary: item.netSalary,
+        salarySnapshot: item.salarySnapshot,
         createdBy: req.userId,
         status: "PENDING_APPROVAL",
       };
