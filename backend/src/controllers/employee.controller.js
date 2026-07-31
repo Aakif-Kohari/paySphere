@@ -21,7 +21,7 @@ exports.addEmployee = async (req, res, next) => {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ message: 'Request body is required' });
     }
-    const { fullName, role, monthlySalary, overtimeRate } = req.body;
+    const { fullName, role, monthlySalary, overtimeRate, dateOfBirth, joiningDate } = req.body;
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(role)) {
       return res
@@ -80,6 +80,8 @@ exports.addEmployee = async (req, res, next) => {
       monthlySalary: numSalary,
       overtimeRate: numOvertime,
       companyName: sanitizeText(user.companyName),
+      dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+      joiningDate: joiningDate ? new Date(joiningDate) : undefined,
       createdBy: req.userId,
     });
 
@@ -505,6 +507,8 @@ exports.updateEmployee = async (req, res, next) => {
     if (monthlySalary !== undefined) employee.monthlySalary = monthlySalary;
     if (overtimeRate !== undefined) employee.overtimeRate = overtimeRate;
     if (isActive !== undefined) employee.isActive = isActive;
+    if (req.body.dateOfBirth !== undefined) employee.dateOfBirth = req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : undefined;
+    if (req.body.joiningDate !== undefined) employee.joiningDate = req.body.joiningDate ? new Date(req.body.joiningDate) : undefined;
 
     await employee.save();
 

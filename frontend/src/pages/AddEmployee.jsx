@@ -95,6 +95,8 @@ export default function AddEmployee() {
   const [monthlySalary, setMonthlySalary] = useState("");
   const [overtimeRate, setOvertimeRate] = useState("");
   const [currency, setCurrency] = useState("INR");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [joiningDate, setJoiningDate] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -192,6 +194,8 @@ export default function AddEmployee() {
         monthlySalary: salaryNum,
         overtimeRate: otNum,
         currency,
+        dateOfBirth: dateOfBirth || undefined,
+        joiningDate: joiningDate || undefined,
       });
 
       setSuccess("Employee added successfully!");
@@ -199,6 +203,8 @@ export default function AddEmployee() {
       setRole("");
       setMonthlySalary("");
       setOvertimeRate("");
+      setDateOfBirth("");
+      setJoiningDate("");
       fetchRecent(); // Refresh recent list
     } catch (err) {
       setError(err.response?.data?.message || "Failed to add employee.");
@@ -415,6 +421,30 @@ export default function AddEmployee() {
                     className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
                   />
                 </label>
+
+                {/* Dates */}
+                <div className="mb-5">
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <label className="flex-1">
+                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Date of Birth (Optional)</span>
+                      <input
+                        type="date"
+                        value={dateOfBirth}
+                        onChange={(e) => setDateOfBirth(e.target.value)}
+                        className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
+                      />
+                    </label>
+                    <label className="flex-1">
+                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Joining Date (Optional)</span>
+                      <input
+                        type="date"
+                        value={joiningDate}
+                        onChange={(e) => setJoiningDate(e.target.value)}
+                        className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
+                      />
+                    </label>
+                  </div>
+                </div>
 
                 {/* Messages */}
                 {error && (

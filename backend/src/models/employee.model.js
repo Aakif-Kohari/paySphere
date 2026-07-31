@@ -46,6 +46,12 @@ const employeeSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    dateOfBirth: {
+      type: Date,
+    },
+    joiningDate: {
+      type: Date,
+    },
     currency: {
       type: String,
       default: "INR",
