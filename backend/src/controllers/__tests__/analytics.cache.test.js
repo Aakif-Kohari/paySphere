@@ -29,6 +29,11 @@ jest.mock("../../utils/logger", () => ({
   stream: { write: jest.fn() },
 }));
 
+// submitPayrollForReview now consults the attendance ledger (#459).
+jest.mock("../../models/attendance.model", () => ({
+  find: jest.fn(() => ({ select: jest.fn().mockResolvedValue([]) })),
+}));
+
 // submitPayrollForReview now recovers loan instalments (#460). Stubbed so the
 // payroll unit tests stay free of the loan collection; recovery behaviour is
 // covered in payroll.loans.test.js.
@@ -135,13 +140,15 @@ describe("analytics cache invalidation (#415)", () => {
     test("does not invalidate when the period is already paid", async () => {
       PayrollUpdate.find.mockReset();
       PayrollUpdate.find.mockImplementationOnce(() =>
-        createQueryMock([{ employeeName: "Alice Smith" }]),
+        createQueryMock([{ employeeName: "Alice Smith", status: "paid" }]),
       );
 
       await submitPayrollForReview(req, res, next);
 
       expect(cacheService.invalidateAnalytics).not.toHaveBeenCalled();
-      expect(res.status).toHaveBeenCalledWith(400);
+      // 409 since #458: the request is well formed, it is the record's state
+      // that forbids re-submitting it.
+      expect(res.status).toHaveBeenCalledWith(409);
     });
   });
 

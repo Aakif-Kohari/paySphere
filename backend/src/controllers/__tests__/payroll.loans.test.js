@@ -18,6 +18,11 @@ jest.mock('../../models/employee.model');
 jest.mock('../../models/payroll.model');
 jest.mock('../../models/user.model');
 jest.mock('../../models/loan.model');
+// Payroll also consults the attendance ledger (#459); stubbed so this suite
+// stays focused on loan recovery.
+jest.mock('../../models/attendance.model', () => ({
+  find: jest.fn(() => ({ select: jest.fn().mockResolvedValue([]) })),
+}));
 jest.mock('../../services/cache.service', () => ({
   invalidateAnalytics: jest.fn().mockResolvedValue(undefined),
 }));

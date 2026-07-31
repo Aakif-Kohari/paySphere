@@ -11,10 +11,20 @@ const auditLogSchema = new mongoose.Schema({
     required: true,
     enum: [
       "PAYROLL_FINALIZE",
+      // #438 shipped approve/reject handlers that emitted no audit event at
+      // all, so the one action a maker–checker flow exists to record was the
+      // one action left untracked (#458).
+      "PAYROLL_APPROVE",
+      "PAYROLL_REJECT",
       "EMPLOYEE_CREATE",
       "EMPLOYEE_UPDATE",
       "EMPLOYEE_DELETE",
       "EMPLOYEE_IMPORT",
+      // Attendance drives leaveDays and overtimeHours into the salary
+      // calculation, so editing it is a financial mutation and is audited
+      // like one (#459).
+      "ATTENDANCE_UPDATE",
+      "ATTENDANCE_BULK_UPDATE",
       // A salary advance commits future deductions from someone's pay, so
       // issuing, pausing and collecting against one are all financial events
       // and are audited as such (#460).
@@ -31,7 +41,7 @@ const auditLogSchema = new mongoose.Schema({
   },
   resourceType: {
     type: String,
-    enum: ["Payroll", "Employee", "User", "Report", "Loan"],
+    enum: ["Payroll", "Employee", "User", "Report", "Attendance", "Loan"],
     required: true,
   },
   resourceIds: [
