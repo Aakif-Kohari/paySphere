@@ -1,8 +1,10 @@
 const PDFDocument = require("pdfkit");
 const PayrollUpdate = require("../models/payroll.model");
 const Employee = require("../models/employee.model");
+const User = require("../models/user.model");
 const logger = require("../utils/logger");
-const { createAuditLog } = require("../services/audit.service");
+const eventBus = require("../services/event.service");
+const cacheService = require("../services/cache.service");
 
 // GET /api/reports/analytics
 // Returns aggregated financial stats for the authenticated user's company
@@ -10,6 +12,13 @@ exports.getAnalytics = async (req, res, next) => {
   try {
     const userId = req.userId;
     const monthsBack = Math.min(Math.max(parseInt(req.query.months) || 6, 1), 12);
+    const cacheKey = `analytics:${userId}:${monthsBack}`;
+
+    // 1. Check cache first
+    const cachedData = await cacheService.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json(cachedData);
+    }
 
     // Calculate date range
     const now = new Date();
@@ -97,7 +106,7 @@ exports.getAnalytics = async (req, res, next) => {
     );
     const totalNet = payrolls.reduce((sum, p) => sum + p.netSalary, 0);
 
-    res.status(200).json({
+    const responseData = {
       summary: {
         totalPayout: totalNet,
         totalBase,
@@ -109,7 +118,12 @@ exports.getAnalytics = async (req, res, next) => {
       },
       monthlyTrends,
       roleBreakdown,
-    });
+    };
+
+    // 2. Store in cache for 1 hour (3600 seconds)
+    await cacheService.setEx(cacheKey, 3600, responseData);
+
+    res.status(200).json(responseData);
   } catch (error) {
     next(error);
   }
@@ -220,7 +234,7 @@ exports.downloadPDFReport = async (req, res, next) => {
         );
         res.send(Buffer.from(result.pdfData));
 
-        await createAuditLog({
+        eventBus.emit("AUDIT_LOG", {
           userId: req.userId,
           action: "REPORT_DOWNLOAD",
           resourceType: "Report",
@@ -289,6 +303,18 @@ const generatePayslipBuffer = (employee, payroll) => {
     doc.moveDown(1);
 
     doc.fontSize(12).font("Helvetica-Bold").fillColor("#1e3a5f").text(`Net Salary: Rs. ${(payroll.netSalary || 0).toFixed(2)}`, { underline: true });
+
+    // Bank Details section (if available)
+    const bd = employee.bankDetails;
+    if (bd && (bd.bankName || bd.accountNumber || bd.routingCode)) {
+      doc.moveDown(1.5);
+      doc.fontSize(11).font("Helvetica-Bold").fillColor("#333333").text("Bank Details");
+      doc.fontSize(10).font("Helvetica").fillColor("#555555");
+      if (bd.bankName) doc.text(`Bank Name: ${bd.bankName}`);
+      if (bd.accountNumber) doc.text(`Account Number: ${bd.accountNumber}`);
+      if (bd.routingCode) doc.text(`Routing / IFSC Code: ${bd.routingCode}`);
+    }
+
     doc.end();
   });
 };
@@ -422,7 +448,7 @@ exports.exportExcelReport = async (req, res, next) => {
     await workbook.xlsx.write(res);
     res.end();
 
-    await createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "REPORT_DOWNLOAD",
       resourceType: "Report",
@@ -496,7 +522,7 @@ exports.downloadPayslipsZip = async (req, res, next) => {
 
     await archive.finalize();
 
-    await createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: "REPORT_DOWNLOAD",
       resourceType: "Report",

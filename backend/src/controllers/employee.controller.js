@@ -1,20 +1,49 @@
-const mongoose = require('mongoose');
-const Employee = require('../models/employee.model');
-const User = require('../models/user.model');
-const { parse } = require('csv-parse');
-const {
-  isNonEmptyString,
-  isValidEmail,
-  escapeRegex,
-  sanitizeText,
-  MONTHLY_SALARY_MAX,
-  OVERTIME_RATE_MAX,
-  FULLNAME_MAX_LENGTH,
-  ROLE_MAX_LENGTH,
-} = require('../utils/validators');
-const PayrollUpdate = require('../models/payroll.model');
-const logger = require('../utils/logger');
-const { createAuditLog } = require('../services/audit.service');
+const mongoose = require("mongoose");
+const Employee = require("../models/employee.model");
+const User = require("../models/user.model");
+const { parse } = require("csv-parse");
+const { isNonEmptyString, isValidEmail, escapeRegex, sanitizeText, MONTHLY_SALARY_MAX, OVERTIME_RATE_MAX, FULLNAME_MAX_LENGTH, ROLE_MAX_LENGTH } = require("../utils/validators");
+const PayrollUpdate = require("../models/payroll.model");
+const logger = require("../utils/logger");
+const eventBus = require("../services/event.service");
+const cacheService = require("../services/cache.service");
+
+/**
+ * Normalize an employee email for storage.
+ *
+ * Returns `undefined` for a blank/absent address rather than `""`, so the
+ * partial unique index on { email, createdBy } skips the document entirely.
+ * Storing empty strings would put every email-less employee back into the same
+ * index bucket and re-create the duplicate-key collision (#414).
+ *
+ * @param {*} value raw value from the request body or a CSV cell
+ * @returns {{ ok: true, value: string|undefined } | { ok: false }}
+ */
+function normalizeEmployeeEmail(value) {
+  if (value === undefined) return { ok: true, value: undefined };
+  if (value === null || (typeof value === "string" && value.trim() === "")) {
+    // Explicitly clearing the address.
+    return { ok: true, value: undefined };
+  }
+  if (!isValidEmail(value)) return { ok: false };
+  return { ok: true, value: value.trim().toLowerCase() };
+}
+
+/**
+ * Translate a duplicate-key violation on the employee email index into a 409
+ * the client can act on, instead of leaking a raw driver error as a 500.
+ *
+ * @returns {boolean} true if the error was handled
+ */
+function handleDuplicateEmail(error, res) {
+  if (error && error.code === 11000 && error.keyPattern && "email" in error.keyPattern) {
+    res.status(409).json({
+      message: "An employee with this email address already exists",
+    });
+    return true;
+  }
+  return false;
+}
 // ADD EMPLOYEE
 exports.addEmployee = async (req, res, next) => {
   try {
@@ -70,6 +99,16 @@ exports.addEmployee = async (req, res, next) => {
       }
     }
 
+    // `email` was destructured here and then never used, so every address sent
+    // to this endpoint was silently discarded — which is why payslip email
+    // delivery could never find an address to send to (#414).
+    const normalizedEmail = normalizeEmployeeEmail(email);
+    if (!normalizedEmail.ok) {
+      return res
+        .status(400)
+        .json({ message: 'Invalid email address format' });
+    }
+
     // Get the user's company name
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -83,11 +122,21 @@ exports.addEmployee = async (req, res, next) => {
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
       joiningDate: joiningDate ? new Date(joiningDate) : undefined,
       createdBy: req.userId,
+      ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
     });
+
+    // Optionally store bank details if provided
+    if (bankDetails && typeof bankDetails === 'object') {
+      employee.bankDetails = {
+        bankName: sanitizeText(bankDetails.bankName || ''),
+        accountNumber: sanitizeText(bankDetails.accountNumber || ''),
+        routingCode: sanitizeText(bankDetails.routingCode || ''),
+      };
+    }
 
     await employee.save();
 
-    await createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: 'EMPLOYEE_CREATE',
       resourceType: 'Employee',
@@ -106,8 +155,10 @@ exports.addEmployee = async (req, res, next) => {
       fullName: employee.fullName,
     });
 
-    res.status(201).json({ message: 'Employee added successfully', employee });
+    await cacheService.invalidateAnalytics(req.userId);
+    res.status(201).json({ message: "Employee added successfully", employee });
   } catch (error) {
+    if (handleDuplicateEmail(error, res)) return;
     next(error);
   }
 };
@@ -242,6 +293,7 @@ exports.importEmployees = async (req, res, next) => {
 
           const employees = [];
           const errors = [];
+          const seenEmails = new Set();
           let skipped = 0;
 
           records.forEach((record, index) => {
@@ -306,14 +358,30 @@ exports.importEmployees = async (req, res, next) => {
               return;
             }
 
-            const rawEmail = record.email?.trim();
-            if (rawEmail && !isValidEmail(rawEmail)) {
+            // `isValidEmail` was called here without being imported, so any row
+            // carrying an email threw ReferenceError and 500'd the whole import.
+            const normalizedEmail = normalizeEmployeeEmail(record.email);
+            if (!normalizedEmail.ok) {
               skipped++;
               errors.push({
                 row: index + 2,
                 reason: `Invalid email format: "${record.email}"`,
               });
               return;
+            }
+
+            // Reject addresses duplicated within the file itself, before
+            // insertMany turns it into an opaque E11000.
+            if (normalizedEmail.value) {
+              if (seenEmails.has(normalizedEmail.value)) {
+                skipped++;
+                errors.push({
+                  row: index + 2,
+                  reason: `Duplicate email in file: "${normalizedEmail.value}"`,
+                });
+                return;
+              }
+              seenEmails.add(normalizedEmail.value);
             }
 
             const sanitizedName = sanitizeText(rawName);
@@ -338,6 +406,9 @@ exports.importEmployees = async (req, res, next) => {
               overtimeRate,
               companyName: sanitizeText(user.companyName),
               createdBy: req.userId,
+              // The address was validated above and then dropped on the floor,
+              // so imported employees never had an email either (#414, #236).
+              ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
             });
           });
 
@@ -381,7 +452,7 @@ exports.importEmployees = async (req, res, next) => {
 
           const importedCount = createdIds.length;
 
-          await createAuditLog({
+          eventBus.emit("AUDIT_LOG", {
             userId: req.userId,
             action: 'EMPLOYEE_IMPORT',
             resourceType: 'Employee',
@@ -431,7 +502,7 @@ exports.updateEmployee = async (req, res, next) => {
       return res.status(400).json({ message: 'Request body is required' });
     }
     const { id } = req.params;
-    const { fullName, role, monthlySalary, overtimeRate, isActive } = req.body;
+    const { fullName, role, monthlySalary, overtimeRate, isActive, email, bankDetails } = req.body;
 
     const employee = await Employee.findById(id);
 
@@ -498,6 +569,14 @@ exports.updateEmployee = async (req, res, next) => {
         .json({ message: `Overtime rate cannot exceed ${OVERTIME_RATE_MAX}` });
     }
 
+    // Same as addEmployee: `email` was destructured and never applied (#414).
+    const normalizedEmail = normalizeEmployeeEmail(email);
+    if (!normalizedEmail.ok) {
+      return res
+        .status(400)
+        .json({ message: 'Invalid email address format' });
+    }
+
     // Capture old name for payroll propagation check (#253)
     const oldName = employee.fullName;
 
@@ -509,6 +588,26 @@ exports.updateEmployee = async (req, res, next) => {
     if (isActive !== undefined) employee.isActive = isActive;
     if (req.body.dateOfBirth !== undefined) employee.dateOfBirth = req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : undefined;
     if (req.body.joiningDate !== undefined) employee.joiningDate = req.body.joiningDate ? new Date(req.body.joiningDate) : undefined;
+
+    if (email !== undefined) {
+      // `undefined` here means "clear it" — assigning undefined would be a no-op
+      // in mongoose, so the path has to be unset explicitly.
+      if (normalizedEmail.value) {
+        employee.email = normalizedEmail.value;
+      } else {
+        employee.email = undefined;
+        employee.markModified('email');
+      }
+    }
+
+    // Patch bank details: merge only the provided sub-fields
+    if (bankDetails && typeof bankDetails === 'object') {
+      employee.bankDetails = {
+        bankName: sanitizeText(bankDetails.bankName ?? employee.bankDetails?.bankName ?? ''),
+        accountNumber: sanitizeText(bankDetails.accountNumber ?? employee.bankDetails?.accountNumber ?? ''),
+        routingCode: sanitizeText(bankDetails.routingCode ?? employee.bankDetails?.routingCode ?? ''),
+      };
+    }
 
     await employee.save();
 
@@ -535,7 +634,7 @@ exports.updateEmployee = async (req, res, next) => {
       }
     }
 
-    await createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: 'EMPLOYEE_UPDATE',
       resourceType: 'Employee',
@@ -554,10 +653,10 @@ exports.updateEmployee = async (req, res, next) => {
       fullName: employee.fullName,
     });
 
-    res
-      .status(200)
-      .json({ message: 'Employee updated successfully', employee });
+    await cacheService.invalidateAnalytics(req.userId);
+    res.status(200).json({ message: "Employee updated successfully", employee });
   } catch (error) {
+    if (handleDuplicateEmail(error, res)) return;
     next(error);
   }
 };
@@ -581,6 +680,30 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
 
     employee.isActive = !employee.isActive;
     await employee.save();
+
+    // Inactive employees are excluded from payroll (#260), so flipping this
+    // changes the analytics aggregates and must clear the cache (#415).
+    await cacheService.invalidateAnalytics(req.userId);
+
+    // This was the only employee mutation with no audit event, unlike its
+    // create/update/delete siblings.
+    eventBus.emit("AUDIT_LOG", {
+      userId: req.userId,
+      action: 'EMPLOYEE_STATUS_TOGGLE',
+      resourceType: 'Employee',
+      resourceIds: [employee._id],
+      details: {
+        fullName: employee.fullName,
+        isActive: employee.isActive,
+      },
+      req,
+    });
+
+    logger.info(`Employee status toggled`, {
+      userId: req.userId,
+      employeeId: employee._id,
+      isActive: employee.isActive,
+    });
 
     res.status(200).json({ message: 'Employee status updated', employee });
   } catch (error) {
@@ -648,7 +771,7 @@ exports.deleteEmployee = async (req, res, next) => {
       session.endSession();
     }
 
-    await createAuditLog({
+    eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: 'EMPLOYEE_DELETE',
       resourceType: 'Employee',
@@ -662,6 +785,11 @@ exports.deleteEmployee = async (req, res, next) => {
       employeeId: id,
       fullName: employee.fullName,
     });
+
+    // Deletion cascades a PayrollUpdate.deleteMany, so it shifts the aggregates
+    // more than an edit does — yet it was the one mutation with no invalidation
+    // while addEmployee and updateEmployee both had it (#415).
+    await cacheService.invalidateAnalytics(req.userId);
 
     res.status(200).json({
       message: 'Employee and payroll records deleted successfully',

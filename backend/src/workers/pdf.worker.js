@@ -1,7 +1,7 @@
-const { parentPort } = require("worker_threads");
+const { workerData, parentPort } = require("worker_threads");
 const PDFDocument = require("pdfkit");
 
-parentPort.on("message", async (data) => {
+async function generatePDF() {
   try {
     const { type, payload } = data;
 
@@ -45,66 +45,167 @@ parentPort.on("message", async (data) => {
         ["Net Payout", `Rs. ${totalPayout.toLocaleString("en-IN")}`],
       ];
 
-      summaryData.forEach(([label, value]) => {
-        doc.fontSize(10).font("Helvetica").fillColor("#555555").text(label, 60, doc.y, { continued: true, width: 200 });
-        doc.font("Helvetica-Bold").fillColor("#1e3a5f").text(`  ${value}`, { align: "right" });
-        doc.moveDown(0.2);
+    // --- Company Header ---
+    doc
+      .fontSize(22)
+      .font("Helvetica-Bold")
+      .fillColor("#1e3a5f")
+      .text(companyName, { align: "center" });
+
+    doc
+      .fontSize(12)
+      .font("Helvetica")
+      .fillColor("#666666")
+      .text(`Payroll Summary Report — ${monthName} ${year}`, {
+        align: "center",
       });
 
-      doc.moveDown(1);
+    doc.moveDown(0.5);
 
-      // --- Employee Payroll Table ---
-      doc.fontSize(14).font("Helvetica-Bold").fillColor("#333333").text("Employee Payroll Details");
-      doc.moveDown(0.5);
+    // Divider line
+    doc
+      .moveTo(40, doc.y)
+      .lineTo(555, doc.y)
+      .strokeColor("#cccccc")
+      .lineWidth(1)
+      .stroke();
 
-      // Table header
-      let tableTop = doc.y;
-      const colWidths = [110, 65, 55, 60, 55, 55, 65];
-      const colLabels = ["Employee", "Base", "Leave", "Overtime", "Bonus", "Deduct", "Net Pay"];
-      const startX = 40;
+    doc.moveDown(1);
 
-      // Header background
-      doc.rect(startX, tableTop - 4, 515, 18).fill("#e8edf3");
+    // --- Summary Section ---
+    const totalPayout = payrolls.reduce((sum, p) => sum + p.netSalary, 0);
+    const totalBase = payrolls.reduce((sum, p) => sum + p.baseSalary, 0);
+    const totalOvertime = payrolls.reduce((sum, p) => sum + p.overtimePay, 0);
+    const totalBonus = payrolls.reduce((sum, p) => sum + p.bonus, 0);
+    const totalDeductions = payrolls.reduce(
+      (sum, p) => sum + p.deductions + p.leaveDeduction,
+      0,
+    );
 
-      let xPos = startX + 5;
-      colLabels.forEach((label, i) => {
-        doc.fontSize(8).font("Helvetica-Bold").fillColor("#333333").text(label, xPos, tableTop, { width: colWidths[i] });
+    doc
+      .fontSize(14)
+      .font("Helvetica-Bold")
+      .fillColor("#333333")
+      .text("Financial Summary");
+
+    doc.moveDown(0.3);
+
+    const summaryData = [
+      ["Total Employees", String(payrolls.length)],
+      ["Total Base Salary", `Rs. ${totalBase.toLocaleString("en-IN")}`],
+      ["Total Overtime Pay", `Rs. ${totalOvertime.toLocaleString("en-IN")}`],
+      ["Total Bonuses", `Rs. ${totalBonus.toLocaleString("en-IN")}`],
+      ["Total Deductions", `Rs. ${totalDeductions.toLocaleString("en-IN")}`],
+      ["Net Payout", `Rs. ${totalPayout.toLocaleString("en-IN")}`],
+    ];
+
+    summaryData.forEach(([label, value]) => {
+      doc
+        .fontSize(10)
+        .font("Helvetica")
+        .fillColor("#555555")
+        .text(label, 60, doc.y, { continued: true, width: 200 });
+      doc
+        .font("Helvetica-Bold")
+        .fillColor("#1e3a5f")
+        .text(`  ${value}`, { align: "right" });
+      doc.moveDown(0.2);
+    });
+
+    doc.moveDown(1);
+
+    // --- Employee Payroll Table ---
+    doc
+      .fontSize(14)
+      .font("Helvetica-Bold")
+      .fillColor("#333333")
+      .text("Employee Payroll Details");
+
+    doc.moveDown(0.5);
+
+    // Table header
+    const tableTop = doc.y;
+    const colWidths = [110, 65, 55, 60, 55, 55, 65];
+    const colLabels = [
+      "Employee",
+      "Base",
+      "Leave",
+      "Overtime",
+      "Bonus",
+      "Deduct",
+      "Net Pay",
+    ];
+    const startX = 40;
+
+    // Header background
+    doc
+      .rect(startX, tableTop - 4, 515, 18)
+      .fill("#e8edf3");
+
+    let xPos = startX + 5;
+    colLabels.forEach((label, i) => {
+      doc
+        .fontSize(8)
+        .font("Helvetica-Bold")
+        .fillColor("#333333")
+        .text(label, xPos, tableTop, { width: colWidths[i] });
+      xPos += colWidths[i];
+    });
+
+    doc.y = tableTop + 18;
+
+    // Table rows
+    payrolls.forEach((p, idx) => {
+      if (doc.y > 750) {
+        doc.addPage();
+      }
+
+      const rowY = doc.y;
+
+      // Alternating row background
+      if (idx % 2 === 0) {
+        doc.rect(startX, rowY - 2, 515, 14).fill("#f9fafb");
+      }
+
+      const rowData = [
+        p.employeeName,
+        `Rs. ${p.baseSalary.toLocaleString("en-IN")}`,
+        String(p.leaveDays),
+        `Rs. ${p.overtimePay.toLocaleString("en-IN")}`,
+        `Rs. ${p.bonus.toLocaleString("en-IN")}`,
+        `Rs. ${(p.deductions + p.leaveDeduction).toLocaleString("en-IN")}`,
+        `Rs. ${p.netSalary.toLocaleString("en-IN")}`,
+      ];
+
+      xPos = startX + 5;
+      rowData.forEach((cell, i) => {
+        doc
+          .fontSize(8)
+          .font(i === 0 ? "Helvetica" : "Helvetica")
+          .fillColor("#444444")
+          .text(cell, xPos, rowY, { width: colWidths[i] });
         xPos += colWidths[i];
       });
 
-      doc.y = tableTop + 18;
+      doc.y = rowY + 14;
+    });
 
-      // Table rows
-      payrolls.forEach((p, idx) => {
-        if (doc.y > 750) {
-          doc.addPage();
-        }
+    // Table footer / totals
+    doc.moveDown(0.5);
+    doc
+      .moveTo(startX, doc.y)
+      .lineTo(startX + 515, doc.y)
+      .strokeColor("#cccccc")
+      .lineWidth(0.5)
+      .stroke();
 
-        const rowY = doc.y;
-        const emp = employeeMap[String(p.employeeId)];
-        const role = emp?.role ? ` (${emp.role})` : "";
-
-        if (idx % 2 === 0) {
-          doc.rect(startX, rowY - 2, 515, 14).fill("#f9fafb");
-        }
-
-        const rowData = [
-          `${p.employeeName}${role}`,
-          `Rs. ${p.baseSalary.toLocaleString("en-IN")}`,
-          String(p.leaveDays),
-          `Rs. ${p.overtimePay.toLocaleString("en-IN")}`,
-          `Rs. ${p.bonus.toLocaleString("en-IN")}`,
-          `Rs. ${(p.deductions + p.leaveDeduction).toLocaleString("en-IN")}`,
-          `Rs. ${p.netSalary.toLocaleString("en-IN")}`,
-        ];
-
-        xPos = startX + 5;
-        rowData.forEach((cell, i) => {
-          doc.fontSize(8).font("Helvetica").fillColor("#444444").text(cell, xPos, rowY, { width: colWidths[i] });
-          xPos += colWidths[i];
-        });
-
-        doc.y = rowY + 14;
+    doc.moveDown(0.3);
+    doc
+      .fontSize(9)
+      .font("Helvetica-Bold")
+      .fillColor("#1e3a5f")
+      .text(`Total Payout: Rs. ${totalPayout.toLocaleString("en-IN")}`, startX, doc.y, {
+        align: "right",
       });
 
       doc.moveDown(0.5);
@@ -158,7 +259,11 @@ parentPort.on("message", async (data) => {
       doc.fontSize(14).text(`Net Salary: Rs. ${payroll.netSalary.toFixed(2)}`, { underline: true });
       doc.end();
     }
+
+    doc.end();
   } catch (error) {
     parentPort.postMessage({ success: false, error: error.message });
   }
-});
+}
+
+generatePDF();

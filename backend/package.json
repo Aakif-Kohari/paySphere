@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "seed": "node src/seeds/index.js",
     "test": "jest",
     "lint": "eslint ."
   },
@@ -15,6 +16,7 @@
     "archiver": "^8.0.0",
     "axios": "^1.15.2",
     "bcryptjs": "^3.0.3",
+    "bullmq": "^5.81.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "csv-parse": "^7.0.1",
@@ -24,6 +26,7 @@
     "express-rate-limit": "^8.5.2",
     "google-auth-library": "^10.6.2",
     "helmet": "^8.3.0",
+    "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.5.0",
     "morgan": "^1.11.0",

@@ -40,6 +40,15 @@ PaySphere is divided into a Node.js/Express backend and a React (Vite) frontend.
    ```
    The backend API will run on `http://localhost:5000` (or the port specified in your code).
 
+   The server seeds the RBAC roles and permissions automatically on boot, so no
+   extra step is needed for a fresh database. If you change the role or
+   permission definitions in `src/config/permissions.js`, re-seed by hand:
+   ```bash
+   npm run seed
+   ```
+   Seeding is idempotent — running it repeatedly is safe. It also assigns the
+   default role to any account that does not yet have one.
+
 #### Frontend Setup
 1. Open a new terminal and navigate to the frontend directory:
    ```bash

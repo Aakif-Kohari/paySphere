@@ -61,10 +61,45 @@ const employeeSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    bankDetails: {
+      bankName: {
+        type: String,
+        default: '',
+        maxlength: [100, 'Bank name cannot exceed 100 characters'],
+      },
+      accountNumber: {
+        type: String,
+        default: '',
+        maxlength: [30, 'Account number cannot exceed 30 characters'],
+      },
+      routingCode: {
+        type: String,
+        default: '',
+        maxlength: [20, 'Routing/IFSC code cannot exceed 20 characters'],
+      },
+    },
   },
   { timestamps: true },
 );
 
 employeeSchema.index({ createdBy: 1, fullName: 1, role: 1 }, { unique: true });
+
+// One email per company — but only for employees that actually have one.
+//
+// `sparse: true` does not work on a compound index here. Per the MongoDB docs a
+// compound sparse index indexes a document that has *at least one* of the keys,
+// and `createdBy` is `required: true`, so every employee got an index entry with
+// `email` recorded as null. Every email-less employee therefore collided on the
+// same { email: null, createdBy } key and the second one failed with E11000.
+//
+// `partialFilterExpression` is the correct construct: documents without a string
+// `email` are left out of the index entirely (#414, #374).
+employeeSchema.index(
+  { email: 1, createdBy: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { email: { $type: 'string' } },
+  },
+);
 
 module.exports = mongoose.model('Employee', employeeSchema);

@@ -16,7 +16,8 @@ const {
   OVERTIME_RATE_MAX,
 } = require('../utils/validators');
 const logger = require('../utils/logger');
-const { createAuditLog } = require('../services/audit.service');
+const eventBus = require('../services/event.service');
+const { getDefaultRole } = require('../seeds/rbac.seed');
 
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
@@ -85,14 +86,25 @@ exports.signup = async (req, res, next) => {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // Assign the owner role at creation. Without this the account is locked out
+    // of every permission-guarded route the moment it is created (#413).
+    const defaultRole = await getDefaultRole();
+
     const newUser = new User({
       fullName: sanitizeText(fullName),
       email: cleanEmail,
       companyName: sanitizeText(companyName),
       password: hashedPassword,
+      ...(defaultRole ? { role: defaultRole._id } : {}),
     });
 
     await newUser.save();
+
+    if (!defaultRole) {
+      logger.warn('Signed up a user without a role: RBAC roles are not seeded', {
+        userId: newUser._id,
+      });
+    }
 
     const token = generateTokens(newUser, res);
 
@@ -162,6 +174,25 @@ exports.getSettings = async (req, res, next) => {
 };
 
 // UPDATE USER SETTINGS
+
+exports.uploadLogo = async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No image provided" });
+    
+    // Store as base64 string
+    const base64Data = req.file.buffer.toString("base64");
+    const mimeType = req.file.mimetype;
+    const logoDataUrl = `data:${mimeType};base64,${base64Data}`;
+
+    await User.findByIdAndUpdate(req.userId, { companyLogoData: logoDataUrl });
+    
+    // Also invalidate settings cache if we had one
+    res.status(200).json({ message: "Logo updated successfully", logo: logoDataUrl });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.updateSettings = async (req, res, next) => {
   try {
     if (!req.body || typeof req.body !== 'object') {
@@ -276,7 +307,7 @@ exports.updateSettings = async (req, res, next) => {
 
     await user.save();
 
-    await createAuditLog({
+    eventBus.emitAuditLog({
       userId: req.userId,
       action: 'SETTINGS_UPDATE',
       resourceType: 'User',
@@ -342,7 +373,7 @@ exports.updatePassword = async (req, res, next) => {
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
 
-    await createAuditLog({
+    eventBus.emitAuditLog({
       userId: req.userId,
       action: 'PASSWORD_UPDATE',
       resourceType: 'User',
@@ -411,12 +442,17 @@ exports.googleAuth = async (req, res, next) => {
         });
       }
 
+      // Same as the password signup path: a Google-registered owner needs the
+      // default role or they are locked out of the app they just created (#413).
+      const defaultRole = await getDefaultRole();
+
       user = new User({
         fullName: sanitizeText(name),
         email,
         companyName: sanitizeText(companyName),
         googleId: googleId || googleData.sub,
         avatar: picture || googleData.picture,
+        ...(defaultRole ? { role: defaultRole._id } : {}),
       });
 
       await user.save();
@@ -611,6 +647,18 @@ exports.deleteAccount = async (req, res, next) => {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    const { currentPassword } = req.body;
+    if (!currentPassword) {
+      return res.status(400).json({ message: 'Current password is required' });
+    }
+    if (!user.password) {
+      return res.status(400).json({ message: 'No password set on this account' });
+    }
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(403).json({ message: 'Current password is incorrect' });
+    }
+
     // Try to start a transaction (gracefully fallback if not supported)
     try {
       session = await mongoose.startSession();
@@ -621,7 +669,7 @@ exports.deleteAccount = async (req, res, next) => {
 
     const deleteOptions = session ? { session } : {};
 
-    const AuditLog = require('../models/audit.model');
+    const AuditLog = require('../models/auditLog.model');
 
     await Employee.deleteMany({ createdBy: req.userId }, deleteOptions);
     await PayrollUpdate.deleteMany({ createdBy: req.userId }, deleteOptions);
@@ -633,7 +681,7 @@ exports.deleteAccount = async (req, res, next) => {
       session.endSession();
     }
 
-    await createAuditLog({
+    eventBus.emitAuditLog({
       userId: req.userId,
       action: 'ACCOUNT_DELETE',
       resourceType: 'User',
