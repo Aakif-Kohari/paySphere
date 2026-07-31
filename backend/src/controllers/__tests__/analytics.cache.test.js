@@ -29,6 +29,14 @@ jest.mock("../../utils/logger", () => ({
   stream: { write: jest.fn() },
 }));
 
+// submitPayrollForReview now recovers loan instalments (#460). Stubbed so the
+// payroll unit tests stay free of the loan collection; recovery behaviour is
+// covered in payroll.loans.test.js.
+jest.mock("../../models/loan.model", () => ({
+  find: jest.fn().mockResolvedValue([]),
+  updateOne: jest.fn().mockResolvedValue({}),
+}));
+
 const { submitPayrollForReview } = require("../payroll.controller");
 const {
   deleteEmployee,

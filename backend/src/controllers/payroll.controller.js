@@ -7,6 +7,12 @@ const { generatePayrollCSV } = require("../utils/csvExport");
 const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
+const Loan = require("../models/loan.model");
+const {
+  LOAN_STATUS,
+  allocateRecovery,
+  applyRepayment,
+} = require("../utils/loanSchedule");
 
 
 // Helper: parse tag labels back into structured numbers
@@ -199,6 +205,33 @@ exports.submitPayrollForReview = async (req, res, next) => {
     // Fetch user settings for default rates
     const user = await User.findById(req.userId);
 
+    // Load every collectible loan for the run in one query, grouped by
+    // employee. Recovery is applied *after* the net salary is computed, so it
+    // can be capped against what the employee can actually afford (#460).
+    let loansByEmployee = new Map();
+
+    try {
+      const activeLoans = await Loan.find({
+        createdBy: req.userId,
+        status: LOAN_STATUS.ACTIVE,
+      });
+
+      (activeLoans || []).forEach((loan) => {
+        const key = String(loan.employeeId);
+        if (!loansByEmployee.has(key)) loansByEmployee.set(key, []);
+        loansByEmployee.get(key).push(loan);
+      });
+    } catch (loanError) {
+      // A loan-ledger failure must not stop people being paid. Skipping
+      // recovery under-collects for one month, which is recoverable; failing
+      // the run is not.
+      logger.warn("Could not read the loan ledger; skipping recovery this run", {
+        userId: req.userId,
+        error: loanError.message,
+      });
+      loansByEmployee = new Map();
+    }
+
     const preparedItems = [];
     const errors = [];
 
@@ -274,6 +307,29 @@ exports.submitPayrollForReview = async (req, res, next) => {
         continue;
       }
 
+      // Loan recovery, capped at the net salary so a deduction can never drive
+      // take-home pay below zero. Any uncollected part is a shortfall carried
+      // forward — the loan is not forgiven, this month's instalment simply is
+      // not taken and the outstanding balance stays where it was (#460).
+      const employeeLoans = loansByEmployee.get(String(employee._id)) || [];
+      const recovery = allocateRecovery({
+        loans: employeeLoans,
+        month: currentMonth,
+        year: currentYear,
+        availableForRecovery: netSalary,
+      });
+
+      const netAfterRecovery = Math.max(
+        0,
+        Math.round((netSalary - recovery.totalRecovered) * 100) / 100,
+      );
+
+      if (recovery.shortfall > 0) {
+        errors.push(
+          `Loan recovery for "${employee.fullName}" was short by ${recovery.shortfall}; the balance carries forward`,
+        );
+      }
+
       preparedItems.push({
         employee,
         baseSalary,
@@ -283,7 +339,10 @@ exports.submitPayrollForReview = async (req, res, next) => {
         deductions,
         leaveDeduction,
         overtimePay,
-        netSalary
+        netSalary: netAfterRecovery,
+        grossNetBeforeRecovery: netSalary,
+        loanRecoveries: recovery.recoveries,
+        loanRecoveryTotal: recovery.totalRecovered
       });
     }
 
@@ -339,6 +398,8 @@ exports.submitPayrollForReview = async (req, res, next) => {
         leaveDeduction: item.leaveDeduction,
         overtimePay: item.overtimePay,
         netSalary: item.netSalary,
+        loanRecoveries: item.loanRecoveries,
+        loanRecoveryTotal: item.loanRecoveryTotal,
         createdBy: req.userId,
         status: "PENDING_APPROVAL",
       };
@@ -389,12 +450,78 @@ exports.submitPayrollForReview = async (req, res, next) => {
       bonus: item.bonus,
       deductions: item.deductions,
       netSalary: item.netSalary,
+      loanRecoveryTotal: item.loanRecoveryTotal,
+      loanRecoveries: item.loanRecoveries,
       payrollId: payrollMap[item.employee._id.toString()],
     }));
 
     if (session) {
       await session.commitTransaction();
       session.endSession();
+    }
+
+    // Write the loan ledger only after the payroll write has committed.
+    //
+    // `applyRepayment` replaces the entry for the period rather than appending,
+    // so re-finalising a month (which the approval flow explicitly allows for a
+    // rejected run) cannot collect the same instalment twice.
+    for (const item of preparedItems) {
+      for (const entry of item.loanRecoveries || []) {
+        if (!entry.loanId || entry.alreadyRecovered) continue;
+
+        try {
+          const loan = (loansByEmployee.get(String(item.employee._id)) || []).find(
+            (l) => String(l._id) === String(entry.loanId),
+          );
+          if (!loan) continue;
+
+          const applied = applyRepayment(loan, {
+            month: currentMonth,
+            year: currentYear,
+            amount: entry.amount,
+            payrollId: payrollMap[item.employee._id.toString()] || null,
+          });
+
+          await Loan.updateOne(
+            { _id: loan._id, createdBy: req.userId },
+            {
+              $set: {
+                repayments: applied.repayments,
+                totalRepaid: applied.totalRepaid,
+                outstanding: applied.outstanding,
+                status: applied.status,
+                ...(applied.status === LOAN_STATUS.COMPLETED
+                  ? { completedAt: new Date() }
+                  : {}),
+              },
+            },
+          );
+
+          eventBus.emit("AUDIT_LOG", {
+            userId: req.userId,
+            action: "LOAN_REPAYMENT",
+            resourceType: "Loan",
+            resourceIds: [loan._id],
+            details: {
+              employeeName: item.employee.fullName,
+              amount: entry.amount,
+              month: currentMonth,
+              year: currentYear,
+              outstanding: applied.outstanding,
+              source: "payroll",
+            },
+            req,
+          });
+        } catch (repayError) {
+          // The salary is already committed; a ledger write failure must be
+          // loud but must not roll the payroll back.
+          logger.error("Failed to record a loan repayment after payroll", {
+            userId: req.userId,
+            loanId: String(entry.loanId),
+            error: repayError.message,
+          });
+        }
+      }
     }
 
     // Finalizing payroll is the single biggest change to the analytics figures,

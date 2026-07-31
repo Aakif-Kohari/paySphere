@@ -72,6 +72,25 @@ const payrollUpdateSchema = new mongoose.Schema({
     enum: ["finalized", "paid"],
     default: "finalized",
   },
+  /**
+   * Instalments collected against this payroll row (#460).
+   *
+   * Stored on the row rather than only on the loan so a payslip regenerated
+   * later reproduces the recovery line exactly as it was paid, and so the
+   * deduction can be traced back to the loan it serviced.
+   */
+  loanRecoveries: [{
+    loanId: { type: mongoose.Schema.Types.ObjectId, ref: "Loan" },
+    amount: { type: Number, default: 0 },
+    principalComponent: { type: Number, default: 0 },
+    interestComponent: { type: Number, default: 0 },
+    scheduledAmount: { type: Number, default: 0 },
+    shortfall: { type: Number, default: 0 },
+  }],
+  loanRecoveryTotal: {
+    type: Number,
+    default: 0,
+  },
   payslipEmailed: {
     type: Boolean,
     default: false,

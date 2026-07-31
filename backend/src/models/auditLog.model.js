@@ -15,6 +15,12 @@ const auditLogSchema = new mongoose.Schema({
       "EMPLOYEE_UPDATE",
       "EMPLOYEE_DELETE",
       "EMPLOYEE_IMPORT",
+      // A salary advance commits future deductions from someone's pay, so
+      // issuing, pausing and collecting against one are all financial events
+      // and are audited as such (#460).
+      "LOAN_ISSUE",
+      "LOAN_STATUS_CHANGE",
+      "LOAN_REPAYMENT",
       "PAYSLIP_EMAIL",
       "PAYSLIP_BULK_EMAIL",
       "REPORT_DOWNLOAD",
@@ -25,7 +31,7 @@ const auditLogSchema = new mongoose.Schema({
   },
   resourceType: {
     type: String,
-    enum: ["Payroll", "Employee", "User", "Report"],
+    enum: ["Payroll", "Employee", "User", "Report", "Loan"],
     required: true,
   },
   resourceIds: [
