@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import GridViewIcon from '@mui/icons-material/GridView';
 import PeopleIcon from '@mui/icons-material/People';
 import AssessmentIcon from '@mui/icons-material/Assessment';
-import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
 
 const Sidebar = ({
   companyName,
@@ -88,12 +88,12 @@ const Sidebar = ({
         <div className="p-3 border-t border-gray-200 dark:border-slate-800 space-y-2">
           <button
             onClick={() => {
-              setActivePage('Dashboard');
+              window.location.href = 'mailto:support@paysphere.com';
               onClose();
             }}
             className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
           >
-            <SettingsSuggestIcon />
+            <HelpOutlineIcon />
             Help & Support
           </button>
         </div>

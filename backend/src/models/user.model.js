@@ -10,9 +10,14 @@ const userSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  companyLogoData: { type: String, default: "" },
   companyName: {
     type: String,
     required: true,
+  },
+  role: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Role"
   },
   password: {
     type: String,
