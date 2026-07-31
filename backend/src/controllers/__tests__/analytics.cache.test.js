@@ -132,13 +132,15 @@ describe("analytics cache invalidation (#415)", () => {
     test("does not invalidate when the period is already paid", async () => {
       PayrollUpdate.find.mockReset();
       PayrollUpdate.find.mockImplementationOnce(() =>
-        createQueryMock([{ employeeName: "Alice Smith" }]),
+        createQueryMock([{ employeeName: "Alice Smith", status: "paid" }]),
       );
 
       await submitPayrollForReview(req, res, next);
 
       expect(cacheService.invalidateAnalytics).not.toHaveBeenCalled();
-      expect(res.status).toHaveBeenCalledWith(400);
+      // 409 since #458: the request is well formed, it is the record's state
+      // that forbids re-submitting it.
+      expect(res.status).toHaveBeenCalledWith(409);
     });
   });
 

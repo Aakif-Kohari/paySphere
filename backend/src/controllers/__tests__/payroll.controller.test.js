@@ -300,7 +300,7 @@ describe("submitPayrollForReview paid-record guard (#251)", () => {
     jest.restoreAllMocks();
   });
 
-  test("should return 400 when paid payroll records exist for the same month/year", async () => {
+  test("should return 409 when paid payroll records exist for the same month/year", async () => {
     PayrollUpdate.find.mockImplementationOnce(() =>
       createQueryMock([
         { employeeName: "Alice Smith", status: "paid" },
@@ -310,11 +310,26 @@ describe("submitPayrollForReview paid-record guard (#251)", () => {
 
     await submitPayrollForReview(req, res);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({
-      message: "Payroll has already been paid for: Alice Smith, Bob Jones. Cannot re-finalize paid records.",
-      paidEmployees: ["Alice Smith", "Bob Jones"],
-    });
+    // 409 rather than 400 since #458: the request is well formed, it is the
+    // record's state that forbids it — same code the transition table returns.
+    expect(res.status).toHaveBeenCalledWith(409);
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.message).toContain("already paid for: Alice Smith, Bob Jones");
+    expect(payload.paidEmployees).toEqual(["Alice Smith", "Bob Jones"]);
+    expect(PayrollUpdate.bulkWrite).not.toHaveBeenCalled();
+  });
+
+  test("should return 409 when an approved run already exists — a maker cannot rewrite figures after sign-off (#458)", async () => {
+    PayrollUpdate.find.mockImplementationOnce(() =>
+      createQueryMock([{ employeeName: "Alice Smith", status: "approved" }])
+    );
+
+    await submitPayrollForReview(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.message).toContain("already approved for: Alice Smith");
+    expect(payload.approvedEmployees).toEqual(["Alice Smith"]);
     expect(PayrollUpdate.bulkWrite).not.toHaveBeenCalled();
   });
 
@@ -337,9 +352,9 @@ describe("submitPayrollForReview paid-record guard (#251)", () => {
     expect(jsonCall.results).toHaveLength(2);
   });
 
-  test("should succeed when existing payroll records have status 'finalized' (not 'paid')", async () => {
+  test("should succeed when the period has no approved or paid records yet", async () => {
     PayrollUpdate.find
-      .mockImplementationOnce(() => createQueryMock([])) // Guard — no paid records
+      .mockImplementationOnce(() => createQueryMock([])) // Guard — nothing locked
       .mockImplementationOnce(() =>
         createQueryMock([
           { _id: "payroll1", employeeId: "emp1" },
@@ -354,6 +369,27 @@ describe("submitPayrollForReview paid-record guard (#251)", () => {
     expect(res.status).toHaveBeenCalledWith(200);
     const jsonCall = res.json.mock.calls[0][0];
     expect(jsonCall.results).toHaveLength(2);
+  });
+
+  test("submits the run as pending_approval with a submission trail (#458)", async () => {
+    PayrollUpdate.find
+      .mockImplementationOnce(() => createQueryMock([]))
+      .mockImplementationOnce(() =>
+        createQueryMock([{ _id: "payroll1", employeeId: "emp1" }])
+      );
+
+    PayrollUpdate.bulkWrite.mockResolvedValue({});
+
+    await submitPayrollForReview(req, res);
+
+    const ops = PayrollUpdate.bulkWrite.mock.calls[0][0];
+    const written = ops[0].updateOne.update.$set;
+    expect(written.status).toBe("pending_approval");
+    expect(written.submittedBy).toBe(req.userId);
+    expect(written.submittedAt).toBeInstanceOf(Date);
+    // A resubmission must not carry a stale verdict forward.
+    expect(written.approvedBy).toBeNull();
+    expect(written.rejectionReason).toBeNull();
   });
 
   test("should still validate activity data before paid-record guard", async () => {
@@ -390,9 +426,12 @@ describe("getPayrollSummary floating-point precision unit test (#347)", () => {
   });
 
   test("should round totalPayout to 2 decimal places to prevent floating-point precision errors", async () => {
+    // Since #458 only approved/paid rows count towards totalPayout, so the
+    // fixtures carry an explicit status rather than relying on the old
+    // status-blind sum.
     const mockPayrolls = [
-      { employeeName: "Alice", netSalary: 1250.55 },
-      { employeeName: "Bob", netSalary: 3410.80 },
+      { employeeName: "Alice", netSalary: 1250.55, status: "approved" },
+      { employeeName: "Bob", netSalary: 3410.80, status: "paid" },
     ];
 
     PayrollUpdate.find.mockImplementation(() => createQueryMock(mockPayrolls));

@@ -281,10 +281,14 @@ describe("exportPayrollCSV — regression coverage for #412", () => {
 
       await exportPayrollCSV(req, res, next);
 
+      // The status filter arrived with #458: an exported register is a
+      // financial record and must contain approved rows only, never a run a
+      // checker has not seen or has explicitly rejected.
       expect(PayrollUpdate.find).toHaveBeenCalledWith({
         createdBy: "507f1f77bcf86cd799439011",
         month: 7,
         year: 2026,
+        status: { $in: ["approved", "paid", "finalized"] },
       });
     });
 
@@ -295,7 +299,8 @@ describe("exportPayrollCSV — regression coverage for #412", () => {
 
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith({
-        message: "No payroll data found for the selected month.",
+        message:
+          "No approved payroll data found for the selected month. Approve the run before exporting.",
       });
       expect(res.send).not.toHaveBeenCalled();
     });
