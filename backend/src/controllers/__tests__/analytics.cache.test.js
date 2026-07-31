@@ -29,6 +29,14 @@ jest.mock("../../utils/logger", () => ({
   stream: { write: jest.fn() },
 }));
 
+// deleteEmployee now refuses to destroy an employee with a settled F&F, the
+// same protection #345 added for paid payroll (#462). Stubbed so the employee
+// unit tests stay free of the settlement collection; the guard has its own
+// coverage below and in settlement.controller.test.js.
+jest.mock("../../models/settlement.model", () => ({
+  exists: jest.fn().mockResolvedValue(null),
+}));
+
 const { submitPayrollForReview } = require("../payroll.controller");
 const {
   deleteEmployee,

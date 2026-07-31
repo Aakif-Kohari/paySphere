@@ -56,6 +56,15 @@ const userSchema = new mongoose.Schema({
       currency: { type: String, default: 'INR' },
       leaveDeductionPolicy: { type: String, enum: ['basic_only', 'full_salary'], default: 'basic_only' }
     },
+    // Full & Final settlement policy (#462). Defaults mirror
+    // config/employment.js so an account that has never configured one still
+    // gets a defensible policy.
+    settlementPolicy: {
+      prorationBasis: { type: String, enum: ['calendar', 'working'], default: 'calendar' },
+      leaveEncashmentCapDays: { type: Number, default: 15, min: 0, max: 365 },
+      defaultNoticePeriodDays: { type: Number, default: 30, min: 0, max: 365 },
+      gratuityEnabled: { type: Boolean, default: true },
+    },
     notifications: {
       emailReminders: { type: Boolean, default: true },
       systemAlerts: { type: Boolean, default: true },

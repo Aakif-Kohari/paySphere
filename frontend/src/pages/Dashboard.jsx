@@ -8,6 +8,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import Sidebar from '../components/Sidebar';
 import EmployeeCard from '../components/EmployeeCard';
 import Approvals from './Approvals';
+import Settlements from './Settlements';
 import SettingsModal from '../components/SettingsModal';
 import EmptyState from '../components/common/EmptyState';
 import {
@@ -758,6 +759,8 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
         {/* Dynamic Content */}
         {activePage === 'Approvals' ? (
           <Approvals />
+        ) : activePage === 'Settlements' ? (
+          <Settlements />
         ) : activePage === 'Dashboard' ? (
           <DashboardOverview
             search={search}
