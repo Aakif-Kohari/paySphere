@@ -5,7 +5,7 @@ function clamp(value, min, max) {
 }
 
 function calculateNetSalary(employee, user, adjustments = {}) {
-  let { leaveDays = 0, overtimeHours = 0, bonus = 0, deductions = 0 } = adjustments || {};
+  let { leaveDays = 0, overtimeHours = 0, bonus = 0, deductions = 0, customDeductions = [] } = adjustments || {};
 
   leaveDays = typeof leaveDays === "number" && !isNaN(leaveDays) && Number.isFinite(leaveDays) && leaveDays >= 0 ? Math.min(leaveDays, 31) : 0;
   overtimeHours = typeof overtimeHours === "number" && !isNaN(overtimeHours) && Number.isFinite(overtimeHours) && overtimeHours >= 0 ? overtimeHours : 0;
@@ -30,7 +30,11 @@ function calculateNetSalary(employee, user, adjustments = {}) {
 
   const overtimePay = Math.round(Math.min(overtimeRate * overtimeHours, MAX_SAFE_PAYROLL));
 
-  let netSalary = baseSalary - leaveDeduction + overtimePay + bonus - deductions;
+  const customDedsTotal = Array.isArray(customDeductions) 
+    ? customDeductions.reduce((sum, d) => sum + (Number(d.amount) || 0), 0) 
+    : 0;
+
+  let netSalary = baseSalary - leaveDeduction + overtimePay + bonus - deductions - customDedsTotal;
   if (isNaN(netSalary) || !Number.isFinite(netSalary) || netSalary > MAX_SAFE_PAYROLL) {
     netSalary = 0;
   }

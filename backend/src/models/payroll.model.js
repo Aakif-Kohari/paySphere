@@ -46,6 +46,10 @@ const payrollUpdateSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  customDeductions: [{
+    name: String,
+    amount: Number
+  }],
   leaveDeduction: {
     type: Number,
     default: 0,
