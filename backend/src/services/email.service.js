@@ -1,5 +1,6 @@
 const { sendEmail } = require('../utils/email');
 const logger = require('../utils/logger');
+const User = require('../models/user.model');
 
 exports.sendPayslipEmail = async (employee, payroll) => {
   if (!employee.email) {
@@ -8,6 +9,15 @@ exports.sendPayslipEmail = async (employee, payroll) => {
     });
     return;
   }
+
+  // Fetch user to get company logo
+  let companyLogo = null;
+  try {
+    const user = await User.findById(employee.createdBy);
+    if (user && user.settings && user.settings.companyInfo) {
+      companyLogo = user.settings.companyInfo.companyLogo;
+    }
+  } catch (err) {}
 
   return new Promise((resolve, reject) => {
     try {
@@ -20,7 +30,7 @@ exports.sendPayslipEmail = async (employee, payroll) => {
 
       pdfWorker.postMessage({
         type: 'GENERATE_PAYSLIP',
-        payload: { employee, payroll },
+        payload: { employee, payroll, companyLogo },
       });
 
       // Track whether the promise has already been settled to avoid

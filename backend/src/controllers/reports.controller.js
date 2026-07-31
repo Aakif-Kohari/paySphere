@@ -157,6 +157,9 @@ exports.downloadPDFReport = async (req, res, next) => {
         .json({ message: "No payroll data found for the selected period." });
     }
 
+    const user = await User.findById(userId);
+    const companyLogo = user?.settings?.companyInfo?.companyLogo;
+
     // Fetch employee details for roles
     const employeeIds = payrolls.map((p) => p.employeeId);
     const employees = await Employee.find({ _id: { $in: employeeIds } });
@@ -206,7 +209,7 @@ exports.downloadPDFReport = async (req, res, next) => {
         payrolls,
         employeeMap,
         companyName,
-      companyLogoData,
+        companyLogo,
         monthName,
         year,
         totalBase,

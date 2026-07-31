@@ -50,6 +50,7 @@ const userSchema = new mongoose.Schema({
     },
     companyInfo: {
       payrollCycle: { type: String, enum: ['weekly', 'bi-weekly', 'monthly'], default: 'monthly' },
+      companyLogo: { type: String },
     },
     payrollConfig: {
       currency: { type: String, default: 'INR' },
