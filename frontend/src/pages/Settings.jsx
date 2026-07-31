@@ -471,6 +471,18 @@ export default function Settings() {
                 <input type="text" value={userProfile.companyName} onChange={(e) => setUserProfile({...userProfile, companyName: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white transition" />
               </div>
               <div>
+                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Company Logo (for PDF Payslips)</label>
+                <input type="file" accept="image/*" onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => updateSettingsField('companyInfo', 'companyLogo', reader.result);
+                    reader.readAsDataURL(file);
+                  }
+                }} className="w-full px-4 py-2.5 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 text-sm text-gray-900 dark:text-white transition" />
+                {settings.companyInfo?.companyLogo && <img src={settings.companyInfo.companyLogo} alt="Company Logo" className="mt-2 h-10 w-10 object-contain rounded-md" />}
+              </div>
+              <div>
                 <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Organization ID</label>
                 <input type="text" value={userProfile.organizationId || "ORG-993821"} readOnly className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-900/50 border border-transparent dark:border-slate-800 text-sm text-gray-500 dark:text-slate-400 cursor-not-allowed" />
               </div>

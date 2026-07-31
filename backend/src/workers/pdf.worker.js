@@ -6,7 +6,7 @@ parentPort.on("message", async (data) => {
     const { type, payload } = data;
 
     if (type === "GENERATE_COMPANY_REPORT") {
-      const { payrolls, employeeMap, companyName, monthName, year, totalBase, totalOvertime, totalBonus, totalDeductions, totalPayout } = payload;
+      const { payrolls, employeeMap, companyName, companyLogo, monthName, year, totalBase, totalOvertime, totalBonus, totalDeductions, totalPayout } = payload;
       
       const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
       const buffers = [];
@@ -17,6 +17,13 @@ parentPort.on("message", async (data) => {
       });
 
       // --- Company Header ---
+      if (companyLogo) {
+        try {
+          // companyLogo might be a base64 string
+          const logoBuffer = Buffer.from(companyLogo.replace(/^data:image\/\w+;base64,/, ""), 'base64');
+          doc.image(logoBuffer, 40, 30, { fit: [50, 50] });
+        } catch (err) {}
+      }
       doc.fontSize(22).font("Helvetica-Bold").fillColor("#1e3a5f").text(companyName, { align: "center" });
       doc.fontSize(12).font("Helvetica").fillColor("#666666").text(`Payroll Summary Report — ${monthName} ${year}`, { align: "center" });
       doc.moveDown(0.5);
@@ -114,7 +121,7 @@ parentPort.on("message", async (data) => {
       doc.end();
 
     } else if (type === "GENERATE_PAYSLIP") {
-      const { employee, payroll } = payload;
+      const { employee, payroll, companyLogo } = payload;
       
       const doc = new PDFDocument({ margin: 50 });
       const buffers = [];
@@ -125,6 +132,12 @@ parentPort.on("message", async (data) => {
       });
 
       // Build PDF content
+      if (companyLogo) {
+        try {
+          const logoBuffer = Buffer.from(companyLogo.replace(/^data:image\/\w+;base64,/, ""), 'base64');
+          doc.image(logoBuffer, 50, 40, { fit: [50, 50] });
+        } catch (err) {}
+      }
       doc.fontSize(20).text("PaySphere", { align: "center" });
       doc.moveDown();
       doc.fontSize(16).text(`Payslip for ${payroll.month}/${payroll.year}`, { align: "center" });
