@@ -8,18 +8,9 @@ const { generatePayrollCSV } = require("../utils/csvExport");
 const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
-const {
-  PAYROLL_STATUS,
-  canTransition,
-  describeTransition,
-  isEmailable,
-  normalizeStatus,
-  payableStatusFilter,
-  excludeRejectedFilter,
-} = require("../config/payrollStatus");
+const Attendance = require("../models/attendance.model");
+const { derivePayrollInputs } = require("../utils/attendanceGrid");
 
-const MAX_BATCH_SIZE = 200;
-const MAX_REJECTION_REASON_LENGTH = 500;
 
 // Helper: parse tag labels back into structured numbers
 function parseTagValue(label) {
@@ -568,6 +559,37 @@ exports.submitPayrollForReview = async (req, res, next) => {
     // Fetch user settings for default rates
     const user = await User.findById(req.userId);
 
+    // Load the attendance ledger for the run month in one query, keyed by
+    // employee. Where a month has been recorded, its validated totals are a
+    // better source for leaveDays/overtimeHours than re-parsing the display
+    // strings the client sends — see the comment on the resolver below (#459).
+    let attendanceByEmployee = new Map();
+
+    try {
+      const attendanceRecords = await Attendance.find({
+        createdBy: req.userId,
+        year: currentYear,
+        month: currentMonth,
+      }).select("employeeId totals");
+
+      attendanceByEmployee = new Map(
+        (attendanceRecords || []).map((record) => [
+          String(record.employeeId),
+          record,
+        ]),
+      );
+    } catch (attendanceError) {
+      // The ledger is an improvement on the tag parsing, not a prerequisite for
+      // running payroll. If it cannot be read, fall back to the tag path and
+      // make the degradation loud rather than failing the run.
+      logger.warn("Could not read the attendance ledger; falling back to activity tags", {
+        userId: req.userId,
+        month: currentMonth,
+        year: currentYear,
+        error: attendanceError.message,
+      });
+    }
+
     const preparedItems = [];
     const errors = [];
 
@@ -631,6 +653,28 @@ exports.submitPayrollForReview = async (req, res, next) => {
       bonus = (isNaN(bonus) || !Number.isFinite(bonus) || bonus < 0) ? 0 : bonus;
       deductions = (isNaN(deductions) || !Number.isFinite(deductions) || deductions < 0) ? 0 : deductions;
 
+      // Prefer the persisted ledger over the parsed tag strings.
+      //
+      // The tag path reaches these numbers by stripping non-digits out of a
+      // label like "– 3 days leave" and disambiguating with substring matching,
+      // so "2 days unpaid leave (overtime adjusted)" hits the `includes("overtime")`
+      // branch first and is booked as overtime hours. It also cannot represent
+      // a half day and cannot tell paid leave from unpaid.
+      //
+      // The ledger has none of those problems: it was validated at write time,
+      // half days contribute 0.5, and only *unpaid* absence reaches leaveDays.
+      // Bonus and deductions still come from the tags — they are ad-hoc
+      // monetary adjustments with no attendance equivalent.
+      let attendanceSource = "manual";
+      const ledger = attendanceByEmployee.get(String(employee._id));
+
+      if (ledger && ledger.totals) {
+        const derived = derivePayrollInputs(ledger.totals);
+        leaveDays = derived.leaveDays;
+        overtimeHours = derived.overtimeHours;
+        attendanceSource = "ledger";
+      }
+
       const {
         baseSalary,
         leaveDeduction,
@@ -652,7 +696,8 @@ exports.submitPayrollForReview = async (req, res, next) => {
         deductions,
         leaveDeduction,
         overtimePay,
-        netSalary
+        netSalary,
+        attendanceSource
       });
     }
 
@@ -732,6 +777,9 @@ exports.submitPayrollForReview = async (req, res, next) => {
         leaveDeduction: item.leaveDeduction,
         overtimePay: item.overtimePay,
         netSalary: item.netSalary,
+        // Recorded so a later audit can tell whether the leave figure came
+        // from the validated ledger or from a parsed display string (#459).
+        attendanceSource: item.attendanceSource,
         createdBy: req.userId,
         status: PAYROLL_STATUS.PENDING_APPROVAL,
         submittedBy: req.userId,
@@ -792,6 +840,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
       bonus: item.bonus,
       deductions: item.deductions,
       netSalary: item.netSalary,
+      attendanceSource: item.attendanceSource,
       payrollId: payrollMap[item.employee._id.toString()],
     }));
 

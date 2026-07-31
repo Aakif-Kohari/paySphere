@@ -20,6 +20,11 @@ const auditLogSchema = new mongoose.Schema({
       "EMPLOYEE_UPDATE",
       "EMPLOYEE_DELETE",
       "EMPLOYEE_IMPORT",
+      // Attendance drives leaveDays and overtimeHours into the salary
+      // calculation, so editing it is a financial mutation and is audited
+      // like one (#459).
+      "ATTENDANCE_UPDATE",
+      "ATTENDANCE_BULK_UPDATE",
       "PAYSLIP_EMAIL",
       "PAYSLIP_BULK_EMAIL",
       "REPORT_DOWNLOAD",
@@ -30,7 +35,7 @@ const auditLogSchema = new mongoose.Schema({
   },
   resourceType: {
     type: String,
-    enum: ["Payroll", "Employee", "User", "Report"],
+    enum: ["Payroll", "Employee", "User", "Report", "Attendance"],
     required: true,
   },
   resourceIds: [

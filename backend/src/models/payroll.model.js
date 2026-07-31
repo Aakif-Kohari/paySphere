@@ -87,43 +87,20 @@ const payrollUpdateSchema = new mongoose.Schema({
     default: PAYROLL_STATUS.PENDING_APPROVAL,
     set: (value) => normalizeStatus(value) || value,
   },
-
-  // --- Approval trail (#438, #458) ----------------------------------------
-  //
-  // None of these existed on the schema, so mongoose strict mode silently
-  // dropped the `approvedBy`/`approvedAt` the controller was setting and the
-  // rejection reason the UI collected. An approval workflow that records
-  // neither who approved nor why something was rejected is not an approval
-  // workflow.
-  submittedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  },
-  submittedAt: {
-    type: Date,
-  },
-  approvedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  },
-  approvedAt: {
-    type: Date,
-  },
-  rejectedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  },
-  rejectedAt: {
-    type: Date,
-  },
-  rejectionReason: {
+  /**
+   * Where leaveDays and overtimeHours came from.
+   *
+   * "ledger"  — derived from the validated Attendance document for the month
+   * "manual"  — parsed out of the activity tag strings, the pre-#459 path
+   *
+   * Recorded so an audit of "why was this employee docked three days?" can tell
+   * whether the answer is a day-by-day record or a regex over a display label.
+   */
+  attendanceSource: {
     type: String,
-    maxlength: [500, "Rejection reason cannot exceed 500 characters"],
+    enum: ["ledger", "manual"],
+    default: "manual",
   },
-  paidAt: {
-    type: Date,
-  },
-
   payslipEmailed: {
     type: Boolean,
     default: false,
