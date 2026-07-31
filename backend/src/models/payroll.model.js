@@ -72,6 +72,20 @@ const payrollUpdateSchema = new mongoose.Schema({
     enum: ["finalized", "paid"],
     default: "finalized",
   },
+  /**
+   * Where leaveDays and overtimeHours came from.
+   *
+   * "ledger"  — derived from the validated Attendance document for the month
+   * "manual"  — parsed out of the activity tag strings, the pre-#459 path
+   *
+   * Recorded so an audit of "why was this employee docked three days?" can tell
+   * whether the answer is a day-by-day record or a regex over a display label.
+   */
+  attendanceSource: {
+    type: String,
+    enum: ["ledger", "manual"],
+    default: "manual",
+  },
   payslipEmailed: {
     type: Boolean,
     default: false,

@@ -1,14 +1,31 @@
-import React, { useState } from "react";
-// Status configuration definitions
+import React, { useCallback, useEffect, useState } from "react";
+import api from "../services/api";
+
+// Status configuration definitions.
+//
+// The keys are the SCREAMING_SNAKE spellings the attendance API accepts as
+// legacy aliases, so this grid maps onto the server's canonical vocabulary
+// without the client needing to know about it (#459).
 const STATUS_CONFIG = {
   PRESENT: { label: "Present", code: "P", bg: "#10B981", lightBg: "#ECFDF5", text: "#065F46", darkBg: "#064E3B", darkText: "#A7F3D0" },
   HALF_DAY: { label: "Half Day", code: "HD", bg: "#F59E0B", lightBg: "#FFFBEB", text: "#92400E", darkBg: "#78350F", darkText: "#FDE68A" },
   ABSENT: { label: "Unpaid Leave", code: "A", bg: "#EF4444", lightBg: "#FEF2F2", text: "#991B1B", darkBg: "#7F1D1D", darkText: "#FCA5A5" },
   PAID_LEAVE: { label: "Paid Leave", code: "PL", bg: "#3B82F6", lightBg: "#EFF6FF", text: "#1E40AF", darkBg: "#1E3A8A", darkText: "#BFDBFE" },
   OVERTIME: { label: "Overtime", code: "OT", bg: "#8B5CF6", lightBg: "#F5F3FF", text: "#5B21B6", darkBg: "#4C1D95", darkText: "#DDD6FE" },
+  // A weekly off is not leave. Sundays used to default to PAID_LEAVE, which
+  // quietly consumed ~52 days a year against a 12-day entitlement.
+  HOLIDAY: { label: "Week Off / Holiday", code: "WO", bg: "#6B7280", lightBg: "#F3F4F6", text: "#374151", darkBg: "#1F2937", darkText: "#D1D5DB" },
 };
 
 const STATUS_KEYS = Object.keys(STATUS_CONFIG);
+
+/** Server status -> local key. The server answers in canonical lower_snake. */
+const fromServerStatus = (status) => {
+  const key = String(status || "").toUpperCase();
+  if (STATUS_CONFIG[key]) return key;
+  if (key === "UNPAID_LEAVE") return "ABSENT";
+  return "PRESENT";
+};
 
 export default function AttendanceCalendarModal({ isOpen, onClose, employee, onApply, isDark }) {
   const now = new Date();
@@ -20,26 +37,79 @@ export default function AttendanceCalendarModal({ isOpen, onClose, employee, onA
   // Map of day Number (1..daysInMonth) => { status, otHours }
   const [dayStates, setDayStates] = useState({});
   const [selectedDayForOt, setSelectedDayForOt] = useState(null);
-const [otInput, setOtInput] = useState("2");
-  const [initializedKey, setInitializedKey] = useState(null);
-// Reset or initialize when modal opens or employee changes
-  // (calculated directly during render instead of inside a useEffect)
-  const initKey = isOpen && employee ? `${employee.id || employee.fullName}-${year}-${month}` : null;
+  const [otInput, setOtInput] = useState("2");
 
-  if (initKey && initKey !== initializedKey) {
-    setInitializedKey(initKey);
-    const initial = {};
-    for (let d = 1; d <= daysInMonth; d++) {
-      // Default to PRESENT for working days (Mon-Sat, Sun absent/off optional)
-      const dateObj = new Date(year, month, d);
-      const isSunday = dateObj.getDay() === 0;
-      initial[d] = {
-        status: isSunday ? "PAID_LEAVE" : "PRESENT",
-        otHours: 0,
+  // Persistence state (#459). Before this, the grid lived only in React state
+  // and was thrown away on close — the month had to be re-keyed from scratch
+  // for every employee on every payroll run.
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [balance, setBalance] = useState(null);
+  const [isLocked, setIsLocked] = useState(false);
+
+  const employeeId = employee?._id || employee?.id || null;
+
+  /** Build the local grid from the server's day list. */
+  const applyServerDays = useCallback((days) => {
+    const next = {};
+    (Array.isArray(days) ? days : []).forEach((entry) => {
+      next[entry.day] = {
+        status: fromServerStatus(entry.status),
+        otHours: Number(entry.overtimeHours) || 0,
       };
-    }
-    setDayStates(initial);
-  }
+    });
+    setDayStates(next);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || !employeeId) return;
+
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setLoadError("");
+      setSaveError("");
+
+      try {
+        const res = await api.get("/api/attendance", {
+          params: { employeeId, year, month: month + 1 },
+        });
+        if (cancelled) return;
+
+        // The server returns a full month either way — a stored grid, or a
+        // generated default with week-offs already marked as HOLIDAY — so the
+        // client never has to invent one.
+        applyServerDays(res.data?.days);
+        setBalance(res.data?.balance || null);
+        setIsLocked(Boolean(res.data?.isLocked));
+      } catch (error) {
+        if (cancelled) return;
+        setLoadError(
+          error?.response?.data?.message ||
+            "Could not load saved attendance. Showing an empty month.",
+        );
+        // Fall back to a local default so the grid stays usable offline.
+        const fallback = {};
+        for (let d = 1; d <= daysInMonth; d += 1) {
+          const isSunday = new Date(year, month, d).getDay() === 0;
+          fallback[d] = { status: isSunday ? "HOLIDAY" : "PRESENT", otHours: 0 };
+        }
+        setDayStates(fallback);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, employeeId, year, month, daysInMonth, applyServerDays]);
+
   if (!isOpen || !employee) return null;
 
   // Cycle through statuses on tile click
@@ -107,6 +177,65 @@ const [otInput, setOtInput] = useState("2");
     }
   };
 
+  /**
+   * Persist the grid, then hand the derived figures to the payroll screen.
+   *
+   * The server recomputes the totals from the days it is sent and returns the
+   * `leaveDays`/`overtimeHours` it derived, so the payroll row is built from
+   * the ledger's own arithmetic rather than from numbers this component
+   * calculated locally and stringified into a label.
+   *
+   * @returns {Promise<object|null>} the server's payrollInputs, or null on failure
+   */
+  const persistGrid = async () => {
+    // The "no employees yet" demo path opens this modal with a placeholder that
+    // has no id. There is nothing to persist against, so fall back to the
+    // locally computed figures rather than blocking the apply.
+    if (!employeeId) {
+      return { leaveDays: unpaidLeaves, overtimeHours: totalOtHours, unsaved: true };
+    }
+
+    setSaving(true);
+    setSaveError("");
+
+    const days = [];
+    for (let d = 1; d <= daysInMonth; d += 1) {
+      const entry = dayStates[d];
+      if (!entry) continue;
+      days.push({
+        day: d,
+        status: entry.status,
+        overtimeHours:
+          entry.status === "OVERTIME" || entry.status === "HOLIDAY"
+            ? Number(entry.otHours) || 0
+            : 0,
+      });
+    }
+
+    try {
+      const res = await api.put(
+        `/api/attendance/${employeeId}/${year}/${month + 1}`,
+        { days },
+      );
+      setBalance((prev) => prev);
+      return res.data?.payrollInputs || null;
+    } catch (error) {
+      const data = error?.response?.data;
+      const detail = Array.isArray(data?.errors) && data.errors.length > 0
+        ? ` (day ${data.errors[0].day}: ${data.errors[0].reason})`
+        : "";
+      setSaveError((data?.message || "Could not save attendance.") + detail);
+      return null;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveOnly = async () => {
+    const result = await persistGrid();
+    if (result) onClose();
+  };
+
   const handleApplyToPayroll = () => {
     const tags = [];
     if (unpaidLeaves > 0) {
@@ -132,12 +261,23 @@ const [otInput, setOtInput] = useState("2");
       });
     }
 
-    onApply({
-      employeeName: employee.fullName,
-      tags,
-      summary: { presentDays, halfDays, unpaidLeaves, paidLeaves, totalOtHours },
+    // Save before applying. If the write fails the modal stays open with the
+    // error visible, rather than silently handing payroll figures that are not
+    // backed by anything on the server.
+    persistGrid().then((payrollInputs) => {
+      if (!payrollInputs) return;
+
+      onApply({
+        employeeName: employee.fullName,
+        employeeId,
+        tags,
+        // Structured figures straight from the ledger, so the payroll
+        // controller no longer has to re-derive them from the tag labels.
+        payrollInputs,
+        summary: { presentDays, halfDays, unpaidLeaves, paidLeaves, totalOtHours },
+      });
+      onClose();
     });
-    onClose();
   };
 
   return (
@@ -269,6 +409,49 @@ const [otInput, setOtInput] = useState("2");
           </div>
         </div>
 
+        {/* Persistence status: loading, load failure, save failure, and the
+            settled-month lock (#459) */}
+        {(loading || loadError || saveError || isLocked) && (
+          <div style={{ padding: "10px 24px", display: "flex", flexDirection: "column", gap: "6px" }}>
+            {loading && (
+              <div style={{ fontSize: "12.5px", color: isDark ? "#93C5FD" : "#1E40AF" }}>
+                Loading saved attendance…
+              </div>
+            )}
+            {isLocked && (
+              <div
+                style={{
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  background: isDark ? "#1F2937" : "#F3F4F6",
+                  color: isDark ? "#D1D5DB" : "#374151",
+                }}
+              >
+                🔒 This month is locked — its payroll has been paid and the record can no longer be edited.
+              </div>
+            )}
+            {loadError && (
+              <div style={{ fontSize: "12.5px", color: "#B45309" }}>{loadError}</div>
+            )}
+            {saveError && (
+              <div
+                style={{
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  background: isDark ? "#7F1D1D" : "#FEF2F2",
+                  color: isDark ? "#FCA5A5" : "#991B1B",
+                }}
+              >
+                {saveError}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Summary Counter Bar */}
         <div
           style={{
@@ -285,6 +468,11 @@ const [otInput, setOtInput] = useState("2");
           <span>🟧 Half Days: {halfDays}d</span>
           <span>🟥 Unpaid Leave: {unpaidLeaves}d</span>
           <span>⚡ Overtime: {totalOtHours} hrs</span>
+          {balance && (
+            <span title="Paid leave accrued this leave year, less what has been consumed">
+              🏖️ Leave left: {balance.available}d / {balance.entitlement}d
+            </span>
+          )}
         </div>
 
         {/* 31-Day Calendar Grid */}
@@ -443,7 +631,25 @@ const [otInput, setOtInput] = useState("2");
               Cancel
             </button>
             <button
+              onClick={handleSaveOnly}
+              disabled={saving || loading || isLocked}
+              style={{
+                padding: "9px 18px",
+                borderRadius: "10px",
+                border: isDark ? "1px solid #334155" : "1px solid #D1D5DB",
+                background: "transparent",
+                color: isDark ? "#E5E7EB" : "#374151",
+                fontSize: "13.5px",
+                fontWeight: 700,
+                cursor: saving || loading || isLocked ? "not-allowed" : "pointer",
+                opacity: saving || loading || isLocked ? 0.5 : 1,
+              }}
+            >
+              {saving ? "Saving…" : "Save Attendance"}
+            </button>
+            <button
               onClick={handleApplyToPayroll}
+              disabled={saving || loading || isLocked}
               style={{
                 padding: "9px 20px",
                 borderRadius: "10px",
@@ -452,11 +658,12 @@ const [otInput, setOtInput] = useState("2");
                 color: "white",
                 fontSize: "13.5px",
                 fontWeight: 700,
-                cursor: "pointer",
+                cursor: saving || loading || isLocked ? "not-allowed" : "pointer",
+                opacity: saving || loading || isLocked ? 0.5 : 1,
                 boxShadow: "0 4px 12px rgba(37,99,235,0.3)",
               }}
             >
-              Apply to Payroll ⚡
+              {saving ? "Saving…" : "Save & Apply to Payroll ⚡"}
             </button>
           </div>
         </div>

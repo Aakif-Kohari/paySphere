@@ -7,6 +7,12 @@ const mongoose = require("mongoose");
 jest.mock("../../models/employee.model");
 jest.mock("../../models/payroll.model");
 jest.mock("../../models/user.model");
+// submitPayrollForReview now consults the attendance ledger (#459). Stubbed so
+// the payroll unit tests stay free of the attendance collection; the ledger's
+// own behaviour is covered in attendance.controller.test.js.
+jest.mock("../../models/attendance.model", () => ({
+  find: jest.fn(() => ({ select: jest.fn().mockResolvedValue([]) })),
+}));
 jest.mock("../../services/audit.service", () => ({
   createAuditLog: jest.fn(),
 }));

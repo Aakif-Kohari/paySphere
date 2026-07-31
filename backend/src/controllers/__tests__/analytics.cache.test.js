@@ -29,6 +29,11 @@ jest.mock("../../utils/logger", () => ({
   stream: { write: jest.fn() },
 }));
 
+// submitPayrollForReview now consults the attendance ledger (#459).
+jest.mock("../../models/attendance.model", () => ({
+  find: jest.fn(() => ({ select: jest.fn().mockResolvedValue([]) })),
+}));
+
 const { submitPayrollForReview } = require("../payroll.controller");
 const {
   deleteEmployee,
