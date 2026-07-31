@@ -11,6 +11,11 @@ const auditLogSchema = new mongoose.Schema({
     required: true,
     enum: [
       "PAYROLL_FINALIZE",
+      // #438 shipped approve/reject handlers that emitted no audit event at
+      // all, so the one action a maker–checker flow exists to record was the
+      // one action left untracked (#458).
+      "PAYROLL_APPROVE",
+      "PAYROLL_REJECT",
       "EMPLOYEE_CREATE",
       "EMPLOYEE_UPDATE",
       "EMPLOYEE_DELETE",

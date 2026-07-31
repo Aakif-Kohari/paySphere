@@ -1,4 +1,9 @@
 const mongoose = require("mongoose");
+const {
+  ALL_STATUSES,
+  PAYROLL_STATUS,
+  normalizeStatus,
+} = require("../config/payrollStatus");
 
 const payrollUpdateSchema = new mongoose.Schema({
   employeeId: {
@@ -67,11 +72,58 @@ const payrollUpdateSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  // The approval workflow added in #438 writes "PENDING_APPROVAL"/"APPROVED"/
+  // "REJECTED", none of which were in this enum — so every save() path threw a
+  // ValidationError and the workflow only appeared to work because it went
+  // through updateMany, which skips validators by default (#458).
+  //
+  // The vocabulary now comes from config/payrollStatus.js, shared with every
+  // controller that compares against it. `set` folds the legacy "finalized" and
+  // the screaming-snake spellings onto the canonical values so documents
+  // written by either older revision keep validating.
   status: {
     type: String,
-    enum: ["finalized", "paid"],
-    default: "finalized",
+    enum: ALL_STATUSES,
+    default: PAYROLL_STATUS.PENDING_APPROVAL,
+    set: (value) => normalizeStatus(value) || value,
   },
+
+  // --- Approval trail (#438, #458) ----------------------------------------
+  //
+  // None of these existed on the schema, so mongoose strict mode silently
+  // dropped the `approvedBy`/`approvedAt` the controller was setting and the
+  // rejection reason the UI collected. An approval workflow that records
+  // neither who approved nor why something was rejected is not an approval
+  // workflow.
+  submittedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+  submittedAt: {
+    type: Date,
+  },
+  approvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+  approvedAt: {
+    type: Date,
+  },
+  rejectedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+  rejectedAt: {
+    type: Date,
+  },
+  rejectionReason: {
+    type: String,
+    maxlength: [500, "Rejection reason cannot exceed 500 characters"],
+  },
+  paidAt: {
+    type: Date,
+  },
+
   payslipEmailed: {
     type: Boolean,
     default: false,
@@ -82,5 +134,14 @@ const payrollUpdateSchema = new mongoose.Schema({
 payrollUpdateSchema.index({ employeeId: 1, month: 1, year: 1, createdBy: 1 }, { unique: true });
 
 payrollUpdateSchema.index({ createdBy: 1, year: -1, month: -1 });
+
+// The approvals queue reads "everything pending, newest first, for this
+// account". Without a compound index on the two fields it filters by, that is a
+// collection scan on the single largest collection in the product — the exact
+// class of problem #241 fixed for the other hot paths.
+payrollUpdateSchema.index({ createdBy: 1, status: 1, createdAt: -1 });
+
+// Summary, exports and analytics all filter { createdBy, month, year, status }.
+payrollUpdateSchema.index({ createdBy: 1, year: -1, month: -1, status: 1 });
 
 module.exports = mongoose.model("PayrollUpdate", payrollUpdateSchema);

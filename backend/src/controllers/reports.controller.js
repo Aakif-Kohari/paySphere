@@ -1,5 +1,6 @@
 const PDFDocument = require("pdfkit");
 const PayrollUpdate = require("../models/payroll.model");
+const { payableStatusFilter } = require("../config/payrollStatus");
 const Employee = require("../models/employee.model");
 const User = require("../models/user.model");
 const logger = require("../utils/logger");
@@ -25,8 +26,12 @@ exports.getAnalytics = async (req, res, next) => {
     const startDate = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
 
     // Fetch all payroll records within the date range
+    // Analytics is the owner's view of what payroll actually cost. Rows still
+    // waiting on a checker — or ones a checker rejected — are not a cost and
+    // must not appear in the trend, the department split or the totals (#458).
     const payrolls = await PayrollUpdate.find({
       createdBy: userId,
+      ...payableStatusFilter(),
       $or: [
         { year: { $gt: startDate.getFullYear() } },
         {
@@ -149,6 +154,8 @@ exports.downloadPDFReport = async (req, res, next) => {
       createdBy: userId,
       month,
       year,
+      // A generated report is a financial document — approved rows only (#458).
+      ...payableStatusFilter(),
     }).sort({ employeeName: 1 });
 
     if (payrolls.length === 0) {
@@ -338,6 +345,8 @@ exports.exportExcelReport = async (req, res, next) => {
       createdBy: userId,
       month,
       year,
+      // A generated report is a financial document — approved rows only (#458).
+      ...payableStatusFilter(),
     }).sort({ employeeName: 1 });
 
     if (payrolls.length === 0) {
@@ -481,6 +490,8 @@ exports.downloadPayslipsZip = async (req, res, next) => {
       createdBy: userId,
       month,
       year,
+      // A generated report is a financial document — approved rows only (#458).
+      ...payableStatusFilter(),
     }).sort({ employeeName: 1 });
 
     if (payrolls.length === 0) {
