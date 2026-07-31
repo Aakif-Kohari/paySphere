@@ -55,6 +55,7 @@ describe('sendPayslipEmail — PDF worker lifecycle (#375)', () => {
     sendEmail.mockResolvedValue({ success: true });
 
     const promise = sendPayslipEmail(employee, payroll);
+    await new Promise(process.nextTick);
 
     // Worker emits success message
     mockWorkerInstance.emit('message', { success: true, pdfData: fakePdfData });
@@ -68,6 +69,7 @@ describe('sendPayslipEmail — PDF worker lifecycle (#375)', () => {
     sendEmail.mockRejectedValue(new Error('SMTP connection refused'));
 
     const promise = sendPayslipEmail(employee, payroll);
+    await new Promise(process.nextTick);
 
     mockWorkerInstance.emit('message', { success: true, pdfData: fakePdfData });
 
@@ -81,6 +83,7 @@ describe('sendPayslipEmail — PDF worker lifecycle (#375)', () => {
     sendEmail.mockResolvedValue({ success: false, error: 'Proxy error' });
 
     const promise = sendPayslipEmail(employee, payroll);
+    await new Promise(process.nextTick);
 
     mockWorkerInstance.emit('message', { success: true, pdfData: fakePdfData });
 
@@ -91,6 +94,7 @@ describe('sendPayslipEmail — PDF worker lifecycle (#375)', () => {
   // ── 4. PDF generation failure — must terminate worker ─────────────────────────
   test('rejects and terminates worker when PDF generation fails', async () => {
     const promise = sendPayslipEmail(employee, payroll);
+    await new Promise(process.nextTick);
 
     mockWorkerInstance.emit('message', {
       success: false,
@@ -106,6 +110,7 @@ describe('sendPayslipEmail — PDF worker lifecycle (#375)', () => {
   // ── 5. Worker emits 'error' event ─────────────────────────────────────────────
   test('rejects and terminates worker when worker emits an error event', async () => {
     const promise = sendPayslipEmail(employee, payroll);
+    await new Promise(process.nextTick);
 
     mockWorkerInstance.emit('error', new Error('Worker crashed'));
 
@@ -116,6 +121,7 @@ describe('sendPayslipEmail — PDF worker lifecycle (#375)', () => {
   // ── 6. Silent worker crash — exit event with non-zero code (was hanging bug) ──
   test('rejects when worker exits silently with non-zero exit code (no message/error)', async () => {
     const promise = sendPayslipEmail(employee, payroll);
+    await new Promise(process.nextTick);
 
     // Simulate silent crash — no 'message' or 'error' emitted, just 'exit'
     mockWorkerInstance.emit('exit', 1);
@@ -131,6 +137,7 @@ describe('sendPayslipEmail — PDF worker lifecycle (#375)', () => {
     sendEmail.mockResolvedValue({ success: true });
 
     const promise = sendPayslipEmail(employee, payroll);
+    await new Promise(process.nextTick);
 
     mockWorkerInstance.emit('message', { success: true, pdfData: fakePdfData });
     // Worker then exits cleanly (code 0) — should not cause a double-reject
@@ -142,6 +149,7 @@ describe('sendPayslipEmail — PDF worker lifecycle (#375)', () => {
   // ── 8. Double-event guard — settle() prevents double resolve/reject ───────────
   test('does not double-reject when both error and exit events fire', async () => {
     const promise = sendPayslipEmail(employee, payroll);
+    await new Promise(process.nextTick);
 
     mockWorkerInstance.emit('error', new Error('Worker hard crash'));
     mockWorkerInstance.emit('exit', 1); // would be a second rejection without guard

@@ -29,7 +29,7 @@ jest.mock("../../utils/logger", () => ({
   stream: { write: jest.fn() },
 }));
 
-const { finalizePayroll } = require("../payroll.controller");
+const { submitPayrollForReview } = require("../payroll.controller");
 const {
   deleteEmployee,
   toggleEmployeeStatus,
@@ -56,7 +56,7 @@ describe("analytics cache invalidation (#415)", () => {
     next = jest.fn();
   });
 
-  describe("finalizePayroll", () => {
+  describe("submitPayrollForReview", () => {
     const employee = {
       _id: "emp-1",
       fullName: "Alice Smith",
@@ -103,14 +103,14 @@ describe("analytics cache invalidation (#415)", () => {
       // This was the mutation that mattered most and the one that never cleared
       // the cache: run payroll, open Reports, see the previous month's totals
       // for up to an hour.
-      await finalizePayroll(req, res, next);
+      await submitPayrollForReview(req, res, next);
 
       expect(cacheService.invalidateAnalytics).toHaveBeenCalledWith("user123");
       expect(res.status).toHaveBeenCalledWith(200);
     });
 
     test("invalidates exactly once", async () => {
-      await finalizePayroll(req, res, next);
+      await submitPayrollForReview(req, res, next);
 
       expect(cacheService.invalidateAnalytics).toHaveBeenCalledTimes(1);
     });
@@ -118,7 +118,7 @@ describe("analytics cache invalidation (#415)", () => {
     test("does not invalidate when validation rejects the request", async () => {
       req.body.activities = [];
 
-      await finalizePayroll(req, res, next);
+      await submitPayrollForReview(req, res, next);
 
       expect(cacheService.invalidateAnalytics).not.toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(400);
@@ -130,7 +130,7 @@ describe("analytics cache invalidation (#415)", () => {
         createQueryMock([{ employeeName: "Alice Smith" }]),
       );
 
-      await finalizePayroll(req, res, next);
+      await submitPayrollForReview(req, res, next);
 
       expect(cacheService.invalidateAnalytics).not.toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(400);

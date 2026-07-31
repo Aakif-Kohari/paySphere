@@ -302,7 +302,14 @@ describe('Reports Controller - downloadPDFReport', () => {
       { _id: 'emp1', role: 'Developer', companyName: 'TestCorp' },
     ]);
 
-    await downloadPDFReport(req, res, next);
+    await new Promise((resolve, reject) => {
+      res.send = jest.fn(() => {
+        resolve();
+      });
+      next = jest.fn((err) => reject(err));
+      
+      downloadPDFReport(req, res, next).catch(reject);
+    });
 
     expect(res.setHeader).toHaveBeenCalledWith(
       'Content-Type',

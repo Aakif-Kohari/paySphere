@@ -50,7 +50,7 @@ exports.addEmployee = async (req, res, next) => {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ message: 'Request body is required' });
     }
-    const { fullName, role, monthlySalary, overtimeRate, dateOfBirth, joiningDate } = req.body;
+    const { fullName, role, monthlySalary, overtimeRate, dateOfBirth, joiningDate, email, bankDetails } = req.body;
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(role)) {
       return res
