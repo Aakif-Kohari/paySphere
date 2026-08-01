@@ -17,6 +17,7 @@ import SalaryDistributionChart from '../components/reports/SalaryDistributionCha
 import OvertimeChart from '../components/reports/OvertimeChart';
 import PayrollTable from '../components/reports/PayrollTable';
 import CustomReportBuilder from '../components/reports/CustomReportBuilder';
+import TurnoverMetrics from '../components/reports/TurnoverMetrics';
 
 // --- Month-Year Selector ---
 const MONTH_NAMES = [
@@ -286,6 +287,12 @@ export default function Reports() {
                   Analytics
                 </button>
                 <button 
+                  onClick={() => setActiveTab('hr')} 
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'hr' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
+                >
+                  HR Metrics
+                </button>
+                <button 
                   onClick={() => setActiveTab('custom')} 
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'custom' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
                 >
@@ -297,6 +304,7 @@ export default function Reports() {
           </div>
 
           {/* Export Action Bar */}
+          {activeTab === 'analytics' && (
           <div className="flex flex-wrap gap-3 mb-8 items-center">
             <button
               onClick={handleDownloadPDF}
@@ -370,6 +378,7 @@ export default function Reports() {
               {exportingType === 'csv' ? 'Exporting CSV...' : 'Export Accounting CSV'}
             </button>
           </div>
+          )}
 
           {exportingType && (
             <div className="mb-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 flex items-center gap-3">
@@ -384,7 +393,9 @@ export default function Reports() {
           )}
 
 
-          {activeTab === 'custom' ? (
+          {activeTab === 'hr' ? (
+            <TurnoverMetrics />
+          ) : activeTab === 'custom' ? (
             <CustomReportBuilder />
           ) : loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
