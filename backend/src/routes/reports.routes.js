@@ -1,11 +1,12 @@
 const express = require("express");
-const { getAnalytics, downloadPDFReport, exportExcelReport, downloadPayslipsZip } = require("../controllers/reports.controller");
+const { getAnalytics, downloadPDFReport, exportExcelReport, downloadPayslipsZip, generateCustomReport } = require("../controllers/reports.controller");
 const auth = require("../middlewares/auth.middleware");
 const { requirePermission } = require("../middlewares/rbac.middleware");
 const router = express.Router();
 
 router.get("/analytics", auth, requirePermission("READ_REPORT"), getAnalytics);
 router.get("/download-pdf", auth, requirePermission("READ_REPORT"), downloadPDFReport);
+router.post("/custom", auth, requirePermission("READ_REPORT"), generateCustomReport);
 
 // `exportExcelReport` and `downloadPayslipsZip` were implemented in full for
 // #334 and imported here, but no route was ever registered — so both endpoints
