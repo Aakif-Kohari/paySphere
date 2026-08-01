@@ -83,7 +83,7 @@ const DashboardOverview = ({
       {/* Title */}
       <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4">
         <div>
-          <p className="text-sm text-gray-400 dark:text-slate-400">
+          <p className="text-sm text-gray-500 dark:text-slate-500">
             Monthly Overview
           </p>
           <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white">
@@ -123,7 +123,7 @@ const DashboardOverview = ({
 
           <button
             onClick={onAddUpdate}
-            className="flex-1 cursor-pointer sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none"
+            className="flex-1 cursor-pointer sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           >
             Run Payroll
           </button>
@@ -142,25 +142,25 @@ const DashboardOverview = ({
         ) : (
           <>
             <div className="flex-1 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
-              <p className="text-xs uppercase text-gray-400 dark:text-slate-400 font-bold mb-2">
+              <p className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold mb-2">
                 Total Monthly Payout
               </p>
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
                 ₹{totalPayout.toLocaleString('en-IN')}
               </h2>
-              <p className="text-gray-400 dark:text-slate-400 text-sm mt-2">
+              <p className="text-gray-500 dark:text-slate-500 text-sm mt-2">
                 {employeeCount} employees on payroll
               </p>
             </div>
 
             <div className="w-full sm:w-64 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
-              <p className="text-xs uppercase text-gray-400 dark:text-slate-400 font-bold mb-2">
+              <p className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold mb-2">
                 Employees
               </p>
               <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white">
                 {employeeCount}
               </h2>
-              <p className="text-gray-400 dark:text-slate-400 text-sm">
+              <p className="text-gray-500 dark:text-slate-500 text-sm">
                 Active this month
               </p>
             </div>
@@ -175,7 +175,7 @@ const DashboardOverview = ({
             type="button"
             onClick={handleCloseBtn}
             aria-label="Dismiss tutorial"
-            className="absolute right-4 top-4 cursor-pointer rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            className="absolute right-4 top-4 cursor-pointer rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           >
             ✕
           </button>
@@ -183,7 +183,7 @@ const DashboardOverview = ({
           <h2 className="mb-2 text-2xl font-semibold text-gray-900 dark:text-white">
             Getting Started
           </h2>
-          <p className="text-gray-600 dark:text-slate-400">
+          <p className="text-gray-600 dark:text-slate-500">
             New to PaySphere? Watch this quick tutorial to learn how to navigate
             the application and get started.
           </p>
@@ -192,7 +192,7 @@ const DashboardOverview = ({
             href="https://youtu.be/N3SizOsiNGw"
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-5 inline-flex items-center rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white transition-colors duration-200 hover:bg-blue-700"
+            className="mt-5 inline-flex items-center rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           >
             ▶ Watch Tutorial
           </a>
@@ -247,7 +247,7 @@ const DashboardOverview = ({
             action={
               <button
                 onClick={onAddEmployee}
-                className="px-6 py-2.5 bg-blue-600 cursor-pointer hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition shadow-md shadow-blue-200 dark:shadow-none"
+                className="px-6 py-2.5 bg-blue-600 cursor-pointer hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               >
                 + Add Employee
               </button>
@@ -272,11 +272,11 @@ const DashboardOverview = ({
         )}
 
         {!loading && (filtered.length > 0 || search) && (
-          <div
+          <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
             onClick={onAddEmployee}
             className="border-2 border-dashed border-gray-300 dark:border-slate-800 rounded-xl flex items-center justify-center min-h-44 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-indigo-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition duration-200"
           >
-            <p className="text-gray-400 dark:text-slate-400 font-semibold">
+            <p className="text-gray-500 dark:text-slate-500 font-semibold">
               + Add Employee
             </p>
           </div>
@@ -319,13 +319,13 @@ const EmployeeManagement = ({
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-900/50 mb-4">
             Payroll done in 30 seconds
           </span>
-          <p className="text-sm text-gray-400 dark:text-slate-400 mb-1">
+          <p className="text-sm text-gray-500 dark:text-slate-500 mb-1">
             Final Summary
           </p>
           <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white mb-2">
             ₹{totalNet.toLocaleString('en-IN')}
           </h1>
-          <p className="text-sm text-gray-400 dark:text-slate-400">
+          <p className="text-sm text-gray-500 dark:text-slate-500">
             Total Monthly Payout for{' '}
             <span className="text-gray-700 dark:text-slate-200 font-semibold">
               {employees.length} Employee{employees.length !== 1 ? 's' : ''}
@@ -336,11 +336,11 @@ const EmployeeManagement = ({
         <div className="flex gap-3 w-full sm:w-auto">
           <button
             onClick={onAddUpdate}
-            className="flex-1 sm:flex-none cursor-pointer px-5 py-3 border border-gray-200 dark:border-slate-800 rounded-xl font-semibold text-gray-700 dark:text-slate-200 hover:shadow dark:hover:bg-slate-800 transition-colors"
+            className="flex-1 sm:flex-none cursor-pointer px-5 py-3 border border-gray-200 dark:border-slate-800 rounded-xl font-semibold text-gray-700 dark:text-slate-200 hover:shadow dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           >
             Edit Updates
           </button>
-          <button className="flex-1 sm:flex-none cursor-pointer px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-200 dark:shadow-none" onClick={() => api.post('/api/payroll/submit', { activities: [], month: new Date().getMonth() + 1, year: new Date().getFullYear() }).then(() => alert('Submitted!')).catch(console.error)}>
+          <button className="flex-1 sm:flex-none cursor-pointer px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => api.post('/api/payroll/submit', { activities: [], month: new Date().getMonth() + 1, year: new Date().getFullYear() }).then(() => alert('Submitted!')).catch(console.error)}>
             Submit for Review
           </button>
         </div>
@@ -359,7 +359,7 @@ const EmployeeManagement = ({
             action={
               <button
                 onClick={onAddEmployee}
-                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition shadow-md shadow-blue-200 dark:shadow-none"
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               >
                 + Add Employee
               </button>
@@ -379,11 +379,11 @@ const EmployeeManagement = ({
         )}
 
         {!loading && employees.length > 0 && (
-          <div
+          <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
             onClick={onAddEmployee}
             className="border-2 border-dashed border-gray-300 dark:border-slate-800 rounded-xl flex items-center justify-center min-h-48 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-indigo-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition duration-200"
           >
-            <p className="text-gray-400 dark:text-slate-400 font-semibold">
+            <p className="text-gray-500 dark:text-slate-500 font-semibold">
               + Add more employees
             </p>
           </div>
@@ -400,7 +400,7 @@ const EmployeeManagement = ({
           >
             Previous
           </button>
-          <span className="text-sm text-gray-600 dark:text-slate-400">
+          <span className="text-sm text-gray-600 dark:text-slate-500">
             Page {currentPage} of {totalPages}
           </span>
           <button
@@ -540,14 +540,14 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              className="px-5 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm disabled:opacity-50 transition-colors"
+              className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm disabled:opacity-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
               {submitting ? 'Saving...' : 'Save Changes'}
             </button>
@@ -722,7 +722,7 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
         <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 transition-colors">
           <div className="flex items-center gap-4 sm:gap-6">
             <button
-              className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"
+              className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => setIsSidebarOpen(true)}
             >
               ☰
@@ -730,7 +730,7 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
             <span className="font-bold text-blue-900 dark:text-blue-400 truncate">
               Ledger Payroll
             </span>
-            <button className="hidden sm:block text-blue-600 dark:text-blue-400 font-semibold border-b-2 border-blue-600 dark:border-blue-400 pb-0.5 whitespace-nowrap">
+            <button className="hidden sm:block text-blue-600 dark:text-blue-400 font-semibold border-b-2 border-blue-600 dark:border-blue-400 pb-0.5 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
               {new Date().toLocaleString('default', {
                 month: 'long',
                 year: 'numeric',
@@ -738,7 +738,7 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
             </button>
           </div>
 
-          <div className="flex items-center gap-3 text-gray-500 dark:text-slate-400">
+          <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
             <ThemeToggle />
             <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
               {getInitials(companyName)}
@@ -809,7 +809,7 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
                 Delete Employee?
               </h2>
 
-              <p className="mt-3 text-gray-600 dark:text-slate-400">
+              <p className="mt-3 text-gray-600 dark:text-slate-500">
                 Are you sure you want to delete{' '}
                 <span className="font-semibold">
                   {employeeToDelete.fullName}
@@ -830,7 +830,7 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
                 <button
                   disabled={deleting}
                   onClick={handleDeleteEmployee}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm disabled:opacity-50 transition-colors"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm disabled:opacity-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 >
                   {deleting ? 'Deleting...' : 'Delete'}
                 </button>
@@ -847,7 +847,7 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
         open={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       >
-        <p className="text-sm text-gray-500 dark:text-slate-400">
+        <p className="text-sm text-gray-500 dark:text-slate-500">
           Settings will be available here soon.
         </p>
       </SettingsModal>

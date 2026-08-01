@@ -515,7 +515,7 @@ export default function AttendanceCalendarModal({ isOpen, onClose, employee, onA
               const cfg = STATUS_CONFIG[dayState.status] || STATUS_CONFIG.PRESENT;
 
               return (
-                <div
+                <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
                   key={d}
                   onClick={() => handleTileClick(d)}
                   style={{

@@ -84,7 +84,7 @@ export default function ResetPassword() {
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-xl p-4 lg:p-5 shadow-md border border-transparent dark:border-slate-800/80 relative z-10">
-              <p className="text-sm text-gray-500 dark:text-slate-400 mb-2">Digital Ledger</p>
+              <p className="text-sm text-gray-500 dark:text-slate-500 mb-2">Digital Ledger</p>
               <h2 className="text-lg font-serif text-gray-900 dark:text-white">
                 Payroll made simple.
               </h2>
@@ -101,7 +101,7 @@ export default function ResetPassword() {
                   </svg>
                 </div>
                 <h2 className="text-2xl font-serif mb-2 text-gray-900 dark:text-white">Password Reset Successful!</h2>
-                <p className="text-gray-500 dark:text-slate-400 text-sm mb-6">
+                <p className="text-gray-500 dark:text-slate-500 text-sm mb-6">
                   Your password has been successfully updated. You will be redirected to the login page shortly.
                 </p>
                 <button
@@ -114,7 +114,7 @@ export default function ResetPassword() {
             ) : (
               <>
                 <h2 className="text-2xl font-serif mb-1 text-gray-900 dark:text-white">Set New Password</h2>
-                <p className="text-gray-500 dark:text-slate-400 text-sm mb-6">
+                <p className="text-gray-500 dark:text-slate-500 text-sm mb-6">
                   Please enter your new password below.
                 </p>
 
@@ -146,7 +146,7 @@ export default function ResetPassword() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition mb-5 text-center disabled:opacity-50"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition mb-5 text-center disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     {loading ? "Resetting..." : "Reset Password"}
                   </button>

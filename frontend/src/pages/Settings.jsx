@@ -303,7 +303,7 @@ export default function Settings() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Personal Profile</h2>
-              <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Manage your personal information and how it appears.</p>
+              <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">Manage your personal information and how it appears.</p>
             </div>
             
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 bg-gray-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-gray-100 dark:border-slate-800">
@@ -316,9 +316,9 @@ export default function Settings() {
               </div>
               <div className="flex-1 text-center sm:text-left">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">{userProfile.fullName || "Your Name"}</h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">Payroll Administrator at {userProfile.companyName}</p>
+                <p className="text-sm text-gray-500 dark:text-slate-500 mb-4">Payroll Administrator at {userProfile.companyName}</p>
                 <div className="flex flex-wrap justify-center sm:justify-start gap-3">
-                  <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleAvatarChange} />
+                  <input type="file" accept="image/*" className="hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" ref={fileInputRef} onChange={handleAvatarChange} />
                   <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700 transition">
                     Change Picture
                   </button>
@@ -331,7 +331,7 @@ export default function Settings() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Full Name</label>
+                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Full Name</label>
                 <input
                   type="text"
                   value={userProfile.fullName}
@@ -347,7 +347,7 @@ export default function Settings() {
                 )}
               </div>
               <div>
-                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Email Address</label>
+                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Email Address</label>
                 <input
                   type="email"
                   value={userProfile.email}
@@ -363,17 +363,17 @@ export default function Settings() {
                 )}
               </div>
               <div>
-                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Payroll ID</label>
-                <input type="text" value={userProfile.payrollId || "PR-8821"} readOnly className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-900/50 border border-transparent dark:border-slate-800 text-sm text-gray-500 dark:text-slate-400 cursor-not-allowed" />
+                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Payroll ID</label>
+                <input type="text" value={userProfile.payrollId || "PR-8821"} readOnly className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-900/50 border border-transparent dark:border-slate-800 text-sm text-gray-500 dark:text-slate-500 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" />
               </div>
               <div>
-                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Role / Designation</label>
+                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Role / Designation</label>
                 <input type="text" defaultValue="Admin" className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 outline-none text-sm text-gray-900 dark:text-white transition" />
               </div>
             </div>
 
             <div className="flex justify-end pt-4 border-t border-gray-100 dark:border-slate-800">
-              <button onClick={handleSaveSettings} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition">
+              <button onClick={handleSaveSettings} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
                 Save Changes
               </button>
             </div>
@@ -385,7 +385,7 @@ export default function Settings() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Account Security</h2>
-              <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Manage your password and connected accounts.</p>
+              <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">Manage your password and connected accounts.</p>
             </div>
 
             <div className="p-5 border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm space-y-4">
@@ -394,7 +394,7 @@ export default function Settings() {
                 <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="Current Password" className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-transparent dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white" />
                 <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New Password" className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-transparent dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white" />
               </div>
-              <button onClick={handlePasswordUpdate} className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg text-sm font-bold transition hover:opacity-90">
+              <button onClick={handlePasswordUpdate} className="px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg text-sm font-bold transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
                 Update Password
               </button>
             </div>
@@ -412,10 +412,10 @@ export default function Settings() {
                     </svg>
                     <div>
                       <p className="font-bold text-sm text-gray-900 dark:text-white">Google Account</p>
-                      <p className="text-xs text-gray-500 dark:text-slate-400">{userProfile.email || "No email linked"}</p>
+                      <p className="text-xs text-gray-500 dark:text-slate-500">{userProfile.email || "No email linked"}</p>
                     </div>
                   </div>
-                  <button onClick={handleDisconnectGoogle} className="text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition">
+                  <button onClick={handleDisconnectGoogle} className="text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
                     Disconnect
                   </button>
                 </div>
@@ -441,7 +441,7 @@ export default function Settings() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">App Preferences</h2>
-              <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Customize your UI and language settings.</p>
+              <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">Customize your UI and language settings.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -459,7 +459,7 @@ export default function Settings() {
                     </label>
                   ))}
                 </div>
-                <p className="text-xs text-gray-400 dark:text-slate-500 mt-3">* Uses standard global theme logic</p>
+                <p className="text-xs text-gray-500 dark:text-slate-500 mt-3">* Uses standard global theme logic</p>
               </div>
               <div className="p-5 border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm">
                 <h3 className="font-bold text-sm text-gray-900 dark:text-white mb-4">Language</h3>
@@ -473,7 +473,7 @@ export default function Settings() {
             </div>
             
             <div className="flex justify-end pt-4 border-t border-gray-100 dark:border-slate-800">
-              <button onClick={handleSaveSettings} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition">
+              <button onClick={handleSaveSettings} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
                 Save Preferences
               </button>
             </div>
@@ -485,16 +485,16 @@ export default function Settings() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Company Information</h2>
-              <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Details about your organization registered on PaySphere.</p>
+              <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">Details about your organization registered on PaySphere.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Company Name</label>
+                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Company Name</label>
                 <input type="text" value={userProfile.companyName} onChange={(e) => setUserProfile({...userProfile, companyName: e.target.value})} className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white transition" />
               </div>
               <div>
-                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Company Logo (for PDF Payslips)</label>
+                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Company Logo (for PDF Payslips)</label>
                 <input type="file" accept="image/*" onChange={(e) => {
                   const file = e.target.files[0];
                   if (file) {
@@ -506,15 +506,15 @@ export default function Settings() {
                 {settings.companyInfo?.companyLogo && <img src={settings.companyInfo.companyLogo} alt="Company Logo" className="mt-2 h-10 w-10 object-contain rounded-md" />}
               </div>
               <div>
-                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Organization ID</label>
-                <input type="text" value={userProfile.organizationId || "ORG-993821"} readOnly className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-900/50 border border-transparent dark:border-slate-800 text-sm text-gray-500 dark:text-slate-400 cursor-not-allowed" />
+                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Organization ID</label>
+                <input type="text" value={userProfile.organizationId || "ORG-993821"} readOnly className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-900/50 border border-transparent dark:border-slate-800 text-sm text-gray-500 dark:text-slate-500 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" />
               </div>
               <div>
-                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Employee Count</label>
-                <input type="text" value={userProfile.employeeCount} readOnly className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-900/50 border border-transparent dark:border-slate-800 text-sm text-gray-500 dark:text-slate-400 cursor-not-allowed" />
+                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Employee Count</label>
+                <input type="text" value={userProfile.employeeCount} readOnly className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-900/50 border border-transparent dark:border-slate-800 text-sm text-gray-500 dark:text-slate-500 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" />
               </div>
               <div>
-                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Payroll Cycle</label>
+                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Payroll Cycle</label>
                 <select value={settings.companyInfo.payrollCycle} onChange={(e) => updateSettingsField('companyInfo', 'payrollCycle', e.target.value)} className="w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border border-transparent dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white transition cursor-pointer">
                   <option value="monthly">Monthly (End of month)</option>
                   <option value="bi-weekly">Bi-weekly</option>
@@ -524,7 +524,7 @@ export default function Settings() {
             </div>
 
             <div className="flex justify-end pt-4 border-t border-gray-100 dark:border-slate-800">
-              <button onClick={handleSaveSettings} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition">
+              <button onClick={handleSaveSettings} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
                 Update Company Info
               </button>
             </div>
@@ -536,14 +536,14 @@ export default function Settings() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Payroll Config</h2>
-              <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Configure default rates, currency, and logic for payroll processing.</p>
+              <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">Configure default rates, currency, and logic for payroll processing.</p>
             </div>
 
             <div className="p-6 border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm space-y-5">
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Currency</label>
+                  <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Currency</label>
                   <select value={settings.payrollConfig.currency} onChange={(e)=>updateSettingsField('payrollConfig', 'currency', e.target.value)} className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold transition cursor-pointer">
                     <option value="INR">INR (₹)</option>
                     <option value="USD">USD ($)</option>
@@ -552,7 +552,7 @@ export default function Settings() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Processing Date</label>
+                  <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Processing Date</label>
                   <select value={settings.payrollConfig.processingDate} onChange={(e)=>updateSettingsField('payrollConfig', 'processingDate', e.target.value)} className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold transition cursor-pointer">
                     <option>Last working day</option>
                     <option>1st of next month</option>
@@ -560,21 +560,21 @@ export default function Settings() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Default Daily Rate</label>
+                  <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Default Daily Rate</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 font-bold text-sm">₹</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500 font-bold text-sm">₹</span>
                     <input type="number" value={settings.payrollConfig.defaultDailyRate} onChange={(e) => updateSettingsField('payrollConfig', 'defaultDailyRate', Number(e.target.value))} className="w-full pl-8 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold transition" />
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Default Overtime Rate (per hr)</label>
+                  <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Default Overtime Rate (per hr)</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 font-bold text-sm">₹</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500 font-bold text-sm">₹</span>
                     <input type="number" value={settings.payrollConfig.defaultOvertimeRate} onChange={(e) => updateSettingsField('payrollConfig', 'defaultOvertimeRate', Number(e.target.value))} className="w-full pl-8 pr-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold transition" />
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Leave Deduction Policy</label>
+                  <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Leave Deduction Policy</label>
                   <select value={settings.payrollConfig.leaveDeductionPolicy} onChange={(e)=>updateSettingsField('payrollConfig', 'leaveDeductionPolicy', e.target.value)} className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold transition cursor-pointer">
                     <option value="basic_only">Basic Salary Only (1/30th)</option>
                     <option value="full_salary">Full Salary</option>
@@ -583,7 +583,7 @@ export default function Settings() {
               </div>
 
               <div className="pt-4 flex justify-end">
-                <button onClick={handleSaveSettings} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition">
+                <button onClick={handleSaveSettings} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
                   Save Payroll Config
                 </button>
               </div>
@@ -597,7 +597,7 @@ export default function Settings() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Notifications</h2>
-              <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Manage what events trigger email or push notifications.</p>
+              <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">Manage what events trigger email or push notifications.</p>
             </div>
 
             <div className="border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm overflow-hidden divide-y divide-gray-100 dark:divide-slate-800">
@@ -605,10 +605,10 @@ export default function Settings() {
               <div className="p-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800/50 transition">
                 <div>
                   <h3 className="font-bold text-sm text-gray-900 dark:text-white">Payroll Completion</h3>
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Get alerted when a payroll run is successfully finalized.</p>
+                  <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Get alerted when a payroll run is successfully finalized.</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" checked={settings.notifications.payrollCompletion} onChange={() => updateSettingsField('notifications', 'payrollCompletion', !settings.notifications.payrollCompletion)} />
+                  <input type="checkbox" className="sr-only peer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" checked={settings.notifications.payrollCompletion} onChange={() => updateSettingsField('notifications', 'payrollCompletion', !settings.notifications.payrollCompletion)} />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
               </div>
@@ -616,10 +616,10 @@ export default function Settings() {
               <div className="p-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800/50 transition">
                 <div>
                   <h3 className="font-bold text-sm text-gray-900 dark:text-white">Employee Updates</h3>
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Alerts for new employee additions or removals.</p>
+                  <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Alerts for new employee additions or removals.</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" checked={settings.notifications.systemAlerts} onChange={() => updateSettingsField('notifications', 'systemAlerts', !settings.notifications.systemAlerts)} />
+                  <input type="checkbox" className="sr-only peer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" checked={settings.notifications.systemAlerts} onChange={() => updateSettingsField('notifications', 'systemAlerts', !settings.notifications.systemAlerts)} />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
               </div>
@@ -627,10 +627,10 @@ export default function Settings() {
               <div className="p-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800/50 transition">
                 <div>
                   <h3 className="font-bold text-sm text-gray-900 dark:text-white">Payroll Reminders</h3>
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Reminders when a cycle is nearing its processing date.</p>
+                  <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Reminders when a cycle is nearing its processing date.</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" checked={settings.notifications.emailReminders} onChange={() => updateSettingsField('notifications', 'emailReminders', !settings.notifications.emailReminders)} />
+                  <input type="checkbox" className="sr-only peer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" checked={settings.notifications.emailReminders} onChange={() => updateSettingsField('notifications', 'emailReminders', !settings.notifications.emailReminders)} />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
               </div>
@@ -638,16 +638,16 @@ export default function Settings() {
               <div className="p-5 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800/50 transition">
                 <div>
                   <h3 className="font-bold text-sm text-gray-900 dark:text-white">Feature Announcements</h3>
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">News on new PaySphere features and product updates.</p>
+                  <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">News on new PaySphere features and product updates.</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" checked={settings.notifications.featureAnnouncements} onChange={() => updateSettingsField('notifications', 'featureAnnouncements', !settings.notifications.featureAnnouncements)} />
+                  <input type="checkbox" className="sr-only peer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" checked={settings.notifications.featureAnnouncements} onChange={() => updateSettingsField('notifications', 'featureAnnouncements', !settings.notifications.featureAnnouncements)} />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
               </div>
 
               <div className="p-5 flex justify-end">
-                <button onClick={handleSaveSettings} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition">
+                <button onClick={handleSaveSettings} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
                   Save Notifications
                 </button>
               </div>
@@ -661,7 +661,7 @@ export default function Settings() {
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">About PaySphere</h2>
-              <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">System info, documentation, and support.</p>
+              <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">System info, documentation, and support.</p>
             </div>
 
             <div className="border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm overflow-hidden p-6 text-center">
@@ -669,40 +669,40 @@ export default function Settings() {
                 ₹
               </div>
               <h3 className="text-xl font-serif text-gray-900 dark:text-white font-bold mb-1">PaySphere</h3>
-              <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">Modern Payroll Management</p>
+              <p className="text-sm text-gray-500 dark:text-slate-500 mb-6">Modern Payroll Management</p>
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-left border-t border-gray-100 dark:border-slate-800 pt-6">
                 <div>
-                  <p className="text-xs font-bold uppercase text-gray-400 dark:text-slate-500 mb-1">Version</p>
+                  <p className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 mb-1">Version</p>
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">2.4.0</p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold uppercase text-gray-400 dark:text-slate-500 mb-1">Build Number</p>
+                  <p className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 mb-1">Build Number</p>
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">1082</p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold uppercase text-gray-400 dark:text-slate-500 mb-1">Tech Stack</p>
+                  <p className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 mb-1">Tech Stack</p>
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">React, Node, MongoDB</p>
                 </div>
                 <div>
-                  <p className="text-xs font-bold uppercase text-gray-400 dark:text-slate-500 mb-1">License</p>
+                  <p className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 mb-1">License</p>
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">MIT</p>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <a href="#" className="p-4 border border-gray-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition text-center group cursor-pointer block">
+              <a href="#" className="p-4 border border-gray-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition text-center group cursor-pointer block focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
                 <h4 className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">Documentation</h4>
-                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">API & Integration Guides</p>
+                <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">API & Integration Guides</p>
               </a>
-              <a href="#" className="p-4 border border-gray-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition text-center group cursor-pointer block">
+              <a href="#" className="p-4 border border-gray-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition text-center group cursor-pointer block focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
                 <h4 className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">GitHub Repo</h4>
-                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Source Code & Issues</p>
+                <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Source Code & Issues</p>
               </a>
-              <a href="#" className="p-4 border border-gray-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition text-center group cursor-pointer block">
+              <a href="#" className="p-4 border border-gray-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition text-center group cursor-pointer block focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
                 <h4 className="font-bold text-sm text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">Contact Support</h4>
-                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Get Help from Team</p>
+                <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">Get Help from Team</p>
               </a>
             </div>
           </div>
@@ -723,7 +723,7 @@ export default function Settings() {
 
       {/* Sidebar Backdrop */}
       {isSidebarOpen && (
-        <div
+        <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
@@ -738,11 +738,11 @@ export default function Settings() {
             </div>
             <div>
               <p className="font-bold text-sm text-gray-900 dark:text-white">{userProfile.companyName}</p>
-              <p className="text-xs text-gray-400 dark:text-slate-500">Payroll ID: {userProfile.payrollId ? userProfile.payrollId.replace('PR-', '') : '8821'}</p>
+              <p className="text-xs text-gray-500 dark:text-slate-500">Payroll ID: {userProfile.payrollId ? userProfile.payrollId.replace('PR-', '') : '8821'}</p>
             </div>
           </div>
           <button
-            className="md:hidden p-2 text-gray-400 hover:text-gray-600"
+            className="md:hidden p-2 text-gray-500 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             onClick={() => setIsSidebarOpen(false)}
           >
             ✕
@@ -760,7 +760,7 @@ export default function Settings() {
               className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${
                 item.id === "settings"
                   ? "bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold"
-                  : "text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800/50"
+                  : "text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50"
               }`}
             >
               {item.icon}
@@ -770,7 +770,7 @@ export default function Settings() {
         </nav>
 
         <div className="p-3 border-t border-gray-200 dark:border-slate-800 space-y-2">
-          <button className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition">
+          <button className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
             <SupportIcon />
             Help & Support
           </button>
@@ -787,7 +787,7 @@ export default function Settings() {
         <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 transition-colors">
           <div className="flex items-center gap-4 sm:gap-6">
             <button
-              className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"
+              className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => setIsSidebarOpen(true)}
             >
               ☰
@@ -795,10 +795,10 @@ export default function Settings() {
             <span className="font-bold text-blue-900 dark:text-blue-400 truncate">Settings</span>
           </div>
 
-          <div className="flex items-center gap-3 text-gray-500 dark:text-slate-400">
+          <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
             <ThemeToggle />
-            <button className="hidden sm:flex p-2 text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"><BellIcon /></button>
-            <button className="hidden sm:flex p-2 text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"><HelpCircleIcon /></button>
+            <button className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><BellIcon /></button>
+            <button className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><HelpCircleIcon /></button>
             <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
               {getInitials(userProfile.companyName)}
             </div>
@@ -829,10 +829,10 @@ export default function Settings() {
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-200 ${
                       activeTab === tab.id
                         ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-100 dark:border-slate-800"
-                        : "text-gray-500 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-900/50 hover:text-gray-900 dark:hover:text-white border border-transparent"
+                        : "text-gray-500 dark:text-slate-500 hover:bg-white/60 dark:hover:bg-slate-900/50 hover:text-gray-900 dark:hover:text-white border border-transparent"
                     }`}
                   >
-                    <span className={activeTab === tab.id ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-slate-500"}>
+                    <span className={activeTab === tab.id ? "text-blue-600 dark:text-blue-400" : "text-gray-500 dark:text-slate-500"}>
                       {tab.icon}
                     </span>
                     {tab.label}
@@ -859,12 +859,12 @@ export default function Settings() {
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-600 dark:text-red-500"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
               </div>
               <h3 className="text-xl font-bold text-center text-gray-900 dark:text-white mb-2">Are you absolutely sure?</h3>
-              <p className="text-sm text-center text-gray-500 dark:text-slate-400 mb-6">
+              <p className="text-sm text-center text-gray-500 dark:text-slate-500 mb-6">
                 This action cannot be undone. This will permanently delete your account, your company's payroll data, and all employee records.
               </p>
               
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider">
+                <label className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider">
                   Type <span className="text-red-600 dark:text-red-500 select-all">DELETE</span> to confirm
                 </label>
                 <input 

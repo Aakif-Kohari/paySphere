@@ -18,7 +18,7 @@ export default function Hero() {
         </h1>
 
         {/* Description */}
-        <p className="text-base sm:text-lg md:text-xl text-gray-500 dark:text-slate-400 max-w-xl sm:max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-900">
+        <p className="text-base sm:text-lg md:text-xl text-gray-500 dark:text-slate-500 max-w-xl sm:max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-8 duration-900">
           The digital ledger for modern Indian small businesses. Manage attendance,
           compliance, and payouts without the headache.
         </p>
