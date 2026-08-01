@@ -35,13 +35,13 @@ export default function Contributors() {
         
         {/* Section Header */}
         <div className="text-center mb-12 sm:mb-16 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-          <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 dark:text-slate-400 uppercase tracking-[0.2em] mb-4">
+          <p className="text-[9px] sm:text-[10px] font-bold text-gray-500 dark:text-slate-500 uppercase tracking-[0.2em] mb-4">
             OPEN SOURCE COMMUNITY
           </p>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
             Built by amazing <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-500 dark:from-blue-400 dark:to-cyan-300">contributors</span>
           </h2>
-          <p className="mt-4 text-sm sm:text-base text-gray-500 dark:text-slate-400 max-w-2xl mx-auto">
+          <p className="mt-4 text-sm sm:text-base text-gray-500 dark:text-slate-500 max-w-2xl mx-auto">
             PaySphere is powered by the brilliant minds of developers across the globe. 
             Meet the people shaping the future of modern payroll.
           </p>
@@ -76,7 +76,7 @@ export default function Contributors() {
                   href={contributor.html_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group relative flex flex-col items-center p-6 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/30 hover:bg-white dark:hover:bg-slate-800/80 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-in fade-in zoom-in"
+                  className="group relative flex flex-col items-center p-6 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/30 hover:bg-white dark:hover:bg-slate-800/80 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-in fade-in zoom-in focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   style={{ animationDelay: `${(index % 15) * 50}ms` }}
                 >
                   {/* Avatar with Ring */}
@@ -94,14 +94,14 @@ export default function Contributors() {
                   <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate w-full text-center">
                     {contributor.login}
                   </h3>
-                  <p className="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-slate-400 mt-1 bg-gray-100 dark:bg-slate-800 px-2 py-1 rounded-full">
+                  <p className="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-slate-500 mt-1 bg-gray-100 dark:bg-slate-800 px-2 py-1 rounded-full">
                     {contributor.contributions} commits
                   </p>
                 </a>
               ))
             ) : (
               // Fallback if no contributors found
-              <div className="col-span-full text-center py-10 text-gray-500 dark:text-slate-400">
+              <div className="col-span-full text-center py-10 text-gray-500 dark:text-slate-500">
                 No contributors found or API limit reached.
               </div>
             )}

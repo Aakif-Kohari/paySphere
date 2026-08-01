@@ -16,6 +16,7 @@ import DepartmentChart from '../components/reports/DepartmentChart';
 import SalaryDistributionChart from '../components/reports/SalaryDistributionChart';
 import OvertimeChart from '../components/reports/OvertimeChart';
 import PayrollTable from '../components/reports/PayrollTable';
+import CustomReportBuilder from '../components/reports/CustomReportBuilder';
 
 // --- Month-Year Selector ---
 const MONTH_NAMES = [
@@ -90,6 +91,7 @@ export default function Reports() {
   const [exportingType, setExportingType] = useState(null);
   const [reportData, setReportData] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
+  const [activeTab, setActiveTab] = useState('analytics');
   
   const companyName = localStorage.getItem('companyName') || 'PaySphere';
 
@@ -237,14 +239,14 @@ export default function Reports() {
         <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 transition-colors">
           <div className="flex items-center gap-4 sm:gap-6">
             <button
-              className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"
+              className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => setIsSidebarOpen(true)}
             >
               ☰
             </button>
             <span className="font-bold text-blue-900 dark:text-blue-400 truncate">Ledger Payroll</span>
           </div>
-          <div className="flex items-center gap-3 text-gray-500 dark:text-slate-400">
+          <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
             <ThemeToggle />
             <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
               {getInitials(companyName)}
@@ -266,16 +268,31 @@ export default function Reports() {
               <div className="flex items-center gap-3 mb-1">
                 <button
                   onClick={() => navigate("/dashboard")}
-                  className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition"
+                  className="p-1 rounded-md text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition"
                 >
                   <ArrowBackIcon fontSize="small" />
                 </button>
-                <p className="text-sm text-gray-400 dark:text-slate-400">Payroll Analytics</p>
+                <p className="text-sm text-gray-500 dark:text-slate-500">Payroll Analytics</p>
               </div>
               <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white">Reports</h1>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-4 sm:mt-0">
-              <MonthYearSelector month={month} year={year} onChange={handleMonthChange} />
+            
+            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto mt-4 sm:mt-0 items-center">
+              <div className="flex bg-gray-200 dark:bg-slate-800 p-1 rounded-lg self-start sm:self-auto">
+                <button 
+                  onClick={() => setActiveTab('analytics')} 
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'analytics' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
+                >
+                  Analytics
+                </button>
+                <button 
+                  onClick={() => setActiveTab('custom')} 
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'custom' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
+                >
+                  Custom Reports
+                </button>
+              </div>
+              {activeTab === 'analytics' && <MonthYearSelector month={month} year={year} onChange={handleMonthChange} />}
             </div>
           </div>
 
@@ -284,7 +301,7 @@ export default function Reports() {
             <button
               onClick={handleDownloadPDF}
               disabled={Boolean(exportingType)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition-colors cursor-pointer disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition-colors cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
               {exportingType === 'pdf' ? (
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -302,7 +319,7 @@ export default function Reports() {
             <button
               onClick={handleDownloadZIP}
               disabled={Boolean(exportingType)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-md shadow-indigo-200 dark:shadow-none transition-colors cursor-pointer disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-md shadow-indigo-200 dark:shadow-none transition-colors cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
               {exportingType === 'zip' ? (
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -320,7 +337,7 @@ export default function Reports() {
             <button
               onClick={handleExportXLSX}
               disabled={Boolean(exportingType)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-md shadow-emerald-200 dark:shadow-none transition-colors cursor-pointer disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-md shadow-emerald-200 dark:shadow-none transition-colors cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
               {exportingType === 'xlsx' ? (
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -338,7 +355,7 @@ export default function Reports() {
             <button
               onClick={handleExportCSV}
               disabled={Boolean(exportingType)}
-              className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 disabled:opacity-50 transition-colors cursor-pointer disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 disabled:opacity-50 transition-colors cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
               {exportingType === 'csv' ? (
                 <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -367,7 +384,9 @@ export default function Reports() {
           )}
 
 
-          {loading ? (
+          {activeTab === 'custom' ? (
+            <CustomReportBuilder />
+          ) : loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
               {Array.from({ length: 5 }).map((_, i) => (
                 <div key={i} className="h-28 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 animate-pulse" />
@@ -379,7 +398,7 @@ export default function Reports() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No payroll data yet</h3>
-              <p className="text-gray-400 dark:text-slate-400 text-sm mb-6 max-w-sm mx-auto">
+              <p className="text-gray-500 dark:text-slate-500 text-sm mb-6 max-w-sm mx-auto">
                 Run payroll for at least one month to see analytics and generate reports.
               </p>
               <button

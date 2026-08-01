@@ -47,7 +47,7 @@ export default function Footer() {
                 PaySphere
               </div>
 
-              <p className="text-gray-500 dark:text-slate-400 text-base sm:text-lg leading-relaxed max-w-sm mb-8 sm:mb-10">
+              <p className="text-gray-500 dark:text-slate-500 text-base sm:text-lg leading-relaxed max-w-sm mb-8 sm:mb-10">
                 Building the financial infrastructure for modern Indian small businesses.
                 Simplify payroll, stay compliant, and empower your team.
               </p>
@@ -58,7 +58,7 @@ export default function Footer() {
               <h4 className="font-bold text-sm uppercase tracking-widest text-gray-900 dark:text-white mb-6 sm:mb-8">
                 Quick Links
               </h4>
-              <ul className="space-y-4 text-[15px] sm:text-base text-gray-500 dark:text-slate-400">
+              <ul className="space-y-4 text-[15px] sm:text-base text-gray-500 dark:text-slate-500">
                 {[
                   { name: "Features", href: "#features" },
                   { name: "Process", href: "#process" },
@@ -66,7 +66,7 @@ export default function Footer() {
                   { name: "FAQ", href: "#faq" }
                 ].map((link, j) => (
                   <li key={j}>
-                    <a href={link.href} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                    <a href={link.href} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
                       {link.name}
                     </a>
                   </li>
@@ -79,13 +79,13 @@ export default function Footer() {
               <h4 className="font-bold text-sm uppercase tracking-widest text-gray-900 dark:text-white mb-6 sm:mb-8">
                 Stay in the loop
               </h4>
-              <p className="text-gray-500 dark:text-slate-400 text-[15px] sm:text-base mb-6 leading-relaxed">
+              <p className="text-gray-500 dark:text-slate-500 text-[15px] sm:text-base mb-6 leading-relaxed">
                 Join 2,000+ business owners receiving our weekly payroll & compliance tips.
               </p>
               <form className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
-                  className="bg-blue-600 cursor-pointer hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-blue-100 dark:shadow-none transition-all active:scale-95 text-sm"
+                  className="bg-blue-600 cursor-pointer hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-blue-100 dark:shadow-none transition-all active:scale-95 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 >
                   Join
                 </button>
@@ -96,7 +96,7 @@ export default function Footer() {
           {/* Bottom Bar */}
           <div className="flex flex-col md:flex-row justify-center items-center pt-8 sm:pt-10 md:pt-12 border-t border-gray-100 dark:border-slate-800 gap-6 text-center md:text-left">
             <div className="flex flex-col md:flex-row items-center gap-4 sm:gap-6">
-              <p className="text-[13px] sm:text-sm text-gray-400 dark:text-slate-500 font-medium">
+              <p className="text-[13px] sm:text-sm text-gray-500 dark:text-slate-500 font-medium">
                 © 2026 PaySphere Inc.
               </p>
             </div>

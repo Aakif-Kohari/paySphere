@@ -38,7 +38,7 @@ const Sidebar = ({
   return (
     <>
       {isSidebarOpen && (
-        <div
+        <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={onClose}
         />
@@ -58,13 +58,13 @@ const Sidebar = ({
               <p className="font-bold text-sm text-gray-900 dark:text-white">
                 {companyName}
               </p>
-              <p className="text-xs text-gray-400 dark:text-slate-500">
+              <p className="text-xs text-gray-500 dark:text-slate-500">
                 Payroll workspace
               </p>
             </div>
           </div>
           <button
-            className="md:hidden p-2 text-gray-400 hover:text-gray-600"
+            className="md:hidden p-2 text-gray-500 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             onClick={onClose}
           >
             ✕
@@ -82,7 +82,7 @@ const Sidebar = ({
               className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${
                 activePage === item.id
                   ? 'bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold'
-                  : 'text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800/50'
+                  : 'text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
               }`}
             >
               {item.icon}
@@ -97,7 +97,7 @@ const Sidebar = ({
               window.location.href = 'mailto:support@paysphere.com';
               onClose();
             }}
-            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
           >
             <HelpOutlineIcon />
             Help & Support

@@ -21,7 +21,7 @@ export default function Dashboard() {
                 <span className="text-lg sm:text-xl font-bold">₹</span>
               </div>
               <div>
-                <div className="text-[9px] sm:text-[10px] font-bold text-gray-400 dark:text-slate-400 uppercase tracking-widest">
+                <div className="text-[9px] sm:text-[10px] font-bold text-gray-500 dark:text-slate-500 uppercase tracking-widest">
                   Total Net Payout
                 </div>
                 <div className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white">
@@ -31,7 +31,7 @@ export default function Dashboard() {
             </div>
 
             <div className="flex justify-between items-center pt-3 sm:pt-4 border-t border-gray-100 dark:border-slate-800">
-              <span className="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-slate-400">
+              <span className="text-[10px] sm:text-xs font-semibold text-gray-500 dark:text-slate-500">
                 12 Employees paid
               </span>
               <span className="text-[9px] sm:text-[10px] bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full font-bold uppercase">
@@ -43,7 +43,7 @@ export default function Dashboard() {
 
         {/* Trusted By */}
         <div className="mt-16 sm:mt-24 md:mt-32 text-center">
-          <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 dark:text-slate-400 uppercase tracking-[0.2em] mb-6 sm:mb-10">
+          <p className="text-[9px] sm:text-[10px] font-bold text-gray-500 dark:text-slate-500 uppercase tracking-[0.2em] mb-6 sm:mb-10">
             TRUSTED BY MODERN TEAMS IN BHARAT
           </p>
 

@@ -458,7 +458,7 @@ export default function MonthlyUpdates() {
 
       {/* ── Sidebar Backdrop ── */}
       {isSidebarOpen && (
-        <div 
+        <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} 
           onClick={() => setIsSidebarOpen(false)}
           style={{
             position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 40
@@ -506,7 +506,7 @@ export default function MonthlyUpdates() {
             { id:"employees",  label:"Employees",  icon:<PeopleIcon /> },
             { id:"settings",   label:"Settings", icon:<SpeedoIcon /> },
           ].map(item => (
-            <button key={item.id} className="nav-btn"
+            <button key={item.id} className="nav-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => {
                 setIsSidebarOpen(false); // Close on selection on mobile
                 if (item.id === "dashboard" || item.id === "employees") {
@@ -529,7 +529,7 @@ export default function MonthlyUpdates() {
         </nav>
 
         <div style={{ padding:"14px 12px 20px", borderTop: isDark ? "1.5px solid #1e293b" : "1.5px solid #F0F1F3", display:"flex", flexDirection:"column", gap:8 }}>
-          <button className="nav-btn" style={{ background:"transparent", color: isDark ? "#94a3b8" : "#6B7280", fontWeight:500 }}
+          <button className="nav-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" style={{ background:"transparent", color: isDark ? "#94a3b8" : "#6B7280", fontWeight:500 }}
             onMouseEnter={e=>e.currentTarget.style.background=isDark ? "#1e293b" : "#F9FAFB"}
             onMouseLeave={e=>e.currentTarget.style.background="transparent"}
           ><SupportIcon /> Help &amp; Support</button>
@@ -571,7 +571,7 @@ export default function MonthlyUpdates() {
               background:"none", border:"none", fontFamily:"'DM Sans',sans-serif",
               fontSize:14.5, fontWeight:700, color: isDark ? "#3b82f6" : "#2563EB", cursor:"pointer",
               borderBottom: isDark ? "2px solid #3b82f6" : "2px solid #2563EB", paddingBottom:2,
-            }} className="sm:flex">{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} <ChevronDown /></button>
+            }} className="sm:flex focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} <ChevronDown /></button>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
             <ThemeToggle />
@@ -660,7 +660,7 @@ export default function MonthlyUpdates() {
           {/* Quick action chips & Attendance Calendar Button */}
           <div style={{ display:"flex", gap:10, flexWrap:"wrap", justifyContent:"center", marginBottom:40, width:"100%", maxWidth:760 }}>
             <button
-              className="chip-btn"
+              className="chip-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => {
                 if (employees.length > 0) {
                   setShowEmpPicker(true);
@@ -680,7 +680,7 @@ export default function MonthlyUpdates() {
               📅 Open Attendance Calendar
             </button>
             {QUICK_ACTIONS.map(a => (
-              <button key={a.label} className="chip-btn" onClick={() => insertTemplate(a.template)}>
+              <button key={a.label} className="chip-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => insertTemplate(a.template)}>
                 {a.icon} {a.label}
               </button>
             ))}
@@ -739,8 +739,8 @@ export default function MonthlyUpdates() {
                   </div>
                   {item.pending && (
                     <div style={{ display:"flex", gap:4, flexShrink:0 }}>
-                      <button className="icon-btn" onClick={() => handleDelete(item.id)} title="Delete"><TrashIcon /></button>
-                      <button className="icon-btn" title="Edit"><EditIcon2 /></button>
+                      <button className="icon-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => handleDelete(item.id)} title="Delete"><TrashIcon /></button>
+                      <button className="icon-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" title="Edit"><EditIcon2 /></button>
                     </div>
                   )}
                 </div>
@@ -824,7 +824,7 @@ export default function MonthlyUpdates() {
               )}
 
               <button
-                className="bottom-cta-btn"
+                className="bottom-cta-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 onClick={handleFinalize}
                 disabled={finalizing || activity.length === 0}
                 style={{
@@ -847,8 +847,8 @@ export default function MonthlyUpdates() {
 
           {/* Payroll Results Modal */}
           {showResults && payrollResults && (
-            <div className="modal-overlay" onClick={() => setShowResults(false)}>
-              <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-overlay" onClick={() => setShowResults(false)}>
+              <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-box" onClick={e => e.stopPropagation()}>
                 {/* Modal Header */}
                 <div style={{ padding:"28px 28px 20px", borderBottom: isDark ? "1.5px solid #1e293b" : "1.5px solid #F0F1F3" }}>
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
@@ -1019,8 +1019,8 @@ export default function MonthlyUpdates() {
 
           {/* Disambiguation Picker Modal (#274) */}
           {disambiguationMatches.length > 0 && (
-            <div className="modal-overlay" onClick={handleDisambiguationCancel}>
-              <div className="modal-box" onClick={e => e.stopPropagation()} style={{ padding: "24px" }}>
+            <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-overlay" onClick={handleDisambiguationCancel}>
+              <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-box" onClick={e => e.stopPropagation()} style={{ padding: "24px" }}>
                 <h3 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "6px" }}>
                   {pendingParsed && pendingParsed.rawInput
                     ? `Which employee did you mean?`
@@ -1076,8 +1076,8 @@ export default function MonthlyUpdates() {
 
           {/* Employee Picker Modal for Calendar (#137) */}
           {showEmpPicker && (
-            <div className="modal-overlay" onClick={() => setShowEmpPicker(false)}>
-              <div className="modal-box" onClick={e => e.stopPropagation()} style={{ padding: "24px" }}>
+            <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-overlay" onClick={() => setShowEmpPicker(false)}>
+              <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-box" onClick={e => e.stopPropagation()} style={{ padding: "24px" }}>
                 <h3 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "6px" }}>Select Employee for Calendar</h3>
                 <p style={{ fontSize: "13.5px", color: isDark ? "#9CA3AF" : "#6B7280", marginBottom: "18px" }}>
                   Choose an employee to open their 31-day muster roll attendance calendar grid:

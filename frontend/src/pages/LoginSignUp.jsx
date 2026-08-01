@@ -186,7 +186,7 @@ export default function PaySphereLogin() {
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-xl p-4 lg:p-5 shadow-md border border-transparent dark:border-slate-800/80 relative z-10">
-              <p className="text-sm text-gray-500 dark:text-slate-400 mb-2">
+              <p className="text-sm text-gray-500 dark:text-slate-500 mb-2">
                 Last Month Payout
               </p>
               <h2 className="text-xl lg:text-2xl font-serif text-gray-900 dark:text-white">
@@ -236,7 +236,7 @@ export default function PaySphereLogin() {
                     <h2 className="text-2xl font-serif text-gray-900 dark:text-white mb-1">
                       Reset Password
                     </h2>
-                    <p className="text-gray-500 dark:text-slate-400 text-sm mb-6">
+                    <p className="text-gray-500 dark:text-slate-500 text-sm mb-6">
                       Enter your registered email to receive a password reset
                       link.
                     </p>
@@ -263,7 +263,7 @@ export default function PaySphereLogin() {
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition mb-5 text-center disabled:opacity-50"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition mb-5 text-center disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                       >
                         {loading ? 'Sending...' : 'Send Reset Link'}
                       </button>
@@ -288,7 +288,7 @@ export default function PaySphereLogin() {
                     <h2 className="text-2xl font-serif text-gray-900 dark:text-white mb-1">
                       Welcome back
                     </h2>
-                    <p className="text-gray-500 dark:text-slate-400 text-sm mb-6">
+                    <p className="text-gray-500 dark:text-slate-500 text-sm mb-6">
                       Enter your credentials
                     </p>
 
@@ -332,7 +332,7 @@ export default function PaySphereLogin() {
                       <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-blue-600 cursor-pointer hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition mb-5 text-center disabled:opacity-50"
+                        className="w-full bg-blue-600 cursor-pointer hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition mb-5 text-center disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                       >
                         {loading ? 'Logging in...' : 'Login'}
                       </button>
@@ -342,7 +342,7 @@ export default function PaySphereLogin() {
 
                 <div className="flex items-center gap-3 mb-5">
                   <div className="flex-1 h-px bg-gray-200 dark:bg-slate-800" />
-                  <span className="text-xs text-gray-400 dark:text-slate-400 font-semibold">
+                  <span className="text-xs text-gray-500 dark:text-slate-500 font-semibold">
                     OR
                   </span>
                   <div className="flex-1 h-px bg-gray-200 dark:bg-slate-800" />
@@ -351,7 +351,7 @@ export default function PaySphereLogin() {
                 <button
                   onClick={onGoogleClick}
                   disabled={loading}
-                  className="w-full border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50"
+                  className="w-full border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 >
                   <GoogleIcon />
                   Sign in with Google
@@ -362,7 +362,7 @@ export default function PaySphereLogin() {
                 <h2 className="text-2xl font-serif text-gray-900 dark:text-white mb-1">
                   Create your account
                 </h2>
-                <p className="text-gray-500 dark:text-slate-400 text-sm mb-6">
+                <p className="text-gray-500 dark:text-slate-500 text-sm mb-6">
                   Set up your company roster
                 </p>
 
@@ -410,7 +410,7 @@ export default function PaySphereLogin() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-blue-600 cursor-pointer hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition mb-5 text-center disabled:opacity-50"
+                    className="w-full bg-blue-600 cursor-pointer hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition mb-5 text-center disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     {loading ? 'Creating Account...' : 'Create Account'}
                   </button>
@@ -418,7 +418,7 @@ export default function PaySphereLogin() {
 
                 <div className="flex items-center gap-3 mb-5">
                   <div className="flex-1 h-px bg-gray-200 dark:bg-slate-800" />
-                  <span className="text-xs text-gray-400 dark:text-slate-400 font-semibold">
+                  <span className="text-xs text-gray-500 dark:text-slate-500 font-semibold">
                     OR
                   </span>
                   <div className="flex-1 h-px bg-gray-200 dark:bg-slate-800" />
@@ -427,7 +427,7 @@ export default function PaySphereLogin() {
                 <button
                   onClick={onGoogleClick}
                   disabled={loading}
-                  className="w-full border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50"
+                  className="w-full border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 >
                   <GoogleIcon />
                   Sign Up with Google
