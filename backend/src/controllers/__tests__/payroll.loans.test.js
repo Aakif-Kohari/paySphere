@@ -23,6 +23,11 @@ jest.mock('../../models/loan.model');
 jest.mock('../../models/attendance.model', () => ({
   find: jest.fn(() => ({ select: jest.fn().mockResolvedValue([]) })),
 }));
+// Payroll also snapshots the salary breakdown (#461); stubbed so this suite
+// stays focused on loan recovery.
+jest.mock('../../models/salaryStructure.model', () => ({
+  find: jest.fn(() => ({ sort: jest.fn().mockResolvedValue([]) })),
+}));
 jest.mock('../../services/cache.service', () => ({
   invalidateAnalytics: jest.fn().mockResolvedValue(undefined),
 }));

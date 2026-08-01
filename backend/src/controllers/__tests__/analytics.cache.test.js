@@ -42,6 +42,13 @@ jest.mock("../../models/loan.model", () => ({
   updateOne: jest.fn().mockResolvedValue({}),
 }));
 
+// submitPayrollForReview now snapshots the salary component breakdown (#461).
+// Stubbed so the payroll unit tests stay free of the structure collection;
+// resolution is covered in salaryStructure.test.js.
+jest.mock("../../models/salaryStructure.model", () => ({
+  find: jest.fn(() => ({ sort: jest.fn().mockResolvedValue([]) })),
+}));
+
 const { submitPayrollForReview } = require("../payroll.controller");
 const {
   deleteEmployee,

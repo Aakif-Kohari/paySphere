@@ -120,6 +120,24 @@ const payrollUpdateSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  /**
+   * The salary component split in force when this row was calculated (#461).
+   *
+   * Snapshotted rather than looked up at render time, so a payslip regenerated
+   * a year later still shows the breakdown that was actually paid instead of
+   * the employee's current package.
+   */
+  salarySnapshot: {
+    effectiveGross: { type: Number },
+    isProrated: { type: Boolean, default: false },
+    segmentCount: { type: Number, default: 1 },
+    components: [{
+      code: String,
+      label: String,
+      type: String,
+      amount: Number,
+    }],
+  },
   payslipEmailed: {
     type: Boolean,
     default: false,

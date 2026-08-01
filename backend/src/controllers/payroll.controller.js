@@ -29,6 +29,11 @@ const {
   allocateRecovery,
   applyRepayment,
 } = require("../utils/loanSchedule");
+const SalaryStructure = require("../models/salaryStructure.model");
+const {
+  resolveStructureForPeriod,
+  computeComponentAmounts,
+} = require("../utils/salaryStructure");
 
 // Also dropped by the #464 merge alongside the payrollStatus import: both are
 // referenced by parsePayrollIdBatch and rejectPayroll (#458).
@@ -582,10 +587,13 @@ exports.submitPayrollForReview = async (req, res, next) => {
     // Fetch user settings for default rates
     const user = await User.findById(req.userId);
 
-    // Two ledgers are loaded up front, and they sit on opposite sides of the
-    // salary calculation: attendance supplies its *inputs* (leaveDays,
-    // overtimeHours), while loan recovery is taken out of its *output* and is
-    // therefore capped by what the employee can actually afford.
+    // Three ledgers are loaded up front, and they sit at different points of
+    // the salary calculation: attendance supplies its *inputs* (leaveDays,
+    // overtimeHours), loan recovery is taken out of its *output* and is
+    // therefore capped by what the employee can actually afford, and the
+    // salary structure describes how the gross it works from is split.
+    // None of them is a prerequisite for paying people — each degrades loudly
+    // rather than failing the run.
 
     // Where a month has been recorded, its validated totals are a better
     // source for leaveDays/overtimeHours than re-parsing the display strings
@@ -606,9 +614,6 @@ exports.submitPayrollForReview = async (req, res, next) => {
         ]),
       );
     } catch (attendanceError) {
-      // The ledger is an improvement on the tag parsing, not a prerequisite for
-      // running payroll. If it cannot be read, fall back to the tag path and
-      // make the degradation loud rather than failing the run.
       logger.warn("Could not read the attendance ledger; falling back to activity tags", {
         userId: req.userId,
         month: currentMonth,
@@ -640,6 +645,32 @@ exports.submitPayrollForReview = async (req, res, next) => {
         error: loanError.message,
       });
       loansByEmployee = new Map();
+    }
+
+    // Every salary revision for the run, grouped by employee, so the row can
+    // snapshot the component breakdown that was actually in force. Without the
+    // snapshot, regenerating a payslip after a later raise would show the new
+    // split against the old total (#461).
+    let revisionsByEmployee = new Map();
+
+    try {
+      const revisions = await SalaryStructure.find({
+        createdBy: req.userId,
+      }).sort({ effectiveFrom: 1 });
+
+      (revisions || []).forEach((revision) => {
+        const key = String(revision.employeeId);
+        if (!revisionsByEmployee.has(key)) revisionsByEmployee.set(key, []);
+        revisionsByEmployee.get(key).push(revision);
+      });
+    } catch (structureError) {
+      // The breakdown is presentational; the gross on the employee record is
+      // still authoritative.
+      logger.warn("Could not read salary structures; payroll will run without a breakdown", {
+        userId: req.userId,
+        error: structureError.message,
+      });
+      revisionsByEmployee = new Map();
     }
 
     const preparedItems = [];
@@ -739,6 +770,46 @@ exports.submitPayrollForReview = async (req, res, next) => {
         continue;
       }
 
+      // Snapshot the component split in force for this period. A mid-month
+      // revision produces more than one segment, and `effectiveGross` is the
+      // day-weighted blend of the rates that actually applied.
+      let salarySnapshot = null;
+
+      try {
+        const employeeRevisions = revisionsByEmployee.get(String(employee._id)) || [];
+
+        if (employeeRevisions.length > 0) {
+          const period = resolveStructureForPeriod(
+            employeeRevisions,
+            currentMonth,
+            currentYear,
+          );
+
+          if (period.segments.length > 0) {
+            const primary = period.segments[period.segments.length - 1].structure;
+            const breakdown = computeComponentAmounts(primary);
+
+            salarySnapshot = {
+              effectiveGross: period.effectiveGross,
+              isProrated: period.segments.length > 1,
+              segmentCount: period.segments.length,
+              components: breakdown.components.map((c) => ({
+                code: c.code,
+                label: c.label,
+                type: c.type,
+                amount: c.amount,
+              })),
+            };
+          }
+        }
+      } catch (snapshotError) {
+        logger.warn("Could not snapshot the salary breakdown for a payroll row", {
+          userId: req.userId,
+          employeeId: String(employee._id),
+          error: snapshotError.message,
+        });
+      }
+
       // Loan recovery, capped at the net salary so a deduction can never drive
       // take-home pay below zero. Any uncollected part is a shortfall carried
       // forward — the loan is not forgiven, this month's instalment simply is
@@ -775,7 +846,8 @@ exports.submitPayrollForReview = async (req, res, next) => {
         grossNetBeforeRecovery: netSalary,
         loanRecoveries: recovery.recoveries,
         loanRecoveryTotal: recovery.totalRecovered,
-        attendanceSource
+        attendanceSource,
+        salarySnapshot
       });
     }
 
@@ -860,6 +932,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
         // Recorded so a later audit can tell whether the leave figure came
         // from the validated ledger or from a parsed display string (#459).
         attendanceSource: item.attendanceSource,
+        salarySnapshot: item.salarySnapshot,
         createdBy: req.userId,
         status: PAYROLL_STATUS.PENDING_APPROVAL,
         submittedBy: req.userId,
