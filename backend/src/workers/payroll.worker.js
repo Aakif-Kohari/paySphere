@@ -27,7 +27,7 @@ const payrollWorker = new Worker(
 
       const { activities, currentMonth, currentYear, userId } = job.data;
 
-      const employees = await Employee.find({ createdBy: userId });
+      const employees = await Employee.find({ createdBy: userId, deletedAt: null });
       const user = await User.findById(userId);
 
       const preparedItems = [];
