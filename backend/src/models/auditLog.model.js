@@ -31,6 +31,10 @@ const auditLogSchema = new mongoose.Schema({
       "LOAN_ISSUE",
       "LOAN_STATUS_CHANGE",
       "LOAN_REPAYMENT",
+      // EMPLOYEE_UPDATE records only the *names* of the fields that changed,
+      // so a salary change left no trace of what it changed from. This one
+      // carries the before/after (#461).
+      "SALARY_REVISION",
       "PAYSLIP_EMAIL",
       "PAYSLIP_BULK_EMAIL",
       "REPORT_DOWNLOAD",

@@ -4,6 +4,9 @@ const connectDB = require("./config/db");
 const { startCronJobs } = require("./jobs/cron.jobs");
 const { seedRbac } = require("./seeds/rbac.seed");
 const { backfillPayrollStatus } = require("./migrations/backfillPayrollStatus");
+const {
+  backfillSalaryStructures,
+} = require("./migrations/backfillSalaryStructures");
 const logger = require("./utils/logger");
 
 const startServer = async () => {
@@ -18,6 +21,12 @@ const startServer = async () => {
   // no-op on an already-clean collection, and never throws — see
   // migrations/backfillPayrollStatus.js (#458).
   await backfillPayrollStatus();
+
+  // Give every existing employee an `initial` salary revision derived from the
+  // figure already on their record, so the history starts from a true
+  // statement. Never changes anyone's pay, idempotent, and never throws — see
+  // migrations/backfillSalaryStructures.js (#461).
+  await backfillSalaryStructures();
 
   // Start background jobs
   startCronJobs();
