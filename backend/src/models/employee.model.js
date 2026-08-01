@@ -56,6 +56,10 @@ const employeeSchema = new mongoose.Schema(
       type: String,
       default: "INR",
     },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
