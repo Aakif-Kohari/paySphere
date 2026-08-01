@@ -13,6 +13,21 @@ jest.mock("../../models/user.model");
 jest.mock("../../models/attendance.model", () => ({
   find: jest.fn(() => ({ select: jest.fn().mockResolvedValue([]) })),
 }));
+
+// submitPayrollForReview now recovers loan instalments (#460). Stubbed so the
+// payroll unit tests stay free of the loan collection; recovery behaviour is
+// covered in payroll.loans.test.js.
+jest.mock("../../models/loan.model", () => ({
+  find: jest.fn().mockResolvedValue([]),
+  updateOne: jest.fn().mockResolvedValue({}),
+}));
+
+// submitPayrollForReview now snapshots the salary component breakdown (#461).
+// Stubbed so the payroll unit tests stay free of the structure collection;
+// resolution is covered in salaryStructure.test.js.
+jest.mock("../../models/salaryStructure.model", () => ({
+  find: jest.fn(() => ({ sort: jest.fn().mockResolvedValue([]) })),
+}));
 jest.mock("../../services/audit.service", () => ({
   createAuditLog: jest.fn(),
 }));

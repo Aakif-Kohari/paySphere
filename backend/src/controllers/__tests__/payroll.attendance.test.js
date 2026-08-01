@@ -18,6 +18,17 @@ jest.mock('../../models/employee.model');
 jest.mock('../../models/payroll.model');
 jest.mock('../../models/user.model');
 jest.mock('../../models/attendance.model');
+// Payroll also recovers loan instalments (#460); stubbed so this suite stays
+// focused on the attendance ledger.
+jest.mock('../../models/loan.model', () => ({
+  find: jest.fn().mockResolvedValue([]),
+  updateOne: jest.fn().mockResolvedValue({}),
+}));
+// Payroll also snapshots the salary breakdown (#461); stubbed so this suite
+// stays focused on the attendance ledger.
+jest.mock('../../models/salaryStructure.model', () => ({
+  find: jest.fn(() => ({ sort: jest.fn().mockResolvedValue([]) })),
+}));
 jest.mock('../../services/cache.service', () => ({
   invalidateAnalytics: jest.fn().mockResolvedValue(undefined),
 }));

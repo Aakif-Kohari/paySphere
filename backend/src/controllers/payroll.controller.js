@@ -8,9 +8,10 @@ const { generatePayrollCSV } = require("../utils/csvExport");
 const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
-// Restored: dropped when #464 was merged into main via the GitHub conflict
-// editor, leaving PAYROLL_STATUS, payableStatusFilter and friends undefined
-// (#458).
+// Restored: this import was dropped when #464 was merged into main via the
+// GitHub conflict editor, leaving PAYROLL_STATUS, payableStatusFilter and
+// friends undefined — every summary, export, payslip email and approval call
+// throws a ReferenceError without it (#458).
 const {
   PAYROLL_STATUS,
   canTransition,
@@ -22,10 +23,20 @@ const {
 } = require("../config/payrollStatus");
 const Attendance = require("../models/attendance.model");
 const { derivePayrollInputs } = require("../utils/attendanceGrid");
+const Loan = require("../models/loan.model");
+const {
+  LOAN_STATUS,
+  allocateRecovery,
+  applyRepayment,
+} = require("../utils/loanSchedule");
+const SalaryStructure = require("../models/salaryStructure.model");
+const {
+  resolveStructureForPeriod,
+  computeComponentAmounts,
+} = require("../utils/salaryStructure");
 
-
-// Also dropped by the #464 merge: both are referenced by parsePayrollIdBatch
-// and rejectPayroll (#458).
+// Also dropped by the #464 merge alongside the payrollStatus import: both are
+// referenced by parsePayrollIdBatch and rejectPayroll (#458).
 const MAX_BATCH_SIZE = 200;
 const MAX_REJECTION_REASON_LENGTH = 500;
 
@@ -576,10 +587,17 @@ exports.submitPayrollForReview = async (req, res, next) => {
     // Fetch user settings for default rates
     const user = await User.findById(req.userId);
 
-    // Load the attendance ledger for the run month in one query, keyed by
-    // employee. Where a month has been recorded, its validated totals are a
-    // better source for leaveDays/overtimeHours than re-parsing the display
-    // strings the client sends — see the comment on the resolver below (#459).
+    // Three ledgers are loaded up front, and they sit at different points of
+    // the salary calculation: attendance supplies its *inputs* (leaveDays,
+    // overtimeHours), loan recovery is taken out of its *output* and is
+    // therefore capped by what the employee can actually afford, and the
+    // salary structure describes how the gross it works from is split.
+    // None of them is a prerequisite for paying people — each degrades loudly
+    // rather than failing the run.
+
+    // Where a month has been recorded, its validated totals are a better
+    // source for leaveDays/overtimeHours than re-parsing the display strings
+    // the client sends — see the comment on the resolver below (#459).
     let attendanceByEmployee = new Map();
 
     try {
@@ -596,15 +614,63 @@ exports.submitPayrollForReview = async (req, res, next) => {
         ]),
       );
     } catch (attendanceError) {
-      // The ledger is an improvement on the tag parsing, not a prerequisite for
-      // running payroll. If it cannot be read, fall back to the tag path and
-      // make the degradation loud rather than failing the run.
       logger.warn("Could not read the attendance ledger; falling back to activity tags", {
         userId: req.userId,
         month: currentMonth,
         year: currentYear,
         error: attendanceError.message,
       });
+    }
+
+    // Every collectible loan for the run, grouped by employee (#460).
+    let loansByEmployee = new Map();
+
+    try {
+      const activeLoans = await Loan.find({
+        createdBy: req.userId,
+        status: LOAN_STATUS.ACTIVE,
+      });
+
+      (activeLoans || []).forEach((loan) => {
+        const key = String(loan.employeeId);
+        if (!loansByEmployee.has(key)) loansByEmployee.set(key, []);
+        loansByEmployee.get(key).push(loan);
+      });
+    } catch (loanError) {
+      // A loan-ledger failure must not stop people being paid. Skipping
+      // recovery under-collects for one month, which is recoverable; failing
+      // the run is not.
+      logger.warn("Could not read the loan ledger; skipping recovery this run", {
+        userId: req.userId,
+        error: loanError.message,
+      });
+      loansByEmployee = new Map();
+    }
+
+    // Every salary revision for the run, grouped by employee, so the row can
+    // snapshot the component breakdown that was actually in force. Without the
+    // snapshot, regenerating a payslip after a later raise would show the new
+    // split against the old total (#461).
+    let revisionsByEmployee = new Map();
+
+    try {
+      const revisions = await SalaryStructure.find({
+        createdBy: req.userId,
+      }).sort({ effectiveFrom: 1 });
+
+      (revisions || []).forEach((revision) => {
+        const key = String(revision.employeeId);
+        if (!revisionsByEmployee.has(key)) revisionsByEmployee.set(key, []);
+        revisionsByEmployee.get(key).push(revision);
+      });
+    } catch (structureError) {
+      // The breakdown is presentational; the gross on the employee record is
+      // still authoritative.
+      logger.warn("Could not read salary structures; payroll will run without a breakdown", {
+        userId: req.userId,
+        error: structureError.message,
+      });
+      revisionsByEmployee = new Map();
     }
 
     const preparedItems = [];
@@ -713,6 +779,69 @@ exports.submitPayrollForReview = async (req, res, next) => {
         continue;
       }
 
+      // Snapshot the component split in force for this period. A mid-month
+      // revision produces more than one segment, and `effectiveGross` is the
+      // day-weighted blend of the rates that actually applied.
+      let salarySnapshot = null;
+
+      try {
+        const employeeRevisions = revisionsByEmployee.get(String(employee._id)) || [];
+
+        if (employeeRevisions.length > 0) {
+          const period = resolveStructureForPeriod(
+            employeeRevisions,
+            currentMonth,
+            currentYear,
+          );
+
+          if (period.segments.length > 0) {
+            const primary = period.segments[period.segments.length - 1].structure;
+            const breakdown = computeComponentAmounts(primary);
+
+            salarySnapshot = {
+              effectiveGross: period.effectiveGross,
+              isProrated: period.segments.length > 1,
+              segmentCount: period.segments.length,
+              components: breakdown.components.map((c) => ({
+                code: c.code,
+                label: c.label,
+                type: c.type,
+                amount: c.amount,
+              })),
+            };
+          }
+        }
+      } catch (snapshotError) {
+        logger.warn("Could not snapshot the salary breakdown for a payroll row", {
+          userId: req.userId,
+          employeeId: String(employee._id),
+          error: snapshotError.message,
+        });
+      }
+
+      // Loan recovery, capped at the net salary so a deduction can never drive
+      // take-home pay below zero. Any uncollected part is a shortfall carried
+      // forward — the loan is not forgiven, this month's instalment simply is
+      // not taken and the outstanding balance stays where it was (#460).
+      const employeeLoans = loansByEmployee.get(String(employee._id)) || [];
+      const recovery = allocateRecovery({
+        loans: employeeLoans,
+        month: currentMonth,
+        year: currentYear,
+        availableForRecovery: netSalary,
+      });
+
+      const netAfterRecovery = Math.max(
+        0,
+        Math.round((netSalary - recovery.totalRecovered) * 100) / 100,
+      );
+
+      if (recovery.shortfall > 0) {
+        errors.push(
+          `Loan recovery for "${employee.fullName}" was short by ${recovery.shortfall}; the balance carries forward`,
+        );
+      }
+
       preparedItems.push({
         employee,
         baseSalary,
@@ -722,8 +851,12 @@ exports.submitPayrollForReview = async (req, res, next) => {
         deductions,
         leaveDeduction,
         overtimePay,
-        netSalary,
-        attendanceSource
+        netSalary: netAfterRecovery,
+        grossNetBeforeRecovery: netSalary,
+        loanRecoveries: recovery.recoveries,
+        loanRecoveryTotal: recovery.totalRecovered,
+        attendanceSource,
+        salarySnapshot
       });
     }
 
@@ -803,9 +936,12 @@ exports.submitPayrollForReview = async (req, res, next) => {
         leaveDeduction: item.leaveDeduction,
         overtimePay: item.overtimePay,
         netSalary: item.netSalary,
+        loanRecoveries: item.loanRecoveries,
+        loanRecoveryTotal: item.loanRecoveryTotal,
         // Recorded so a later audit can tell whether the leave figure came
         // from the validated ledger or from a parsed display string (#459).
         attendanceSource: item.attendanceSource,
+        salarySnapshot: item.salarySnapshot,
         createdBy: req.userId,
         status: PAYROLL_STATUS.PENDING_APPROVAL,
         submittedBy: req.userId,
@@ -866,6 +1002,8 @@ exports.submitPayrollForReview = async (req, res, next) => {
       bonus: item.bonus,
       deductions: item.deductions,
       netSalary: item.netSalary,
+      loanRecoveryTotal: item.loanRecoveryTotal,
+      loanRecoveries: item.loanRecoveries,
       attendanceSource: item.attendanceSource,
       payrollId: payrollMap[item.employee._id.toString()],
     }));
@@ -873,6 +1011,70 @@ exports.submitPayrollForReview = async (req, res, next) => {
     if (session) {
       await session.commitTransaction();
       session.endSession();
+    }
+
+    // Write the loan ledger only after the payroll write has committed.
+    //
+    // `applyRepayment` replaces the entry for the period rather than appending,
+    // so re-finalising a month (which the approval flow explicitly allows for a
+    // rejected run) cannot collect the same instalment twice.
+    for (const item of preparedItems) {
+      for (const entry of item.loanRecoveries || []) {
+        if (!entry.loanId || entry.alreadyRecovered) continue;
+
+        try {
+          const loan = (loansByEmployee.get(String(item.employee._id)) || []).find(
+            (l) => String(l._id) === String(entry.loanId),
+          );
+          if (!loan) continue;
+
+          const applied = applyRepayment(loan, {
+            month: currentMonth,
+            year: currentYear,
+            amount: entry.amount,
+            payrollId: payrollMap[item.employee._id.toString()] || null,
+          });
+
+          await Loan.updateOne(
+            { _id: loan._id, createdBy: req.userId },
+            {
+              $set: {
+                repayments: applied.repayments,
+                totalRepaid: applied.totalRepaid,
+                outstanding: applied.outstanding,
+                status: applied.status,
+                ...(applied.status === LOAN_STATUS.COMPLETED
+                  ? { completedAt: new Date() }
+                  : {}),
+              },
+            },
+          );
+
+          eventBus.emit("AUDIT_LOG", {
+            userId: req.userId,
+            action: "LOAN_REPAYMENT",
+            resourceType: "Loan",
+            resourceIds: [loan._id],
+            details: {
+              employeeName: item.employee.fullName,
+              amount: entry.amount,
+              month: currentMonth,
+              year: currentYear,
+              outstanding: applied.outstanding,
+              source: "payroll",
+            },
+            req,
+          });
+        } catch (repayError) {
+          // The salary is already committed; a ledger write failure must be
+          // loud but must not roll the payroll back.
+          logger.error("Failed to record a loan repayment after payroll", {
+            userId: req.userId,
+            loanId: String(entry.loanId),
+            error: repayError.message,
+          });
+        }
+      }
     }
 
     // Finalizing payroll is the single biggest change to the analytics figures,

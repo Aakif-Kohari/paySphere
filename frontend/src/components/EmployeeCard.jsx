@@ -1,5 +1,7 @@
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'; // <-- Added Edit Icon
+import { useState } from 'react';
+import SalaryStructurePanel from './SalaryStructurePanel';
 
 /**
  * EmployeeCard
@@ -106,6 +108,11 @@ export default function EmployeeCard({
 }) {
   const p = payroll;
 
+  // Salary package + revision timeline (#461). Collapsed by default and
+  // mounted lazily, so a grid of employee cards does not fire a request per
+  // card on load.
+  const [showSalaryHistory, setShowSalaryHistory] = useState(false);
+
   if (variant === 'breakdown') {
     return (
       <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-gray-200 dark:border-slate-800 shadow-sm hover:shadow-md transition duration-200">
@@ -195,6 +202,24 @@ export default function EmployeeCard({
             {fmt(p ? p.netSalary : emp.monthlySalary, emp.currency)}
           </span>
         </div>
+
+        {/* Salary package & revision history (#461) */}
+        <button
+          onClick={() => setShowSalaryHistory((v) => !v)}
+          className="mt-4 w-full py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors text-sm font-medium"
+        >
+          {showSalaryHistory ? 'Hide salary history' : 'Salary package & history'}
+        </button>
+
+        {showSalaryHistory && (
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-800">
+            <SalaryStructurePanel
+              employeeId={emp._id}
+              employeeName={emp.fullName}
+              currency={emp.currency}
+            />
+          </div>
+        )}
 
         {/* Delete Employee */}
         {onDeleteEmployee && (

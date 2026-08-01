@@ -4,6 +4,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
 import LogoutIcon from '@mui/icons-material/Logout';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
 
 const Sidebar = ({
@@ -19,6 +20,7 @@ const Sidebar = ({
       { id: 'Employees', label: 'Employees', icon: <PeopleIcon /> },
       { id: 'Approvals', label: 'Approvals', icon: <FactCheckIcon /> },
       { id: 'Settlements', label: 'Exits & F&F', icon: <LogoutIcon /> },
+      { id: 'Loans', label: 'Advances', icon: <AccountBalanceWalletIcon /> },
       { id: 'Reports', label: 'Reports', icon: <AssessmentIcon /> },
     ],
     [],

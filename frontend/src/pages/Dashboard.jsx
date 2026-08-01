@@ -9,6 +9,7 @@ import Sidebar from '../components/Sidebar';
 import EmployeeCard from '../components/EmployeeCard';
 import Approvals from './Approvals';
 import Settlements from './Settlements';
+import Loans from './Loans';
 import SettingsModal from '../components/SettingsModal';
 import EmptyState from '../components/common/EmptyState';
 import {
@@ -761,6 +762,8 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
           <Approvals />
         ) : activePage === 'Settlements' ? (
           <Settlements />
+        ) : activePage === 'Loans' ? (
+          <Loans />
         ) : activePage === 'Dashboard' ? (
           <DashboardOverview
             search={search}

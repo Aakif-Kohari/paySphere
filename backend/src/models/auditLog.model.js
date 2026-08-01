@@ -30,6 +30,16 @@ const auditLogSchema = new mongoose.Schema({
       "EMPLOYEE_EXIT_INITIATED",
       "SETTLEMENT_CREATE",
       "SETTLEMENT_STATUS_CHANGE",
+      // A salary advance commits future deductions from someone's pay, so
+      // issuing, pausing and collecting against one are all financial events
+      // and are audited as such (#460).
+      "LOAN_ISSUE",
+      "LOAN_STATUS_CHANGE",
+      "LOAN_REPAYMENT",
+      // EMPLOYEE_UPDATE records only the *names* of the fields that changed,
+      // so a salary change left no trace of what it changed from. This one
+      // carries the before/after (#461).
+      "SALARY_REVISION",
       "PAYSLIP_EMAIL",
       "PAYSLIP_BULK_EMAIL",
       "REPORT_DOWNLOAD",
@@ -40,7 +50,7 @@ const auditLogSchema = new mongoose.Schema({
   },
   resourceType: {
     type: String,
-    enum: ["Payroll", "Employee", "User", "Report", "Attendance", "Settlement"],
+    enum: ["Payroll", "Employee", "User", "Report", "Attendance", "Settlement", "Loan"],
     required: true,
   },
   resourceIds: [
