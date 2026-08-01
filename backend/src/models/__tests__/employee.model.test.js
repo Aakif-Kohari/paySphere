@@ -73,3 +73,12 @@ describe("Employee schema — email uniqueness index (#414)", () => {
     expect(Employee.schema.path("email").defaultValue).toBeUndefined();
   });
 });
+
+describe("Employee schema — soft delete field (#445)", () => {
+  test("declares deletedAt field with Date type and null default", () => {
+    const deletedAtPath = Employee.schema.path("deletedAt");
+    expect(deletedAtPath).toBeDefined();
+    expect(deletedAtPath.instance).toBe("Date");
+    expect(deletedAtPath.defaultValue).toBeNull();
+  });
+});

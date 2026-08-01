@@ -7,6 +7,7 @@ const {
   updateEmployee,
   deleteEmployee,
   toggleEmployeeStatus,
+  restoreEmployee,
 } = require("../controllers/employee.controller");
 
 const auth = require("../middlewares/auth.middleware");
@@ -29,6 +30,7 @@ router.get("/", auth, requirePermission("READ_EMPLOYEE"), getEmployees);
 router.get("/recent", auth, requirePermission("READ_EMPLOYEE"), getRecentEmployees);
 router.delete("/:id", auth, requirePermission("DELETE_EMPLOYEE"), writeRateLimiter, deleteEmployee);
 router.put("/:id", auth, requirePermission("WRITE_EMPLOYEE"), writeRateLimiter, updateEmployee);
+router.put("/:id/restore", auth, requirePermission("WRITE_EMPLOYEE"), writeRateLimiter, restoreEmployee);
 router.patch("/:id/status", auth, requirePermission("WRITE_EMPLOYEE"), writeRateLimiter, toggleEmployeeStatus);
 
 // --- Salary structure & revision history (#461) --------------------------
