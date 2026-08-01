@@ -17,7 +17,9 @@ exports.sendPayslipEmail = async (employee, payroll) => {
     if (user && user.settings && user.settings.companyInfo) {
       companyLogo = user.settings.companyInfo.companyLogo;
     }
-  } catch (err) {}
+  } catch (err) {
+    logger.warn('Failed to fetch company logo for payslip email', { error: err.message });
+  }
 
   return new Promise((resolve, reject) => {
     try {
