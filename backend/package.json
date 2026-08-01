@@ -34,6 +34,8 @@
     "node-cron": "^4.6.0",
     "nodemailer": "^9.0.3",
     "pdfkit": "^0.19.1",
+    "rate-limit-redis": "^6.0.0",
+    "redis": "^6.2.0",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0"
   },
