@@ -168,10 +168,11 @@ describe("analytics cache invalidation (#415)", () => {
   });
 
   describe("deleteEmployee", () => {
+    const validId = "507f1f77bcf86cd799439011";
     beforeEach(() => {
-      req = { userId: "user123", params: { id: "emp-1" } };
+      req = { userId: "user123", params: { id: validId } };
       Employee.findById.mockResolvedValue({
-        _id: "emp-1",
+        _id: validId,
         fullName: "Alice Smith",
         role: "Designer",
         createdBy: { toString: () => "user123" },
@@ -190,9 +191,6 @@ describe("analytics cache invalidation (#415)", () => {
     afterEach(() => jest.restoreAllMocks());
 
     test("invalidates the analytics cache", async () => {
-      // Deletion cascades PayrollUpdate.deleteMany, so it shifts the aggregates
-      // further than an edit — yet addEmployee/updateEmployee invalidated and
-      // this did not.
       await deleteEmployee(req, res, next);
 
       expect(cacheService.invalidateAnalytics).toHaveBeenCalledWith("user123");
@@ -210,7 +208,7 @@ describe("analytics cache invalidation (#415)", () => {
 
     test("does not invalidate when the caller does not own the employee", async () => {
       Employee.findById.mockResolvedValue({
-        _id: "emp-1",
+        _id: validId,
         createdBy: { toString: () => "someone-else" },
       });
 
@@ -232,11 +230,12 @@ describe("analytics cache invalidation (#415)", () => {
 
   describe("toggleEmployeeStatus", () => {
     let employee;
+    const validId = "507f1f77bcf86cd799439011";
 
     beforeEach(() => {
-      req = { userId: "user123", params: { id: "emp-1" } };
+      req = { userId: "user123", params: { id: validId } };
       employee = {
-        _id: "emp-1",
+        _id: validId,
         fullName: "Alice Smith",
         isActive: true,
         createdBy: { toString: () => "user123" },

@@ -172,6 +172,7 @@ exports.getEmployees = async (req, res, next) => {
     let limit = parseInt(req.query.limit, 10);
     if (isNaN(limit) || limit < 1 || limit > 100) limit = 10;
     const includeInactive = req.query.includeInactive === 'true';
+    const includeDeleted = req.query.includeDeleted === 'true';
 
     let search = req.query.search;
     if (typeof search !== 'string') search = '';
@@ -182,6 +183,10 @@ exports.getEmployees = async (req, res, next) => {
     const query = {
       createdBy: req.userId,
     };
+
+    if (!includeDeleted) {
+      query.deletedAt = null;
+    }
 
     if (!includeInactive) {
       query.isActive = true;
@@ -218,7 +223,7 @@ exports.getEmployees = async (req, res, next) => {
 // GET RECENTLY ADDED EMPLOYEES (last 5)
 exports.getRecentEmployees = async (req, res, next) => {
   try {
-    const employees = await Employee.find({ createdBy: req.userId })
+    const employees = await Employee.find({ createdBy: req.userId, deletedAt: null })
       .sort({ createdAt: -1 })
       .limit(5);
 
@@ -507,7 +512,7 @@ exports.updateEmployee = async (req, res, next) => {
 
     const employee = await Employee.findById(id);
 
-    if (!employee) {
+    if (!employee || employee.deletedAt) {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
@@ -672,7 +677,7 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
 
     const employee = await Employee.findById(id);
 
-    if (!employee) {
+    if (!employee || employee.deletedAt) {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
@@ -715,7 +720,7 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
   }
 };
 
-// DELETE EMPLOYEE
+// DELETE EMPLOYEE (SOFT DELETE)
 exports.deleteEmployee = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -725,7 +730,7 @@ exports.deleteEmployee = async (req, res, next) => {
 
     const employee = await Employee.findById(id);
 
-    if (!employee) {
+    if (!employee || employee.deletedAt) {
       return res.status(404).json({
         message: 'Employee not found',
       });
@@ -782,55 +787,78 @@ exports.deleteEmployee = async (req, res, next) => {
       });
     }
 
-    // Try to start a transaction
-    let session = null;
-    try {
-      session = await mongoose.startSession();
-      session.startTransaction();
-    } catch {
-      session = null;
-    }
-
-    const deleteOptions = session ? { session } : {};
-    // Delete related payroll records
-    await PayrollUpdate.deleteMany(
-      {
-        employeeId: id,
-        createdBy: req.userId,
-      },
-      deleteOptions,
-    );
-
-    // Delete employee
-    await Employee.findByIdAndDelete(id, deleteOptions);
-
-    if (session) {
-      await session.commitTransaction();
-      session.endSession();
-    }
+    employee.deletedAt = new Date();
+    employee.isActive = false;
+    await employee.save();
 
     eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: 'EMPLOYEE_DELETE',
       resourceType: 'Employee',
       resourceIds: [id],
-      details: { fullName: employee.fullName, role: employee.role },
+      details: { fullName: employee.fullName, role: employee.role, deletedAt: employee.deletedAt },
       req,
     });
 
-    logger.info(`Employee deleted`, {
+    logger.info(`Employee soft deleted`, {
       userId: req.userId,
       employeeId: id,
       fullName: employee.fullName,
     });
 
-    // Deletion cascades a PayrollUpdate.deleteMany, so it shifts the aggregates
-    // more than an edit does — yet it was the one mutation with no invalidation
-    // while addEmployee and updateEmployee both had it (#415).
     await cacheService.invalidateAnalytics(req.userId);
 
     res.status(200).json({
-      message: 'Employee and payroll records deleted successfully',
+      message: 'Employee deleted successfully',
+      employee,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// RESTORE SOFT-DELETED EMPLOYEE
+exports.restoreEmployee = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid ID format' });
+    }
+
+    const employee = await Employee.findById(id);
+
+    if (!employee || !employee.deletedAt) {
+      return res.status(404).json({ message: 'Soft-deleted employee not found' });
+    }
+
+    if (employee.createdBy.toString() !== req.userId) {
+      return res.status(403).json({ message: 'Not authorized to restore this employee' });
+    }
+
+    employee.deletedAt = null;
+    employee.isActive = true;
+    await employee.save();
+
+    eventBus.emit("AUDIT_LOG", {
+      userId: req.userId,
+      action: 'EMPLOYEE_RESTORE',
+      resourceType: 'Employee',
+      resourceIds: [id],
+      details: { fullName: employee.fullName, role: employee.role },
+      req,
+    });
+
+    logger.info(`Employee restored`, {
+      userId: req.userId,
+      employeeId: id,
+      fullName: employee.fullName,
+    });
+
+    await cacheService.invalidateAnalytics(req.userId);
+
+    res.status(200).json({
+      message: 'Employee restored successfully',
+      employee,
     });
   } catch (error) {
     next(error);

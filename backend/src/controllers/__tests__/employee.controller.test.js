@@ -70,58 +70,27 @@ describe("Employee Controller - deleteEmployee (#345)", () => {
     });
   });
 
-  test("should block deletion and return 400 if employee has historical 'paid' payroll records", async () => {
+  test("should soft delete employee by setting deletedAt and isActive = false", async () => {
     const mockEmployee = {
       _id: "507f1f77bcf86cd799439011",
       createdBy: "507f1f77bcf86cd799439012",
       fullName: "John Doe",
       role: "Developer",
+      isActive: true,
+      deletedAt: null,
+      save: jest.fn().mockResolvedValue(true),
     };
     Employee.findById.mockResolvedValue(mockEmployee);
-    PayrollUpdate.exists.mockResolvedValue(true);
 
     await deleteEmployee(req, res);
 
-    expect(PayrollUpdate.exists).toHaveBeenCalledWith({
-      employeeId: "507f1f77bcf86cd799439011",
-      createdBy: "507f1f77bcf86cd799439012",
-      status: "paid",
-    });
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({
-      message: "Cannot delete employee with historical paid payroll records",
-    });
-    expect(PayrollUpdate.deleteMany).not.toHaveBeenCalled();
-    expect(Employee.findByIdAndDelete).not.toHaveBeenCalled();
-  });
-
-  test("should delete employee and unpaid payroll records if no 'paid' payroll records exist", async () => {
-    const mockEmployee = {
-      _id: "507f1f77bcf86cd799439011",
-      createdBy: "507f1f77bcf86cd799439012",
-      fullName: "John Doe",
-      role: "Developer",
-    };
-    Employee.findById.mockResolvedValue(mockEmployee);
-    PayrollUpdate.exists.mockResolvedValue(null);
-    PayrollUpdate.deleteMany.mockResolvedValue({ deletedCount: 2 });
-    Employee.findByIdAndDelete.mockResolvedValue(mockEmployee);
-
-    await deleteEmployee(req, res);
-
-    expect(PayrollUpdate.exists).toHaveBeenCalledWith({
-      employeeId: "507f1f77bcf86cd799439011",
-      createdBy: "507f1f77bcf86cd799439012",
-      status: "paid",
-    });
-    expect(PayrollUpdate.deleteMany).toHaveBeenCalledWith({
-      employeeId: "507f1f77bcf86cd799439011",
-      createdBy: "507f1f77bcf86cd799439012",
-    }, { session: mockSession });
-    expect(Employee.findByIdAndDelete).toHaveBeenCalledWith("507f1f77bcf86cd799439011", { session: mockSession });
+    expect(mockEmployee.save).toHaveBeenCalled();
+    expect(mockEmployee.isActive).toBe(false);
+    expect(mockEmployee.deletedAt).toBeInstanceOf(Date);
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
-      message: "Employee and payroll records deleted successfully",
+      message: "Employee deleted successfully",
+      employee: mockEmployee,
     });
   });
 });
