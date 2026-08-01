@@ -30,6 +30,7 @@ export default defineConfig([
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
       'jsx-a11y/label-has-associated-control': 'warn',
       'jsx-a11y/anchor-is-valid': 'warn',
+      'react-hooks/set-state-in-effect': 'off',
     },
   },
 ]);

@@ -60,7 +60,7 @@ const DashboardOverview = ({
   employeeCount,
   loading,
   payrolls,
-  onEditEmployee, 
+  onEditEmployee,
 }) => {
   const payrollMap = {};
   (payrolls || []).forEach((p) => {
@@ -95,7 +95,6 @@ const DashboardOverview = ({
           </h1>
         </div>
 
-        
         <div className="w-full sm:w-auto mt-4 md:mt-0">
           <input
             value={search}
@@ -106,7 +105,7 @@ const DashboardOverview = ({
         </div>
 
         <div className="flex gap-3 w-full sm:w-auto">
-          <button 
+          <button
             onClick={() => navigate('/reports')}
             className="flex-1 cursor-pointer sm:flex-none px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 transition-colors"
           >
@@ -273,7 +272,10 @@ const DashboardOverview = ({
         )}
 
         {!loading && (filtered.length > 0 || search) && (
-          <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
+          <div
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
             onClick={onAddEmployee}
             className="border-2 border-dashed border-gray-300 dark:border-slate-800 rounded-xl flex items-center justify-center min-h-44 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-indigo-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition duration-200"
           >
@@ -289,8 +291,6 @@ const DashboardOverview = ({
 
 // --- Employee Management Component ---
 const EmployeeManagement = ({
-  search,
-  setSearch,
   employees,
   loading,
   onAddEmployee,
@@ -300,7 +300,7 @@ const EmployeeManagement = ({
   totalPages,
   setCurrentPage,
   onDeleteEmployee,
-  onEditEmployee, 
+  onEditEmployee,
 }) => {
   const payrollMap = {};
   (payrolls || []).forEach((p) => {
@@ -341,7 +341,19 @@ const EmployeeManagement = ({
           >
             Edit Updates
           </button>
-          <button className="flex-1 sm:flex-none cursor-pointer px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => api.post('/api/payroll/submit', { activities: [], month: new Date().getMonth() + 1, year: new Date().getFullYear() }).then(() => alert('Submitted!')).catch(console.error)}>
+          <button
+            className="flex-1 sm:flex-none cursor-pointer px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+            onClick={() =>
+              api
+                .post('/api/payroll/submit', {
+                  activities: [],
+                  month: new Date().getMonth() + 1,
+                  year: new Date().getFullYear(),
+                })
+                .then(() => alert('Submitted!'))
+                .catch(console.error)
+            }
+          >
             Submit for Review
           </button>
         </div>
@@ -380,7 +392,10 @@ const EmployeeManagement = ({
         )}
 
         {!loading && employees.length > 0 && (
-          <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
+          <div
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
             onClick={onAddEmployee}
             className="border-2 border-dashed border-gray-300 dark:border-slate-800 rounded-xl flex items-center justify-center min-h-48 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-indigo-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition duration-200"
           >
@@ -456,9 +471,10 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
         monthlySalary: salary,
         overtimeRate: otRate,
       });
-} catch {
+    } catch {
       setError('Failed to update employee details.');
-    } finally {      setSubmitting(false);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -573,12 +589,13 @@ export default function PaySphereDashboard() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
   const [payrolls, setPayrolls] = useState([]);
-  
+
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-const [employeeToEdit, setEmployeeToEdit] = useState(null); 
-  const [prevDebouncedSearch, setPrevDebouncedSearch] = useState(debouncedSearch);
+  const [employeeToEdit, setEmployeeToEdit] = useState(null);
+  const [prevDebouncedSearch, setPrevDebouncedSearch] =
+    useState(debouncedSearch);
   const companyName = localStorage.getItem('companyName') || 'Acme Corp';
   const token = useSelector((state) => state.auth.token);
 
@@ -595,7 +612,7 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
     return () => clearTimeout(timer);
   }, [search]);
 
-// Reset to page 1 when the search term changes (adjusted during render, not in an effect)
+  // Reset to page 1 when the search term changes (adjusted during render, not in an effect)
   if (debouncedSearch !== prevDebouncedSearch) {
     setPrevDebouncedSearch(debouncedSearch);
     setCurrentPage(1);
@@ -640,10 +657,10 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
       e.fullName.toLowerCase().includes(search.toLowerCase()) ||
       (e.role || '').toLowerCase().includes(search.toLowerCase()),
   );
-  
+
   const handleDeleteEmployee = async () => {
     if (!employeeToDelete) return;
-    
+
     try {
       setDeleting(true);
 
@@ -669,9 +686,9 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
   const handleEditSubmit = async (id, updatedData) => {
     try {
       await api.put(`/api/employees/${id}`, updatedData);
-      
+
       setEmployees((prev) =>
-        prev.map((emp) => (emp._id === id ? { ...emp, ...updatedData } : emp))
+        prev.map((emp) => (emp._id === id ? { ...emp, ...updatedData } : emp)),
       );
       setEmployeeToEdit(null);
     } catch (error) {
@@ -679,7 +696,7 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
       alert('Failed to update employee. Please try again.');
     }
   };
-  
+
   const getInitials = (name) =>
     name
       .split(' ')
@@ -776,7 +793,7 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
             employeeCount={totalEmployees}
             loading={loading}
             payrolls={payrolls}
-            onEditEmployee={(emp) => setEmployeeToEdit(emp)} 
+            onEditEmployee={(emp) => setEmployeeToEdit(emp)}
           />
         ) : (
           <EmployeeManagement
@@ -791,7 +808,7 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
             totalPages={totalPages}
             setCurrentPage={setCurrentPage}
             onDeleteEmployee={(emp) => setEmployeeToDelete(emp)}
-            onEditEmployee={(emp) => setEmployeeToEdit(emp)} 
+            onEditEmployee={(emp) => setEmployeeToEdit(emp)}
           />
         )}
 
