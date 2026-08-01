@@ -16,6 +16,19 @@ html {
 
 button, a { cursor: pointer; }
 
+/* Command palette (cmdk) group headings */
+[cmdk-group-heading] {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.75rem 0.35rem;
+  color: #9ca3af;
+}
+.dark [cmdk-group-heading] {
+  color: #64748b;
+}
+
 .skeleton {
   position: relative;
   overflow: hidden;

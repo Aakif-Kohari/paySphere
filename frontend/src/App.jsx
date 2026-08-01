@@ -14,6 +14,7 @@ import Reports from "./pages/Reports"
 import NotFound from "./pages/NotFound"
 import ProtectedRoute from "./components/ProtectedRoute"
 import ScrollToTop from "./components/common/ScrollToTop"
+import CommandPalette from "./components/common/CommandPalette"
 function App() {
   const dispatch = useDispatch();
   const themeMode = useSelector((state) => state.ui.themeMode);
@@ -68,6 +69,7 @@ function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
         <ScrollToTop />
+        <CommandPalette />
       </BrowserRouter>
     </ThemeProvider>
   )

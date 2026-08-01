@@ -25,6 +25,11 @@ const auditLogSchema = new mongoose.Schema({
       // like one (#459).
       "ATTENDANCE_UPDATE",
       "ATTENDANCE_BULK_UPDATE",
+      // Offboarding is a financial event: it produces a final payout and
+      // removes someone from the headcount (#462).
+      "EMPLOYEE_EXIT_INITIATED",
+      "SETTLEMENT_CREATE",
+      "SETTLEMENT_STATUS_CHANGE",
       // A salary advance commits future deductions from someone's pay, so
       // issuing, pausing and collecting against one are all financial events
       // and are audited as such (#460).
@@ -45,7 +50,7 @@ const auditLogSchema = new mongoose.Schema({
   },
   resourceType: {
     type: String,
-    enum: ["Payroll", "Employee", "User", "Report", "Attendance", "Loan"],
+    enum: ["Payroll", "Employee", "User", "Report", "Attendance", "Settlement", "Loan"],
     required: true,
   },
   resourceIds: [

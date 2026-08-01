@@ -3,6 +3,7 @@ const {
   MONTHLY_SALARY_MAX,
   OVERTIME_RATE_MAX,
 } = require('../utils/validators');
+const { EMPLOYMENT_STATUS, EXIT_TYPE } = require('../config/employment');
 
 const employeeSchema = new mongoose.Schema(
   {
@@ -20,9 +21,44 @@ const employeeSchema = new mongoose.Schema(
       default: '',
       maxlength: [100, 'Role cannot exceed 100 characters'],
     },
+    /**
+     * Derived mirror of `employmentStatus`, kept so every existing query that
+     * filters on it keeps working untouched (#462).
+     */
     isActive: {
       type: Boolean,
       default: true,
+    },
+
+    /**
+     * Explicit employment state.
+     *
+     * `isActive` meant both "temporarily suspended" and "has left the company"
+     * — two states with completely different payroll semantics collapsed into
+     * one flag. An employee on notice is still working and still payable up to
+     * their last day; an exited one is not, but keeps their history (#462).
+     */
+    employmentStatus: {
+      type: String,
+      enum: Object.values(EMPLOYMENT_STATUS),
+      default: EMPLOYMENT_STATUS.ACTIVE,
+    },
+
+    exitDetails: {
+      lastWorkingDay: { type: Date },
+      resignationDate: { type: Date },
+      exitType: {
+        type: String,
+        enum: Object.values(EXIT_TYPE),
+      },
+      reason: {
+        type: String,
+        default: '',
+        maxlength: [500, 'Exit reason cannot exceed 500 characters'],
+      },
+      noticePeriodDays: { type: Number, min: 0, max: 365 },
+      noticeServedDays: { type: Number, min: 0, max: 365 },
+      exitInterviewDone: { type: Boolean, default: false },
     },
     monthlySalary: {
       type: Number,
