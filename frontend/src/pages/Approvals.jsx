@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Snackbar } from '@mui/material';
 import api from '../services/api';
+import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 
 const MONTH_NAMES = [
   'January',
@@ -82,6 +83,8 @@ const describeError = (error, fallback) => {
 };
 
 const Approvals = () => {
+  const rejectFormRef = useRef(null);
+  useCtrlEnterSubmit(rejectFormRef);
   const [pending, setPending] = useState([]);
   const [pendingTotal, setPendingTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -408,7 +411,7 @@ const Approvals = () => {
               resubmits it.
             </p>
 
-            <form onSubmit={handleReject}>
+            <form ref={rejectFormRef} onSubmit={handleReject}>
               <textarea
                 className="w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent mb-1 text-gray-900 dark:text-white min-h-24"
                 placeholder="Reason for rejection…"

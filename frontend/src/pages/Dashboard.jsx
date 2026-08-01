@@ -1,8 +1,8 @@
 import DownloadIcon from '@mui/icons-material/Download';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { logout } from '../features/auth/authSlice';
 import ThemeToggle from '../components/ThemeToggle';
 import Sidebar from '../components/Sidebar';
@@ -18,6 +18,7 @@ import {
 } from '../components/common/Skeleton';
 import api from '../services/api';
 import { exportEmployeesToCsv } from '../utils/exportEmployeesToCsv';
+import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 
 // Trigger a file download from the browser
 const downloadFile = (url, filename) => {
@@ -418,6 +419,8 @@ const EmployeeManagement = ({
 
 // --- Edit Employee Modal Component ---
 const EditEmployeeModal = ({ employee, onClose, onSave }) => {
+  const formRef = useRef(null);
+  useCtrlEnterSubmit(formRef);
   const [formData, setFormData] = useState({
     fullName: employee?.fullName || '',
     role: employee?.role || '',
@@ -476,7 +479,7 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
               Full Name
@@ -580,6 +583,26 @@ const [employeeToEdit, setEmployeeToEdit] = useState(null);
   const [prevDebouncedSearch, setPrevDebouncedSearch] = useState(debouncedSearch);
   const companyName = localStorage.getItem('companyName') || 'Acme Corp';
   const token = useSelector((state) => state.auth.token);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const qParam = searchParams.get('q');
+
+  // Deep-link support: /dashboard?tab=employees&q=Rahul lets the command
+  // palette (Cmd+K) jump straight to a tab and pre-fill the search box.
+  useEffect(() => {
+    const TAB_IDS = ['Dashboard', 'Employees', 'Approvals', 'Loans'];
+    const targetTab = TAB_IDS.find(
+      (id) => id.toLowerCase() === (tabParam || '').toLowerCase(),
+    );
+
+    if (targetTab) setActivePage(targetTab);
+
+    if (qParam) {
+      setSearch(qParam);
+      // Consume the q param so it does not re-apply on the next mount.
+      if (targetTab) setSearchParams({ tab: targetTab }, { replace: true });
+    }
+  }, [tabParam, qParam, setActivePage, setSearch, setSearchParams]);
 
   useEffect(() => {
     if (!token) {

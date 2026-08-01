@@ -5,6 +5,7 @@ import { useDispatch } from "react-redux";
 import { logout } from "../features/auth/authSlice";
 import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
+import useCtrlEnterSubmit from "../hooks/useCtrlEnterSubmit";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const GridIcon = () => (
@@ -104,6 +105,8 @@ export default function AddEmployee() {
   const [csvFile, setCsvFile] = useState(null);
   const [uploadingCsv, setUploadingCsv] = useState(false);
   const fileInputRef = useRef(null);
+  const formRef = useRef(null);
+  useCtrlEnterSubmit(formRef);
   // Recently added employees
   const [recentEmployees, setRecentEmployees] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
@@ -343,7 +346,7 @@ export default function AddEmployee() {
                 Enter basic details to add someone to the next payroll run.
               </p>
 
-              <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 transition-colors duration-200">
+              <form ref={formRef} onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 transition-colors duration-200">
                 {/* Full Name */}
                 <label className="block mb-5">
                   <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Full Name</span>
