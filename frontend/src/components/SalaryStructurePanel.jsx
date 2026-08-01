@@ -182,7 +182,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
         <Alert
           severity="error"
           action={
-            <button onClick={load} className="px-3 py-1 text-sm font-semibold underline">
+            <button onClick={load} className="px-3 py-1 text-sm font-semibold underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
               Retry
             </button>
           }
@@ -201,17 +201,17 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
         <div className="p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl">
           <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
             <div>
-              <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-slate-500">
+              <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-slate-500">
                 Current package{employeeName ? ` — ${employeeName}` : ''}
               </p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                 {formatCurrency(breakdown.grossMonthly, currency)}
-                <span className="text-sm font-normal text-gray-500 dark:text-slate-400">
+                <span className="text-sm font-normal text-gray-500 dark:text-slate-500">
                   {' '}
                   / month
                 </span>
               </p>
-              <p className="text-sm text-gray-500 dark:text-slate-400">
+              <p className="text-sm text-gray-500 dark:text-slate-500">
                 {formatCurrency(breakdown.grossMonthly * 12, currency)} annual CTC
               </p>
               {structure.isSynthesised && (
@@ -231,7 +231,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
-              <thead className="text-gray-500 dark:text-slate-400 border-b border-gray-200 dark:border-slate-800">
+              <thead className="text-gray-500 dark:text-slate-500 border-b border-gray-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2">Component</th>
                   <th className="py-2">Type</th>
@@ -242,7 +242,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
                 {breakdown.components.map((c) => (
                   <tr key={c.code} className="border-b border-gray-100 dark:border-slate-800/60">
                     <td className="py-2">{c.label}</td>
-                    <td className="py-2 capitalize text-gray-500 dark:text-slate-400">
+                    <td className="py-2 capitalize text-gray-500 dark:text-slate-500">
                       {c.type}
                     </td>
                     <td className="py-2 text-right">{formatCurrency(c.amount, currency)}</td>
@@ -279,7 +279,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
                 step="0.01"
                 value={form.grossMonthly}
                 onChange={setField('grossMonthly')}
-                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               />
             </label>
 
@@ -290,7 +290,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
                 type="date"
                 value={form.effectiveFrom}
                 onChange={setField('effectiveFrom')}
-                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               />
             </label>
 
@@ -299,7 +299,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
               <select
                 value={form.reason}
                 onChange={setField('reason')}
-                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               >
                 {REVISION_REASONS.map((r) => (
                   <option key={r.value} value={r.value}>
@@ -317,11 +317,11 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
               maxLength={500}
               value={form.note}
               onChange={setField('note')}
-              className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white"
+              className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             />
           </label>
 
-          <p className="text-xs text-gray-500 dark:text-slate-400">
+          <p className="text-xs text-gray-500 dark:text-slate-500">
             Revisions are append-only. A correction is recorded as a new entry so
             the history stays intact.
           </p>
@@ -344,7 +344,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
                   {preview.diff.percentChange}%)
                 </span>
               </p>
-              <div className="grid gap-1 text-xs text-gray-600 dark:text-slate-400">
+              <div className="grid gap-1 text-xs text-gray-600 dark:text-slate-500">
                 {preview.diff.components
                   .filter((c) => c.change !== 'unchanged')
                   .map((c) => (
@@ -365,14 +365,14 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
               type="button"
               onClick={handlePreview}
               disabled={!Number(form.grossMonthly)}
-              className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 disabled:opacity-50"
+              className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
               Preview
             </button>
             <button
               type="submit"
               disabled={busy}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
               {busy ? 'Saving…' : 'Record revision'}
             </button>
@@ -386,7 +386,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
         </h3>
 
         {timeline.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-slate-400">
+          <p className="text-sm text-gray-500 dark:text-slate-500">
             No revisions recorded yet.
           </p>
         ) : (
@@ -419,11 +419,11 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                <p className="text-xs text-gray-500 dark:text-slate-500 mt-0.5">
                   Effective {formatDate(entry.effectiveFrom)}
                 </p>
                 {entry.note && (
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 italic">
+                  <p className="text-xs text-gray-500 dark:text-slate-500 mt-1 italic">
                     {entry.note}
                   </p>
                 )}

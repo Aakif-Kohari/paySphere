@@ -45,59 +45,6 @@ async function generatePDF() {
         ["Net Payout", `Rs. ${totalPayout.toLocaleString("en-IN")}`],
       ];
 
-    // --- Company Header ---
-    doc
-      .fontSize(22)
-      .font("Helvetica-Bold")
-      .fillColor("#1e3a5f")
-      .text(companyName, { align: "center" });
-
-    doc
-      .fontSize(12)
-      .font("Helvetica")
-      .fillColor("#666666")
-      .text(`Payroll Summary Report — ${monthName} ${year}`, {
-        align: "center",
-      });
-
-    doc.moveDown(0.5);
-
-    // Divider line
-    doc
-      .moveTo(40, doc.y)
-      .lineTo(555, doc.y)
-      .strokeColor("#cccccc")
-      .lineWidth(1)
-      .stroke();
-
-    doc.moveDown(1);
-
-    // --- Summary Section ---
-    const totalPayout = payrolls.reduce((sum, p) => sum + p.netSalary, 0);
-    const totalBase = payrolls.reduce((sum, p) => sum + p.baseSalary, 0);
-    const totalOvertime = payrolls.reduce((sum, p) => sum + p.overtimePay, 0);
-    const totalBonus = payrolls.reduce((sum, p) => sum + p.bonus, 0);
-    const totalDeductions = payrolls.reduce(
-      (sum, p) => sum + p.deductions + p.leaveDeduction,
-      0,
-    );
-
-    doc
-      .fontSize(14)
-      .font("Helvetica-Bold")
-      .fillColor("#333333")
-      .text("Financial Summary");
-
-    doc.moveDown(0.3);
-
-    const summaryData = [
-      ["Total Employees", String(payrolls.length)],
-      ["Total Base Salary", `Rs. ${totalBase.toLocaleString("en-IN")}`],
-      ["Total Overtime Pay", `Rs. ${totalOvertime.toLocaleString("en-IN")}`],
-      ["Total Bonuses", `Rs. ${totalBonus.toLocaleString("en-IN")}`],
-      ["Total Deductions", `Rs. ${totalDeductions.toLocaleString("en-IN")}`],
-      ["Net Payout", `Rs. ${totalPayout.toLocaleString("en-IN")}`],
-    ];
 
     summaryData.forEach(([label, value]) => {
       doc

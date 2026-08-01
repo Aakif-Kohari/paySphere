@@ -255,20 +255,20 @@ const Approvals = () => {
           <h1 className="text-3xl font-serif text-gray-900 dark:text-white">
             Pending Approvals
           </h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+          <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">
             Review submitted payroll runs before they can be paid or emailed.
           </p>
         </div>
 
         {!loading && pending.length > 0 && (
           <div className="text-right">
-            <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-slate-500">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-slate-500">
               Awaiting approval
             </p>
             <p className="text-2xl font-semibold text-gray-900 dark:text-white">
               {formatCurrency(pendingTotal)}
             </p>
-            <p className="text-xs text-gray-500 dark:text-slate-400">
+            <p className="text-xs text-gray-500 dark:text-slate-500">
               across {pending.length} record{pending.length !== 1 ? 's' : ''}
             </p>
           </div>
@@ -282,7 +282,7 @@ const Approvals = () => {
             action={
               <button
                 onClick={fetchPending}
-                className="px-3 py-1 text-sm font-semibold underline"
+                className="px-3 py-1 text-sm font-semibold underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               >
                 Retry
               </button>
@@ -304,7 +304,7 @@ const Approvals = () => {
         </div>
       ) : pending.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
-          <p className="text-gray-500 dark:text-slate-400">
+          <p className="text-gray-500 dark:text-slate-500">
             No payroll runs are currently waiting for approval.
           </p>
         </div>
@@ -317,14 +317,14 @@ const Approvals = () => {
                   type="checkbox"
                   checked={allSelected}
                   onChange={toggleAll}
-                  className="w-4 h-4"
+                  className="w-4 h-4 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 />
                 Select all
               </label>
 
               {selectedIds.size > 0 && (
                 <>
-                  <span className="text-sm text-gray-500 dark:text-slate-400">
+                  <span className="text-sm text-gray-500 dark:text-slate-500">
                     {selectedIds.size} selected · {formatCurrency(selectedTotal)}
                   </span>
                   <div className="ml-auto flex gap-2">
@@ -364,12 +364,12 @@ const Approvals = () => {
                       <p className="font-semibold text-lg text-gray-900 dark:text-white">
                         {p.employeeName}
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-slate-400">
+                      <p className="text-sm text-gray-500 dark:text-slate-500">
                         {formatPeriod(p.month, p.year)} · Net{' '}
                         {formatCurrency(p.netSalary, p.currency)}
                       </p>
                       {p.submittedBy?.fullName && (
-                        <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
+                        <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
                           Submitted by {p.submittedBy.fullName}
                         </p>
                       )}
@@ -406,21 +406,21 @@ const Approvals = () => {
               Reject {rejectTargets.length} payroll record
               {rejectTargets.length !== 1 ? 's' : ''}
             </h3>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">
+            <p className="text-sm text-gray-500 dark:text-slate-500 mb-4">
               The reason is recorded against the run and shown to whoever
               resubmits it.
             </p>
 
             <form ref={rejectFormRef} onSubmit={handleReject}>
               <textarea
-                className="w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent mb-1 text-gray-900 dark:text-white min-h-24"
+                className="w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent mb-1 text-gray-900 dark:text-white min-h-24 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 placeholder="Reason for rejection…"
                 value={rejectReason}
                 maxLength={MAX_REASON_LENGTH}
                 onChange={(e) => setRejectReason(e.target.value)}
                 required
               />
-              <p className="text-xs text-gray-400 dark:text-slate-500 mb-4 text-right">
+              <p className="text-xs text-gray-500 dark:text-slate-500 mb-4 text-right">
                 {rejectReason.length}/{MAX_REASON_LENGTH}
               </p>
 
@@ -431,14 +431,14 @@ const Approvals = () => {
                     setRejectTargets(null);
                     setRejectReason('');
                   }}
-                  className="px-4 py-2 text-gray-500 dark:text-slate-400"
+                  className="px-4 py-2 text-gray-500 dark:text-slate-500"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={busy || rejectReason.trim() === ''}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg font-semibold"
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 >
                   Confirm reject
                 </button>

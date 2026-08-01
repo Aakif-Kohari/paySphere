@@ -9,7 +9,7 @@ export default function Steps() {
         </h2>
 
         {/* Subtext */}
-        <p className="text-base sm:text-lg text-gray-500 dark:text-slate-400 mb-10 sm:mb-16 max-w-xl mx-auto">
+        <p className="text-base sm:text-lg text-gray-500 dark:text-slate-500 mb-10 sm:mb-16 max-w-xl mx-auto">
           We stripped away the complexity of traditional payroll systems.
         </p>
 
@@ -34,7 +34,7 @@ export default function Steps() {
                 {step.title}
               </h3>
 
-              <p className="text-gray-500 dark:text-slate-400 leading-relaxed text-sm sm:text-[15px]">
+              <p className="text-gray-500 dark:text-slate-500 leading-relaxed text-sm sm:text-[15px]">
                 Import your existing team in seconds. Our automated system handles the migration.
               </p>
             </div>

@@ -11,6 +11,14 @@ jest.mock("../../services/audit.service", () => ({ createAuditLog: jest.fn() }))
 
 // Mock csv-parse so we can assert on options passed
 jest.mock("csv-parse", () => ({ parse: jest.fn() }));
+
+// deleteEmployee now refuses to destroy an employee with a settled F&F, the
+// same protection #345 added for paid payroll (#462). Stubbed so the employee
+// unit tests stay free of the settlement collection; the guard has its own
+// coverage below and in settlement.controller.test.js.
+jest.mock("../../models/settlement.model", () => ({
+  exists: jest.fn().mockResolvedValue(null),
+}));
 const { parse: mockParse } = require("csv-parse");
 
 describe("Employee Controller - deleteEmployee (#345)", () => {

@@ -78,7 +78,7 @@ const CardHeader = ({ emp, finalized, onEdit }) => (
         <p className="font-bold text-sm text-slate-900 dark:text-white">
           {emp.fullName}
         </p>
-        <p className="text-xs text-gray-400 dark:text-slate-400">
+        <p className="text-xs text-gray-500 dark:text-slate-500">
           {emp.role || 'Employee'}
         </p>
       </div>
@@ -88,7 +88,7 @@ const CardHeader = ({ emp, finalized, onEdit }) => (
       {onEdit && (
         <button
           onClick={onEdit}
-          className="pt-2 px-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 bg-gray-50 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md transition-colors"
+          className="pt-2 px-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 bg-gray-50 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           title="Edit Employee"
         >
           <EditOutlinedIcon fontSize="small" className='mb-2'/>
@@ -123,7 +123,7 @@ export default function EmployeeCard({
         {/* Breakdown */}
         <div className="space-y-2 text-sm mb-5 text-slate-700 dark:text-slate-300">
           <div className="flex justify-between">
-            <span className="text-gray-500 dark:text-slate-400">Base Salary</span>
+            <span className="text-gray-500 dark:text-slate-500">Base Salary</span>
             <span className="font-semibold text-gray-950 dark:text-white">
               {fmt(emp.monthlySalary, emp.currency)}
             </span>
@@ -156,7 +156,7 @@ export default function EmployeeCard({
                   <p className="font-semibold text-gray-800 dark:text-white mb-2">
                     Overtime Calculation
                   </p>
-                  <div className="space-y-1 text-xs text-gray-600 dark:text-slate-400">
+                  <div className="space-y-1 text-xs text-gray-600 dark:text-slate-500">
                     <p>Hours Worked: {p.overtimeHours}</p>
                     <p>Overtime Pay: {fmt(p.overtimePay, emp.currency)}</p>
                     <p className="font-semibold text-gray-800 dark:text-white mt-2 mb-1">
@@ -195,7 +195,7 @@ export default function EmployeeCard({
 
         {/* Net */}
         <div className="flex justify-between items-center">
-          <span className="text-xs uppercase text-gray-400 dark:text-slate-400 font-bold">
+          <span className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold">
             {p ? 'Net Salary' : 'Monthly Salary'}
           </span>
           <span className="text-2xl font-semibold text-blue-600 dark:text-blue-400">
@@ -242,11 +242,11 @@ export default function EmployeeCard({
       {/* Salary */}
       <div className="bg-gray-50 dark:bg-slate-950 p-3 rounded-lg transition-colors">
         <div className="flex justify-between items-baseline">
-          <p className="text-xs text-gray-400 dark:text-slate-400 uppercase">
+          <p className="text-xs text-gray-500 dark:text-slate-500 uppercase">
             {p ? 'Net Salary' : 'Base Salary'}
           </p>
           {p && (p.leaveDays > 0 || p.overtimeHours > 0) && (
-            <span className="text-[10px] text-gray-400 dark:text-slate-400 font-medium">
+            <span className="text-[10px] text-gray-500 dark:text-slate-500 font-medium">
               Incl. adjustments
             </span>
           )}
@@ -259,7 +259,7 @@ export default function EmployeeCard({
       {/* Button */}
       <button
         onClick={onAddUpdate}
-        className="border border-gray-200 dark:border-slate-800 rounded-lg py-2 text-blue-600 dark:text-blue-400 font-semibold hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors"
+        className="border border-gray-200 dark:border-slate-800 rounded-lg py-2 text-blue-600 dark:text-blue-400 font-semibold hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
       >
         {p ? 'Edit Updates' : '+ Add Update'}
       </button>

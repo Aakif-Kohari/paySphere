@@ -241,7 +241,7 @@ export default function AddEmployee() {
 
       {/* Sidebar Backdrop */}
       {isSidebarOpen && (
-        <div
+        <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
@@ -256,11 +256,11 @@ export default function AddEmployee() {
             </div>
             <div>
               <p className="font-bold text-sm text-gray-900 dark:text-white">{companyName}</p>
-              <p className="text-xs text-gray-400 dark:text-slate-500">Payroll ID: 8821</p>
+              <p className="text-xs text-gray-500 dark:text-slate-500">Payroll ID: 8821</p>
             </div>
           </div>
           <button
-            className="md:hidden p-2 text-gray-400 hover:text-gray-600"
+            className="md:hidden p-2 text-gray-500 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             onClick={() => setIsSidebarOpen(false)}
           >
             ✕
@@ -277,7 +277,7 @@ export default function AddEmployee() {
               }}
               className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${item.id === "employees"
                   ? "bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold"
-                  : "text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800/50"
+                  : "text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50"
                 }`}
             >
               {item.icon}
@@ -287,7 +287,7 @@ export default function AddEmployee() {
         </nav>
 
         <div className="p-3 border-t border-gray-200 dark:border-slate-800 space-y-2">
-          <button className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition">
+          <button className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
             <SupportIcon />
             Help & Support
           </button>
@@ -304,21 +304,21 @@ export default function AddEmployee() {
         <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 transition-colors">
           <div className="flex items-center gap-4 sm:gap-6">
             <button
-              className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"
+              className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => setIsSidebarOpen(true)}
             >
               ☰
             </button>
             <span className="font-bold text-blue-900 dark:text-blue-400 truncate">Ledger Payroll</span>
-            <button className="hidden sm:block text-blue-600 dark:text-blue-400 font-semibold border-b-2 border-blue-600 dark:border-blue-400 pb-0.5 whitespace-nowrap">
+            <button className="hidden sm:block text-blue-600 dark:text-blue-400 font-semibold border-b-2 border-blue-600 dark:border-blue-400 pb-0.5 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
               {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
             </button>
           </div>
 
-          <div className="flex items-center gap-3 text-gray-500 dark:text-slate-400">
+          <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
             <ThemeToggle />
-            <button className="hidden sm:flex p-2 text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"><BellIcon /></button>
-            <button className="hidden sm:flex p-2 text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"><HelpCircleIcon /></button>
+            <button className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><BellIcon /></button>
+            <button className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><HelpCircleIcon /></button>
             <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
               {getInitials(companyName)}
             </div>
@@ -342,14 +342,14 @@ export default function AddEmployee() {
             {/* ── LEFT: Form Section ── */}
             <div className="flex-1">
               <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white mb-2">Add Employee</h1>
-              <p className="text-gray-500 dark:text-slate-400 text-sm mb-8">
+              <p className="text-gray-500 dark:text-slate-500 text-sm mb-8">
                 Enter basic details to add someone to the next payroll run.
               </p>
 
               <form ref={formRef} onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 transition-colors duration-200">
                 {/* Full Name */}
                 <label className="block mb-5">
-                  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Full Name</span>
+                  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Full Name</span>
                   <input
                     id="employee-full-name"
                     type="text"
@@ -364,7 +364,7 @@ export default function AddEmployee() {
                 {/* Salary Row */}
                 <div className="flex flex-col sm:flex-col gap-4 mb-6">
                   <label className="flex-1">
-                    <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Currency</span>
+                    <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Currency</span>
                     <select
                       value={currency}
                       onChange={(e) => setCurrency(e.target.value)}
@@ -379,9 +379,9 @@ export default function AddEmployee() {
 
                   <div className="flex flex-col sm:flex-row gap-4">
                     <label className="flex-1">
-                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Monthly Salary</span>
+                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Monthly Salary</span>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 font-semibold text-sm">{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'}</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500 font-semibold text-sm">{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'}</span>
                         <input
                           id="employee-salary"
                           type="text"
@@ -395,9 +395,9 @@ export default function AddEmployee() {
                     </label>
 
                     <label className="flex-1">
-                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Overtime Rate (Optional)</span>
+                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Overtime Rate (Optional)</span>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 font-semibold text-sm">{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'}</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500 font-semibold text-sm">{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'}</span>
                         <input
                           id="employee-overtime"
                           type="text"
@@ -413,7 +413,7 @@ export default function AddEmployee() {
 
                 {/* Role */}
                 <label className="block mb-5">
-                  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Role</span>
+                  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Role</span>
                   <input
                     id="employee-role"
                     type="text"
@@ -429,7 +429,7 @@ export default function AddEmployee() {
                 <div className="mb-5">
                   <div className="flex flex-col sm:flex-row gap-4">
                     <label className="flex-1">
-                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Date of Birth (Optional)</span>
+                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Date of Birth (Optional)</span>
                       <input
                         type="date"
                         value={dateOfBirth}
@@ -438,7 +438,7 @@ export default function AddEmployee() {
                       />
                     </label>
                     <label className="flex-1">
-                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 tracking-wider mb-2 block">Joining Date (Optional)</span>
+                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Joining Date (Optional)</span>
                       <input
                         type="date"
                         value={joiningDate}
@@ -469,7 +469,7 @@ export default function AddEmployee() {
                   id="add-employee-btn"
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-200 dark:shadow-none"
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 >
                   <PersonPlusIcon />
                   {loading ? "Adding..." : "Add Employee"}
@@ -501,7 +501,7 @@ export default function AddEmployee() {
                       Choose CSV file
                     </p>
 
-                    <p className="text-xs text-gray-400 mt-1 mb-3">
+                    <p className="text-xs text-gray-500 mt-1 mb-3">
                       Only .csv files are supported
                     </p>
 
@@ -530,7 +530,7 @@ export default function AddEmployee() {
                         <p className="text-sm font-semibold text-gray-800 truncate">
                           {csvFile.name}
                         </p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-gray-500">
                           {(csvFile.size / 1024).toFixed(1)} KB
                         </p>
                       </div>
@@ -557,7 +557,7 @@ export default function AddEmployee() {
                 type="button"
                 onClick={handleCsvUpload}
                 disabled={!csvFile || uploadingCsv}
-                className="mt-4 w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="mt-4 w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               >
                 {uploadingCsv ? "Uploading..." : "Upload CSV"}
               </button>
@@ -571,7 +571,7 @@ export default function AddEmployee() {
                   <CheckCircleIcon />
                   <div>
                     <h3 className="font-bold text-gray-900 dark:text-white text-sm">Recently Added</h3>
-                    <p className="text-xs text-gray-400 dark:text-slate-450 mt-0.5 leading-relaxed">
+                    <p className="text-xs text-gray-500 dark:text-slate-450 mt-0.5 leading-relaxed">
                       Employees added here will automatically appear in your {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} payroll worksheet.
                     </p>
                   </div>
@@ -579,16 +579,16 @@ export default function AddEmployee() {
 
                 <div className="space-y-0">
                   {loadingRecent ? (
-                    <div className="py-6 text-center text-sm text-gray-400">Loading...</div>
+                    <div className="py-6 text-center text-sm text-gray-500">Loading...</div>
                   ) : recentEmployees.length === 0 ? (
-                    <div className="py-6 text-center text-sm text-gray-400">No employees added yet.</div>
+                    <div className="py-6 text-center text-sm text-gray-500">No employees added yet.</div>
                   ) : (
                     recentEmployees.slice(0, 3).map((emp) => (
                       <div key={emp._id} className="flex items-center gap-3 py-3 border-b border-gray-100 dark:border-slate-800 last:border-0">
                         <Avatar name={emp.fullName} size={36} />
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">{emp.fullName}</p>
-                          <p className="text-xs text-gray-400 dark:text-slate-400 truncate">{emp.role || "Employee"}</p>
+                          <p className="text-xs text-gray-500 dark:text-slate-500 truncate">{emp.role || "Employee"}</p>
                         </div>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
                           {fmt(emp.monthlySalary, emp.currency)}
