@@ -67,10 +67,20 @@ const userSchema = new mongoose.Schema({
       allowNegativeBalance: { type: Boolean, default: false },
     },
     // JS weekday indices (0 = Sunday) treated as weekly offs when a month's
-    // grid is generated for the first time.
+    // grid is generated for the first time. Also the basis for working-day
+    // proration in a settlement (#462).
     weeklyOffDays: {
       type: [Number],
       default: [0],
+    },
+    // Full & Final settlement policy (#462). Defaults mirror
+    // config/employment.js so an account that has never configured one still
+    // gets a defensible policy.
+    settlementPolicy: {
+      prorationBasis: { type: String, enum: ['calendar', 'working'], default: 'calendar' },
+      leaveEncashmentCapDays: { type: Number, default: 15, min: 0, max: 365 },
+      defaultNoticePeriodDays: { type: Number, default: 30, min: 0, max: 365 },
+      gratuityEnabled: { type: Boolean, default: true },
     },
     notifications: {
       emailReminders: { type: Boolean, default: true },

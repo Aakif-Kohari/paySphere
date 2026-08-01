@@ -14,6 +14,7 @@ const TurnoverMetrics = () => {
       try {
         const res = await api.get('/api/reports/turnover');
         setData(res.data);
+      // eslint-disable-next-line no-unused-vars
       } catch (err) {
         setError('Failed to fetch turnover metrics.');
       } finally {

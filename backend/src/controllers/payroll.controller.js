@@ -703,6 +703,15 @@ exports.submitPayrollForReview = async (req, res, next) => {
         continue;
       }
 
+      // An employee serving notice is still working and still payable up to
+      // their last day — excluding them the moment they resign is exactly what
+      // made the final month unpayable before #462. Only an *exited* employee
+      // drops out.
+      if (employee.employmentStatus === "exited") {
+        errors.push(`Employee ${employee.fullName} has exited and cannot be included in payroll`);
+        continue;
+      }
+
       if (!employee.isActive) {
         errors.push(`Employee ${employee.fullName} is inactive and cannot be included in payroll`);
         continue;

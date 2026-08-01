@@ -547,6 +547,7 @@ exports.downloadPayslipsZip = async (req, res, next) => {
   }
 };
 
+
 // GET /api/reports/turnover
 // Calculates employee turnover metrics and headcount trends
 exports.getTurnoverMetrics = async (req, res, next) => {
@@ -616,6 +617,72 @@ exports.getTurnoverMetrics = async (req, res, next) => {
       totalTerminated: terminatedCount,
       trends
     });
+  } catch (error) {
+    next(error);
+  }
+};
+// POST /api/reports/custom
+// Generates a custom report dynamically with NoSQL injection prevention
+exports.generateCustomReport = async (req, res, next) => {
+  try {
+    const { dataset, columns, filters } = req.body;
+    if (!dataset || !['employees', 'payroll'].includes(dataset)) {
+      return res.status(400).json({ message: "Invalid dataset" });
+    }
+
+    if (!Array.isArray(columns) || columns.length === 0) {
+      return res.status(400).json({ message: "Columns are required" });
+    }
+
+    // Validate columns (prevent projection injection)
+    const validColumns = {
+      employees: ['fullName', 'email', 'department', 'role', 'baseSalary', 'status', 'createdAt'],
+      payroll: ['employeeName', 'month', 'year', 'baseSalary', 'netSalary', 'status', 'approvedAt']
+    };
+    const allowed = validColumns[dataset];
+    const project = { _id: 1 };
+    
+    for (const col of columns) {
+      if (allowed.includes(col)) {
+        project[col] = 1;
+      }
+    }
+
+    // Secure query construction
+    const query = { createdBy: req.userId }; // always scope by tenant/user
+    
+    if (Array.isArray(filters)) {
+      for (const filter of filters) {
+        // filter format: { field: "role", operator: "equals", value: "Manager" }
+        if (!allowed.includes(filter.field)) continue;
+        
+        // Prevent NoSQL injection by strictly casting/building the query object
+        const val = filter.value;
+        switch (filter.operator) {
+          case 'equals':
+            query[filter.field] = val;
+            break;
+          case 'not_equals':
+            query[filter.field] = { $ne: val };
+            break;
+          case 'contains':
+            query[filter.field] = { $regex: String(val).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'), $options: 'i' };
+            break;
+          case 'gt':
+            query[filter.field] = { $gt: Number(val) };
+            break;
+          case 'lt':
+            query[filter.field] = { $lt: Number(val) };
+            break;
+        }
+      }
+    }
+
+    const Model = dataset === 'employees' ? Employee : PayrollUpdate;
+    const results = await Model.find(query, project).lean();
+
+    res.status(200).json({ results, columns: Object.keys(project).filter(k => k !== '_id') });
+
   } catch (error) {
     next(error);
   }

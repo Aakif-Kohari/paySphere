@@ -17,7 +17,7 @@ const STATUS_STYLES = {
   active: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
   on_hold: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
   completed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
-  cancelled: 'bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-400',
+  cancelled: 'bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-500',
 };
 
 const STATUS_LABELS = {
@@ -216,7 +216,7 @@ const Loans = () => {
           <h1 className="text-3xl font-serif text-gray-900 dark:text-white">
             Salary Advances &amp; Loans
           </h1>
-          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+          <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">
             Instalments are recovered automatically during each payroll run.
           </p>
         </div>
@@ -232,7 +232,7 @@ const Loans = () => {
       {summary && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl">
-            <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-slate-500">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-slate-500">
               Total outstanding
             </p>
             <p className="text-2xl font-semibold text-gray-900 dark:text-white">
@@ -240,7 +240,7 @@ const Loans = () => {
             </p>
           </div>
           <div className="p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl">
-            <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-slate-500">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-slate-500">
               Active
             </p>
             <p className="text-2xl font-semibold text-gray-900 dark:text-white">
@@ -248,7 +248,7 @@ const Loans = () => {
             </p>
           </div>
           <div className="p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl">
-            <p className="text-xs uppercase tracking-wide text-gray-400 dark:text-slate-500">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-slate-500">
               Completed
             </p>
             <p className="text-2xl font-semibold text-gray-900 dark:text-white">
@@ -270,7 +270,7 @@ const Loans = () => {
                 required
                 value={form.employeeId}
                 onChange={setField('employeeId')}
-                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               >
                 <option value="">Select an employee…</option>
                 {employees.map((emp) => (
@@ -286,7 +286,7 @@ const Loans = () => {
               <select
                 value={form.type}
                 onChange={setField('type')}
-                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               >
                 <option value="advance">Salary advance</option>
                 <option value="loan">Loan</option>
@@ -302,7 +302,7 @@ const Loans = () => {
                 step="0.01"
                 value={form.principal}
                 onChange={setField('principal')}
-                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               />
             </label>
 
@@ -315,7 +315,7 @@ const Loans = () => {
                 max="120"
                 value={form.tenureMonths}
                 onChange={setField('tenureMonths')}
-                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               />
             </label>
 
@@ -324,7 +324,7 @@ const Loans = () => {
               <select
                 value={form.interestMethod}
                 onChange={setField('interestMethod')}
-                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               >
                 {INTEREST_METHODS.map((m) => (
                   <option key={m.value} value={m.value}>
@@ -344,7 +344,7 @@ const Loans = () => {
                   step="0.01"
                   value={form.interestRatePercent}
                   onChange={setField('interestRatePercent')}
-                  className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white"
+                  className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 />
               </label>
             )}
@@ -357,7 +357,7 @@ const Loans = () => {
               maxLength={500}
               value={form.reason}
               onChange={setField('reason')}
-              className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white"
+              className="mt-1 w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             />
           </label>
 
@@ -366,14 +366,14 @@ const Loans = () => {
               type="button"
               onClick={handlePreview}
               disabled={!canPreview}
-              className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 disabled:opacity-50"
+              className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
               Preview schedule
             </button>
             <button
               type="submit"
               disabled={busy || !form.employeeId}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
               {busy ? 'Issuing…' : 'Issue'}
             </button>
@@ -398,7 +398,7 @@ const Loans = () => {
 
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left">
-                  <thead className="text-gray-500 dark:text-slate-400">
+                  <thead className="text-gray-500 dark:text-slate-500">
                     <tr>
                       <th className="py-1 pr-4">#</th>
                       <th className="py-1 pr-4">Period</th>
@@ -441,7 +441,7 @@ const Loans = () => {
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
               statusFilter === status
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
+                : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-500'
             }`}
           >
             {status ? STATUS_LABELS[status] : 'All'}
@@ -454,7 +454,7 @@ const Loans = () => {
           severity="error"
           className="mb-4"
           action={
-            <button onClick={fetchLoans} className="px-3 py-1 text-sm font-semibold underline">
+            <button onClick={fetchLoans} className="px-3 py-1 text-sm font-semibold underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
               Retry
             </button>
           }
@@ -474,7 +474,7 @@ const Loans = () => {
         </div>
       ) : loans.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
-          <p className="text-gray-500 dark:text-slate-400">
+          <p className="text-gray-500 dark:text-slate-500">
             No salary advances recorded yet.
           </p>
         </div>
@@ -499,7 +499,7 @@ const Loans = () => {
                       {STATUS_LABELS[loan.status] || loan.status}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                  <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">
                     {formatCurrency(loan.principal)} over {loan.tenureMonths} months ·{' '}
                     {formatCurrency(loan.installmentAmount)}/month
                   </p>
@@ -545,7 +545,7 @@ const Loans = () => {
                     style={{ width: `${progressFor(loan)}%` }}
                   />
                 </div>
-                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
                   {formatCurrency(loan.totalRepaid)} of{' '}
                   {formatCurrency(loan.totalPayable)} repaid ({progressFor(loan)}%)
                 </p>
