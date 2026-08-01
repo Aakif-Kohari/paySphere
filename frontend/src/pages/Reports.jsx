@@ -16,8 +16,7 @@ import DepartmentChart from '../components/reports/DepartmentChart';
 import SalaryDistributionChart from '../components/reports/SalaryDistributionChart';
 import OvertimeChart from '../components/reports/OvertimeChart';
 import PayrollTable from '../components/reports/PayrollTable';
-import CustomReportBuilder from '../components/reports/CustomReportBuilder';
-import TurnoverMetrics from '../components/reports/TurnoverMetrics';
+import ScheduleReportModal from '../components/reports/ScheduleReportModal';
 
 // --- Month-Year Selector ---
 const MONTH_NAMES = [
@@ -92,7 +91,7 @@ export default function Reports() {
   const [exportingType, setExportingType] = useState(null);
   const [reportData, setReportData] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
-  const [activeTab, setActiveTab] = useState('analytics');
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   
   const companyName = localStorage.getItem('companyName') || 'PaySphere';
 
@@ -277,29 +276,14 @@ export default function Reports() {
               </div>
               <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white">Reports</h1>
             </div>
-            
-            <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto mt-4 sm:mt-0 items-center">
-              <div className="flex bg-gray-200 dark:bg-slate-800 p-1 rounded-lg self-start sm:self-auto">
-                <button 
-                  onClick={() => setActiveTab('analytics')} 
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'analytics' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
-                >
-                  Analytics
-                </button>
-                <button 
-                  onClick={() => setActiveTab('hr')} 
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'hr' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
-                >
-                  HR Metrics
-                </button>
-                <button 
-                  onClick={() => setActiveTab('custom')} 
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'custom' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white'}`}
-                >
-                  Custom Reports
-                </button>
-              </div>
-              {activeTab === 'analytics' && <MonthYearSelector month={month} year={year} onChange={handleMonthChange} />}
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-4 sm:mt-0 items-center">
+              <button
+                onClick={() => setIsScheduleModalOpen(true)}
+                className="px-4 py-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700 transition"
+              >
+                Schedule Report
+              </button>
+              <MonthYearSelector month={month} year={year} onChange={handleMonthChange} />
             </div>
           </div>
 
@@ -439,8 +423,14 @@ export default function Reports() {
         </main>
       </div>
 
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%', variant: 'filled' }}>
+      <ScheduleReportModal 
+        isOpen={isScheduleModalOpen} 
+        onClose={() => setIsScheduleModalOpen(false)}
+        onScheduled={() => setSnackbar({ open: true, message: 'Report scheduled successfully!', severity: 'success' })}
+      />
+
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

@@ -12,6 +12,7 @@ const auditRoutes = require("./routes/audit.routes");
 const attendanceRoutes = require("./routes/attendance.routes");
 const settlementRoutes = require("./routes/settlement.routes");
 const loanRoutes = require("./routes/loan.routes");
+const schedulerRoutes = require("./routes/scheduler.routes");
 const logger = require("./utils/logger");
 
 const app = express();
@@ -61,6 +62,7 @@ app.use("/api/auth", userRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/reports", reportsRoutes);
+app.use("/api/schedules", schedulerRoutes);
 app.use("/api/audit-logs", auditRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/settlements", settlementRoutes);
