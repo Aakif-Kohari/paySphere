@@ -1,10 +1,11 @@
 const express = require("express");
-const { getAnalytics, downloadPDFReport, exportExcelReport, downloadPayslipsZip } = require("../controllers/reports.controller");
+const { getAnalytics, downloadPDFReport, exportExcelReport, downloadPayslipsZip, getTurnoverMetrics } = require("../controllers/reports.controller");
 const auth = require("../middlewares/auth.middleware");
 const { requirePermission } = require("../middlewares/rbac.middleware");
 const router = express.Router();
 
 router.get("/analytics", auth, requirePermission("READ_REPORT"), getAnalytics);
+router.get("/turnover", auth, requirePermission("READ_REPORT"), getTurnoverMetrics);
 router.get("/download-pdf", auth, requirePermission("READ_REPORT"), downloadPDFReport);
 
 // `exportExcelReport` and `downloadPayslipsZip` were implemented in full for
