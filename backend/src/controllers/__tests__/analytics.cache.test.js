@@ -34,6 +34,14 @@ jest.mock("../../models/attendance.model", () => ({
   find: jest.fn(() => ({ select: jest.fn().mockResolvedValue([]) })),
 }));
 
+// deleteEmployee now refuses to destroy an employee with a settled F&F, the
+// same protection #345 added for paid payroll (#462). Stubbed so the employee
+// unit tests stay free of the settlement collection; the guard has its own
+// coverage in settlement.controller.test.js.
+jest.mock("../../models/settlement.model", () => ({
+  exists: jest.fn().mockResolvedValue(null),
+}));
+
 // submitPayrollForReview now recovers loan instalments (#460). Stubbed so the
 // payroll unit tests stay free of the loan collection; recovery behaviour is
 // covered in payroll.loans.test.js.

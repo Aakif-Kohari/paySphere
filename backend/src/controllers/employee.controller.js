@@ -7,6 +7,7 @@ const PayrollUpdate = require("../models/payroll.model");
 const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
+const Settlement = require("../models/settlement.model");
 
 /**
  * Normalize an employee email for storage.
@@ -739,6 +740,50 @@ exports.deleteEmployee = async (req, res, next) => {
     if (employee.createdBy.toString() !== req.userId) {
       return res.status(403).json({
         message: 'Not authorized to delete this employee',
+      });
+    }
+
+    // Check if employee has historical "paid" payroll records (#345)
+    const hasPaidPayroll = await PayrollUpdate.exists({
+      employeeId: id,
+      createdBy: req.userId,
+      status: 'paid',
+    });
+
+    if (hasPaidPayroll) {
+      return res.status(400).json({
+        message: 'Cannot delete employee with historical paid payroll records',
+      });
+    }
+
+    // Same principle as #345: an employee who has been formally settled has a
+    // final statement on record, and destroying them would destroy the
+    // counterpart to a payment that has already been made (#462).
+    let hasSettlement = false;
+    try {
+      hasSettlement = Boolean(
+        await Settlement.exists({
+          employeeId: id,
+          createdBy: req.userId,
+          status: { $in: ['approved', 'paid'] },
+        }),
+      );
+    } catch (settlementError) {
+      // A lookup failure must not silently downgrade a protection.
+      logger.error('Could not check for an existing settlement before deletion', {
+        userId: req.userId,
+        employeeId: id,
+        error: settlementError.message,
+      });
+      return res.status(500).json({
+        message: 'Could not verify settlement history. Deletion aborted.',
+      });
+    }
+
+    if (hasSettlement) {
+      return res.status(400).json({
+        message:
+          'Cannot delete an employee with an approved or paid full & final settlement',
       });
     }
 
