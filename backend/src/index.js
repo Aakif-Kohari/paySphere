@@ -2,6 +2,7 @@ require("dotenv").config();
 const app = require("./app");
 const connectDB = require("./config/db");
 const { startCronJobs } = require("./jobs/cron.jobs");
+require("./jobs/reportCron"); // Load report scheduling cron job
 const { seedRbac } = require("./seeds/rbac.seed");
 const { backfillPayrollStatus } = require("./migrations/backfillPayrollStatus");
 const {
