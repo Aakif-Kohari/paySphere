@@ -12,6 +12,7 @@ const Employee = require('../../models/employee.model');
 const User = require('../../models/user.model');
 const PayrollUpdate = require('../../models/payroll.model');
 const eventBus = require('../../services/event.service');
+const AppError = require('../../utils/AppError');
 
 jest.mock('../../models/attendance.model');
 jest.mock('../../models/employee.model');
@@ -82,8 +83,10 @@ describe('getAttendance — ownership and defaults (#459)', () => {
 
     await getAttendance(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json.mock.calls[0][0].message).toBe('Employee not found');
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    const err = next.mock.calls[0][0];
+    expect(err.statusCode).toBe(404);
+    expect(err.message).toBe('Employee not found');
   });
 
   test('rejects a malformed employee id before touching the database', async () => {
@@ -91,7 +94,8 @@ describe('getAttendance — ownership and defaults (#459)', () => {
 
     await getAttendance(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    expect(next.mock.calls[0][0].statusCode).toBe(400);
     expect(Employee.findOne).not.toHaveBeenCalled();
   });
 
@@ -103,7 +107,8 @@ describe('getAttendance — ownership and defaults (#459)', () => {
       jest.clearAllMocks();
       req.query = query;
       await getAttendance(req, res, next);
-      expect(res.status).toHaveBeenCalledWith(400);
+      expect(next).toHaveBeenCalledWith(expect.any(AppError));
+      expect(next.mock.calls[0][0].statusCode).toBe(400);
     }
   });
 
@@ -212,9 +217,10 @@ describe('upsertAttendance — validation, totals and locking (#459)', () => {
 
     await upsertAttendance(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-    const payload = res.json.mock.calls[0][0];
-    expect(payload.errors).toHaveLength(2);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    const err = next.mock.calls[0][0];
+    expect(err.statusCode).toBe(400);
+    expect(err.extra.errors).toHaveLength(2);
     expect(Attendance.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
@@ -224,7 +230,8 @@ describe('upsertAttendance — validation, totals and locking (#459)', () => {
 
     await upsertAttendance(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    expect(next.mock.calls[0][0].statusCode).toBe(400);
   });
 
   test('refuses to edit a month whose payroll has been paid', async () => {
@@ -234,7 +241,8 @@ describe('upsertAttendance — validation, totals and locking (#459)', () => {
 
     await upsertAttendance(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(409);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    expect(next.mock.calls[0][0].statusCode).toBe(409);
     expect(Attendance.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
@@ -248,7 +256,8 @@ describe('upsertAttendance — validation, totals and locking (#459)', () => {
 
     await upsertAttendance(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(409);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    expect(next.mock.calls[0][0].statusCode).toBe(409);
     expect(Attendance.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
@@ -257,7 +266,8 @@ describe('upsertAttendance — validation, totals and locking (#459)', () => {
 
     await upsertAttendance(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(404);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    expect(next.mock.calls[0][0].statusCode).toBe(404);
     expect(Attendance.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
@@ -305,8 +315,12 @@ describe('upsertAttendance — validation, totals and locking (#459)', () => {
 
     await upsertAttendance(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(409);
-    expect(next).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    const err = next.mock.calls[0][0];
+    expect(err.statusCode).toBe(409);
+    expect(err.message).toBe(
+      'Attendance for this month was updated concurrently. Reload and retry.',
+    );
   });
 
   test('an unexpected error is forwarded to the error handler', async () => {
@@ -370,7 +384,8 @@ describe('bulkMarkAttendance (#459)', () => {
 
     await bulkMarkAttendance(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    expect(next.mock.calls[0][0].statusCode).toBe(400);
   });
 
   test('rejects an inverted or out-of-range day span', async () => {
@@ -383,7 +398,8 @@ describe('bulkMarkAttendance (#459)', () => {
       Employee.find.mockResolvedValue([employeeDoc()]);
       req.body = { ...req.body, ...range };
       await bulkMarkAttendance(req, res, next);
-      expect(res.status).toHaveBeenCalledWith(400);
+      expect(next).toHaveBeenCalledWith(expect.any(AppError));
+      expect(next.mock.calls[0][0].statusCode).toBe(400);
     }
   });
 
@@ -392,7 +408,8 @@ describe('bulkMarkAttendance (#459)', () => {
       jest.clearAllMocks();
       req.body = { ...req.body, employeeIds };
       await bulkMarkAttendance(req, res, next);
-      expect(res.status).toHaveBeenCalledWith(400);
+      expect(next).toHaveBeenCalledWith(expect.any(AppError));
+      expect(next.mock.calls[0][0].statusCode).toBe(400);
     }
   });
 
@@ -401,7 +418,8 @@ describe('bulkMarkAttendance (#459)', () => {
 
     await bulkMarkAttendance(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(404);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    expect(next.mock.calls[0][0].statusCode).toBe(404);
     expect(Attendance.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
@@ -509,7 +527,8 @@ describe('getMonthSummary (#459)', () => {
 
     await getMonthSummary(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    expect(next.mock.calls[0][0].statusCode).toBe(400);
   });
 });
 
@@ -540,7 +559,8 @@ describe('getLeaveBalance (#459)', () => {
 
     await getLeaveBalance(req, res, next);
 
-    expect(res.status).toHaveBeenCalledWith(404);
+    expect(next).toHaveBeenCalledWith(expect.any(AppError));
+    expect(next.mock.calls[0][0].statusCode).toBe(404);
   });
 
   test('reflects consumption from the recorded history', async () => {
