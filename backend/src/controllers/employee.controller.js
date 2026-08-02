@@ -869,3 +869,68 @@ exports.restoreEmployee = async (req, res, next) => {
     next(error);
   }
 };
+// EXPORT EMPLOYEES TO CSV
+exports.exportEmployeesCSV = async (req, res, next) => {
+  try {
+    const query = {
+      createdBy: req.userId,
+      deletedAt: null,
+    };
+
+    const employees = await Employee.find(query).sort({ createdAt: -1 });
+
+    const header = [
+      "Name",
+      "Role",
+      "Email",
+      "Status",
+      "Monthly Salary",
+      "Overtime Rate",
+      "Date of Birth",
+      "Joining Date",
+      "Department",
+    ];
+
+    const escapeCsvField = (value) => {
+      if (value === undefined || value === null) return "";
+      let str = String(value);
+      if (/^[=+\-@\t\r]/.test(str)) {
+        str = "'" + str;
+      }
+      if (str.includes(",") || str.includes("\n") || str.includes('"')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const formatDate = (date) => {
+      if (!date) return "";
+      const d = new Date(date);
+      return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
+    };
+
+    const rows = employees.map((emp) => [
+      escapeCsvField(emp.fullName || ""),
+      escapeCsvField(emp.role || ""),
+      escapeCsvField(emp.email || ""),
+      escapeCsvField(emp.isActive ? "Active" : "Inactive"),
+      emp.monthlySalary || 0,
+      emp.overtimeRate || 0,
+      escapeCsvField(formatDate(emp.dateOfBirth)),
+      escapeCsvField(formatDate(emp.joiningDate)),
+      escapeCsvField(emp.department || ""),
+    ]);
+
+    const csvContent = [header.join(","), ...rows.map((row) => row.join(","))].join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=employees_${new Date().toISOString().split("T")[0]}.csv`
+    );
+
+    return res.status(200).send(csvContent);
+  } catch (error) {
+    next(error);
+  }
+};
