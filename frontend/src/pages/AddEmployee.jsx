@@ -428,6 +428,31 @@ export default function AddEmployee() {
                   />
                 </label>
 
+                {/* Department Field */}
+                <label className="block mb-5">
+                  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">
+                    Department
+                  </span>
+                  <input
+                    id="employee-department"
+                    type="text"
+                    list="department-suggestions"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    placeholder="e.g. Engineering, Sales, HR, Marketing"
+                    className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
+                  />
+                  <datalist id="department-suggestions">
+                    <option value="Engineering" />
+                    <option value="Sales" />
+                    <option value="Marketing" />
+                    <option value="Human Resources" />
+                    <option value="Finance" />
+                    <option value="Operations" />
+                    <option value="Design" />
+                  </datalist>
+                </label>
+
                 {/* Dates */}
                 <div className="mb-5">
                   <div className="flex flex-col sm:flex-row gap-4">
@@ -636,27 +661,3 @@ export default function AddEmployee() {
     </div>
   );
 }
-{/* Department Field */ }
-<label className="block mb-5">
-  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">
-    Department
-  </span>
-  <input
-    id="employee-department"
-    type="text"
-    list="department-suggestions"
-    value={department}
-    onChange={(e) => setDepartment(e.target.value)}
-    placeholder="e.g. Engineering, Sales, HR, Marketing"
-    className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
-  />
-  <datalist id="department-suggestions">
-    <option value="Engineering" />
-    <option value="Sales" />
-    <option value="Marketing" />
-    <option value="Human Resources" />
-    <option value="Finance" />
-    <option value="Operations" />
-    <option value="Design" />
-  </datalist>
-</label>
