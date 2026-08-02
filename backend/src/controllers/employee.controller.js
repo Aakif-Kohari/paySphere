@@ -8,9 +8,6 @@ const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
 const Settlement = require("../models/settlement.model");
-const { fullName, role, department, monthlySalary, overtimeRate, dateOfBirth, joiningDate, email, bankDetails } = req.body;
-
-
 /**
  * Normalize an employee email for storage.
  *
