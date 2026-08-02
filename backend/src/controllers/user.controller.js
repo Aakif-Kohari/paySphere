@@ -18,6 +18,7 @@ const {
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const { getDefaultRole } = require('../seeds/rbac.seed');
+const mongoose = require("mongoose");
 
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
@@ -771,6 +772,51 @@ exports.logout = async (req, res, next) => {
       sameSite: 'strict',
     });
     res.status(200).json({ message: 'Logged out successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+// GET SYSTEM HEALTH METRICS
+exports.getSystemHealth = async (req, res, next) => {
+  try {
+    const memoryUsage = process.memoryUsage();
+    const uptimeSeconds = process.uptime();
+
+    // Map mongoose connection states
+    const dbStates = {
+      0: "Disconnected",
+      1: "Connected",
+      2: "Connecting",
+      3: "Disconnecting",
+    };
+
+    const healthData = {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: {
+        seconds: Math.floor(uptimeSeconds),
+        formatted: `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${Math.floor(uptimeSeconds % 60)}s`,
+      },
+      database: {
+        status: dbStates[mongoose.connection.readyState] || "Unknown",
+        readyState: mongoose.connection.readyState,
+        host: mongoose.connection.host || "N/A",
+        name: mongoose.connection.name || "N/A",
+      },
+      memory: {
+        rssMB: (memoryUsage.rss / 1024 / 1024).toFixed(2),
+        heapTotalMB: (memoryUsage.heapTotal / 1024 / 1024).toFixed(2),
+        heapUsedMB: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2),
+        externalMB: (memoryUsage.external / 1024 / 1024).toFixed(2),
+      },
+      environment: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        pid: process.pid,
+      },
+    };
+
+    return res.status(200).json(healthData);
   } catch (error) {
     next(error);
   }
