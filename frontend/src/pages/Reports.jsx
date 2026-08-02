@@ -51,7 +51,13 @@ const MonthYearSelector = ({ month, year, onChange }) => (
 // --- Download Helper ---
 const downloadFileWithProgress = async (url, filename, type, setExportingType, setSnackbar) => {
   const token = localStorage.getItem('token');
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const baseUrl =
+    import.meta.env.VITE_API_URL ||
+    (import.meta.env.PROD
+      ? typeof window !== 'undefined'
+        ? window.location.origin
+        : ''
+      : 'http://localhost:5000');
   setExportingType(type);
   try {
     const res = await fetch(`${baseUrl}${url}`, {
