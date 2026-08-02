@@ -18,6 +18,7 @@ const Sidebar = ({
     () => [
       { id: 'Dashboard', label: 'Dashboard', icon: <GridViewIcon /> },
       { id: 'Employees', label: 'Employees', icon: <PeopleIcon /> },
+      { id: 'Payroll', label: 'Payroll History', icon: <AccountBalanceWalletIcon /> },
       { id: 'Approvals', label: 'Approvals', icon: <FactCheckIcon /> },
       { id: 'Settlements', label: 'Exits & F&F', icon: <LogoutIcon /> },
       { id: 'Loans', label: 'Advances', icon: <AccountBalanceWalletIcon /> },

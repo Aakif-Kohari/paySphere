@@ -38,6 +38,8 @@ jest.mock("../../services/email.service", () => ({
 // Helper to construct query mock supporting both direct await and .sort() chaining
 const createQueryMock = (data) => ({
   sort: jest.fn().mockReturnThis(),
+  skip: jest.fn().mockReturnThis(),
+  limit: jest.fn().mockReturnThis(),
   exec: jest.fn().mockResolvedValue(data),
   then: (resolve, reject) => Promise.resolve(data).then(resolve, reject),
   catch: (reject) => Promise.resolve(data).catch(reject),
@@ -449,6 +451,10 @@ describe("getPayrollSummary floating-point precision unit test (#347)", () => {
       { employeeName: "Bob", netSalary: 3410.80, status: "paid" },
     ];
 
+    PayrollUpdate.countDocuments.mockResolvedValue(mockPayrolls.length);
+    PayrollUpdate.aggregate.mockResolvedValue([
+      { totalPayout: 4661.35, payableCount: 2, pendingApprovalTotal: 0, pendingApprovalCount: 0 }
+    ]);
     PayrollUpdate.find.mockImplementation(() => createQueryMock(mockPayrolls));
 
     await getPayrollSummary(req, res, next);

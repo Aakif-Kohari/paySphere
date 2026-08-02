@@ -217,21 +217,36 @@ export default function MonthlyUpdates() {
     }
   }, [token, navigate]);
 
-  // Fetch real employees from API
+  // Fetch all active employees page-by-page to avoid huge payloads.
+  // The monthly-updates input box needs the full list to resolve names,
+  // but we still use the server's pagination so each round-trip is small.
   useEffect(() => {
-    const fetchEmployees = async () => {
+    const fetchAllEmployees = async () => {
       try {
-        const res = await api.get(`/api/employees`);
-        setEmployees(res.data.employees);
+        const PAGE_SIZE = 50;
+        let page = 1;
+        let allEmployees = [];
+        let totalPages = 1;
+
+        do {
+          const res = await api.get(`/api/employees?page=${page}&limit=${PAGE_SIZE}`);
+          const data = res.data;
+          allEmployees = allEmployees.concat(data.employees || []);
+          totalPages = data.totalPages || 1;
+          page++;
+        } while (page <= totalPages);
+
+        setEmployees(allEmployees);
       } catch (err) {
         console.error("Failed to fetch employees:", err);
       } finally {
         setLoadingEmployees(false);
       }
     };
-    if (token) fetchEmployees();
+    if (token) fetchAllEmployees();
     else setTimeout(() => setLoadingEmployees(false), 0);
   }, [token]);
+
 
 
 
