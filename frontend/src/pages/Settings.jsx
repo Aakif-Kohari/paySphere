@@ -444,6 +444,11 @@ export default function Settings() {
       icon: <SupportIcon />,
     },
   ];
+  const ShieldIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </svg>
+);
 
   const settingsTabs = [
     { id: 'profile', label: 'Profile', icon: <UserIcon /> },
@@ -453,6 +458,7 @@ export default function Settings() {
     { id: 'payroll', label: 'Payroll Config', icon: <WalletIcon /> },
     { id: 'notifications', label: 'Notifications', icon: <BellIcon /> },
     { id: 'about', label: 'About PaySphere', icon: <InfoIcon /> },
+    { id: 'auditLogs', label: 'Audit Logs', icon: <ShieldIcon /> },
   ];
 
   const getInitials = (name) =>
@@ -1518,3 +1524,37 @@ export default function Settings() {
     </div>
   );
 }
+const [auditLogs, setAuditLogs] = useState([]);
+const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+const [exportingAuditLogs, setExportingAuditLogs] = useState(false);
+const [auditDaysFilter, setAuditDaysFilter] = useState('');
+
+useEffect(() => {
+  if (activeTab === 'auditLogs') {
+    setLoadingAuditLogs(true);
+    api.get('/api/audit-logs?page=1&limit=50')
+      .then((res) => setAuditLogs(res.data.logs || []))
+      .catch((err) => console.error('Failed to fetch audit logs', err))
+      .finally(() => setLoadingAuditLogs(false));
+  }
+}, [activeTab]);
+
+const handleExportAuditLogs = async () => {
+  setExportingAuditLogs(true);
+  try {
+    const urlParams = auditDaysFilter ? `?days=${auditDaysFilter}` : '';
+    const response = await api.get(`/api/audit-logs/export${urlParams}`, {
+      responseType: 'blob',
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `audit_logs_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    alert(err.response?.data?.message || 'Failed to export audit logs.');
+  } fontFinally(() => setExportingAuditLogs(false));
+};
