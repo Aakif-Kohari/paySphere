@@ -18,7 +18,6 @@ const {
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const { getDefaultRole } = require('../seeds/rbac.seed');
-const mongoose = require("mongoose");
 
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
