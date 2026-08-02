@@ -6,7 +6,6 @@ import { logout } from "../features/auth/authSlice";
 import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
 import useCtrlEnterSubmit from "../hooks/useCtrlEnterSubmit";
-const [department, setDepartment] = useState("");
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const GridIcon = () => (
@@ -95,6 +94,7 @@ export default function AddEmployee() {
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("");
   const [monthlySalary, setMonthlySalary] = useState("");
+  const [department, setDepartment] = useState("");
   const [overtimeRate, setOvertimeRate] = useState("");
   const [currency, setCurrency] = useState("INR");
   const [dateOfBirth, setDateOfBirth] = useState("");
