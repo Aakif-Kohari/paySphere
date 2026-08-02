@@ -21,6 +21,12 @@ const employeeSchema = new mongoose.Schema(
       default: '',
       maxlength: [100, 'Role cannot exceed 100 characters'],
     },
+    department: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: [100, 'Department cannot exceed 100 characters'],
+    },
     /**
      * Derived mirror of `employmentStatus`, kept so every existing query that
      * filters on it keeps working untouched (#462).
@@ -32,11 +38,6 @@ const employeeSchema = new mongoose.Schema(
 
     /**
      * Explicit employment state.
-     *
-     * `isActive` meant both "temporarily suspended" and "has left the company"
-     * — two states with completely different payroll semantics collapsed into
-     * one flag. An employee on notice is still working and still payable up to
-     * their last day; an exited one is not, but keeps their history (#462).
      */
     employmentStatus: {
       type: String,
@@ -123,17 +124,8 @@ const employeeSchema = new mongoose.Schema(
 );
 
 employeeSchema.index({ createdBy: 1, fullName: 1, role: 1 }, { unique: true });
+employeeSchema.index({ createdBy: 1, fullName: 1, role: 1, department: 1 }, { unique: true });
 
-// One email per company — but only for employees that actually have one.
-//
-// `sparse: true` does not work on a compound index here. Per the MongoDB docs a
-// compound sparse index indexes a document that has *at least one* of the keys,
-// and `createdBy` is `required: true`, so every employee got an index entry with
-// `email` recorded as null. Every email-less employee therefore collided on the
-// same { email: null, createdBy } key and the second one failed with E11000.
-//
-// `partialFilterExpression` is the correct construct: documents without a string
-// `email` are left out of the index entirely (#414, #374).
 employeeSchema.index(
   { email: 1, createdBy: 1 },
   {
