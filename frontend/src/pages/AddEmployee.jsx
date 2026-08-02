@@ -631,3 +631,37 @@ export default function AddEmployee() {
     </div>
   );
 }
+const [exportingCsv, setExportingCsv] = useState(false);
+
+const handleExportCsv = async () => {
+  setExportingCsv(true);
+  try {
+    const response = await api.get("/api/employees/export-csv", {
+      responseType: "blob",
+    });
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `employees_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    setError(err.response?.data?.message || "Failed to export employees list.");
+  } finally {
+    setExportingCsv(false);
+  }
+};
+<div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-800">
+  <button
+    type="button"
+    onClick={handleExportCsv}
+    disabled={exportingCsv}
+    className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-semibold disabled:opacity-40 transition flex items-center justify-center gap-2 text-sm shadow-xs"
+  >
+    <span>📥</span>
+    {exportingCsv ? "Exporting..." : "Export Employees to CSV"}
+  </button>
+</div>
