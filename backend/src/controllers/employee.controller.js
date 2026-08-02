@@ -8,6 +8,8 @@ const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
 const Settlement = require("../models/settlement.model");
+const { fullName, role, department, monthlySalary, overtimeRate, dateOfBirth, joiningDate, email, bankDetails } = req.body;
+
 
 /**
  * Normalize an employee email for storage.
@@ -117,6 +119,7 @@ exports.addEmployee = async (req, res, next) => {
     const employee = new Employee({
       fullName: sanitizeText(fullName),
       role: sanitizeText(role),
+      department: department ? sanitizeText(department) : '',
       monthlySalary: numSalary,
       overtimeRate: numOvertime,
       companyName: sanitizeText(user.companyName),
@@ -234,6 +237,7 @@ exports.getRecentEmployees = async (req, res, next) => {
 };
 
 exports.importEmployees = async (req, res, next) => {
+  const sanitizedDepartment = record.department ? sanitizeText(record.department.trim()) : '';
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -285,9 +289,9 @@ exports.importEmployees = async (req, res, next) => {
           const existingEmployees =
             nameRegexes.length > 0
               ? await Employee.find({
-                  createdBy: req.userId,
-                  fullName: { $in: nameRegexes },
-                }).select('fullName role')
+                createdBy: req.userId,
+                fullName: { $in: nameRegexes },
+              }).select('fullName role')
               : [];
 
           const existingKeys = new Set(
@@ -408,6 +412,7 @@ exports.importEmployees = async (req, res, next) => {
             employees.push({
               fullName: sanitizedName,
               role: sanitizedRole,
+              department: sanitizedDepartment,
               monthlySalary,
               overtimeRate,
               companyName: sanitizeText(user.companyName),
@@ -508,8 +513,8 @@ exports.updateEmployee = async (req, res, next) => {
       return res.status(400).json({ message: 'Request body is required' });
     }
     const { id } = req.params;
-    const { fullName, role, monthlySalary, overtimeRate, isActive, email, bankDetails } = req.body;
-
+    const { fullName, role, department, monthlySalary, overtimeRate, isActive, email, bankDetails } = req.body;
+    if (department !== undefined) employee.department = sanitizeText(department);
     const employee = await Employee.findById(id);
 
     if (!employee || employee.deletedAt) {
