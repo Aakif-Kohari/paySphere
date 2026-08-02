@@ -8,7 +8,7 @@ const auth = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    const user = await User.findById(decoded.id).select("_id isActive tokenVersion");
+    const user = await User.findById(decoded.id).select("_id isActive tokenVersion role employeeId");
     if (!user || user.isActive === false) {
       return res.status(401).json({ message: "User not found or deactivated" });
     }

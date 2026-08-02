@@ -10,6 +10,7 @@ import AddEmployee from "./pages/AddEmployee"
 import ResetPassword from "./pages/ResetPassword"
 import Settings from "./pages/Settings"
 import Reports from "./pages/Reports"
+import EmployeePortal from "./pages/EmployeePortal"
 import NotFound from "./pages/NotFound"
 import ScrollToTop from "./components/common/ScrollToTop"
 function App() {
@@ -48,15 +49,17 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<LoginSignUp />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/employee-portal" element={<EmployeePortal />} />
           <Route path="/monthly-updates" element={<MonthlyUpdates />} />
           <Route path="/add-employee" element={<AddEmployee />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="*" element={<NotFound />} />
-</Routes>
+        </Routes>
         <ScrollToTop />
-      </BrowserRouter>    </ThemeProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
 

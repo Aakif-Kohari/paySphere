@@ -6,6 +6,7 @@ const userRoutes = require("./routes/user.routes");
 const employeeRoutes = require("./routes/employee.routes");
 const payrollRoutes = require("./routes/payroll.routes");
 const reportsRoutes = require("./routes/reports.routes");
+const employeePortalRoutes = require("./routes/employeePortal.routes");
 
 const app = express();
 
@@ -45,6 +46,7 @@ app.use("/api/auth", userRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/reports", reportsRoutes);
+app.use("/api/employee-portal", employeePortalRoutes);
 
 // CORS error handler — return 403 for blocked origins
 app.use((err, req, res, next) => {
