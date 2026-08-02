@@ -39,7 +39,7 @@ export default function Contributors() {
             OPEN SOURCE COMMUNITY
           </p>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight">
-            Built by amazing <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-500 dark:from-blue-400 dark:to-cyan-300">contributors</span>
+            Built by amazing <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-cyan-500 dark:from-blue-400 dark:to-cyan-300">contributors</span>
           </h2>
           <p className="mt-4 text-sm sm:text-base text-gray-500 dark:text-slate-400 max-w-2xl mx-auto">
             PaySphere is powered by the brilliant minds of developers across the globe. 
@@ -48,7 +48,7 @@ export default function Contributors() {
         </div>
 
         {/* Scrollable Wrapper Container (Calculated for ~3 rows) */}
-        <div className="max-h-[550px] sm:max-h-[650px] overflow-y-auto pr-2 sm:pr-4 pb-4 
+        <div className="max-h-137.5 sm:max-h-162.5 overflow-y-auto pr-2 sm:pr-4 pb-4 
           [&::-webkit-scrollbar]:w-2 
           [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-track]:dark:bg-slate-900/50 [&::-webkit-scrollbar-track]:rounded-full 
           [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:dark:bg-slate-700 [&::-webkit-scrollbar-thumb]:rounded-full

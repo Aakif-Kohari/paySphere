@@ -40,12 +40,12 @@ export default function Landing() {
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
         
         {/* 1. Subtle Grid Pattern */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-size-[32px_32px]"></div>
 
         {/* 2. Glowing Gradient Orbs */}
-        <div className="absolute -top-40 -left-40 w-[500px] h-[500px] bg-blue-400/20 dark:bg-blue-600/10 rounded-full blur-[100px]"></div>
-        <div className="absolute top-1/3 -right-40 w-[400px] h-[400px] bg-emerald-400/20 dark:bg-emerald-600/10 rounded-full blur-[100px]"></div>
-        <div className="absolute -bottom-40 left-1/3 w-[600px] h-[600px] bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-[120px]"></div>
+        <div className="absolute -top-40 -left-40 w-125 h-125 bg-blue-400/20 dark:bg-blue-600/10 rounded-full blur-[100px]"></div>
+        <div className="absolute top-1/3 -right-40 w-100 h-100 bg-emerald-400/20 dark:bg-emerald-600/10 rounded-full blur-[100px]"></div>
+        <div className="absolute -bottom-40 left-1/3 w-150 h-150 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-[120px]"></div>
         
         {/* Top Left: Rupee Sign */}
         <FloatingShape 
