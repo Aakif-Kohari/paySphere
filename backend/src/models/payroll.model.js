@@ -1,4 +1,9 @@
 const mongoose = require("mongoose");
+const {
+  ALL_STATUSES,
+  PAYROLL_STATUS,
+  normalizeStatus,
+} = require("../config/payrollStatus");
 
 const payrollUpdateSchema = new mongoose.Schema({
   employeeId: {
@@ -13,6 +18,10 @@ const payrollUpdateSchema = new mongoose.Schema({
   month: {
     type: Number, // 1-12
     required: true,
+  },
+  currency: {
+    type: String,
+    default: "INR",
   },
   year: {
     type: Number,
@@ -42,6 +51,10 @@ const payrollUpdateSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  customDeductions: [{
+    name: String,
+    amount: Number
+  }],
   leaveDeduction: {
     type: Number,
     default: 0,
@@ -59,14 +72,90 @@ const payrollUpdateSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  // The approval workflow added in #438 writes "PENDING_APPROVAL"/"APPROVED"/
+  // "REJECTED", none of which were in this enum — so every save() path threw a
+  // ValidationError and the workflow only appeared to work because it went
+  // through updateMany, which skips validators by default (#458).
+  //
+  // The vocabulary now comes from config/payrollStatus.js, shared with every
+  // controller that compares against it. `set` folds the legacy "finalized" and
+  // the screaming-snake spellings onto the canonical values so documents
+  // written by either older revision keep validating.
   status: {
     type: String,
-    enum: ["finalized", "paid"],
-    default: "finalized",
+    enum: ALL_STATUSES,
+    default: PAYROLL_STATUS.PENDING_APPROVAL,
+    set: (value) => normalizeStatus(value) || value,
+  },
+  /**
+   * Where leaveDays and overtimeHours came from.
+   *
+   * "ledger"  — derived from the validated Attendance document for the month
+   * "manual"  — parsed out of the activity tag strings, the pre-#459 path
+   *
+   * Recorded so an audit of "why was this employee docked three days?" can tell
+   * whether the answer is a day-by-day record or a regex over a display label.
+   */
+  attendanceSource: {
+    type: String,
+    enum: ["ledger", "manual"],
+    default: "manual",
+  },
+  /**
+   * Instalments collected against this payroll row (#460).
+   *
+   * Stored on the row rather than only on the loan so a payslip regenerated
+   * later reproduces the recovery line exactly as it was paid, and so the
+   * deduction can be traced back to the loan it serviced.
+   */
+  loanRecoveries: [{
+    loanId: { type: mongoose.Schema.Types.ObjectId, ref: "Loan" },
+    amount: { type: Number, default: 0 },
+    principalComponent: { type: Number, default: 0 },
+    interestComponent: { type: Number, default: 0 },
+    scheduledAmount: { type: Number, default: 0 },
+    shortfall: { type: Number, default: 0 },
+  }],
+  loanRecoveryTotal: {
+    type: Number,
+    default: 0,
+  },
+  /**
+   * The salary component split in force when this row was calculated (#461).
+   *
+   * Snapshotted rather than looked up at render time, so a payslip regenerated
+   * a year later still shows the breakdown that was actually paid instead of
+   * the employee's current package.
+   */
+  salarySnapshot: {
+    effectiveGross: { type: Number },
+    isProrated: { type: Boolean, default: false },
+    segmentCount: { type: Number, default: 1 },
+    components: [{
+      code: String,
+      label: String,
+      type: String,
+      amount: Number,
+    }],
+  },
+  payslipEmailed: {
+    type: Boolean,
+    default: false,
   },
 }, { timestamps: true });
 
 // Ensure one payroll record per employee per month
 payrollUpdateSchema.index({ employeeId: 1, month: 1, year: 1, createdBy: 1 }, { unique: true });
+
+payrollUpdateSchema.index({ createdBy: 1, year: -1, month: -1 });
+
+// The approvals queue reads "everything pending, newest first, for this
+// account". Without a compound index on the two fields it filters by, that is a
+// collection scan on the single largest collection in the product — the exact
+// class of problem #241 fixed for the other hot paths.
+payrollUpdateSchema.index({ createdBy: 1, status: 1, createdAt: -1 });
+
+// Summary, exports and analytics all filter { createdBy, month, year, status }.
+payrollUpdateSchema.index({ createdBy: 1, year: -1, month: -1, status: 1 });
 
 module.exports = mongoose.model("PayrollUpdate", payrollUpdateSchema);

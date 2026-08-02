@@ -22,10 +22,10 @@ export default function Navbar() {
 
           {/* Desktop Menu */}
           <ul className="hidden md:flex gap-6 lg:gap-8 text-[14px] lg:text-[15px] font-medium text-gray-600 dark:text-slate-300">
-            <a href="#features" className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors">Features</a>
-            <a href="#process" className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors">Process</a>
-            <a href="#pricing" className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors">Pricing</a>
-            <a href="#faq" className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors">FAQ</a>
+            <a href="#features" className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">Features</a>
+            <a href="#process" className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">Process</a>
+            <a href="#pricing" className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">Pricing</a>
+            <a href="#faq" className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">FAQ</a>
           </ul>
         </div>
 
@@ -50,7 +50,7 @@ export default function Navbar() {
         <div className="flex items-center gap-2 md:hidden">
           <ThemeToggle />
           <button
-            className="flex flex-col gap-1 p-2"
+            className="flex flex-col gap-1 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             onClick={() => setIsOpen(!isOpen)}
             aria-label="Toggle menu"
           >
@@ -65,10 +65,10 @@ export default function Navbar() {
       {isOpen && (
         <div className="md:hidden px-6 pb-6 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 transition-colors duration-200">
           <ul className="flex flex-col gap-4 text-[15px] font-medium text-gray-700 dark:text-slate-200 mt-4 mb-6">
-            <a href="#features" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors" onClick={() => setIsOpen(false)}>Features</a>
-            <a href="#process" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors" onClick={() => setIsOpen(false)}>Process</a>
-            <a href="#pricing" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors" onClick={() => setIsOpen(false)}>Pricing</a>
-            <a href="#faq" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors" onClick={() => setIsOpen(false)}>FAQ</a>
+            <a href="#features" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => setIsOpen(false)}>Features</a>
+            <a href="#process" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => setIsOpen(false)}>Process</a>
+            <a href="#pricing" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => setIsOpen(false)}>Pricing</a>
+            <a href="#faq" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => setIsOpen(false)}>FAQ</a>
           </ul>
 
           <div className="flex items-center gap-4">

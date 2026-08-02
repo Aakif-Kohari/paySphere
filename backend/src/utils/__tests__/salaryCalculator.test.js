@@ -101,4 +101,17 @@ describe('calculateNetSalary Unit Tests', () => {
     expect(result.overtimePay).toBe(151);
     expect(result.netSalary).toBe(33989);
   });
+
+  // Test case 8: Net salary should never go negative
+  test('should floor net salary at 0 when deductions exceed base salary', () => {
+    const employee = { monthlySalary: 30000 };
+    const user = { defaultDailyRate: 1000 };
+    const adjustments = { leaveDays: 30, deductions: 500 };
+    // leaveDeduction: 1000 * 30 = 30000; netSalary would be 30000 - 30000 - 500 = -500
+
+    const result = calculateNetSalary(employee, user, adjustments);
+
+    expect(result.leaveDeduction).toBe(30000);
+    expect(result.netSalary).toBe(0);
+  });
 });

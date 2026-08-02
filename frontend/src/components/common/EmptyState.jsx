@@ -22,7 +22,7 @@ export default function EmptyState({ title, description, action }) {
       <EmptyIllustration />
 
       <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
-      <p className="text-gray-400 text-sm mb-6 max-w-sm">{description}</p>
+      <p className="text-gray-500 text-sm mb-6 max-w-sm">{description}</p>
 
       {action}
     </div>

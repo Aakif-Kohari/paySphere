@@ -1,54 +1,112 @@
-const axios = require("axios");
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const { OAuth2Client } = require("google-auth-library");
-const crypto = require("crypto");
-const User = require("../models/user.model");
-const Employee = require("../models/employee.model");
-const PayrollUpdate = require("../models/payroll.model");
-const { sendEmail } = require("../utils/email");
-const { isNonEmptyString, isValidEmail } = require("../utils/validators");
+const axios = require('axios');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+const { OAuth2Client } = require('google-auth-library');
+const crypto = require('crypto');
+const User = require('../models/user.model');
+const Employee = require('../models/employee.model');
+const PayrollUpdate = require('../models/payroll.model');
+const { sendEmail } = require('../utils/email');
+const {
+  isNonEmptyString,
+  isValidEmail,
+  sanitizeText,
+  DAILY_RATE_MAX,
+  OVERTIME_RATE_MAX,
+} = require('../utils/validators');
+const logger = require('../utils/logger');
+const eventBus = require('../services/event.service');
+const { getDefaultRole } = require('../seeds/rbac.seed');
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const GOOGLE_CLIENT_ID =
+  process.env.GOOGLE_CLIENT_ID ||
+  '250441239388-ldget7kv1v1hvf6vm1r6b0p48fassv43.apps.googleusercontent.com';
+const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+
+const generateTokens = (user, res) => {
+  const accessToken = jwt.sign(
+    { id: user._id, tokenVersion: user.tokenVersion || 0 },
+    process.env.JWT_SECRET,
+    { expiresIn: '15m' },
+  );
+
+  const refreshToken = jwt.sign(
+    { id: user._id, tokenVersion: user.tokenVersion || 0 },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' },
+  );
+
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  });
+
+  return accessToken;
+};
 
 // SIGN UP
 exports.signup = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ message: 'Request body is required' });
+    }
     const { fullName, email, companyName, password } = req.body;
 
-    if (!isNonEmptyString(fullName) || !isNonEmptyString(email) || !isNonEmptyString(companyName) || !isNonEmptyString(password)) {
-      return res.status(400).json({ message: "Full name, email, company name, and password are required non-empty strings" });
+    if (
+      !isNonEmptyString(fullName) ||
+      !isNonEmptyString(email) ||
+      !isNonEmptyString(companyName) ||
+      !isNonEmptyString(password)
+    ) {
+      return res.status(400).json({
+        message:
+          'Full name, email, company name, and password are required non-empty strings',
+      });
     }
 
     if (!isValidEmail(email)) {
-      return res.status(400).json({ message: "Invalid email address format" });
+      return res.status(400).json({ message: 'Invalid email address format' });
     }
 
     if (!passwordRegex.test(password)) {
-      return res.status(400).json({ message: "Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character" });
+      return res.status(400).json({
+        message:
+          'Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character',
+      });
     }
 
     const cleanEmail = email.trim().toLowerCase();
     const existingUser = await User.findOne({ email: cleanEmail });
-    if (existingUser) return res.status(400).json({ message: "User already exists" });
+    if (existingUser)
+      return res.status(400).json({ message: 'User already exists' });
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // Assign the owner role at creation. Without this the account is locked out
+    // of every permission-guarded route the moment it is created (#413).
+    const defaultRole = await getDefaultRole();
+
     const newUser = new User({
-      fullName: fullName.trim(),
+      fullName: sanitizeText(fullName),
       email: cleanEmail,
-      companyName: companyName.trim(),
+      companyName: sanitizeText(companyName),
       password: hashedPassword,
+      ...(defaultRole ? { role: defaultRole._id } : {}),
     });
 
     await newUser.save();
 
-    const token = jwt.sign(
-      { id: newUser._id, tokenVersion: newUser.tokenVersion || 0 },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    if (!defaultRole) {
+      logger.warn('Signed up a user without a role: RBAC roles are not seeded', {
+        userId: newUser._id,
+      });
+    }
+
+    const token = generateTokens(newUser, res);
 
     res.status(201).json({ token, companyName: newUser.companyName, role: newUser.role || "ADMIN", employeeId: newUser.employeeId });
   } catch (error) {
@@ -62,26 +120,24 @@ exports.login = async (req, res, next) => {
     const { email, password } = req.body;
 
     if (!isNonEmptyString(email) || !isNonEmptyString(password)) {
-      return res.status(400).json({ message: "Email and password are required strings" });
+      return res
+        .status(400)
+        .json({ message: 'Email and password are required strings' });
     }
 
     if (!isValidEmail(email)) {
-      return res.status(400).json({ message: "Invalid email address format" });
+      return res.status(400).json({ message: 'Invalid email address format' });
     }
 
     const cleanEmail = email.trim().toLowerCase();
     const user = await User.findOne({ email: cleanEmail });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res.status(400).json({ message: 'Invalid credentials' });
 
-    const token = jwt.sign(
-      { id: user._id, tokenVersion: user.tokenVersion || 0 },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = generateTokens(user, res);
 
     res.status(200).json({ token, companyName: user.companyName, role: user.role || "ADMIN", employeeId: user.employeeId });
   } catch (error) {
@@ -95,7 +151,9 @@ exports.getSettings = async (req, res, next) => {
     const user = await User.findById(req.userId).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const employeeCount = await Employee.countDocuments({ createdBy: req.userId });
+    const employeeCount = await Employee.countDocuments({
+      createdBy: req.userId,
+    });
 
     res.status(200).json({
       fullName: user.fullName,
@@ -107,8 +165,8 @@ exports.getSettings = async (req, res, next) => {
       defaultDailyRate: user.defaultDailyRate || 0,
       isGoogleLinked: !!user.googleId,
       organizationId: user._id.toString(),
-      payrollId: "PR-" + user._id.toString().slice(-6).toUpperCase(),
-      employeeCount
+      payrollId: 'PR-' + user._id.toString().slice(-6).toUpperCase(),
+      employeeCount,
     });
   } catch (error) {
     next(error);
@@ -116,55 +174,161 @@ exports.getSettings = async (req, res, next) => {
 };
 
 // UPDATE USER SETTINGS
+
+exports.uploadLogo = async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No image provided" });
+    
+    // Store as base64 string
+    const base64Data = req.file.buffer.toString("base64");
+    const mimeType = req.file.mimetype;
+    const logoDataUrl = `data:${mimeType};base64,${base64Data}`;
+
+    await User.findByIdAndUpdate(req.userId, { companyLogoData: logoDataUrl });
+    
+    // Also invalidate settings cache if we had one
+    res.status(200).json({ message: "Logo updated successfully", logo: logoDataUrl });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.updateSettings = async (req, res, next) => {
   try {
-    const { settings, fullName, email, companyName, defaultOvertimeRate, defaultDailyRate, avatar } = req.body;
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ message: 'Request body is required' });
+    }
+    let {
+      settings,
+      fullName,
+      email,
+      companyName,
+      defaultOvertimeRate,
+      defaultDailyRate,
+      avatar,
+    } = req.body;
 
-    const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    if (
-      (defaultOvertimeRate !== undefined && (typeof defaultOvertimeRate !== "number" || isNaN(defaultOvertimeRate) || defaultOvertimeRate < 0)) ||
-      (defaultDailyRate !== undefined && (typeof defaultDailyRate !== "number" || isNaN(defaultDailyRate) || defaultDailyRate < 0))
-    ) {
-      return res.status(400).json({ message: "Default rates must be non-negative numbers" });
+    if (settings && settings.payrollConfig) {
+      if (defaultDailyRate === undefined && settings.payrollConfig.defaultDailyRate !== undefined) {
+        defaultDailyRate = Number(settings.payrollConfig.defaultDailyRate);
+      }
+      if (defaultOvertimeRate === undefined && settings.payrollConfig.defaultOvertimeRate !== undefined) {
+        defaultOvertimeRate = Number(settings.payrollConfig.defaultOvertimeRate);
+      }
     }
 
-    if (fullName) user.fullName = fullName;
-    if (email) user.email = email;
-    if (companyName) user.companyName = companyName;
-    if (defaultOvertimeRate !== undefined) user.defaultOvertimeRate = defaultOvertimeRate;
-    if (defaultDailyRate !== undefined) user.defaultDailyRate = defaultDailyRate;
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (
+      (defaultOvertimeRate !== undefined &&
+        (typeof defaultOvertimeRate !== 'number' ||
+          isNaN(defaultOvertimeRate) ||
+          defaultOvertimeRate < 0)) ||
+      (defaultDailyRate !== undefined &&
+        (typeof defaultDailyRate !== 'number' ||
+          isNaN(defaultDailyRate) ||
+          defaultDailyRate < 0))
+    ) {
+      return res
+        .status(400)
+        .json({ message: 'Default rates must be non-negative numbers' });
+    }
+
+    if (
+      defaultOvertimeRate !== undefined &&
+      defaultOvertimeRate > OVERTIME_RATE_MAX
+    ) {
+      return res.status(400).json({
+        message: `Default overtime rate cannot exceed ${OVERTIME_RATE_MAX}`,
+      });
+    }
+    if (defaultDailyRate !== undefined && defaultDailyRate > DAILY_RATE_MAX) {
+      return res.status(400).json({
+        message: `Default daily rate cannot exceed ${DAILY_RATE_MAX}`,
+      });
+    }
+
+    if (fullName) user.fullName = sanitizeText(fullName);
+
+    if (email !== undefined) {
+      const cleanEmail = email.trim().toLowerCase();
+      if (!isValidEmail(cleanEmail)) {
+        return res
+          .status(400)
+          .json({ message: 'Invalid email address format' });
+      }
+      if (cleanEmail !== user.email) {
+        const emailExists = await User.findOne({ email: cleanEmail });
+        if (emailExists) {
+          return res
+            .status(409)
+            .json({ message: 'Email is already in use by another account' });
+        }
+        user.email = cleanEmail;
+      }
+    }
+
+    if (companyName) user.companyName = sanitizeText(companyName);
+    if (defaultOvertimeRate !== undefined)
+      user.defaultOvertimeRate = defaultOvertimeRate;
+    if (defaultDailyRate !== undefined)
+      user.defaultDailyRate = defaultDailyRate;
     if (avatar !== undefined) user.avatar = avatar;
 
     if (!user.settings) user.settings = {};
 
     if (settings) {
       if (settings.preferences) {
-        user.settings.preferences = { ...(user.settings.preferences || {}), ...settings.preferences };
+        user.settings.preferences = {
+          ...(user.settings.preferences || {}),
+          ...settings.preferences,
+        };
       }
       if (settings.companyInfo) {
-        user.settings.companyInfo = { ...(user.settings.companyInfo || {}), ...settings.companyInfo };
+        user.settings.companyInfo = {
+          ...(user.settings.companyInfo || {}),
+          ...settings.companyInfo,
+        };
       }
       if (settings.payrollConfig) {
-        user.settings.payrollConfig = { ...(user.settings.payrollConfig || {}), ...settings.payrollConfig };
+        user.settings.payrollConfig = {
+          ...(user.settings.payrollConfig || {}),
+          ...settings.payrollConfig,
+        };
       }
       if (settings.notifications) {
-        user.settings.notifications = { ...(user.settings.notifications || {}), ...settings.notifications };
+        user.settings.notifications = {
+          ...(user.settings.notifications || {}),
+          ...settings.notifications,
+        };
       }
     }
 
     await user.save();
 
+    eventBus.emitAuditLog({
+      userId: req.userId,
+      action: 'SETTINGS_UPDATE',
+      resourceType: 'User',
+      details: { updatedFields: Object.keys(req.body) },
+      req,
+    });
+
+    logger.info(`Settings updated`, {
+      userId: req.userId,
+      fields: Object.keys(req.body),
+    });
+
     res.status(200).json({
-      message: "Settings updated successfully",
+      message: 'Settings updated successfully',
       settings: user.settings,
       fullName: user.fullName,
       email: user.email,
       companyName: user.companyName,
       avatar: user.avatar,
       defaultOvertimeRate: user.defaultOvertimeRate,
-      defaultDailyRate: user.defaultDailyRate
+      defaultDailyRate: user.defaultDailyRate,
     });
   } catch (error) {
     next(error);
@@ -174,22 +338,52 @@ exports.updateSettings = async (req, res, next) => {
 // UPDATE PASSWORD
 exports.updatePassword = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ message: 'Request body is required' });
+    }
     const { currentPassword, newPassword } = req.body;
     const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (!isNonEmptyString(currentPassword) || !isNonEmptyString(newPassword)) {
+      return res
+        .status(400)
+        .json({ message: 'Current password and new password are required' });
+    }
+
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        message:
+          'Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character',
+      });
+    }
 
     if (!user.password) {
-      return res.status(400).json({ message: "No password set. Please use password recovery." });
+      return res
+        .status(400)
+        .json({ message: 'No password set. Please use password recovery.' });
     }
 
     const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Incorrect current password" });
+    if (!isMatch)
+      return res.status(400).json({ message: 'Incorrect current password' });
 
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     user.password = hashedPassword;
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
 
-    res.status(200).json({ message: "Password updated successfully" });
+    eventBus.emitAuditLog({
+      userId: req.userId,
+      action: 'PASSWORD_UPDATE',
+      resourceType: 'User',
+      details: {},
+      req,
+    });
+
+    logger.info(`Password updated`, { userId: req.userId });
+
+    res.status(200).json({ message: 'Password updated successfully' });
   } catch (error) {
     next(error);
   }
@@ -197,20 +391,37 @@ exports.updatePassword = async (req, res, next) => {
 // GOOGLE AUTH
 exports.googleAuth = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ message: 'Request body is required' });
+    }
     const { credential, accessToken, companyName } = req.body;
     let googleData;
 
     if (credential) {
       const ticket = await client.verifyIdToken({
         idToken: credential,
-        audience: process.env.GOOGLE_CLIENT_ID,
+        audience: GOOGLE_CLIENT_ID,
       });
       googleData = ticket.getPayload();
     } else if (accessToken) {
-      const response = await axios.get(
+      const tokenInfoResponse = await axios.get(
+        `https://oauth2.googleapis.com/tokeninfo?access_token=${accessToken}`,
+      );
+      const tokenInfo = tokenInfoResponse.data;
+
+      if (
+        tokenInfo.aud !== GOOGLE_CLIENT_ID &&
+        tokenInfo.azp !== GOOGLE_CLIENT_ID
+      ) {
+        return res
+          .status(401)
+          .json({ message: 'Invalid Google access token: audience mismatch' });
+      }
+
+      const userInfoResponse = await axios.get(
         `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`,
       );
-      googleData = response.data;
+      googleData = userInfoResponse.data;
     } else {
       return res
         .status(400)
@@ -231,12 +442,17 @@ exports.googleAuth = async (req, res, next) => {
         });
       }
 
+      // Same as the password signup path: a Google-registered owner needs the
+      // default role or they are locked out of the app they just created (#413).
+      const defaultRole = await getDefaultRole();
+
       user = new User({
-        fullName: name,
+        fullName: sanitizeText(name),
         email,
-        companyName,
+        companyName: sanitizeText(companyName),
         googleId: googleId || googleData.sub,
         avatar: picture || googleData.picture,
+        ...(defaultRole ? { role: defaultRole._id } : {}),
       });
 
       await user.save();
@@ -246,11 +462,7 @@ exports.googleAuth = async (req, res, next) => {
       await user.save();
     }
 
-    const token = jwt.sign(
-      { id: user._id, tokenVersion: user.tokenVersion || 0 },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = generateTokens(user, res);
 
     res.status(200).json({
       token,
@@ -266,22 +478,39 @@ exports.googleAuth = async (req, res, next) => {
 
 // Local Map to store cooldowns for password reset requests (5 minutes per email)
 const resetCooldowns = new Map();
+const COOLDOWN_MS = 5 * 60 * 1000;
+
+// Periodically clean up expired cooldown entries to prevent unbounded memory growth
+setInterval(() => {
+  const cutoff = Date.now() - COOLDOWN_MS;
+  for (const [email, timestamp] of resetCooldowns) {
+    if (timestamp < cutoff) resetCooldowns.delete(email);
+  }
+}, 60 * 1000);
 
 // FORGOT PASSWORD
 exports.forgotPassword = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ message: 'Request body is required' });
+    }
     const { email } = req.body;
     if (!isNonEmptyString(email) || !isValidEmail(email)) {
-      return res.status(400).json({ message: "A valid email address is required" });
+      return res
+        .status(400)
+        .json({ message: 'A valid email address is required' });
     }
 
     const cleanEmail = email.trim().toLowerCase();
 
     // Check cooldown for this email (5 minutes)
     const lastRequest = resetCooldowns.get(cleanEmail);
-    if (lastRequest && Date.now() - lastRequest < 5 * 60 * 1000) {
+    if (lastRequest && Date.now() - lastRequest < COOLDOWN_MS) {
       // Still in cooldown period, return generic message without sending email
-      return res.status(200).json({ message: "If an account with that email exists, a password reset link has been sent." });
+      return res.status(200).json({
+        message:
+          'If an account with that email exists, a password reset link has been sent.',
+      });
     }
 
     // Update cooldown
@@ -289,7 +518,10 @@ exports.forgotPassword = async (req, res, next) => {
 
     const user = await User.findOne({ email: cleanEmail });
     if (!user) {
-      return res.status(200).json({ message: "If an account with that email exists, a password reset link has been sent." });
+      return res.status(200).json({
+        message:
+          'If an account with that email exists, a password reset link has been sent.',
+      });
     }
 
     // Generate token
@@ -303,9 +535,9 @@ exports.forgotPassword = async (req, res, next) => {
     user.resetPasswordExpires = Date.now() + 3600000;
     await user.save();
 
-    // Reset link pointing to frontend
-    const frontendUrl =
-      req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5173';
+    // Reset link pointing to frontend — always use server-side config,
+    // never the user-controlled Origin header (prevents token hijacking)
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
     const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
     const text =
@@ -330,7 +562,10 @@ exports.forgotPassword = async (req, res, next) => {
       html,
     });
 
-    res.status(200).json({ message: "If an account with that email exists, a password reset link has been sent." });
+    res.status(200).json({
+      message:
+        'If an account with that email exists, a password reset link has been sent.',
+    });
   } catch (error) {
     next(error);
   }
@@ -340,10 +575,16 @@ exports.forgotPassword = async (req, res, next) => {
 exports.resetPassword = async (req, res, next) => {
   try {
     const { token } = req.params;
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ message: 'Request body is required' });
+    }
     const { password } = req.body;
 
     if (!isNonEmptyString(password) || !passwordRegex.test(password)) {
-      return res.status(400).json({ message: "Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character" });
+      return res.status(400).json({
+        message:
+          'Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character',
+      });
     }
 
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
@@ -379,16 +620,21 @@ exports.resetPassword = async (req, res, next) => {
 exports.disconnectGoogle = async (req, res, next) => {
   try {
     const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     if (!user.password) {
-      return res.status(400).json({ message: "You must set a password before disconnecting your Google account." });
+      return res.status(400).json({
+        message:
+          'You must set a password before disconnecting your Google account.',
+      });
     }
 
     user.googleId = undefined;
     await user.save();
 
-    res.status(200).json({ message: "Google account disconnected successfully." });
+    res
+      .status(200)
+      .json({ message: 'Google account disconnected successfully.' });
   } catch (error) {
     next(error);
   }
@@ -396,17 +642,180 @@ exports.disconnectGoogle = async (req, res, next) => {
 
 // DELETE ACCOUNT
 exports.deleteAccount = async (req, res, next) => {
+  let session = null;
   try {
     const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Cascading deletes to prevent orphaned records
-    await Employee.deleteMany({ createdBy: req.userId });
-    await PayrollUpdate.deleteMany({ createdBy: req.userId });
-    
-    await User.findByIdAndDelete(req.userId);
+    const { currentPassword } = req.body;
+    if (!currentPassword) {
+      return res.status(400).json({ message: 'Current password is required' });
+    }
+    if (!user.password) {
+      return res.status(400).json({ message: 'No password set on this account' });
+    }
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(403).json({ message: 'Current password is incorrect' });
+    }
 
-    res.status(200).json({ message: "Account and associated data deleted successfully." });
+    // Try to start a transaction (gracefully fallback if not supported)
+    try {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    } catch {
+      session = null;
+    }
+
+    const deleteOptions = session ? { session } : {};
+
+    const AuditLog = require('../models/auditLog.model');
+
+    await Employee.deleteMany({ createdBy: req.userId }, deleteOptions);
+    await PayrollUpdate.deleteMany({ createdBy: req.userId }, deleteOptions);
+    await AuditLog.deleteMany({ userId: req.userId }, deleteOptions);
+    await User.findByIdAndDelete(req.userId, deleteOptions);
+
+    if (session) {
+      await session.commitTransaction();
+      session.endSession();
+    }
+
+    eventBus.emitAuditLog({
+      userId: req.userId,
+      action: 'ACCOUNT_DELETE',
+      resourceType: 'User',
+      details: {},
+      req,
+    });
+
+    logger.info(`Account deleted`, { userId: req.userId });
+
+    res
+      .status(200)
+      .json({ message: 'Account and associated data deleted successfully.' });
+  } catch (error) {
+    if (session) {
+      try {
+        await session.abortTransaction();
+        session.endSession();
+      } catch {
+        // ignore session cleanup error
+      }
+    }
+    next(error);
+  }
+};
+
+// REFRESH TOKEN
+exports.refresh = async (req, res, next) => {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken)
+      return res.status(401).json({ message: 'No refresh token provided' });
+
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+    } catch {
+      return res
+        .status(401)
+        .json({ message: 'Invalid or expired refresh token' });
+    }
+
+    const user = await User.findById(decoded.id).select(
+      '_id isActive tokenVersion',
+    );
+    if (!user || user.isActive === false) {
+      return res.status(401).json({ message: 'User not found or deactivated' });
+    }
+
+    if (
+      decoded.tokenVersion !== undefined &&
+      user.tokenVersion !== undefined &&
+      decoded.tokenVersion !== user.tokenVersion
+    ) {
+      return res.status(401).json({ message: 'Token is no longer valid' });
+    }
+
+    const token = generateTokens(user, res);
+    res.status(200).json({ token });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// LOGOUT
+exports.logout = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+          ignoreExpiration: true,
+        });
+        if (decoded && decoded.id) {
+          await User.findByIdAndUpdate(decoded.id, {
+            $inc: { tokenVersion: 1 },
+          });
+        }
+      } catch {
+        // Ignore token verification errors during logout
+      }
+    }
+
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    });
+    res.status(200).json({ message: 'Logged out successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+// GET SYSTEM HEALTH METRICS
+exports.getSystemHealth = async (req, res, next) => {
+  try {
+    const memoryUsage = process.memoryUsage();
+    const uptimeSeconds = process.uptime();
+
+    // Map mongoose connection states
+    const dbStates = {
+      0: "Disconnected",
+      1: "Connected",
+      2: "Connecting",
+      3: "Disconnecting",
+    };
+
+    const healthData = {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: {
+        seconds: Math.floor(uptimeSeconds),
+        formatted: `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m ${Math.floor(uptimeSeconds % 60)}s`,
+      },
+      database: {
+        status: dbStates[mongoose.connection.readyState] || "Unknown",
+        readyState: mongoose.connection.readyState,
+        host: mongoose.connection.host || "N/A",
+        name: mongoose.connection.name || "N/A",
+      },
+      memory: {
+        rssMB: (memoryUsage.rss / 1024 / 1024).toFixed(2),
+        heapTotalMB: (memoryUsage.heapTotal / 1024 / 1024).toFixed(2),
+        heapUsedMB: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2),
+        externalMB: (memoryUsage.external / 1024 / 1024).toFixed(2),
+      },
+      environment: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        pid: process.pid,
+      },
+    };
+
+    return res.status(200).json(healthData);
   } catch (error) {
     next(error);
   }

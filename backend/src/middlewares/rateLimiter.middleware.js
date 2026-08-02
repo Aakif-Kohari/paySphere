@@ -1,4 +1,14 @@
 const rateLimit = require("express-rate-limit");
+const cacheService = require("../services/cache.service");
+
+// Determine the store to use (Redis if configured, memory otherwise)
+let store = undefined;
+if (cacheService.isRedisEnabled && cacheService.client) {
+  const { RedisStore } = require("rate-limit-redis");
+  store = new RedisStore({
+    sendCommand: (...args) => cacheService.client.call(...args),
+  });
+}
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -8,6 +18,7 @@ const authRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: store,
 });
 
 const generalRateLimiter = rateLimit({
@@ -18,16 +29,18 @@ const generalRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: store,
 });
 
 const writeRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 20, // Limit each IP to 20 write requests per `window`
+  limit: 200, // Limit each IP to 200 write requests per `window`
   message: {
     message: "Too many write operations from this IP, please try again after 15 minutes."
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: store,
 });
 
 module.exports = { authRateLimiter, generalRateLimiter, writeRateLimiter };

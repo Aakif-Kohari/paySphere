@@ -2,7 +2,10 @@ import { useMemo } from 'react';
 import GridViewIcon from '@mui/icons-material/GridView';
 import PeopleIcon from '@mui/icons-material/People';
 import AssessmentIcon from '@mui/icons-material/Assessment';
-import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
+import LogoutIcon from '@mui/icons-material/Logout';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
 
 const Sidebar = ({
   companyName,
@@ -15,6 +18,9 @@ const Sidebar = ({
     () => [
       { id: 'Dashboard', label: 'Dashboard', icon: <GridViewIcon /> },
       { id: 'Employees', label: 'Employees', icon: <PeopleIcon /> },
+      { id: 'Approvals', label: 'Approvals', icon: <FactCheckIcon /> },
+      { id: 'Settlements', label: 'Exits & F&F', icon: <LogoutIcon /> },
+      { id: 'Loans', label: 'Advances', icon: <AccountBalanceWalletIcon /> },
       { id: 'Reports', label: 'Reports', icon: <AssessmentIcon /> },
     ],
     [],
@@ -32,7 +38,7 @@ const Sidebar = ({
   return (
     <>
       {isSidebarOpen && (
-        <div
+        <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={onClose}
         />
@@ -52,13 +58,13 @@ const Sidebar = ({
               <p className="font-bold text-sm text-gray-900 dark:text-white">
                 {companyName}
               </p>
-              <p className="text-xs text-gray-400 dark:text-slate-500">
+              <p className="text-xs text-gray-500 dark:text-slate-500">
                 Payroll workspace
               </p>
             </div>
           </div>
           <button
-            className="md:hidden p-2 text-gray-400 hover:text-gray-600"
+            className="md:hidden p-2 text-gray-500 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             onClick={onClose}
           >
             ✕
@@ -76,7 +82,7 @@ const Sidebar = ({
               className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${
                 activePage === item.id
                   ? 'bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold'
-                  : 'text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800/50'
+                  : 'text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
               }`}
             >
               {item.icon}
@@ -88,12 +94,12 @@ const Sidebar = ({
         <div className="p-3 border-t border-gray-200 dark:border-slate-800 space-y-2">
           <button
             onClick={() => {
-              setActivePage('Dashboard');
+              window.location.href = 'mailto:support@paysphere.com';
               onClose();
             }}
-            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
           >
-            <SettingsSuggestIcon />
+            <HelpOutlineIcon />
             Help & Support
           </button>
         </div>

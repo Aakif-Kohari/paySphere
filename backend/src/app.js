@@ -2,21 +2,33 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const multer = require("multer");
+const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
 const userRoutes = require("./routes/user.routes");
 const employeeRoutes = require("./routes/employee.routes");
 const payrollRoutes = require("./routes/payroll.routes");
 const reportsRoutes = require("./routes/reports.routes");
+const auditRoutes = require("./routes/audit.routes");
+const attendanceRoutes = require("./routes/attendance.routes");
+const settlementRoutes = require("./routes/settlement.routes");
+const loanRoutes = require("./routes/loan.routes");
+const schedulerRoutes = require("./routes/scheduler.routes");
 const employeePortalRoutes = require("./routes/employeePortal.routes");
+const logger = require("./utils/logger");
 
 const app = express();
+app.use(cookieParser());
 
 const errorHandler = require("./middlewares/error.middleware");
 
 // Security headers
-app.use(helmet());
+app.use(helmet({ crossOriginOpenerPolicy: false }));
 
 // Rate limiting trust proxy configuration
 app.set("trust proxy", 1);
+
+// HTTP request logging via morgan + winston
+app.use(morgan("combined", { stream: logger.stream }));
 
 // CORS configuration — restrict to frontend origin
 const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
@@ -38,6 +50,11 @@ app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use(cors(corsOptions));
 
 const { generalRateLimiter } = require("./middlewares/rateLimiter.middleware");
+const requireBody = require("./middlewares/requireBody.middleware");
+const { MAX_FILE_SIZE } = require("./middlewares/upload.middleware");
+
+// Require request body for state-changing methods
+app.use("/api", requireBody);
 
 // Routes
 app.get("/", (req, res) => res.send("PaySphere API is running..."));
@@ -47,6 +64,11 @@ app.use("/api/employees", employeeRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/reports", reportsRoutes);
 app.use("/api/employee-portal", employeePortalRoutes);
+app.use("/api/schedules", schedulerRoutes);
+app.use("/api/audit-logs", auditRoutes);
+app.use("/api/attendance", attendanceRoutes);
+app.use("/api/settlements", settlementRoutes);
+app.use("/api/loans", loanRoutes);
 
 // CORS error handler — return 403 for blocked origins
 app.use((err, req, res, next) => {
@@ -60,7 +82,8 @@ app.use((err, req, res, next) => {
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({ message: "File too large. Maximum size is 5MB." });
+      const maxMB = MAX_FILE_SIZE / (1024 * 1024);
+      return res.status(400).json({ message: `File too large. Maximum size is ${maxMB}MB.` });
     }
     return res.status(400).json({ message: "File upload error" });
   }

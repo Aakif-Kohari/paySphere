@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { useSelector } from "react-redux";
-import ThemeToggle from "../components/ThemeToggle";
+import { useSelector, useDispatch } from "react-redux";
+import { logoutUser } from "../features/auth/authSlice";import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
 import AttendanceCalendarModal from "../components/AttendanceCalendarModal";
+import { Snackbar, Alert } from '@mui/material';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const PayrollIcon = () => (
@@ -114,25 +115,44 @@ const QUICK_ACTIONS = [
 
 function parseInput(text, employeeList) {
   const lower = text.toLowerCase();
-  
+
+  // Parse tags early so they're available even in ambiguous cases
+  const tags = [];
+  const leaveMatch = lower.match(/(\d+)\s*day[s]?\s*leave/);
+  if (leaveMatch) tags.push({ label: `\u2013 ${leaveMatch[1]} day${leaveMatch[1]>1?"s":""} leave`, bg: "#FEF2F2", color: "#DC2626" });
+  const overtimeMatch = lower.match(/(\d+)\s*hour[s]?\s*overtime/);
+  if (overtimeMatch) tags.push({ label: `+ ${overtimeMatch[1]} hr overtime`, bg: "#EFF6FF", color: "#2563EB" });
+  const bonusMatch = lower.match(/\u20b9?([\d,]+)\s*bonus/);
+  if (bonusMatch) tags.push({ label: `+ \u20b9${bonusMatch[1]} bonus`, bg: "#F0FDF4", color: "#16A34A" });
+  const dedMatch = lower.match(/\u20b9?([\d,]+)\s*deduction/);
+  if (dedMatch) tags.push({ label: `\u2013 \u20b9${dedMatch[1]} deduction`, bg: "#FEF2F2", color: "#DC2626" });
+  if (tags.length === 0) tags.push({ label: text.slice(0,30), bg: "#F3F4F6", color: "#374151" });
+
   // 1. Try exact full-name match
   let name = null;
+  let employeeId = null;
   for (const emp of employeeList) {
     if (lower.startsWith(emp.fullName.toLowerCase())) {
       name = emp.fullName;
+      employeeId = emp._id;
       break;
     }
   }
 
-  // 2. Try first-name match: "Ravi took..." → matches "Ravi Kumar"
+  // 2. Try first-name match: "Ravi took..." -> matches "Ravi Kumar" / "Ravi Singh"
   if (!name) {
+    const firstMatches = [];
     for (const emp of employeeList) {
       const firstName = emp.fullName.split(" ")[0].toLowerCase();
-      // Check if input starts with the first name followed by a space or action word
       if (lower.startsWith(firstName + " ")) {
-        name = emp.fullName;
-        break;
+        firstMatches.push({ fullName: emp.fullName, _id: emp._id });
       }
+    }
+    if (firstMatches.length === 1) {
+      name = firstMatches[0].fullName;
+      employeeId = firstMatches[0]._id;
+    } else if (firstMatches.length > 1) {
+      return { employeeId: null, name: null, tags, note: null, pending: true, ambiguousMatches: firstMatches, rawInput: text };
     }
   }
 
@@ -140,25 +160,18 @@ function parseInput(text, employeeList) {
   if (!name) {
     const nameMatch = text.match(/^([A-Za-z]+(?:\s[A-Za-z]+)?)/);
     name = nameMatch ? nameMatch[1] : "Unknown";
+    const matchedEmp = employeeList.find(emp => emp.fullName.toLowerCase() === name.toLowerCase());
+    employeeId = matchedEmp ? matchedEmp._id : null;
   }
 
-  const tags = [];
-  const leaveMatch = lower.match(/(\d+)\s*day[s]?\s*leave/);
-  if (leaveMatch) tags.push({ label: `– ${leaveMatch[1]} day${leaveMatch[1]>1?"s":""} leave`, bg: "#FEF2F2", color: "#DC2626" });
-  const overtimeMatch = lower.match(/(\d+)\s*hour[s]?\s*overtime/);
-  if (overtimeMatch) tags.push({ label: `+ ${overtimeMatch[1]} hr overtime`, bg: "#EFF6FF", color: "#2563EB" });
-  const bonusMatch = lower.match(/₹?([\d,]+)\s*bonus/);
-  if (bonusMatch) tags.push({ label: `+ ₹${bonusMatch[1]} bonus`, bg: "#F0FDF4", color: "#16A34A" });
-  const dedMatch = lower.match(/₹?([\d,]+)\s*deduction/);
-  if (dedMatch) tags.push({ label: `– ₹${dedMatch[1]} deduction`, bg: "#FEF2F2", color: "#DC2626" });
-  if (tags.length === 0) tags.push({ label: text.slice(0,30), bg: "#F3F4F6", color: "#374151" });
-  return { name, tags, note: null, pending: true };
+  return { employeeId, name, tags, note: null, pending: true };
 }
 
 const COLORS = ["#818CF8","#34D399","#FB7185","#FBBF24","#60A5FA","#A78BFA"];
 
 export default function MonthlyUpdates() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const themeMode = useSelector((state) => state.ui.themeMode);
   const isDark = themeMode === "dark";
 
@@ -175,6 +188,7 @@ export default function MonthlyUpdates() {
   const [payrollResults, setPayrollResults] = useState(null);
   const [finalizeError, setFinalizeError] = useState("");
 
+
   // Attendance Calendar Modal states (#137)
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [selectedCalendarEmp, setSelectedCalendarEmp] = useState(null);
@@ -185,8 +199,23 @@ export default function MonthlyUpdates() {
   const [emailStatuses, setEmailStatuses] = useState({});
   const [bulkEmailMsg, setBulkEmailMsg] = useState("");
 
+  // Copy Payroll Summary state (#184)
+  const [copiedSummary, setCopiedSummary] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
+
+  // Disambiguation state for first-name collision (#274)
+  const [disambiguationMatches, setDisambiguationMatches] = useState([]);
+  const [pendingParsed, setPendingParsed] = useState(null);
+
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
-  const token = localStorage.getItem("token");
+  const reduxToken = useSelector((state) => state.auth.token);
+  const token = reduxToken || localStorage.getItem("token");
+
+  useEffect(() => {
+    if (!token) {
+      navigate('/auth');
+    }
+  }, [token, navigate]);
 
   // Fetch real employees from API
   useEffect(() => {
@@ -217,10 +246,29 @@ export default function MonthlyUpdates() {
   const handleSubmit = () => {
     if (!input.trim()) return;
     const parsed = parseInput(input.trim(), employees);
+    if (parsed.ambiguousMatches && parsed.ambiguousMatches.length > 1) {
+      setDisambiguationMatches(parsed.ambiguousMatches);
+      setPendingParsed(parsed);
+      return;
+    }
     const color = COLORS[nextId % COLORS.length];
     setActivity(prev => [{ ...parsed, id: nextId, color }, ...prev]);
     setNextId(n => n + 1);
     setInput("");
+  };
+
+  const handleDisambiguationSelect = (emp) => {
+    const color = COLORS[nextId % COLORS.length];
+    setActivity(prev => [{ ...pendingParsed, employeeId: emp._id, name: emp.fullName, id: nextId, color }, ...prev]);
+    setNextId(n => n + 1);
+    setInput("");
+    setDisambiguationMatches([]);
+    setPendingParsed(null);
+  };
+
+  const handleDisambiguationCancel = () => {
+    setDisambiguationMatches([]);
+    setPendingParsed(null);
   };
 
   const handleDelete = (id) => setActivity(prev => prev.filter(a => a.id !== id));
@@ -232,15 +280,20 @@ export default function MonthlyUpdates() {
   };
 
   // Handle Attendance Calendar Apply (#137)
-  const handleApplyCalendar = ({ employeeName, tags }) => {
+  const handleApplyCalendar = ({ employeeName, employeeId, tags }) => {
     const color = COLORS[nextId % COLORS.length];
-    setActivity(prev => [{ name: employeeName, tags, pending: true, id: nextId, color }, ...prev]);
+    // Prefer the id the calendar already resolved. Falling back to a
+    // case-insensitive name match reproduces #93/#274, where two employees
+    // sharing a name silently attributed one's attendance to the other.
+    const matchedEmp = employees.find(emp => emp.fullName.toLowerCase() === employeeName.toLowerCase());
+    const empId = employeeId || (matchedEmp ? matchedEmp._id : null);
+    setActivity(prev => [{ employeeId: empId, name: employeeName, tags, pending: true, id: nextId, color }, ...prev]);
     setNextId(n => n + 1);
   };
 
   const pendingCount = activity.filter(a => a.pending).length;
 
-  const fmt = (n) => "₹" + Math.abs(n).toLocaleString("en-IN");
+  const fmt = (n, c = "INR") => new Intl.NumberFormat('en-IN', { style: 'currency', currency: c }).format(n);
 
   // Finalize payroll
   const handleFinalize = async () => {
@@ -253,7 +306,7 @@ export default function MonthlyUpdates() {
       const res = await api.post(
         `/api/payroll/finalize`,
         {
-          activities: activity.map(a => ({ name: a.name, tags: a.tags })),
+          activities: activity.map(a => ({ employeeId: a.employeeId, name: a.name, tags: a.tags })),
           month: now.getMonth() + 1,
           year: now.getFullYear(),
         }
@@ -294,6 +347,63 @@ export default function MonthlyUpdates() {
     } finally {
       setSendingBulkEmail(false);
     }
+  };
+
+  // Handle Copy Payroll Summary to Clipboard (#184)
+  const handleCopySummary = () => {
+    if (!payrollResults || !payrollResults.results) return;
+    const now = new Date();
+    const monthName = now.toLocaleString("default", { month: "long" });
+    const year = now.getFullYear();
+    const totalPayout = payrollResults.results.reduce((sum, r) => sum + (r.netSalary || 0), 0);
+
+    let summaryText = `💰 PaySphere Payroll Summary (${monthName} ${year})\n`;
+    summaryText += `-----------------------------------\n`;
+    summaryText += `👥 Total Employees: ${payrollResults.results.length}\n`;
+    summaryText += `💵 Total Payout: ${fmt(totalPayout, 'INR')} (Base Currency)\n`;
+    summaryText += `-----------------------------------\n`;
+
+    payrollResults.results.forEach((r) => {
+      summaryText += `• ${r.employeeName}: ${fmt(r.netSalary, r.currency)}\n`;
+    });
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(summaryText);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = summaryText;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+
+    setCopiedSummary(true);
+    setTimeout(() => setCopiedSummary(false), 2000);
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      const now = new Date();
+      const response = await api.get(`/api/payroll/export-csv?month=${now.getMonth() + 1}&year=${now.getFullYear()}`, {
+        responseType: 'blob',
+      });
+      const blob = response.data;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `payroll-${now.getMonth() + 1}-${now.getFullYear()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+} catch {
+      setSnackbar({ open: true, message: 'No data to export', severity: 'error' });
+    }  };
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') return;
+    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   return (
@@ -348,7 +458,7 @@ export default function MonthlyUpdates() {
 
       {/* ── Sidebar Backdrop ── */}
       {isSidebarOpen && (
-        <div 
+        <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} 
           onClick={() => setIsSidebarOpen(false)}
           style={{
             position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 40
@@ -396,7 +506,7 @@ export default function MonthlyUpdates() {
             { id:"employees",  label:"Employees",  icon:<PeopleIcon /> },
             { id:"settings",   label:"Settings", icon:<SpeedoIcon /> },
           ].map(item => (
-            <button key={item.id} className="nav-btn"
+            <button key={item.id} className="nav-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => {
                 setIsSidebarOpen(false); // Close on selection on mobile
                 if (item.id === "dashboard" || item.id === "employees") {
@@ -419,7 +529,7 @@ export default function MonthlyUpdates() {
         </nav>
 
         <div style={{ padding:"14px 12px 20px", borderTop: isDark ? "1.5px solid #1e293b" : "1.5px solid #F0F1F3", display:"flex", flexDirection:"column", gap:8 }}>
-          <button className="nav-btn" style={{ background:"transparent", color: isDark ? "#94a3b8" : "#6B7280", fontWeight:500 }}
+          <button className="nav-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" style={{ background:"transparent", color: isDark ? "#94a3b8" : "#6B7280", fontWeight:500 }}
             onMouseEnter={e=>e.currentTarget.style.background=isDark ? "#1e293b" : "#F9FAFB"}
             onMouseLeave={e=>e.currentTarget.style.background="transparent"}
           ><SupportIcon /> Help &amp; Support</button>
@@ -461,7 +571,7 @@ export default function MonthlyUpdates() {
               background:"none", border:"none", fontFamily:"'DM Sans',sans-serif",
               fontSize:14.5, fontWeight:700, color: isDark ? "#3b82f6" : "#2563EB", cursor:"pointer",
               borderBottom: isDark ? "2px solid #3b82f6" : "2px solid #2563EB", paddingBottom:2,
-            }} className="sm:flex">{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} <ChevronDown /></button>
+            }} className="sm:flex focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} <ChevronDown /></button>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
             <ThemeToggle />
@@ -472,7 +582,7 @@ export default function MonthlyUpdates() {
             </div>
             <button
               onClick={() => {
-                localStorage.removeItem("token");
+                dispatch(logoutUser());
                 localStorage.removeItem("companyName");
                 navigate("/auth");
               }}
@@ -550,7 +660,7 @@ export default function MonthlyUpdates() {
           {/* Quick action chips & Attendance Calendar Button */}
           <div style={{ display:"flex", gap:10, flexWrap:"wrap", justifyContent:"center", marginBottom:40, width:"100%", maxWidth:760 }}>
             <button
-              className="chip-btn"
+              className="chip-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => {
                 if (employees.length > 0) {
                   setShowEmpPicker(true);
@@ -570,7 +680,7 @@ export default function MonthlyUpdates() {
               📅 Open Attendance Calendar
             </button>
             {QUICK_ACTIONS.map(a => (
-              <button key={a.label} className="chip-btn" onClick={() => insertTemplate(a.template)}>
+              <button key={a.label} className="chip-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => insertTemplate(a.template)}>
                 {a.icon} {a.label}
               </button>
             ))}
@@ -629,8 +739,8 @@ export default function MonthlyUpdates() {
                   </div>
                   {item.pending && (
                     <div style={{ display:"flex", gap:4, flexShrink:0 }}>
-                      <button className="icon-btn" onClick={() => handleDelete(item.id)} title="Delete"><TrashIcon /></button>
-                      <button className="icon-btn" title="Edit"><EditIcon2 /></button>
+                      <button className="icon-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => handleDelete(item.id)} title="Delete"><TrashIcon /></button>
+                      <button className="icon-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" title="Edit"><EditIcon2 /></button>
                     </div>
                   )}
                 </div>
@@ -714,7 +824,7 @@ export default function MonthlyUpdates() {
               )}
 
               <button
-                className="bottom-cta-btn"
+                className="bottom-cta-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 onClick={handleFinalize}
                 disabled={finalizing || activity.length === 0}
                 style={{
@@ -737,8 +847,8 @@ export default function MonthlyUpdates() {
 
           {/* Payroll Results Modal */}
           {showResults && payrollResults && (
-            <div className="modal-overlay" onClick={() => setShowResults(false)}>
-              <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-overlay" onClick={() => setShowResults(false)}>
+              <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-box" onClick={e => e.stopPropagation()}>
                 {/* Modal Header */}
                 <div style={{ padding:"28px 28px 20px", borderBottom: isDark ? "1.5px solid #1e293b" : "1.5px solid #F0F1F3" }}>
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
@@ -804,7 +914,7 @@ export default function MonthlyUpdates() {
                               </span>
                             )}
                           </div>
-                          <div style={{ fontSize:12, color:"#9CA3AF" }}>Base: {fmt(r.baseSalary)}</div>
+                          <div style={{ fontSize:12, color:"#9CA3AF" }}>Base: {fmt(r.baseSalary, r.currency)}</div>
                         </div>
                       </div>
 
@@ -812,25 +922,25 @@ export default function MonthlyUpdates() {
                         {r.leaveDays > 0 && (
                           <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
                             <span style={{ color: isDark ? "#cbd5e1" : "#6B7280" }}>{r.leaveDays} day{r.leaveDays > 1 ? "s" : ""} leave</span>
-                            <span style={{ color:"#DC2626", fontWeight:600 }}>- {fmt(r.leaveDeduction)}</span>
+                            <span style={{ color:"#DC2626", fontWeight:600 }}>- {fmt(r.leaveDeduction, r.currency)}</span>
                           </div>
                         )}
                         {r.overtimeHours > 0 && (
                           <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
                             <span style={{ color: isDark ? "#cbd5e1" : "#6B7280" }}>{r.overtimeHours} hr{r.overtimeHours > 1 ? "s" : ""} overtime</span>
-                            <span style={{ color: isDark ? "#3b82f6" : "#2563EB", fontWeight:600 }}>+ {fmt(r.overtimePay)}</span>
+                            <span style={{ color: isDark ? "#3b82f6" : "#2563EB", fontWeight:600 }}>+ {fmt(r.overtimePay, r.currency)}</span>
                           </div>
                         )}
                         {r.bonus > 0 && (
                           <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
                             <span style={{ color: isDark ? "#cbd5e1" : "#6B7280" }}>Bonus</span>
-                            <span style={{ color:"#16A34A", fontWeight:600 }}>+ {fmt(r.bonus)}</span>
+                            <span style={{ color:"#16A34A", fontWeight:600 }}>+ {fmt(r.bonus, r.currency)}</span>
                           </div>
                         )}
                         {r.deductions > 0 && (
                           <div style={{ display:"flex", justifyContent:"space-between", fontSize:13 }}>
                             <span style={{ color: isDark ? "#cbd5e1" : "#6B7280" }}>Deductions</span>
-                            <span style={{ color:"#DC2626", fontWeight:600 }}>- {fmt(r.deductions)}</span>
+                            <span style={{ color:"#DC2626", fontWeight:600 }}>- {fmt(r.deductions, r.currency)}</span>
                           </div>
                         )}
                       </div>
@@ -841,7 +951,7 @@ export default function MonthlyUpdates() {
                         background: isDark ? "#1e293b" : "#EEF2FF",
                       }}>
                         <span style={{ fontSize:12, fontWeight:700, color: isDark ? "#cbd5e1" : "#6B7280", textTransform:"uppercase", letterSpacing:"0.05em" }}>Net Salary</span>
-                        <span style={{ fontSize:20, fontWeight:700, color: isDark ? "#3b82f6" : "#2563EB" }}>{fmt(r.netSalary)}</span>
+                        <span style={{ fontSize:20, fontWeight:700, color: isDark ? "#3b82f6" : "#2563EB" }}>{fmt(r.netSalary, r.currency)}</span>
                       </div>
                     </div>
                   ))}
@@ -863,7 +973,20 @@ export default function MonthlyUpdates() {
                     {sendingBulkEmail ? "Sending Emails... ⏳" : "📧 Email All Payslips"}
                   </button>
                   <button
-                    onClick={() => { const now = new Date(); fetch(`/api/payroll/export-csv?month=${now.getMonth()+1}&year=${now.getFullYear()}`, { headers: { Authorization: `Bearer ${token}` } }).then(r=>r.ok?r.blob():null).then(b=>{if(!b){alert('No data to export');return;}const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`payroll-${now.getMonth()+1}-${now.getFullYear()}.csv`;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(a.href);}).catch(()=>alert('Export failed.')); }}
+                    onClick={handleCopySummary}
+                    style={{
+                      padding:"11px 20px", borderRadius:10,
+                      border: isDark ? "1.5px solid #10B981" : "1.5px solid #059669",
+                      background: copiedSummary ? (isDark ? "#064E3B" : "#ECFDF5") : (isDark ? "#1e293b" : "white"),
+                      fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:700,
+                      color: isDark ? "#A7F3D0" : "#059669", cursor:"pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                  >
+                    {copiedSummary ? "Copied to Clipboard! ✅" : "📋 Copy Summary"}
+                  </button>
+                  <button
+                    onClick={handleExportCsv}
                     style={{
                       padding:"11px 20px", borderRadius:10,
                       border: isDark ? "1.5px solid #334155" : "1.5px solid #E5E7EB", background: isDark ? "#1e293b" : "white",
@@ -894,10 +1017,67 @@ export default function MonthlyUpdates() {
             </div>
           )}
 
+          {/* Disambiguation Picker Modal (#274) */}
+          {disambiguationMatches.length > 0 && (
+            <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-overlay" onClick={handleDisambiguationCancel}>
+              <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-box" onClick={e => e.stopPropagation()} style={{ padding: "24px" }}>
+                <h3 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "6px" }}>
+                  {pendingParsed && pendingParsed.rawInput
+                    ? `Which employee did you mean?`
+                    : "Multiple matches found"}
+                </h3>
+                <p style={{ fontSize: "13.5px", color: isDark ? "#9CA3AF" : "#6B7280", marginBottom: "18px" }}>
+                  Multiple employees share this first name. Please select the correct one:
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "300px", overflowY: "auto", marginBottom: "20px" }}>
+                  {disambiguationMatches.map(emp => (
+                    <button
+                      key={emp._id}
+                      onClick={() => handleDisambiguationSelect(emp)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "12px 16px",
+                        borderRadius: "12px",
+                        border: isDark ? "1px solid #1e293b" : "1px solid #E5E7EB",
+                        background: isDark ? "#111827" : "#F9FAFB",
+                        color: isDark ? "white" : "#111827",
+                        fontSize: "14.5px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <span>{emp.fullName}</span>
+                      <span style={{ fontSize: "12.5px", color: "#2563EB" }}>Select</span>
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    onClick={handleDisambiguationCancel}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "#9CA3AF",
+                      color: "white",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Employee Picker Modal for Calendar (#137) */}
           {showEmpPicker && (
-            <div className="modal-overlay" onClick={() => setShowEmpPicker(false)}>
-              <div className="modal-box" onClick={e => e.stopPropagation()} style={{ padding: "24px" }}>
+            <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-overlay" onClick={() => setShowEmpPicker(false)}>
+              <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-box" onClick={e => e.stopPropagation()} style={{ padding: "24px" }}>
                 <h3 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "6px" }}>Select Employee for Calendar</h3>
                 <p style={{ fontSize: "13.5px", color: isDark ? "#9CA3AF" : "#6B7280", marginBottom: "18px" }}>
                   Choose an employee to open their 31-day muster roll attendance calendar grid:
@@ -966,6 +1146,12 @@ export default function MonthlyUpdates() {
 
         </main>
       </div>
+
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%', variant: 'filled' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </div>
   );
 }
