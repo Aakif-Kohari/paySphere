@@ -108,7 +108,7 @@ exports.signup = async (req, res, next) => {
 
     const token = generateTokens(newUser, res);
 
-    res.status(201).json({ token, companyName: newUser.companyName });
+    res.status(201).json({ token, companyName: newUser.companyName, role: newUser.role || "ADMIN", employeeId: newUser.employeeId });
   } catch (error) {
     next(error);
   }
@@ -139,7 +139,7 @@ exports.login = async (req, res, next) => {
 
     const token = generateTokens(user, res);
 
-    res.status(200).json({ token, companyName: user.companyName });
+    res.status(200).json({ token, companyName: user.companyName, role: user.role || "ADMIN", employeeId: user.employeeId });
   } catch (error) {
     next(error);
   }

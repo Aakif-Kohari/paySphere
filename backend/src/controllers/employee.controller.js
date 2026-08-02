@@ -234,7 +234,6 @@ exports.getRecentEmployees = async (req, res, next) => {
 };
 
 exports.importEmployees = async (req, res, next) => {
-  const sanitizedDepartment = record.department ? sanitizeText(record.department.trim()) : '';
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -404,7 +403,7 @@ exports.importEmployees = async (req, res, next) => {
               return;
             }
 
-            existingKeys.add(key);
+            const sanitizedDepartment = record.department ? sanitizeText(record.department.trim()) : '';
 
             employees.push({
               fullName: sanitizedName,

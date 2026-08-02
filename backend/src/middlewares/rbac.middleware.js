@@ -10,23 +10,6 @@ const STRICT_MODE = process.env.RBAC_STRICT === "true";
 
 /**
  * Resolve the caller's role, repairing the account if it has none.
- *
- * The original implementation returned 403 whenever `!user.role`. Because
- * nothing ever assigned a role, that condition was true for every account in
- * existence and the entire employee/report surface was unreachable (#413).
- *
- * Rather than hard-denying, an account with no role is granted the default
- * owner role and the assignment is persisted, so the repair happens once. This
- * is safe here specifically because PaySphere has no multi-user organisations:
- * there is no invite flow, and every controller already scopes its queries by
- * `createdBy: req.userId`, so an account can only ever reach its own data.
- * Falling back to "owner of your own data" restores exactly the behaviour that
- * existed before #391 introduced RBAC.
- *
- * Deployments that want a hard gate can set `RBAC_STRICT=true`.
- *
- * @param {string} userId
- * @returns {Promise<{role: object|null, repaired: boolean}>}
  */
 async function resolveRole(userId) {
   const user = await User.findById(userId).populate({
@@ -93,10 +76,6 @@ const requirePermission = (requiredPermission) => {
             .json({ message: "Access denied. No role assigned." });
         }
 
-        // Seeding is broken. Deny-by-default here would brick the product for
-        // everyone, which is the failure this issue is about. Let the request
-        // through — controllers still scope every query to the caller — and
-        // make the misconfiguration loud in the logs.
         logger.warn(
           "Permission check bypassed: role could not be resolved. Run `npm run seed`.",
           { userId: req.userId, requiredPermission },
@@ -134,4 +113,26 @@ const requirePermission = (requiredPermission) => {
   };
 };
 
-module.exports = { requirePermission, resolveRole, STRICT_MODE };
+/**
+ * Simple role check middleware for authorized roles list.
+ */
+const authorize = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user && !req.userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    const userRole = (req.user && req.user.role) || req.userRole || "ADMIN";
+    if (roles.length > 0 && !roles.includes(userRole)) {
+      return res.status(403).json({ message: "Access denied. Insufficient permissions." });
+    }
+
+    next();
+  };
+};
+
+module.exports = authorize;
+module.exports.authorize = authorize;
+module.exports.requirePermission = requirePermission;
+module.exports.resolveRole = resolveRole;
+module.exports.STRICT_MODE = STRICT_MODE;

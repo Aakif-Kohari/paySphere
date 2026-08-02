@@ -1,6 +1,7 @@
 const User = require("../../models/user.model");
 const logger = require("../../utils/logger");
 const { getDefaultRole } = require("../../seeds/rbac.seed");
+const authorize = require("../rbac.middleware");
 
 jest.mock("../../models/user.model");
 jest.mock("../../seeds/rbac.seed", () => ({
@@ -36,31 +37,57 @@ const SUPER_ADMIN = () =>
     "READ_REPORT",
   ]);
 
-describe("requirePermission", () => {
-  let req;
-  let res;
-  let next;
-  let requirePermission;
-
-  const loadMiddleware = () => {
-    jest.isolateModules(() => {
-      ({ requirePermission } = require("../rbac.middleware"));
-    });
-  };
+describe('authorize middleware', () => {
+  let req, res, next;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    delete process.env.RBAC_STRICT;
-    loadMiddleware();
-
-    req = { userId: "user123" };
+    req = { user: {} };
     res = {
       status: jest.fn().mockReturnThis(),
-      json: jest.fn().mockReturnThis(),
+      json: jest.fn(),
     };
     next = jest.fn();
   });
 
+  test('should return 401 if user is not attached to request', () => {
+    req.user = null;
+    const middleware = authorize('EMPLOYEE');
+    middleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Authentication required' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test('should return 403 if user role is not authorized', () => {
+    req.user = { role: 'EMPLOYEE' };
+    const middleware = authorize('ADMIN');
+    middleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Access denied. Insufficient permissions.' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test('should call next() if user role is allowed', () => {
+    req.user = { role: 'EMPLOYEE' };
+    const middleware = authorize('EMPLOYEE', 'ADMIN');
+    middleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  test('should default role to ADMIN if user has no role defined', () => {
+    req.user = {};
+    const middleware = authorize('ADMIN');
+    middleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+  });
+});
+
+describe("requirePermission", () => {
   describe("authentication guard", () => {
     test("returns 401 when auth middleware has not run", async () => {
       req = {};

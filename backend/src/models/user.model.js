@@ -98,6 +98,15 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  role: {
+    type: String,
+    enum: ["ADMIN", "EMPLOYEE"],
+    default: "ADMIN",
+  },
+  employeeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Employee",
+  },
   tokenVersion: {
     type: Number,
     default: 0,
