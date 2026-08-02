@@ -8,6 +8,8 @@ const User = require('../models/user.model');
 const Employee = require('../models/employee.model');
 const PayrollUpdate = require('../models/payroll.model');
 const { sendEmail } = require('../utils/email');
+const { authenticator } = require("otplib");
+const QRCode = require("qrcode");
 const {
   isNonEmptyString,
   isValidEmail,
@@ -143,6 +145,13 @@ exports.login = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+  if (user.isTwoFactorEnabled) {
+    return res.status(200).json({
+      requires2FA: true,
+      userId: user._id,
+      message: "Two-Factor Authentication code required",
+    });
+  }
 };
 
 // GET USER SETTINGS
@@ -178,14 +187,14 @@ exports.getSettings = async (req, res, next) => {
 exports.uploadLogo = async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No image provided" });
-    
+
     // Store as base64 string
     const base64Data = req.file.buffer.toString("base64");
     const mimeType = req.file.mimetype;
     const logoDataUrl = `data:${mimeType};base64,${base64Data}`;
 
     await User.findByIdAndUpdate(req.userId, { companyLogoData: logoDataUrl });
-    
+
     // Also invalidate settings cache if we had one
     res.status(200).json({ message: "Logo updated successfully", logo: logoDataUrl });
   } catch (error) {
@@ -771,6 +780,138 @@ exports.logout = async (req, res, next) => {
       sameSite: 'strict',
     });
     res.status(200).json({ message: 'Logged out successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+// GENERATE 2FA QR CODE & SECRET
+exports.generate2FA = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const secret = authenticator.generateSecret();
+    const otpauthUrl = authenticator.keyuri(
+      user.email,
+      `PaySphere (${user.companyName || "Admin"})`,
+      secret
+    );
+
+    user.twoFactorSecret = secret;
+    await user.save();
+
+    const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
+
+    return res.status(200).json({
+      secret,
+      qrCode: qrCodeDataUrl,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// VERIFY & ENABLE 2FA
+exports.verifyAndEnable2FA = async (req, res, next) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ message: "2FA token code is required" });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user || !user.twoFactorSecret) {
+      return res.status(400).json({ message: "2FA is not initialized" });
+    }
+
+    const isValid = authenticator.verify({
+      token: token.trim(),
+      secret: user.twoFactorSecret,
+    });
+
+    if (!isValid) {
+      return res.status(400).json({ message: "Invalid 2FA verification code" });
+    }
+
+    user.isTwoFactorEnabled = true;
+    await user.save();
+
+    return res.status(200).json({
+      message: "Two-Factor Authentication successfully enabled",
+      isTwoFactorEnabled: true,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// DISABLE 2FA
+exports.disable2FA = async (req, res, next) => {
+  try {
+    const { token } = req.body;
+    const user = await User.findById(req.userId);
+
+    if (!user || !user.isTwoFactorEnabled) {
+      return res.status(400).json({ message: "2FA is not currently enabled" });
+    }
+
+    const isValid = authenticator.verify({
+      token: token.trim(),
+      secret: user.twoFactorSecret,
+    });
+
+    if (!isValid) {
+      return res.status(400).json({ message: "Invalid 2FA verification code" });
+    }
+
+    user.isTwoFactorEnabled = false;
+    user.twoFactorSecret = "";
+    await user.save();
+
+    return res.status(200).json({
+      message: "Two-Factor Authentication disabled",
+      isTwoFactorEnabled: false,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// VALIDATE 2FA ON LOGIN
+exports.validate2FALogin = async (req, res, next) => {
+  try {
+    const { userId, token } = req.body;
+    if (!userId || !token) {
+      return res.status(400).json({ message: "User ID and 2FA token are required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user || !user.isTwoFactorEnabled) {
+      return res.status(400).json({ message: "2FA is not enabled for this user" });
+    }
+
+    const isValid = authenticator.verify({
+      token: token.trim(),
+      secret: user.twoFactorSecret,
+    });
+
+    if (!isValid) {
+      return res.status(400).json({ message: "Invalid 2FA code" });
+    }
+
+    // Generate full JWT access token after successful 2FA
+    const accessToken = generateAccessToken(user._id); // Use your existing token helper function
+
+    return res.status(200).json({
+      message: "2FA verification successful",
+      token: accessToken,
+      user: {
+        id: user._id,
+        email: user.email,
+        fullName: user.fullName,
+        companyName: user.companyName,
+      },
+    });
   } catch (error) {
     next(error);
   }

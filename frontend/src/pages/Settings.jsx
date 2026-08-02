@@ -1518,3 +1518,61 @@ export default function Settings() {
     </div>
   );
 }
+{/* 2FA Section in Account Security */}
+<div className="p-5 border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-xs space-y-4">
+  <div className="flex items-center justify-between">
+    <div>
+      <h3 className="font-bold text-sm text-gray-900 dark:text-white">
+        Two-Factor Authentication (2FA)
+      </h3>
+      <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+        Protect your admin account with TOTP apps like Google Authenticator or Authy.
+      </p>
+    </div>
+    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${userProfile.isTwoFactorEnabled ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400" : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"}`}>
+      {userProfile.isTwoFactorEnabled ? "Enabled" : "Disabled"}
+    </span>
+  </div>
+
+  {!userProfile.isTwoFactorEnabled ? (
+    <div>
+      {!qrCodeData ? (
+        <button
+          onClick={handleSetup2FA}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition"
+        >
+          Setup Two-Factor Authentication
+        </button>
+      ) : (
+        <div className="p-4 bg-gray-50 dark:bg-slate-950 rounded-xl space-y-3">
+          <p className="text-xs text-gray-600 dark:text-slate-300 font-medium">
+            1. Scan this QR code in Google Authenticator or Authy:
+          </p>
+          <img src={qrCodeData.qrCode} alt="2FA QR Code" className="w-36 h-36 bg-white p-2 rounded-lg border" />
+          <p className="text-xs text-gray-500 font-mono">Secret Key: {qrCodeData.secret}</p>
+          
+          <div className="flex items-center gap-2 pt-2">
+            <input
+              type="text"
+              maxLength={6}
+              value={twoFactorCode}
+              onChange={(e) => setTwoFactorCode(e.target.value)}
+              placeholder="6-digit code"
+              className="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border text-xs text-center font-bold tracking-widest"
+            />
+            <button
+              onClick={handleConfirm2FA}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold"
+            >
+              Verify & Enable
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  ) : (
+    <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+      ✓ Two-factor authentication is active on your account.
+    </p>
+  )}
+</div>

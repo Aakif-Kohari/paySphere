@@ -440,3 +440,25 @@ export default function PaySphereLogin() {
     </div>
   );
 }
+// Handle login response:
+if (res.data.requires2FA) {
+  setRequires2FA(true);
+  setPendingUserId(res.data.userId);
+  return;
+}
+
+// In the 2FA submission handler:
+const handle2FASubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const res = await api.post("/api/auth/2fa/validate-login", {
+      userId: pendingUserId,
+      token: twoFactorCode,
+    });
+    // Save token & complete login redirect
+    localStorage.setItem("token", res.data.token);
+    navigate("/dashboard");
+  } catch (err) {
+    setError(err.response?.data?.message || "Invalid 2FA code.");
+  }
+};
