@@ -17,7 +17,8 @@ import SalaryDistributionChart from '../components/reports/SalaryDistributionCha
 import OvertimeChart from '../components/reports/OvertimeChart';
 import PayrollTable from '../components/reports/PayrollTable';
 import ScheduleReportModal from '../components/reports/ScheduleReportModal';
-
+import CustomReportBuilder from '../components/reports/CustomReportBuilder';
+import TurnoverMetrics from '../components/reports/TurnoverMetrics';
 // --- Month-Year Selector ---
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',

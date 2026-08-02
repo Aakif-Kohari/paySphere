@@ -1523,38 +1523,4 @@ export default function Settings() {
       )}
     </div>
   );
-}
-const [auditLogs, setAuditLogs] = useState([]);
-const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
-const [exportingAuditLogs, setExportingAuditLogs] = useState(false);
-const [auditDaysFilter, setAuditDaysFilter] = useState('');
-
-useEffect(() => {
-  if (activeTab === 'auditLogs') {
-    setLoadingAuditLogs(true);
-    api.get('/api/audit-logs?page=1&limit=50')
-      .then((res) => setAuditLogs(res.data.logs || []))
-      .catch((err) => console.error('Failed to fetch audit logs', err))
-      .finally(() => setLoadingAuditLogs(false));
-  }
-}, [activeTab]);
-
-const handleExportAuditLogs = async () => {
-  setExportingAuditLogs(true);
-  try {
-    const urlParams = auditDaysFilter ? `?days=${auditDaysFilter}` : '';
-    const response = await api.get(`/api/audit-logs/export${urlParams}`, {
-      responseType: 'blob',
-    });
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `audit_logs_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    alert(err.response?.data?.message || 'Failed to export audit logs.');
-  } fontFinally(() => setExportingAuditLogs(false));
-};
+}
