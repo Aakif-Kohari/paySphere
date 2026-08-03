@@ -293,7 +293,7 @@ const DashboardOverview = ({
           </div>
         )}
       </div>
-    </main>
+    </>
   );
 };
 
