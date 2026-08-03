@@ -81,7 +81,8 @@ describe("runMonthlyPayslipJob — status vocabulary (#560)", () => {
 
     expect(query.month).toBe(7);
     expect(query.year).toBe(2026);
-    expect(query.payslipEmailed).toBe(false);
+    // Not `false`: that misses legacy rows written before the field existed.
+    expect(query.payslipEmailed).toEqual({ $ne: true });
     expect(query.status.$in).toEqual(
       expect.arrayContaining(["approved", "paid"]),
     );
@@ -92,6 +93,15 @@ describe("runMonthlyPayslipJob — status vocabulary (#560)", () => {
 
     const query = PayrollUpdate.find.mock.calls[0][0];
     expect(query.status.$in).toContain("finalized");
+  });
+
+  test("matches a legacy row that has no payslipEmailed field at all", async () => {
+    await runMonthlyPayslipJob({ now: new Date(2026, 7, 1) });
+
+    const query = PayrollUpdate.find.mock.calls[0][0];
+    // `{ payslipEmailed: false }` would skip these documents entirely.
+    expect(query.payslipEmailed).not.toBe(false);
+    expect(query.payslipEmailed.$ne).toBe(true);
   });
 
   test("never picks up an unapproved or rejected run", async () => {

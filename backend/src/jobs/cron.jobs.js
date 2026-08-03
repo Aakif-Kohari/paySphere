@@ -121,7 +121,12 @@ async function runMonthlyPayslipJob({ now = new Date() } = {}) {
       month,
       year,
       ...emailableStatusFilter(),
-      payslipEmailed: false,
+      // `$ne: true` rather than `false`: a document written before
+      // `payslipEmailed` was added to the schema has no such field, and
+      // `{ payslipEmailed: false }` does not match a missing field. Those are
+      // exactly the "finalized"-era rows this job has never managed to reach,
+      // so matching them is the whole point.
+      payslipEmailed: { $ne: true },
     });
 
     found = payrolls.length;
