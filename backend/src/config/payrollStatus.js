@@ -210,6 +210,23 @@ function payableStatusFilter() {
 }
 
 /**
+ * A mongo filter fragment matching rows a payslip may be emailed for,
+ * including legacy "finalized" documents that predate the migration.
+ *
+ * The counterpart to `payableStatusFilter` for the dispatch paths. The monthly
+ * cron hardcoded `status: "finalized"` instead of asking here, and once the
+ * vocabulary was normalised no document carried that value any more — so the
+ * job matched nothing, every month, and payslips silently stopped going out
+ * (#560). Anything deciding "may this be emailed?" reads from here so the two
+ * cannot drift apart again.
+ *
+ * @returns {{ status: { $in: string[] } }}
+ */
+function emailableStatusFilter() {
+  return { status: { $in: [...EMAILABLE_STATUSES, 'finalized'] } };
+}
+
+/**
  * A mongo filter fragment excluding rejected rows, for the read paths that
  * legitimately want to show work in progress (e.g. the review screen) but must
  * never show something a checker has already thrown out.
@@ -235,5 +252,6 @@ module.exports = {
   isPayable,
   isEmailable,
   payableStatusFilter,
+  emailableStatusFilter,
   excludeRejectedFilter,
 };
