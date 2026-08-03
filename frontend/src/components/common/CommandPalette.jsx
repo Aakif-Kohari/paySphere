@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { Command } from 'cmdk';
 import SearchIcon from '@mui/icons-material/Search';
 import GridViewIcon from '@mui/icons-material/GridView';
@@ -95,12 +95,11 @@ const CommandPalette = () => {
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [search, setSearch] = useState('');
 
-  const token = localStorage.getItem('token');
+  const reduxToken = useSelector((state) => state.auth.token);
+  const token = reduxToken || localStorage.getItem('token');
 
   // Open on Cmd/Ctrl+K and index employees fresh each time
   useEffect(() => {
-    if (!token) return undefined;
-
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -109,20 +108,30 @@ const CommandPalette = () => {
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    if (token) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      if (token) {
+        document.removeEventListener('keydown', handleKeyDown);
+      }
+    };
   }, [token]);
 
   // Close on Escape
   useEffect(() => {
-    if (!open) return undefined;
-
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') setOpen(false);
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    if (open) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      if (open) {
+        document.removeEventListener('keydown', handleKeyDown);
+      }
+    };
   }, [open]);
 
   // Index employee names each time the palette opens so search stays fresh
