@@ -129,10 +129,16 @@ describe("employee portal — tenant scoping (#561)", () => {
     const res = makeRes();
     await getEmployeeProfile({ userId: String(OWNER_A) }, res, jest.fn());
 
-    expect(select).toHaveBeenCalledWith(
-      "fullName email role companyName employeeId",
+    // Asserted as "a narrow projection that excludes the sensitive fields"
+    // rather than an exact string, so renaming a field on the User schema does
+    // not fail a test that is really about what is *not* selected.
+    const projection = select.mock.calls[0][0];
+    expect(projection).not.toBe("-password");
+    expect(projection).toContain("fullName");
+    expect(projection).toContain("companyName");
+    ["password", "resetPasswordToken", "googleId", "tokenVersion", "companyLogoData"].forEach(
+      (field) => expect(projection).not.toContain(field),
     );
-    expect(select).not.toHaveBeenCalledWith("-password");
   });
 
   test("does not expose bank details or salary history in the projection", async () => {
