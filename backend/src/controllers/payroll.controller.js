@@ -89,6 +89,36 @@ function parsePayrollIdBatch(value) {
 }
 
 /**
+ * Split a field map into the `$set` and `$unset` halves of an update.
+ *
+ * `approvePayroll` clears the rejection trail by passing `rejectionReason:
+ * undefined`, and `rejectPayroll` clears the approval trail the same way. That
+ * only ever worked by accident: mongoose strips `undefined` values out of a
+ * `$set`, so those keys were dropped and the stale verdict stayed on the
+ * document — a row approved after a rejection kept showing the old reason.
+ *
+ * Anything explicitly cleared belongs in `$unset` instead, which is what the
+ * callers meant.
+ *
+ * @param {object} fields
+ * @returns {{ set: object, unset: object }}
+ */
+function splitFieldUpdates(fields = {}) {
+  const set = {};
+  const unset = {};
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null) {
+      unset[key] = "";
+    } else {
+      set[key] = value;
+    }
+  }
+
+  return { set, unset };
+}
+
+/**
  * Apply a status transition to a batch of payroll records owned by the caller.
  *
  * This is the whole fix for the cross-tenant hole in #458 concentrated in one
@@ -103,7 +133,9 @@ function parsePayrollIdBatch(value) {
  * @param {string} params.userId caller — the ownership scope
  * @param {string[]} params.ids payroll ids to transition
  * @param {string} params.targetStatus a PAYROLL_STATUS value
- * @param {object} params.extraFields fields to $set alongside the status
+ * @param {object} params.extraFields fields to write alongside the status; a
+ *   key whose value is `undefined` or `null` is removed from the document
+ *   rather than written, see `splitFieldUpdates`
  * @returns {Promise<{applied: object[], notFound: string[], invalidTransition: object[]}>}
  */
 async function transitionPayrollBatch({
@@ -148,6 +180,10 @@ async function transitionPayrollBatch({
   if (transitionable.length > 0) {
     const targetIds = transitionable.map((r) => r._id);
 
+    const { set, unset } = splitFieldUpdates(extraFields);
+    const update = { $set: { status: targetStatus, ...set } };
+    if (Object.keys(unset).length > 0) update.$unset = unset;
+
     await PayrollUpdate.updateMany(
       // Re-assert ownership and the source states on the write itself, so a
       // concurrent approval between the read above and this update cannot slip
@@ -156,7 +192,7 @@ async function transitionPayrollBatch({
         _id: { $in: targetIds },
         createdBy: userId,
       },
-      { $set: { status: targetStatus, ...extraFields } },
+      update,
       { runValidators: true },
     );
 
