@@ -8,7 +8,6 @@ const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
 const Settlement = require("../models/settlement.model");
-
 /**
  * Normalize an employee email for storage.
  *
@@ -117,6 +116,7 @@ exports.addEmployee = async (req, res, next) => {
     const employee = new Employee({
       fullName: sanitizeText(fullName),
       role: sanitizeText(role),
+      department: department ? sanitizeText(department) : '',
       monthlySalary: numSalary,
       overtimeRate: numOvertime,
       companyName: sanitizeText(user.companyName),
@@ -285,9 +285,9 @@ exports.importEmployees = async (req, res, next) => {
           const existingEmployees =
             nameRegexes.length > 0
               ? await Employee.find({
-                  createdBy: req.userId,
-                  fullName: { $in: nameRegexes },
-                }).select('fullName role')
+                createdBy: req.userId,
+                fullName: { $in: nameRegexes },
+              }).select('fullName role')
               : [];
 
           const existingKeys = new Set(
@@ -403,11 +403,12 @@ exports.importEmployees = async (req, res, next) => {
               return;
             }
 
-            existingKeys.add(key);
+            const sanitizedDepartment = record.department ? sanitizeText(record.department.trim()) : '';
 
             employees.push({
               fullName: sanitizedName,
               role: sanitizedRole,
+              department: sanitizedDepartment,
               monthlySalary,
               overtimeRate,
               companyName: sanitizeText(user.companyName),
@@ -508,8 +509,8 @@ exports.updateEmployee = async (req, res, next) => {
       return res.status(400).json({ message: 'Request body is required' });
     }
     const { id } = req.params;
-    const { fullName, role, monthlySalary, overtimeRate, isActive, email, bankDetails } = req.body;
-
+    const { fullName, role, department, monthlySalary, overtimeRate, isActive, email, bankDetails } = req.body;
+    if (department !== undefined) employee.department = sanitizeText(department);
     const employee = await Employee.findById(id);
 
     if (!employee || employee.deletedAt) {
@@ -860,6 +861,71 @@ exports.restoreEmployee = async (req, res, next) => {
       message: 'Employee restored successfully',
       employee,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+// EXPORT EMPLOYEES TO CSV
+exports.exportEmployeesCSV = async (req, res, next) => {
+  try {
+    const query = {
+      createdBy: req.userId,
+      deletedAt: null,
+    };
+
+    const employees = await Employee.find(query).sort({ createdAt: -1 });
+
+    const header = [
+      "Name",
+      "Role",
+      "Email",
+      "Status",
+      "Monthly Salary",
+      "Overtime Rate",
+      "Date of Birth",
+      "Joining Date",
+      "Department",
+    ];
+
+    const escapeCsvField = (value) => {
+      if (value === undefined || value === null) return "";
+      let str = String(value);
+      if (/^[=+\-@\t\r]/.test(str)) {
+        str = "'" + str;
+      }
+      if (str.includes(",") || str.includes("\n") || str.includes('"')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const formatDate = (date) => {
+      if (!date) return "";
+      const d = new Date(date);
+      return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
+    };
+
+    const rows = employees.map((emp) => [
+      escapeCsvField(emp.fullName || ""),
+      escapeCsvField(emp.role || ""),
+      escapeCsvField(emp.email || ""),
+      escapeCsvField(emp.isActive ? "Active" : "Inactive"),
+      emp.monthlySalary || 0,
+      emp.overtimeRate || 0,
+      escapeCsvField(formatDate(emp.dateOfBirth)),
+      escapeCsvField(formatDate(emp.joiningDate)),
+      escapeCsvField(emp.department || ""),
+    ]);
+
+    const csvContent = [header.join(","), ...rows.map((row) => row.join(","))].join("\n");
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=employees_${new Date().toISOString().split("T")[0]}.csv`
+    );
+
+    return res.status(200).send(csvContent);
   } catch (error) {
     next(error);
   }

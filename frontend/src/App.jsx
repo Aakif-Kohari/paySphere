@@ -11,10 +11,12 @@ import AddEmployee from "./pages/AddEmployee"
 import ResetPassword from "./pages/ResetPassword"
 import Settings from "./pages/Settings"
 import Reports from "./pages/Reports"
+import EmployeePortal from "./pages/EmployeePortal"
 import NotFound from "./pages/NotFound"
 import ProtectedRoute from "./components/ProtectedRoute"
 import ScrollToTop from "./components/common/ScrollToTop"
 import CommandPalette from "./components/common/CommandPalette"
+import SystemHealth from "./pages/SystemHealth"
 function App() {
   const dispatch = useDispatch();
   const themeMode = useSelector((state) => state.ui.themeMode);
@@ -61,10 +63,12 @@ function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<LoginSignUp />} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/employee-portal" element={<ProtectedRoute><EmployeePortal /></ProtectedRoute>} />
           <Route path="/monthly-updates" element={<ProtectedRoute><MonthlyUpdates /></ProtectedRoute>} />
           <Route path="/add-employee" element={<ProtectedRoute><AddEmployee /></ProtectedRoute>} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/settings/system-health" element={<ProtectedRoute><SystemHealth /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>

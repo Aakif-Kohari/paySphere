@@ -1,0 +1,173 @@
+import { useEffect, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
+import { useNavigate } from 'react-router-dom';
+import ThemeToggle from '../components/ThemeToggle';
+import api from '../services/api';
+
+export default function EmployeePortal() {
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState(null);
+  const [employee, setEmployee] = useState(null);
+  const [payslips, setPayslips] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [profRes, payRes] = await Promise.all([
+          api.get('/api/employee-portal/profile'),
+          api.get('/api/employee-portal/payslips'),
+        ]);
+
+        setProfile(profRes.data.user);
+        setEmployee(profRes.data.employee);
+        setPayslips(payRes.data.payrolls || []);
+      } catch (err) {
+        console.error('Failed to fetch employee portal data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const handleSignOut = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('companyName');
+    localStorage.removeItem('userRole');
+    navigate('/');
+  };
+
+  const getMonthName = (monthNum) => {
+    const date = new Date();
+    date.setMonth(monthNum - 1);
+    return date.toLocaleString('default', { month: 'long' });
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
+      <Helmet>
+        <title>Employee Self-Service Portal | PaySphere</title>
+        <meta name="description" content="View your profile, payslips, and attendance history." />
+      </Helmet>
+
+      {/* Top Bar */}
+      <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 flex items-center justify-between sticky top-0 z-30 transition-colors">
+        <div className="flex items-center gap-3">
+          <span className="font-bold text-xl text-blue-600 dark:text-blue-400">PaySphere</span>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-semibold uppercase tracking-wider">
+            Employee Portal
+          </span>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <ThemeToggle />
+          <button
+            onClick={handleSignOut}
+            className="px-3.5 py-1.5 text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"
+          >
+            Sign Out
+          </button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-8">
+        {loading ? (
+          <div className="animate-pulse space-y-6">
+            <div className="h-32 bg-gray-200 dark:bg-slate-800 rounded-2xl"></div>
+            <div className="h-64 bg-gray-200 dark:bg-slate-800 rounded-2xl"></div>
+          </div>
+        ) : (
+          <>
+            {/* Header Card */}
+            <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                  Welcome back
+                </p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mt-1">
+                  {profile?.fullName || 'Employee'}
+                </h1>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                  {employee?.role ? `${employee.role} • ` : ''}{profile?.companyName || 'PaySphere'}
+                </p>
+              </div>
+
+              {employee && (
+                <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-gray-100 dark:border-slate-800 flex gap-6">
+                  <div>
+                    <p className="text-xs uppercase text-gray-400 font-bold">Base Monthly Salary</p>
+                    <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
+                      ₹{employee.monthlySalary?.toLocaleString('en-IN') || 0}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase text-gray-400 font-bold">Overtime Rate</p>
+                    <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
+                      ₹{employee.overtimeRate || 0}/hr
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Payslips History */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">
+                Payslip History
+              </h2>
+
+              {payslips.length === 0 ? (
+                <div className="text-center py-12 text-gray-500 dark:text-slate-400">
+                  No payslips finalized for you yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-slate-800 text-gray-400 dark:text-slate-400 uppercase text-xs">
+                        <th className="py-3 px-4">Period</th>
+                        <th className="py-3 px-4">Base Salary</th>
+                        <th className="py-3 px-4">Overtime Pay</th>
+                        <th className="py-3 px-4">Leave Deductions</th>
+                        <th className="py-3 px-4 font-bold text-slate-900 dark:text-white">Net Payout</th>
+                        <th className="py-3 px-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-slate-800/60">
+                      {payslips.map((pay) => (
+                        <tr key={pay._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                          <td className="py-4 px-4 font-semibold text-slate-900 dark:text-white">
+                            {getMonthName(pay.month)} {pay.year}
+                          </td>
+                          <td className="py-4 px-4 text-slate-600 dark:text-slate-300">
+                            ₹{pay.baseSalary?.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-4 px-4 text-emerald-600 dark:text-emerald-400">
+                            +₹{pay.overtimePay?.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-4 px-4 text-red-500 dark:text-red-400">
+                            -₹{pay.leaveDeduction?.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-4 px-4 font-bold text-blue-600 dark:text-blue-400">
+                            ₹{pay.netSalary?.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                              {pay.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </main>
+    </div>
+  );
+}

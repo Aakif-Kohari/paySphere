@@ -1,9 +1,11 @@
+
 const express = require("express");
 const {
   addEmployee,
   getEmployees,
   getRecentEmployees,
   importEmployees,
+  exportEmployeesCSV,
   updateEmployee,
   deleteEmployee,
   toggleEmployeeStatus,
@@ -26,6 +28,7 @@ const router = express.Router();
 
 router.post("/", auth, requirePermission("WRITE_EMPLOYEE"), writeRateLimiter, addEmployee);
 router.post("/import", auth, requirePermission("WRITE_EMPLOYEE"), writeRateLimiter, upload.single("file"), importEmployees);
+router.get("/export-csv", auth, requirePermission("READ_EMPLOYEE"), exportEmployeesCSV);
 router.get("/", auth, requirePermission("READ_EMPLOYEE"), getEmployees);
 router.get("/recent", auth, requirePermission("READ_EMPLOYEE"), getRecentEmployees);
 router.delete("/:id", auth, requirePermission("DELETE_EMPLOYEE"), writeRateLimiter, deleteEmployee);
@@ -34,10 +37,6 @@ router.put("/:id/restore", auth, requirePermission("WRITE_EMPLOYEE"), writeRateL
 router.patch("/:id/status", auth, requirePermission("WRITE_EMPLOYEE"), writeRateLimiter, toggleEmployeeStatus);
 
 // --- Salary structure & revision history (#461) --------------------------
-//
-// Mounted on the employee router because they are per-employee resources and
-// share its permissions: reading a package is reading an employee record,
-// revising one changes what that employee is paid.
 router.get(
   "/:id/salary-structure",
   auth,
@@ -50,8 +49,6 @@ router.get(
   requirePermission("READ_EMPLOYEE"),
   getSalaryHistory,
 );
-// Preview writes nothing, so an admin can see the split and the delta before
-// committing to a change that is append-only and cannot be edited away.
 router.post(
   "/:id/salary-structure/preview",
   auth,

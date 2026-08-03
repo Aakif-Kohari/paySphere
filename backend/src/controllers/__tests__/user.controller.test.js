@@ -99,9 +99,13 @@ describe('Google Authentication Controller tests', () => {
 
     expect(User.findOne).toHaveBeenCalledWith({ email: 'newuser@example.com' });
     expect(res.status).toHaveBeenCalledWith(200);
+    // The Google path returns the account type and employee link too, so the
+    // client gets the same shape from every sign-in route (#558).
     expect(res.json).toHaveBeenCalledWith({
       token: 'dummy_jwt_token',
       companyName: 'Test Company',
+      role: 'ADMIN',
+      employeeId: undefined,
       message: 'Account created successfully',
     });
   });
@@ -124,6 +128,8 @@ describe('Google Authentication Controller tests', () => {
     expect(res.json).toHaveBeenCalledWith({
       token: 'dummy_jwt_token',
       companyName: 'Test Company',
+      role: 'ADMIN',
+      employeeId: undefined,
       message: 'Logged in successfully',
     });
   });

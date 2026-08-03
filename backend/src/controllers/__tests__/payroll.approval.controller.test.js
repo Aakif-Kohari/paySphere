@@ -408,9 +408,14 @@ describe("rejectPayroll — reason handling (#458)", () => {
 
     await rejectPayroll(req, res, next);
 
-    const update = PayrollUpdate.updateMany.mock.calls[0][1].$set;
-    expect(update.approvedBy).toBeUndefined();
-    expect(update.approvedAt).toBeUndefined();
+    // The controller passes `approvedBy: undefined` to mean "clear this".
+    // Mongoose strips undefined values out of a $set, so that never actually
+    // cleared anything — a row rejected after an approval kept the old
+    // approver. Explicitly cleared fields belong in $unset (#559).
+    const [, update] = PayrollUpdate.updateMany.mock.calls[0];
+    expect(update.$set.approvedBy).toBeUndefined();
+    expect(update.$set.approvedAt).toBeUndefined();
+    expect(update.$unset).toEqual({ approvedBy: "", approvedAt: "" });
   });
 
   test("scopes the read by createdBy so another company's run cannot be rejected", async () => {
@@ -619,5 +624,91 @@ describe("cross-tenant isolation, end to end (#458)", () => {
     // echoed back to B.
     expect(JSON.stringify(payload)).not.toContain("A's employee");
     expect(JSON.stringify(payload)).not.toContain("999999");
+  });
+});
+
+describe("the approval trail is actually persisted (#559)", () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    req = { userId: OWNER, body: {} };
+    res = makeRes();
+    next = jest.fn();
+    PayrollUpdate.updateMany.mockResolvedValue({ modifiedCount: 1 });
+    PayrollUpdate.find.mockImplementation(() =>
+      selectMock([payrollRow(ID_A, "pending_approval")]),
+    );
+    PayrollUpdate.countDocuments.mockResolvedValue(0);
+    PayrollUpdate.aggregate.mockResolvedValue([]);
+  });
+
+  test("the approvals queue populates the submitter without throwing", async () => {
+    // `.populate("submittedBy", …)` used to raise StrictPopulateError, because
+    // the path was not on the schema — a 500 on every request to the queue.
+    const chain = listMock([]);
+    PayrollUpdate.find.mockReturnValue(chain);
+
+    await getPendingApprovals({ userId: OWNER, query: {} }, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(chain.populate).toHaveBeenCalledWith("submittedBy", "fullName email");
+  });
+
+  test("approving records who approved it and when", async () => {
+    req.body = { payrollIds: [ID_A] };
+
+    await approvePayroll(req, res, next);
+
+    const [, update] = PayrollUpdate.updateMany.mock.calls[0];
+    expect(update.$set.status).toBe("approved");
+    expect(update.$set.approvedBy).toBe(OWNER);
+    expect(update.$set.approvedAt).toBeInstanceOf(Date);
+  });
+
+  test("approving clears any stale rejection rather than silently keeping it", async () => {
+    req.body = { payrollIds: [ID_A] };
+
+    await approvePayroll(req, res, next);
+
+    const [, update] = PayrollUpdate.updateMany.mock.calls[0];
+    expect(update.$unset).toEqual({
+      rejectionReason: "",
+      rejectedBy: "",
+      rejectedAt: "",
+    });
+  });
+
+  test("a transition with nothing to clear sends no $unset", async () => {
+    req.body = { payrollIds: [ID_A] };
+    PayrollUpdate.find.mockImplementation(() =>
+      selectMock([payrollRow(ID_A, "approved")]),
+    );
+
+    await markPayrollPaid(req, res, next);
+
+    const [, update] = PayrollUpdate.updateMany.mock.calls[0];
+    expect(update.$unset).toBeUndefined();
+  });
+
+  test("every field the model writes exists on the schema", () => {
+    // The root cause: the controller and the schema disagreed about which
+    // fields exist, and mongoose reports that disagreement by dropping the
+    // write. Anything the approval handlers set has to be declared.
+    const written = [
+      "submittedBy",
+      "submittedAt",
+      "approvedBy",
+      "approvedAt",
+      "rejectedBy",
+      "rejectedAt",
+      "rejectionReason",
+    ];
+
+    const RealPayrollUpdate = jest.requireActual("../../models/payroll.model");
+
+    written.forEach((field) => {
+      expect(RealPayrollUpdate.schema.path(field)).toBeDefined();
+    });
   });
 });

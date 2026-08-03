@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { logout } from '../features/auth/authSlice';
 import ThemeToggle from '../components/ThemeToggle';
 import Sidebar from '../components/Sidebar';
@@ -24,7 +25,13 @@ import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 // Trigger a file download from the browser
 const downloadFile = (url, filename) => {
   const token = localStorage.getItem('token');
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const baseUrl =
+    import.meta.env.VITE_API_URL ||
+    (import.meta.env.PROD
+      ? typeof window !== 'undefined'
+        ? window.location.origin
+        : ''
+      : 'http://localhost:5000');
   fetch(`${baseUrl}${url}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
@@ -81,11 +88,11 @@ const DashboardOverview = ({
   }
 
   return (
-    <main className="p-4 sm:p-8">
-      {/* Title */}
-      <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4">
+    <>
+      {/* Overview Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-gray-200 dark:border-slate-800">
         <div>
-          <p className="text-sm text-gray-500 dark:text-slate-500">
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1">
             Monthly Overview
           </p>
           <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white">
@@ -100,7 +107,7 @@ const DashboardOverview = ({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search employees..."
+            placeholder={t('dashboard.searchEmployees', 'Search employees...')}
             className="w-full sm:w-auto px-4 py-3 border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-sm focus:border-blue-500 outline-none transition-colors"
           />
         </div>
@@ -110,7 +117,7 @@ const DashboardOverview = ({
             onClick={() => navigate('/reports')}
             className="flex-1 cursor-pointer sm:flex-none px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 transition-colors"
           >
-            Reports
+            {t('dashboard.reports', 'Reports')}
           </button>
 
           <button
@@ -119,14 +126,14 @@ const DashboardOverview = ({
             }
             className="flex-1 cursor-pointer sm:flex-none px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 transition-colors"
           >
-            Export CSV
+            {t('dashboard.exportCsv', 'Export CSV')}
           </button>
 
           <button
             onClick={onAddUpdate}
             className="flex-1 cursor-pointer sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           >
-            Run Payroll
+            {t('dashboard.runPayroll', 'Run Payroll')}
           </button>
         </div>
       </div>
@@ -286,7 +293,7 @@ const DashboardOverview = ({
           </div>
         )}
       </div>
-    </main>
+    </>
   );
 };
 
@@ -578,6 +585,118 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
   );
 };
 
+// --- Payroll Table Component ---
+const PayrollTable = ({
+  payrolls,
+  loading,
+  currentPage,
+  totalPages,
+  totalCount,
+  setCurrentPage,
+}) => {
+  const PAYROLL_LIMIT = 10;
+  const startIdx = (currentPage - 1) * PAYROLL_LIMIT + 1;
+  const endIdx = Math.min(currentPage * PAYROLL_LIMIT, totalCount);
+
+  const STATUS_STYLE = {
+    pending_approval: 'bg-yellow-50 text-yellow-700 border border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800/40',
+    approved: 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800/40',
+    paid: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800/40',
+    rejected: 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/40',
+    finalized: 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800/40',
+  };
+
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const formatStatus = (s) => {
+    if (!s) return 'Unknown';
+    return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  return (
+    <main className="p-4 sm:p-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-2">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Payroll History</h1>
+          {!loading && totalCount > 0 && (
+            <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">
+              Showing {startIdx}–{endIdx} of {totalCount} record{totalCount !== 1 ? 's' : ''}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="hidden sm:grid grid-cols-5 px-6 py-3 bg-gray-50 dark:bg-slate-800/50 border-b border-gray-200 dark:border-slate-800 text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide">
+          <span>Employee</span>
+          <span className="text-center">Period</span>
+          <span className="text-right">Base Salary</span>
+          <span className="text-right">Net Salary</span>
+          <span className="text-center">Status</span>
+        </div>
+
+        {loading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 animate-pulse">
+              <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 mb-2" />
+              <div className="h-3 bg-gray-100 dark:bg-slate-800 rounded w-1/2" />
+            </div>
+          ))
+        ) : payrolls.length === 0 ? (
+          <div className="px-6 py-16 text-center">
+            <p className="text-gray-500 dark:text-slate-500 text-sm">No payroll records found for this month.</p>
+            <p className="text-gray-400 dark:text-slate-600 text-xs mt-1">Run payroll from Monthly Updates to see records here.</p>
+          </div>
+        ) : (
+          payrolls.map((p) => (
+            <div key={p._id} className="grid grid-cols-1 sm:grid-cols-5 px-6 py-4 border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors items-center gap-2">
+              <div>
+                <p className="font-semibold text-gray-900 dark:text-white text-sm">{p.employeeName}</p>
+              </div>
+              <div className="text-center text-sm text-gray-600 dark:text-slate-400">
+                {MONTH_NAMES[(p.month || 1) - 1]} {p.year}
+              </div>
+              <div className="text-right text-sm text-gray-700 dark:text-slate-300">
+                ₹{(p.baseSalary || 0).toLocaleString('en-IN')}
+              </div>
+              <div className="text-right font-bold text-sm text-slate-900 dark:text-white">
+                ₹{(p.netSalary || 0).toLocaleString('en-IN')}
+              </div>
+              <div className="flex sm:justify-center">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[p.status] || STATUS_STYLE['finalized']}`}>
+                  {formatStatus(p.status)}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {!loading && totalPages > 1 && (
+        <div className="flex justify-center items-center gap-4 mt-6">
+          <button
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage(currentPage - 1)}
+            className="px-4 py-2 border border-gray-200 dark:border-slate-800 rounded-lg text-sm font-semibold disabled:opacity-50 text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            ← Previous
+          </button>
+          <span className="text-sm text-gray-600 dark:text-slate-500">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage(currentPage + 1)}
+            className="px-4 py-2 border border-gray-200 dark:border-slate-800 rounded-lg text-sm font-semibold disabled:opacity-50 text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            Next →
+          </button>
+        </div>
+      )}
+    </main>
+  );
+};
+
 export default function PaySphereDashboard() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -592,6 +711,14 @@ export default function PaySphereDashboard() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
   const [payrolls, setPayrolls] = useState([]);
+
+  // Payroll-summary pagination state
+  const [payrollPage, setPayrollPage] = useState(1);
+  const [payrollTotalPages, setPayrollTotalPages] = useState(1);
+  const [payrollTotalCount, setPayrollTotalCount] = useState(0);
+  const [payrollTotalPayout, setPayrollTotalPayout] = useState(0);
+  const [payrollLoading, setPayrollLoading] = useState(false);
+  const [paginatedPayrolls, setPaginatedPayrolls] = useState([]);
 
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -608,7 +735,7 @@ export default function PaySphereDashboard() {
   // Deep-link support: /dashboard?tab=employees&q=Rahul lets the command
   // palette (Cmd+K) jump straight to a tab and pre-fill the search box.
   useEffect(() => {
-    const TAB_IDS = ['Dashboard', 'Employees', 'Approvals', 'Loans'];
+    const TAB_IDS = ['Dashboard', 'Employees', 'Payroll', 'Approvals', 'Loans'];
     const targetTab = TAB_IDS.find(
       (id) => id.toLowerCase() === (tabParam || '').toLowerCase(),
     );
@@ -648,13 +775,14 @@ export default function PaySphereDashboard() {
           : '';
         const [empRes, payRes] = await Promise.all([
           api.get(`/api/employees?page=${currentPage}&limit=10${searchParam}`),
-          api.get(`/api/payroll/summary`),
+          api.get(`/api/payroll/summary?limit=0`),
         ]);
 
         setEmployees(empRes.data.employees);
         setTotalPages(empRes.data.totalPages);
         setTotalEmployees(empRes.data.totalEmployees || 0);
         setPayrolls(payRes.data.payrolls || []);
+        setPayrollTotalPayout(payRes.data.totalPayout || 0);
       } catch (err) {
         console.error('Failed to fetch data:', err);
       } finally {
@@ -664,6 +792,25 @@ export default function PaySphereDashboard() {
     if (token) fetchData();
     else setTimeout(() => setLoading(false), 0);
   }, [token, currentPage, debouncedSearch]);
+
+  // Fetch paginated payroll records when viewing the Payroll tab
+  useEffect(() => {
+    if (!token) return;
+    const fetchPayrollPage = async () => {
+      setPayrollLoading(true);
+      try {
+        const res = await api.get(`/api/payroll/summary?page=${payrollPage}&limit=10`);
+        setPaginatedPayrolls(res.data.payrolls || []);
+        setPayrollTotalPages(res.data.totalPages || 1);
+        setPayrollTotalCount(res.data.totalCount || 0);
+      } catch (err) {
+        console.error('Failed to fetch payroll page:', err);
+      } finally {
+        setPayrollLoading(false);
+      }
+    };
+    fetchPayrollPage();
+  }, [token, payrollPage]);
 
   const payrollMap = {};
   payrolls.forEach((p) => {
@@ -804,6 +951,15 @@ export default function PaySphereDashboard() {
           <Settlements />
         ) : activePage === 'Loans' ? (
           <Loans />
+        ) : activePage === 'Payroll' ? (
+          <PayrollTable
+            payrolls={paginatedPayrolls}
+            loading={payrollLoading}
+            currentPage={payrollPage}
+            totalPages={payrollTotalPages}
+            totalCount={payrollTotalCount}
+            setCurrentPage={setPayrollPage}
+          />
         ) : activePage === 'Dashboard' ? (
           <DashboardOverview
             search={search}

@@ -6,6 +6,8 @@ import { logoutUser } from "../features/auth/authSlice";import ThemeToggle from 
 import api from "../services/api";
 import AttendanceCalendarModal from "../components/AttendanceCalendarModal";
 import { Snackbar, Alert } from '@mui/material';
+import PayrollWizard from "../components/PayrollWizard";
+
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const PayrollIcon = () => (
@@ -175,6 +177,8 @@ export default function MonthlyUpdates() {
   const themeMode = useSelector((state) => state.ui.themeMode);
   const isDark = themeMode === "dark";
 
+  const [isMobile] = useState(() => window.innerWidth <= 480);
+
   const [activePage, setActivePage]   = useState("employees");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [input, setInput]             = useState("");
@@ -217,21 +221,36 @@ export default function MonthlyUpdates() {
     }
   }, [token, navigate]);
 
-  // Fetch real employees from API
+  // Fetch all active employees page-by-page to avoid huge payloads.
+  // The monthly-updates input box needs the full list to resolve names,
+  // but we still use the server's pagination so each round-trip is small.
   useEffect(() => {
-    const fetchEmployees = async () => {
+    const fetchAllEmployees = async () => {
       try {
-        const res = await api.get(`/api/employees`);
-        setEmployees(res.data.employees);
+        const PAGE_SIZE = 50;
+        let page = 1;
+        let allEmployees = [];
+        let totalPages = 1;
+
+        do {
+          const res = await api.get(`/api/employees?page=${page}&limit=${PAGE_SIZE}`);
+          const data = res.data;
+          allEmployees = allEmployees.concat(data.employees || []);
+          totalPages = data.totalPages || 1;
+          page++;
+        } while (page <= totalPages);
+
+        setEmployees(allEmployees);
       } catch (err) {
         console.error("Failed to fetch employees:", err);
       } finally {
         setLoadingEmployees(false);
       }
     };
-    if (token) fetchEmployees();
+    if (token) fetchAllEmployees();
     else setTimeout(() => setLoadingEmployees(false), 0);
   }, [token]);
+
 
 
 
@@ -601,7 +620,10 @@ export default function MonthlyUpdates() {
         </header>
 
         {/* Page */}
-        <main className="desktop-p" style={{ flex:1, padding:"30px 20px 100px", display:"flex", flexDirection:"column", alignItems:"center" }}>
+        {isMobile ? (
+          <PayrollWizard />
+        ) : (
+          <main className="desktop-p" style={{ flex:1, padding:"30px 20px 100px", display:"flex", flexDirection:"column", alignItems:"center" }}>
 
           {/* Title */}
           <div style={{ textAlign:"center", marginBottom:30, width:"100%", maxWidth:760 }}>
@@ -1145,6 +1167,7 @@ export default function MonthlyUpdates() {
           />
 
         </main>
+        )}
       </div>
 
       <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>

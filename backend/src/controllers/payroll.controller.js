@@ -89,6 +89,36 @@ function parsePayrollIdBatch(value) {
 }
 
 /**
+ * Split a field map into the `$set` and `$unset` halves of an update.
+ *
+ * `approvePayroll` clears the rejection trail by passing `rejectionReason:
+ * undefined`, and `rejectPayroll` clears the approval trail the same way. That
+ * only ever worked by accident: mongoose strips `undefined` values out of a
+ * `$set`, so those keys were dropped and the stale verdict stayed on the
+ * document — a row approved after a rejection kept showing the old reason.
+ *
+ * Anything explicitly cleared belongs in `$unset` instead, which is what the
+ * callers meant.
+ *
+ * @param {object} fields
+ * @returns {{ set: object, unset: object }}
+ */
+function splitFieldUpdates(fields = {}) {
+  const set = {};
+  const unset = {};
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null) {
+      unset[key] = "";
+    } else {
+      set[key] = value;
+    }
+  }
+
+  return { set, unset };
+}
+
+/**
  * Apply a status transition to a batch of payroll records owned by the caller.
  *
  * This is the whole fix for the cross-tenant hole in #458 concentrated in one
@@ -103,7 +133,9 @@ function parsePayrollIdBatch(value) {
  * @param {string} params.userId caller — the ownership scope
  * @param {string[]} params.ids payroll ids to transition
  * @param {string} params.targetStatus a PAYROLL_STATUS value
- * @param {object} params.extraFields fields to $set alongside the status
+ * @param {object} params.extraFields fields to write alongside the status; a
+ *   key whose value is `undefined` or `null` is removed from the document
+ *   rather than written, see `splitFieldUpdates`
  * @returns {Promise<{applied: object[], notFound: string[], invalidTransition: object[]}>}
  */
 async function transitionPayrollBatch({
@@ -148,6 +180,10 @@ async function transitionPayrollBatch({
   if (transitionable.length > 0) {
     const targetIds = transitionable.map((r) => r._id);
 
+    const { set, unset } = splitFieldUpdates(extraFields);
+    const update = { $set: { status: targetStatus, ...set } };
+    if (Object.keys(unset).length > 0) update.$unset = unset;
+
     await PayrollUpdate.updateMany(
       // Re-assert ownership and the source states on the write itself, so a
       // concurrent approval between the read above and this update cannot slip
@@ -156,7 +192,7 @@ async function transitionPayrollBatch({
         _id: { $in: targetIds },
         createdBy: userId,
       },
-      { $set: { status: targetStatus, ...extraFields } },
+      update,
       { runValidators: true },
     );
 
@@ -1136,7 +1172,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
   }
 };
 
-// GET PAYROLL SUMMARY for a month
+// GET PAYROLL SUMMARY for a month — with optional pagination
 exports.getPayrollSummary = async (req, res, next) => {
   try {
     let month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
@@ -1150,6 +1186,19 @@ exports.getPayrollSummary = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
+    // Pagination parameters — default to page 1, 20 records per page.
+    // A limit of 0 disables paging and returns the full set (kept for
+    // backward-compatibility with callers that aggregate the whole month).
+    let page = parseInt(req.query.page, 10);
+    if (isNaN(page) || page < 1) page = 1;
+
+    let limit = parseInt(req.query.limit, 10);
+    // Allow limit=0 to opt out of pagination (legacy callers / aggregation)
+    if (isNaN(limit) || limit < 0) limit = 20;
+    if (limit > 100) limit = 100;
+
+    const skip = limit > 0 ? (page - 1) * limit : 0;
+
     // The summary now has to distinguish "submitted" from "signed off". Before
     // #458 it summed every row for the month regardless of status, so a run
     // sitting in pending_approval — or one a checker had explicitly rejected —
@@ -1158,33 +1207,85 @@ exports.getPayrollSummary = async (req, res, next) => {
     // `totalPayout` therefore counts payable rows only. The pending figure is
     // returned alongside it rather than folded in, so the review screen can
     // still show what is in flight without overstating the payout.
-    const payrolls = await PayrollUpdate.find({
+    const baseQuery = {
       createdBy: req.userId,
       month,
       year,
       ...excludeRejectedFilter(),
-    }).sort({ employeeName: 1 });
+    };
 
-    const payableRows = payrolls.filter((p) =>
-      [PAYROLL_STATUS.APPROVED, PAYROLL_STATUS.PAID].includes(
-        normalizeStatus(p.status),
-      ),
-    );
-    const pendingRows = payrolls.filter(
-      (p) => normalizeStatus(p.status) === PAYROLL_STATUS.PENDING_APPROVAL,
-    );
+    // Run the count and the paginated page fetch in parallel.
+    const [totalCount, payrolls] = await Promise.all([
+      PayrollUpdate.countDocuments(baseQuery),
+      limit > 0
+        ? PayrollUpdate.find(baseQuery).sort({ employeeName: 1 }).skip(skip).limit(limit)
+        : PayrollUpdate.find(baseQuery).sort({ employeeName: 1 }),
+    ]);
+
+    const totalPages = limit > 0 ? Math.ceil(totalCount / limit) : 1;
+
+    // Aggregate-level totals across the *entire* month (not just the current
+    // page), so the dashboard summary cards are always accurate.
+    const [aggResult] = await PayrollUpdate.aggregate([
+      { $match: baseQuery },
+      {
+        $group: {
+          _id: null,
+          totalPayout: {
+            $sum: {
+              $cond: [
+                { $in: ["$status", [PAYROLL_STATUS.APPROVED, PAYROLL_STATUS.PAID]] },
+                "$netSalary",
+                0,
+              ],
+            },
+          },
+          payableCount: {
+            $sum: {
+              $cond: [
+                { $in: ["$status", [PAYROLL_STATUS.APPROVED, PAYROLL_STATUS.PAID]] },
+                1,
+                0,
+              ],
+            },
+          },
+          pendingApprovalTotal: {
+            $sum: {
+              $cond: [
+                { $eq: ["$status", PAYROLL_STATUS.PENDING_APPROVAL] },
+                "$netSalary",
+                0,
+              ],
+            },
+          },
+          pendingApprovalCount: {
+            $sum: {
+              $cond: [
+                { $eq: ["$status", PAYROLL_STATUS.PENDING_APPROVAL] },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ]);
 
     const round2 = (n) => Math.round(n * 100) / 100;
-    const sumNet = (rows) => rows.reduce((sum, p) => sum + (p.netSalary || 0), 0);
 
     res.status(200).json({
       month,
       year,
-      totalPayout: round2(sumNet(payableRows)),
-      employeeCount: payableRows.length,
-      pendingApprovalTotal: round2(sumNet(pendingRows)),
-      pendingApprovalCount: pendingRows.length,
+      totalPayout: round2(aggResult ? aggResult.totalPayout : 0),
+      employeeCount: aggResult ? aggResult.payableCount : 0,
+      pendingApprovalTotal: round2(aggResult ? aggResult.pendingApprovalTotal : 0),
+      pendingApprovalCount: aggResult ? aggResult.pendingApprovalCount : 0,
+      // Paginated page of records
       payrolls,
+      // Pagination meta
+      currentPage: page,
+      totalPages,
+      totalCount,
     });
   } catch (error) {
     next(error);

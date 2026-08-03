@@ -1,0 +1,46 @@
+{
+  "dashboard": {
+    "title": "Panel de Control",
+    "welcome": "Bienvenido de nuevo",
+    "totalEmployees": "Total de Empleados",
+    "monthlyPayroll": "Nómina Mensual",
+    "pendingApprovals": "Aprobaciones Pendientes",
+    "activeEmployees": "Empleados Activos",
+    "recentEmployees": "Empleados Recientes",
+    "employeeBreakdown": "Desglose de Empleados",
+    "noEmployees": "No se encontraron empleados",
+    "addFirstEmployee": "Agrega tu primer empleado para comenzar",
+    "viewAll": "Ver Todo",
+    "runPayroll": "Ejecutar Nómina",
+    "exportCsv": "Exportar CSV",
+    "searchEmployees": "Buscar empleados...",
+    "addEmployee": "Agregar Empleado",
+    "payrollHistory": "Historial de Nómina",
+    "reports": "Reportes"
+  },
+  "nav": {
+    "dashboard": "Panel de Control",
+    "employees": "Empleados",
+    "payroll": "Nómina",
+    "reports": "Reportes",
+    "loans": "Préstamos",
+    "approvals": "Aprobaciones",
+    "settings": "Configuración",
+    "logout": "Cerrar Sesión"
+  },
+  "settings": {
+    "title": "Configuración",
+    "preferences": "Preferencias",
+    "language": "Idioma",
+    "theme": "Tema",
+    "savePreferences": "Guardar Preferencias"
+  },
+  "common": {
+    "save": "Guardar Cambios",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "loading": "Cargando...",
+    "noData": "No hay datos disponibles"
+  }
+}

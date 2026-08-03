@@ -20,7 +20,8 @@ router.post("/2fa/verify-and-enable", auth, verifyAndEnable2FA);
 router.post("/2fa/disable", auth, disable2FA);
 router.post("/2fa/validate-login", auth, validate2FALogin);
 
-// Settings
+// Settings & Health
+router.get("/health", auth, getSystemHealth);
 router.get("/settings", auth, getSettings);
 router.patch("/settings", auth, writeRateLimiter, updateSettings);
 router.patch("/security/password", auth, writeRateLimiter, updatePassword);

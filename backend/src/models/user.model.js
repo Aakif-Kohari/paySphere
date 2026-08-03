@@ -1,4 +1,8 @@
 const mongoose = require("mongoose");
+const {
+  ALL_ACCOUNT_TYPES,
+  DEFAULT_ACCOUNT_TYPE,
+} = require("../config/accountTypes");
 
 const userSchema = new mongoose.Schema({
   fullName: {
@@ -15,9 +19,33 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  /**
+   * The RBAC role — a reference to a `Role` document, which carries the
+   * `Permission` set that `requirePermission` checks against.
+   *
+   * #443 declared a *second* field called `role` further down this schema (a
+   * String enum of ADMIN/EMPLOYEE). Mongoose keeps the last declaration, so
+   * this reference was silently replaced by a String: `populate("role")` could
+   * never hydrate a Role, and `signup` assigning `defaultRole._id` failed enum
+   * validation, so registration returned 400 on any seeded database (#558).
+   *
+   * The account-type discriminator now lives on `accountType` below. Nothing
+   * should ever declare `role` twice here again.
+   */
   role: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Role"
+  },
+  /**
+   * What kind of login this is: the owner's console or an employee's
+   * self-service portal (#443). Orthogonal to `role` — an account has a type
+   * *and* a permission set, and conflating the two is what broke #558.
+   */
+  accountType: {
+    type: String,
+    enum: ALL_ACCOUNT_TYPES,
+    default: DEFAULT_ACCOUNT_TYPE,
+    index: true,
   },
   password: {
     type: String,
@@ -105,6 +133,10 @@ const userSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true,
+  },
+  employeeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Employee",
   },
   tokenVersion: {
     type: Number,

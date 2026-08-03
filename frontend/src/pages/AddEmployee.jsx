@@ -94,6 +94,7 @@ export default function AddEmployee() {
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("");
   const [monthlySalary, setMonthlySalary] = useState("");
+  const [department, setDepartment] = useState("");
   const [overtimeRate, setOvertimeRate] = useState("");
   const [currency, setCurrency] = useState("INR");
   const [dateOfBirth, setDateOfBirth] = useState("");
@@ -194,6 +195,7 @@ export default function AddEmployee() {
       await api.post(`/api/employees`, {
         fullName,
         role,
+        department,
         monthlySalary: salaryNum,
         overtimeRate: otNum,
         currency,
@@ -204,6 +206,7 @@ export default function AddEmployee() {
       setSuccess("Employee added successfully!");
       setFullName("");
       setRole("");
+      setDepartment("");
       setMonthlySalary("");
       setOvertimeRate("");
       setDateOfBirth("");
@@ -276,8 +279,8 @@ export default function AddEmployee() {
                 setIsSidebarOpen(false);
               }}
               className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${item.id === "employees"
-                  ? "bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold"
-                  : "text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50"
+                ? "bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold"
+                : "text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50"
                 }`}
             >
               {item.icon}
@@ -423,6 +426,31 @@ export default function AddEmployee() {
                     required
                     className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
                   />
+                </label>
+
+                {/* Department Field */}
+                <label className="block mb-5">
+                  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">
+                    Department
+                  </span>
+                  <input
+                    id="employee-department"
+                    type="text"
+                    list="department-suggestions"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    placeholder="e.g. Engineering, Sales, HR, Marketing"
+                    className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
+                  />
+                  <datalist id="department-suggestions">
+                    <option value="Engineering" />
+                    <option value="Sales" />
+                    <option value="Marketing" />
+                    <option value="Human Resources" />
+                    <option value="Finance" />
+                    <option value="Operations" />
+                    <option value="Design" />
+                  </datalist>
                 </label>
 
                 {/* Dates */}
@@ -588,7 +616,9 @@ export default function AddEmployee() {
                         <Avatar name={emp.fullName} size={36} />
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">{emp.fullName}</p>
-                          <p className="text-xs text-gray-500 dark:text-slate-500 truncate">{emp.role || "Employee"}</p>
+                          <p className="text-xs text-gray-500 dark:text-slate-500 truncate">
+                            {emp.role || "Employee"} {emp.department ? `• ${emp.department}` : ""}
+                          </p>
                         </div>
                         <span className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
                           {fmt(emp.monthlySalary, emp.currency)}
