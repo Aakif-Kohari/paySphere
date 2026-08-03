@@ -1,6 +1,7 @@
 const User = require("../models/user.model");
 const logger = require("../utils/logger");
 const { getDefaultRole } = require("../seeds/rbac.seed");
+const { resolveAccountType } = require("../config/accountTypes");
 
 /**
  * When true, an account whose role cannot be resolved is denied instead of
@@ -114,16 +115,36 @@ const requirePermission = (requiredPermission) => {
 };
 
 /**
- * Simple role check middleware for authorized roles list.
+ * Account-type gate, for routes that are about *which console you are in*
+ * rather than *which permission you hold* — the self-service portal, mainly.
+ *
+ * Previously this read `req.user.role` and fell back to the literal "ADMIN":
+ *
+ *     const userRole = (req.user && req.user.role) || req.userRole || "ADMIN";
+ *
+ * Two problems. `req.user.role` is the RBAC role reference, not an account
+ * type, so on a repaired database it is an ObjectId that matches neither
+ * "ADMIN" nor "EMPLOYEE". And the fallback is fail-open: an account whose type
+ * could not be determined was handed the most privileged one, which for an
+ * authorization check is backwards. It now resolves from the account itself and
+ * denies when it cannot tell (#558).
+ *
+ * @param {...string} allowedTypes ACCOUNT_TYPE values; empty means "any signed-in account"
  */
-const authorize = (...roles) => {
+const authorize = (...allowedTypes) => {
   return (req, res, next) => {
     if (!req.user && !req.userId) {
       return res.status(401).json({ message: "Authentication required" });
     }
 
-    const userRole = (req.user && req.user.role) || req.userRole || "ADMIN";
-    if (roles.length > 0 && !roles.includes(userRole)) {
+    if (allowedTypes.length === 0) return next();
+
+    // `req.accountType` is stamped by the auth middleware. Resolving again from
+    // `req.user` keeps the guard correct when it is mounted without it, or in a
+    // test that builds the request by hand.
+    const accountType = req.accountType || resolveAccountType(req.user);
+
+    if (!accountType || !allowedTypes.includes(accountType)) {
       return res.status(403).json({ message: "Access denied. Insufficient permissions." });
     }
 

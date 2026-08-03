@@ -2,6 +2,11 @@ const User = require("../../models/user.model");
 const logger = require("../../utils/logger");
 const { getDefaultRole } = require("../../seeds/rbac.seed");
 const authorize = require("../rbac.middleware");
+// Every `requirePermission` suite below has been in this file since #413, but
+// this import was lost in a merge — so all 20 of them failed with
+// `ReferenceError: requirePermission is not defined` and the RBAC regressions
+// silently stopped guarding anything (#558).
+const { requirePermission } = require("../rbac.middleware");
 
 jest.mock("../../models/user.model");
 jest.mock("../../seeds/rbac.seed", () => ({
@@ -59,8 +64,8 @@ describe('authorize middleware', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  test('should return 403 if user role is not authorized', () => {
-    req.user = { role: 'EMPLOYEE' };
+  test('should return 403 if user account type is not authorized', () => {
+    req.user = { accountType: 'EMPLOYEE' };
     const middleware = authorize('ADMIN');
     middleware(req, res, next);
 
@@ -69,8 +74,8 @@ describe('authorize middleware', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  test('should call next() if user role is allowed', () => {
-    req.user = { role: 'EMPLOYEE' };
+  test('should call next() if user account type is allowed', () => {
+    req.user = { accountType: 'EMPLOYEE' };
     const middleware = authorize('EMPLOYEE', 'ADMIN');
     middleware(req, res, next);
 
@@ -78,9 +83,49 @@ describe('authorize middleware', () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  test('should default role to ADMIN if user has no role defined', () => {
+  test('prefers the account type the auth middleware already resolved', () => {
+    req.accountType = 'EMPLOYEE';
+    req.user = { accountType: 'ADMIN' };
+    const middleware = authorize('EMPLOYEE');
+    middleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+  });
+
+  test('treats an unlinked account as the owner', () => {
     req.user = {};
     const middleware = authorize('ADMIN');
+    middleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+  });
+
+  test('treats an account linked to an employee record as an employee', () => {
+    // The pre-#558 fallback read `req.user.role || "ADMIN"` and would have let
+    // this through an ADMIN-only route.
+    req.user = { employeeId: 'emp-1' };
+    const middleware = authorize('ADMIN');
+    middleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test('does not treat an RBAC role reference as an account type', () => {
+    // `role` holds an ObjectId now. The old guard compared it against
+    // "ADMIN"/"EMPLOYEE" and fell back to "ADMIN" when it did not match, so an
+    // employee login with a role reference was handed the owner console.
+    req.user = { role: '68f3ac1e5b2d4c0012ab34cd', employeeId: 'emp-1' };
+    const middleware = authorize('ADMIN');
+    middleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  test('lets any signed-in account through when no type is required', () => {
+    req.user = { accountType: 'EMPLOYEE' };
+    const middleware = authorize();
     middleware(req, res, next);
 
     expect(next).toHaveBeenCalled();
@@ -88,6 +133,23 @@ describe('authorize middleware', () => {
 });
 
 describe("requirePermission", () => {
+  // These suites used to lean on the `req/res/next` declared inside the
+  // `authorize` describe above, which is out of scope here — the other half of
+  // what the merge broke.
+  let req, res, next;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete process.env.RBAC_STRICT;
+
+    req = { userId: "user123" };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    };
+    next = jest.fn();
+  });
+
   describe("authentication guard", () => {
     test("returns 401 when auth middleware has not run", async () => {
       req = {};
@@ -296,13 +358,29 @@ describe("requirePermission", () => {
     });
 
     test("denies instead when RBAC_STRICT=true", async () => {
+      // STRICT_MODE is read from the environment once, at require time, so the
+      // middleware has to be loaded again with the flag set. `isolateModules`
+      // gives it a fresh registry; the mocks declared at the top of this file
+      // still apply, but they are *new* mock objects, so the doubles have to be
+      // re-fetched from inside the isolated scope.
       process.env.RBAC_STRICT = "true";
-      loadMiddleware();
 
-      getDefaultRole.mockResolvedValue(null);
-      mockFindById({ _id: "user123", role: null });
+      let strictRequirePermission;
+      let StrictUser;
+      let strictGetDefaultRole;
 
-      await requirePermission("READ_EMPLOYEE")(req, res, next);
+      jest.isolateModules(() => {
+        StrictUser = require("../../models/user.model");
+        ({ getDefaultRole: strictGetDefaultRole } = require("../../seeds/rbac.seed"));
+        ({ requirePermission: strictRequirePermission } = require("../rbac.middleware"));
+      });
+
+      strictGetDefaultRole.mockResolvedValue(null);
+      StrictUser.findById.mockReturnValue({
+        populate: jest.fn().mockResolvedValue({ _id: "user123", role: null }),
+      });
+
+      await strictRequirePermission("READ_EMPLOYEE")(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({

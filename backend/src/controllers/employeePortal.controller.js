@@ -1,6 +1,7 @@
 const Employee = require("../models/employee.model");
 const PayrollUpdate = require("../models/payroll.model");
 const User = require("../models/user.model");
+const { resolveAccountType } = require("../config/accountTypes");
 
 // GET EMPLOYEE PROFILE (Self-service)
 exports.getEmployeeProfile = async (req, res, next) => {
@@ -20,7 +21,9 @@ exports.getEmployeeProfile = async (req, res, next) => {
       user: {
         fullName: user.fullName,
         email: user.email,
-        role: user.role || "EMPLOYEE",
+        // The account type, not the RBAC role reference — `user.role` is an
+        // ObjectId now that the two are separate fields again (#558).
+        role: resolveAccountType(user),
         companyName: user.companyName,
       },
       employee: employee || null,
