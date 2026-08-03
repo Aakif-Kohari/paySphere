@@ -1,0 +1,46 @@
+{
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome back",
+    "totalEmployees": "Total Employees",
+    "monthlyPayroll": "Monthly Payroll",
+    "pendingApprovals": "Pending Approvals",
+    "activeEmployees": "Active Employees",
+    "recentEmployees": "Recent Employees",
+    "employeeBreakdown": "Employee Breakdown",
+    "noEmployees": "No employees found",
+    "addFirstEmployee": "Add your first employee to get started",
+    "viewAll": "View All",
+    "runPayroll": "Run Payroll",
+    "exportCsv": "Export CSV",
+    "searchEmployees": "Search employees...",
+    "addEmployee": "Add Employee",
+    "payrollHistory": "Payroll History",
+    "reports": "Reports"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "employees": "Employees",
+    "payroll": "Payroll",
+    "reports": "Reports",
+    "loans": "Loans",
+    "approvals": "Approvals",
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+  "settings": {
+    "title": "Settings",
+    "preferences": "Preferences",
+    "language": "Language",
+    "theme": "Theme",
+    "savePreferences": "Save Preferences"
+  },
+  "common": {
+    "save": "Save Changes",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "noData": "No data available"
+  }
+}
