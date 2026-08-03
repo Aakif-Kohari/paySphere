@@ -4,6 +4,7 @@ const connectDB = require("./config/db");
 const { startCronJobs } = require("./jobs/cron.jobs");
 require("./jobs/reportCron"); // Load report scheduling cron job
 const { seedRbac } = require("./seeds/rbac.seed");
+const { backfillAccountType } = require("./migrations/backfillAccountType");
 const { backfillPayrollStatus } = require("./migrations/backfillPayrollStatus");
 const {
   backfillSalaryStructures,
@@ -12,6 +13,13 @@ const logger = require("./utils/logger");
 
 const startServer = async () => {
   await connectDB();
+
+  // Separate the account type from the RBAC role reference on accounts written
+  // while both shared the name `role`, and stamp `accountType` on the rest.
+  // Runs *before* the seeder: it unsets `role` on accounts that never had a
+  // real one, which is exactly what the seeder's own backfill then fills in.
+  // Idempotent and never throws — see migrations/backfillAccountType.js (#558).
+  await backfillAccountType();
 
   // Ensure the RBAC roles/permissions exist and that no account is left without
   // a role. Idempotent, and never throws — see seeds/rbac.seed.js (#413).

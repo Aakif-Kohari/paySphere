@@ -1,6 +1,7 @@
 const Employee = require("../models/employee.model");
 const PayrollUpdate = require("../models/payroll.model");
 const User = require("../models/user.model");
+const { resolveAccountType } = require("../config/accountTypes");
 const { payableStatusFilter } = require("../config/payrollStatus");
 const logger = require("../utils/logger");
 
@@ -86,8 +87,12 @@ exports.getEmployeeProfile = async (req, res, next) => {
     // `select("-password")` pulled resetPasswordToken, resetPasswordExpires,
     // googleId, tokenVersion and the base64 company logo into memory to return
     // four fields.
+    // `accountType` rather than `role`: they are separate fields again, and the
+    // one the portal reports is the account type (#558). `employeeId` is
+    // selected because `resolveAccountType` derives from it when the type has
+    // not been backfilled yet.
     const user = await User.findById(req.userId).select(
-      "fullName email role companyName employeeId",
+      "fullName email accountType companyName employeeId",
     );
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -97,7 +102,9 @@ exports.getEmployeeProfile = async (req, res, next) => {
       user: {
         fullName: user.fullName,
         email: user.email,
-        role: user.role || "EMPLOYEE",
+        // The account type, not the RBAC role reference — `user.role` is an
+        // ObjectId now that the two are separate fields again (#558).
+        role: resolveAccountType(user),
         companyName: user.companyName,
       },
       employee: employee || null,
