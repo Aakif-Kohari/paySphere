@@ -41,6 +41,27 @@ const ACCOUNT_TYPE_IN_ROLE = { $in: ALL_ACCOUNT_TYPES };
 const OBJECT_ID_STRING_IN_ROLE = /^[0-9a-fA-F]{24}$/;
 
 /**
+ * The raw collection, deliberately, for every query in this file.
+ *
+ * `role` is an ObjectId path on the schema again, so mongoose casts anything
+ * compared against it — and `{ role: { $in: ["ADMIN", "EMPLOYEE"] } }` or a
+ * regex is precisely what this migration has to look for. Through the model
+ * every one of those queries throws
+ *
+ *     CastError: Cast to ObjectId failed for value "ADMIN" ... at path "role"
+ *
+ * which the try/catch below would turn into a quiet `ok: false` — a migration
+ * that reports failure and repairs nothing. A migration exists to fix documents
+ * that do *not* match the current schema, so it has to talk to the driver
+ * rather than to the schema.
+ *
+ * @returns {import("mongodb").Collection}
+ */
+function users() {
+  return User.collection;
+}
+
+/**
  * Count what needs fixing, so the log line says something useful on a database
  * that has already been migrated ("0 of everything") as well as one that has
  * not.
@@ -50,9 +71,9 @@ const OBJECT_ID_STRING_IN_ROLE = /^[0-9a-fA-F]{24}$/;
 async function surveyAccounts() {
   const [accountTypeInRole, stringifiedRole, missingAccountType] =
     await Promise.all([
-      User.countDocuments({ role: ACCOUNT_TYPE_IN_ROLE }),
-      User.countDocuments({ role: OBJECT_ID_STRING_IN_ROLE }),
-      User.countDocuments({
+      users().countDocuments({ role: ACCOUNT_TYPE_IN_ROLE }),
+      users().countDocuments({ role: OBJECT_ID_STRING_IN_ROLE }),
+      users().countDocuments({
         $or: [{ accountType: { $exists: false } }, { accountType: null }],
       }),
     ]);
@@ -73,7 +94,7 @@ async function moveAccountTypeOutOfRole() {
   let moved = 0;
 
   for (const accountType of ALL_ACCOUNT_TYPES) {
-    const result = await User.updateMany({ role: accountType }, [
+    const result = await users().updateMany({ role: accountType }, [
       {
         $set: {
           // Do not clobber an accountType that is already correct.
@@ -98,16 +119,17 @@ async function moveAccountTypeOutOfRole() {
  * @returns {Promise<number>} accounts recast
  */
 async function recastStringifiedRoles() {
-  const affected = await User.find({ role: OBJECT_ID_STRING_IN_ROLE })
-    .select("_id role")
-    .lean();
+  const affected = await users()
+    .find({ role: OBJECT_ID_STRING_IN_ROLE })
+    .project({ _id: 1, role: 1 })
+    .toArray();
 
   let recast = 0;
 
   for (const account of affected) {
     if (!mongoose.Types.ObjectId.isValid(account.role)) continue;
 
-    await User.updateOne(
+    await users().updateOne(
       { _id: account._id },
       { $set: { role: new mongoose.Types.ObjectId(String(account.role)) } },
     );
@@ -132,12 +154,12 @@ async function stampMissingAccountTypes() {
     $or: [{ accountType: { $exists: false } }, { accountType: null }],
   };
 
-  const employees = await User.updateMany(
+  const employees = await users().updateMany(
     { ...missing, employeeId: { $exists: true, $ne: null } },
     { $set: { accountType: ACCOUNT_TYPE.EMPLOYEE } },
   );
 
-  const admins = await User.updateMany(
+  const admins = await users().updateMany(
     { ...missing },
     { $set: { accountType: ACCOUNT_TYPE.ADMIN } },
   );
