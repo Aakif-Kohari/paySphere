@@ -121,6 +121,15 @@ const LockIcon = () => (
     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
   </svg>
 );
+// Declared at module scope with the other icons. It used to live inside the
+// Settings component, which meant a fresh component type on every render —
+// React remounts it each time and its state is thrown away.
+const ShieldIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </svg>
+);
+
 const PaletteIcon = () => (
   <svg
     width="18"
@@ -444,12 +453,6 @@ export default function Settings() {
       icon: <SupportIcon />,
     },
   ];
-  const ShieldIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-  </svg>
-);
-
   const settingsTabs = [
     { id: 'profile', label: 'Profile', icon: <UserIcon /> },
     { id: 'account', label: 'Account Security', icon: <LockIcon /> },
@@ -1523,4 +1526,4 @@ export default function Settings() {
       )}
     </div>
   );
-}
+}

@@ -20,6 +20,12 @@ import ScheduleReportModal from '../components/reports/ScheduleReportModal';
 import CustomReportBuilder from '../components/reports/CustomReportBuilder';
 import TurnoverMetrics from '../components/reports/TurnoverMetrics';
 // --- Month-Year Selector ---
+const REPORT_TABS = [
+  { id: 'analytics', label: 'Payroll Analytics' },
+  { id: 'hr', label: 'HR Metrics' },
+  { id: 'custom', label: 'Custom Report' },
+];
+
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -99,6 +105,11 @@ export default function Reports() {
   const [reportData, setReportData] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  // Three branches below switch on this, but nothing ever declared it, so every
+  // render of this page threw `ReferenceError: activeTab is not defined` and the
+  // Reports route was blank. 'analytics' is the default because it is the view
+  // the export bar and the month selector belong to.
+  const [activeTab, setActiveTab] = useState('analytics');
   
   const companyName = localStorage.getItem('companyName') || 'PaySphere';
 
@@ -292,6 +303,27 @@ export default function Reports() {
               </button>
               <MonthYearSelector month={month} year={year} onChange={handleMonthChange} />
             </div>
+          </div>
+
+          {/* View switcher. TurnoverMetrics and CustomReportBuilder are imported
+              and rendered by the branches further down, but with no control to
+              set `activeTab` there was no way to reach either of them. */}
+          <div className="flex flex-wrap gap-1 mb-6 border-b border-gray-200 dark:border-slate-800">
+            {REPORT_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                aria-current={activeTab === tab.id ? 'page' : undefined}
+                className={`px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition ${
+                  activeTab === tab.id
+                    ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+                    : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
           {/* Export Action Bar */}
