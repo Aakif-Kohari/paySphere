@@ -37,6 +37,22 @@ jobs:
     name: Frontend preview build & deploy
     runs-on: ubuntu-latest
 
+    env:
+      # `secrets` cannot be referenced from a step-level `if:`. GitHub rejects
+      # the expression when it compiles the workflow ("Unrecognized named-value:
+      # 'secrets'"), and a workflow that fails to compile never starts a single
+      # job — which is why every run of this file, on every branch and on pushes
+      # to main, has been a red cross with zero jobs since it was added.
+      #
+      # Job-level `env` *can* read secrets, and a step-level `if:` *can* read
+      # `env`, so the check is hoisted here. Note the string comparison: an env
+      # value is always a string, so this is 'true', not true.
+      VERCEL_CONFIGURED: ${{ secrets.VERCEL_TOKEN != '' && secrets.VERCEL_ORG_ID != '' && secrets.VERCEL_PROJECT_ID != '' }}
+      # A `pull_request` run triggered from a fork gets a read-only GITHUB_TOKEN
+      # no matter what the `permissions:` block above asks for, so posting a
+      # comment would fail with "Resource not accessible by integration".
+      CAN_COMMENT: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -62,7 +78,7 @@ jobs:
 
       - name: Deploy preview to Vercel
         id: vercel
-        if: ${{ secrets.VERCEL_TOKEN != '' && secrets.VERCEL_ORG_ID != '' && secrets.VERCEL_PROJECT_ID != '' }}
+        if: env.VERCEL_CONFIGURED == 'true'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -78,12 +94,19 @@ jobs:
         shell: bash
 
       - name: Comment preview URL on PR
+        if: env.CAN_COMMENT == 'true'
         uses: actions/github-script@v7
+        env:
+          # `steps` is a workflow context, not a variable in the script sandbox:
+          # `steps?.vercel?.outputs?.preview_url` threw `ReferenceError: steps is
+          # not defined` and took the whole step down with it. The value has to
+          # be interpolated in from the workflow side.
+          PREVIEW_URL: ${{ steps.vercel.outputs.preview_url }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const prNumber = context.payload.pull_request.number;
-            const previewUrl = steps?.vercel?.outputs?.preview_url;
+            const previewUrl = process.env.PREVIEW_URL;
 
             let body;
             if (previewUrl) {
