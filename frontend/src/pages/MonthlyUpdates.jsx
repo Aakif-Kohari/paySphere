@@ -6,6 +6,8 @@ import { logoutUser } from "../features/auth/authSlice";import ThemeToggle from 
 import api from "../services/api";
 import AttendanceCalendarModal from "../components/AttendanceCalendarModal";
 import { Snackbar, Alert } from '@mui/material';
+import PayrollWizard from "../components/PayrollWizard";
+
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const PayrollIcon = () => (
@@ -174,6 +176,8 @@ export default function MonthlyUpdates() {
   const dispatch = useDispatch();
   const themeMode = useSelector((state) => state.ui.themeMode);
   const isDark = themeMode === "dark";
+
+  const [isMobile] = useState(() => window.innerWidth <= 480);
 
   const [activePage, setActivePage]   = useState("employees");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -616,7 +620,10 @@ export default function MonthlyUpdates() {
         </header>
 
         {/* Page */}
-        <main className="desktop-p" style={{ flex:1, padding:"30px 20px 100px", display:"flex", flexDirection:"column", alignItems:"center" }}>
+        {isMobile ? (
+          <PayrollWizard />
+        ) : (
+          <main className="desktop-p" style={{ flex:1, padding:"30px 20px 100px", display:"flex", flexDirection:"column", alignItems:"center" }}>
 
           {/* Title */}
           <div style={{ textAlign:"center", marginBottom:30, width:"100%", maxWidth:760 }}>
@@ -1160,6 +1167,7 @@ export default function MonthlyUpdates() {
           />
 
         </main>
+        )}
       </div>
 
       <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
