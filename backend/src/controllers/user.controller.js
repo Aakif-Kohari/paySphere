@@ -18,6 +18,7 @@ const {
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const { getDefaultRole } = require('../seeds/rbac.seed');
+const { resolveAccountType } = require('../config/accountTypes');
 
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
@@ -108,7 +109,14 @@ exports.signup = async (req, res, next) => {
 
     const token = generateTokens(newUser, res);
 
-    res.status(201).json({ token, companyName: newUser.companyName, role: newUser.role || "ADMIN", employeeId: newUser.employeeId });
+    // `role` here is the *account type* the client renders navigation from, not
+    // the RBAC role reference — see config/accountTypes.js (#558).
+    res.status(201).json({
+      token,
+      companyName: newUser.companyName,
+      role: resolveAccountType(newUser),
+      employeeId: newUser.employeeId,
+    });
   } catch (error) {
     next(error);
   }
@@ -139,7 +147,12 @@ exports.login = async (req, res, next) => {
 
     const token = generateTokens(user, res);
 
-    res.status(200).json({ token, companyName: user.companyName, role: user.role || "ADMIN", employeeId: user.employeeId });
+    res.status(200).json({
+      token,
+      companyName: user.companyName,
+      role: resolveAccountType(user),
+      employeeId: user.employeeId,
+    });
   } catch (error) {
     next(error);
   }
@@ -467,6 +480,8 @@ exports.googleAuth = async (req, res, next) => {
     res.status(200).json({
       token,
       companyName: user.companyName,
+      role: resolveAccountType(user),
+      employeeId: user.employeeId,
       message: isNewUser
         ? 'Account created successfully'
         : 'Logged in successfully',

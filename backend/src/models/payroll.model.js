@@ -88,6 +88,52 @@ const payrollUpdateSchema = new mongoose.Schema({
     set: (value) => normalizeStatus(value) || value,
   },
   /**
+   * The maker–checker trail (#559).
+   *
+   * #458 mounted the approval routes and wired the controller to write these
+   * six fields, but none of them were ever declared here. Two consequences,
+   * both silent:
+   *
+   *   - `getPendingApprovals` calls `.populate("submittedBy", …)`, and mongoose
+   *     has had `strictPopulate` on by default since v6 — populating a path
+   *     that is not in the schema throws, so the checker queue answered 500.
+   *   - Strict mode drops `$set` keys that are not in the schema, so every
+   *     approver, timestamp and rejection reason the controller wrote was
+   *     discarded before the query left the process.
+   *
+   * Without `submittedBy` on disk there is also nothing to compare an approver
+   * against, so the separation of WRITE_PAYROLL from APPROVE_PAYROLL that
+   * config/permissions.js sets up cannot actually be enforced.
+   */
+  submittedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+  submittedAt: {
+    type: Date,
+  },
+  approvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+  approvedAt: {
+    type: Date,
+  },
+  rejectedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+  rejectedAt: {
+    type: Date,
+  },
+  // Capped here as well as in the controller: the controller's slice only
+  // guards the HTTP path, and this field is also written by the migration and
+  // by anything that talks to the model directly.
+  rejectionReason: {
+    type: String,
+    maxlength: [500, "Rejection reason cannot exceed 500 characters"],
+  },
+  /**
    * Where leaveDays and overtimeHours came from.
    *
    * "ledger"  — derived from the validated Attendance document for the month
@@ -157,5 +203,9 @@ payrollUpdateSchema.index({ createdBy: 1, status: 1, createdAt: -1 });
 
 // Summary, exports and analytics all filter { createdBy, month, year, status }.
 payrollUpdateSchema.index({ createdBy: 1, year: -1, month: -1, status: 1 });
+
+// "What did I submit, and where has it got to?" — the maker's own view of the
+// queue, and the lookup an approver-is-not-the-submitter check needs (#559).
+payrollUpdateSchema.index({ createdBy: 1, submittedBy: 1, status: 1 });
 
 module.exports = mongoose.model("PayrollUpdate", payrollUpdateSchema);
