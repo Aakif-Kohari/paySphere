@@ -59,6 +59,14 @@ const userSchema = new mongoose.Schema({
   avatar: {
     type: String,
   },
+  twoFactorSecret: {
+    type: String,
+    default: "",
+  },
+  isTwoFactorEnabled: {
+    type: Boolean,
+    default: false,
+  },
   defaultOvertimeRate: {
     type: Number,
     default: 0,
