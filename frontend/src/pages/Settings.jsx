@@ -778,19 +778,18 @@ export default function Settings() {
                 </h3>
                 <select
                   value={settings.preferences.language}
-                  onChange={(e) =>
-                    updateSettingsField(
-                      'preferences',
-                      'language',
-                      e.target.value,
-                    )
-                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    updateSettingsField('preferences', 'language', val);
+                    const langCode = val.includes('Spanish') ? 'es' : 'en';
+                    import('../i18n/i18n').then((m) => m.default.changeLanguage(langCode));
+                  }}
                   className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 transition cursor-pointer"
                 >
-                  <option>English (US)</option>
-                  <option>English (UK)</option>
-                  <option>Hindi (IN)</option>
-                  <option>Spanish (ES)</option>
+                  <option value="English (US)">English (US)</option>
+                  <option value="Spanish (ES)">Spanish (ES)</option>
+                  <option value="English (UK)">English (UK)</option>
+                  <option value="Hindi (IN)">Hindi (IN)</option>
                 </select>
               </div>
             </div>

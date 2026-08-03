@@ -95,7 +95,7 @@ jobs:
                 const tSim = titleSimilarity(newTitle, existingTitle);
                 const combinedScore = (jSim * 0.4) + (tSim * 0.6);
 
-                if (combinedScore >= 0.3 || tSim >= 0.5) {
+                if (combinedScore >= 0.5) {
                   potentialMatches.push({
                     number: issue.number,
                     title: issue.title,

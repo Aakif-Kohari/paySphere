@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { logout } from '../features/auth/authSlice';
 import ThemeToggle from '../components/ThemeToggle';
 import Sidebar from '../components/Sidebar';
@@ -87,11 +88,11 @@ const DashboardOverview = ({
   }
 
   return (
-    <main className="p-4 sm:p-8">
-      {/* Title */}
-      <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4">
+    <>
+      {/* Overview Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-gray-200 dark:border-slate-800">
         <div>
-          <p className="text-sm text-gray-500 dark:text-slate-500">
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1">
             Monthly Overview
           </p>
           <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white">
@@ -106,7 +107,7 @@ const DashboardOverview = ({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search employees..."
+            placeholder={t('dashboard.searchEmployees', 'Search employees...')}
             className="w-full sm:w-auto px-4 py-3 border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-sm focus:border-blue-500 outline-none transition-colors"
           />
         </div>
@@ -116,7 +117,7 @@ const DashboardOverview = ({
             onClick={() => navigate('/reports')}
             className="flex-1 cursor-pointer sm:flex-none px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 transition-colors"
           >
-            Reports
+            {t('dashboard.reports', 'Reports')}
           </button>
 
           <button
@@ -125,14 +126,14 @@ const DashboardOverview = ({
             }
             className="flex-1 cursor-pointer sm:flex-none px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 transition-colors"
           >
-            Export CSV
+            {t('dashboard.exportCsv', 'Export CSV')}
           </button>
 
           <button
             onClick={onAddUpdate}
             className="flex-1 cursor-pointer sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           >
-            Run Payroll
+            {t('dashboard.runPayroll', 'Run Payroll')}
           </button>
         </div>
       </div>
