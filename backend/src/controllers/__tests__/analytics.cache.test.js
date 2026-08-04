@@ -70,6 +70,11 @@ const createQueryMock = (data) => ({
   catch: (reject) => Promise.resolve(data).catch(reject),
 });
 
+// The company. A different value from the user id on purpose: since #613 the
+// scope is the tenant, not the account that created the row.
+const TENANT = "507f1f77bcf86cd799439098";
+const OTHER_TENANT = "507f1f77bcf86cd799439097";
+
 describe("analytics cache invalidation (#415)", () => {
   let req;
   let res;
@@ -170,12 +175,19 @@ describe("analytics cache invalidation (#415)", () => {
   describe("deleteEmployee", () => {
     const validId = "507f1f77bcf86cd799439011";
     beforeEach(() => {
-      req = { userId: "user123", params: { id: validId } };
+      req = { userId: "user123", tenantId: TENANT, params: { id: validId } };
       Employee.findById.mockResolvedValue({
         _id: validId,
         fullName: "Alice Smith",
         role: "Designer",
         createdBy: { toString: () => "user123" },
+        tenantId: { toString: () => TENANT },
+        // deleteEmployee soft-deletes via `employee.save()` since #445; the
+        // fixture still described the findByIdAndDelete era, so the save threw
+        // and the cache was never invalidated.
+        deletedAt: null,
+        isActive: true,
+        save: jest.fn().mockResolvedValue(true),
       });
       Employee.findByIdAndDelete.mockResolvedValue({});
       PayrollUpdate.exists.mockResolvedValue(false);
@@ -210,6 +222,7 @@ describe("analytics cache invalidation (#415)", () => {
       Employee.findById.mockResolvedValue({
         _id: validId,
         createdBy: { toString: () => "someone-else" },
+        tenantId: { toString: () => OTHER_TENANT },
       });
 
       await deleteEmployee(req, res, next);
@@ -233,12 +246,13 @@ describe("analytics cache invalidation (#415)", () => {
     const validId = "507f1f77bcf86cd799439011";
 
     beforeEach(() => {
-      req = { userId: "user123", params: { id: validId } };
+      req = { userId: "user123", tenantId: TENANT, params: { id: validId } };
       employee = {
         _id: validId,
         fullName: "Alice Smith",
         isActive: true,
         createdBy: { toString: () => "user123" },
+        tenantId: { toString: () => TENANT },
         save: jest.fn().mockResolvedValue(true),
       };
       Employee.findById.mockResolvedValue(employee);
@@ -277,7 +291,7 @@ describe("analytics cache invalidation (#415)", () => {
     });
 
     test("does not invalidate when the caller does not own the employee", async () => {
-      employee.createdBy = { toString: () => "someone-else" };
+      employee.tenantId = { toString: () => OTHER_TENANT };
 
       await toggleEmployeeStatus(req, res, next);
 

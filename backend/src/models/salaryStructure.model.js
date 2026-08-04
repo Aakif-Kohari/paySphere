@@ -63,11 +63,27 @@ const salaryStructureSchema = new mongoose.Schema(
       ref: 'Employee',
       required: true,
     },
+    /**
+     * Who created this row. An audit fact, not a scoping key.
+     *
+     * #585's codemod rewrote every `createdBy: req.userId` in the controllers
+     * to `tenantId: req.tenantId` while leaving this field `required: true`, so
+     * every insert omitted a field the schema demanded and `create()` threw
+     * before reaching Mongo (#613). Both fields are written now: this one
+     * records the actor, `tenantId` below decides who can see the row.
+     */
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
     },
+
+    /**
+     * Which company this row belongs to — the field every read filters on.
+     *
+     * Separate from `createdBy` because a company can have more than one admin,
+     * and a row created by one of them has to stay visible to the others.
+     */
     tenantId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Tenant',
@@ -108,13 +124,15 @@ const salaryStructureSchema = new mongoose.Schema(
 );
 
 // One revision per employee per effective date. Two revisions effective the
-// same day would make "which rate applied?" ambiguous.
+// same day would make "which rate applied?" ambiguous. Scoped to the company,
+// not the admin who filed it — otherwise two admins could each file a revision
+// for the same employee on the same day (#613).
 salaryStructureSchema.index(
-  { employeeId: 1, effectiveFrom: 1, createdBy: 1 },
+  { employeeId: 1, effectiveFrom: 1, tenantId: 1 },
   { unique: true },
 );
 
 // The timeline read: "this employee's revisions, newest first".
-salaryStructureSchema.index({ createdBy: 1, employeeId: 1, effectiveFrom: -1 });
+salaryStructureSchema.index({ tenantId: 1, employeeId: 1, effectiveFrom: -1 });
 
 module.exports = mongoose.model('SalaryStructure', salaryStructureSchema);

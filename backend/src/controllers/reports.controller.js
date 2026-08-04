@@ -59,6 +59,7 @@ async function getEmployeeIdsByDepartments(userId, departments) {
 exports.getAnalytics = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     const monthsBack = Math.min(Math.max(parseInt(req.query.months) || 6, 1), 12);
 
     // Parse department filter
@@ -79,9 +80,12 @@ exports.getAnalytics = async (req, res, next) => {
     const now = new Date();
     const startDate = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
 
-    // Build payroll query - filter by departments if specified
-    const payrollQuery = {
-      createdBy: userId,
+    // Fetch all payroll records within the date range
+    // Analytics is the owner's view of what payroll actually cost. Rows still
+    // waiting on a checker — or ones a checker rejected — are not a cost and
+    // must not appear in the trend, the department split or the totals (#458).
+    const payrolls = await PayrollUpdate.find({
+      tenantId,
       ...payableStatusFilter(),
       $or: [
         { year: { $gt: startDate.getFullYear() } },
@@ -92,24 +96,8 @@ exports.getAnalytics = async (req, res, next) => {
       ],
     };
 
-    // Add employee filter if departments are specified
-    if (employeeIds && employeeIds.length > 0) {
-      payrollQuery.employeeId = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
-    }
-
-    // Fetch all payroll records within the date range
-    // Analytics is the owner's view of what payroll actually cost. Rows still
-    // waiting on a checker — or ones a checker rejected — are not a cost and
-    // must not appear in the trend, the department split or the totals (#458).
-    const payrolls = await PayrollUpdate.find(payrollQuery).sort({ year: 1, month: 1 });
-
-    // Fetch all employees for role breakdown - filter by departments if specified
-    const employeeQuery = { createdBy: userId };
-    if (employeeIds && employeeIds.length > 0) {
-      employeeQuery._id = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
-    }
-
-    const employees = await Employee.find(employeeQuery);
+    // Fetch all employees for role breakdown
+    const employees = await Employee.find({ tenantId });
     const employeeMap = {};
     employees.forEach((emp) => {
       employeeMap[String(emp._id)] = emp;
@@ -206,6 +194,7 @@ exports.getAnalytics = async (req, res, next) => {
 exports.downloadPDFReport = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     let month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
     let year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
 
@@ -216,13 +205,9 @@ exports.downloadPDFReport = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
-    // Parse department filter
-    const departments = parseDepartments(req.query.departments);
-    const employeeIds = await getEmployeeIdsByDepartments(userId, departments);
-
-    // Build payroll query
-    const payrollQuery = {
-      createdBy: userId,
+    // Fetch payroll records for the selected month
+    const payrolls = await PayrollUpdate.find({
+      tenantId,
       month,
       year,
       ...payableStatusFilter(),
@@ -410,6 +395,7 @@ const generatePayslipBuffer = (employee, payroll, currency = "INR") => {
 exports.exportExcelReport = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     let month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
     let year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
 
@@ -420,13 +406,8 @@ exports.exportExcelReport = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
-    // Parse department filter
-    const departments = parseDepartments(req.query.departments);
-    const employeeIds = await getEmployeeIdsByDepartments(userId, departments);
-
-    // Build payroll query
-    const payrollQuery = {
-      createdBy: userId,
+    const payrolls = await PayrollUpdate.find({
+      tenantId,
       month,
       year,
       ...payableStatusFilter(),
@@ -572,6 +553,7 @@ exports.exportExcelReport = async (req, res, next) => {
 exports.downloadPayslipsZip = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     let month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
     let year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
 
@@ -582,13 +564,8 @@ exports.downloadPayslipsZip = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
-    // Parse department filter
-    const departments = parseDepartments(req.query.departments);
-    const employeeIds = await getEmployeeIdsByDepartments(userId, departments);
-
-    // Build payroll query
-    const payrollQuery = {
-      createdBy: userId,
+    const payrolls = await PayrollUpdate.find({
+      tenantId,
       month,
       year,
       ...payableStatusFilter(),
@@ -659,10 +636,11 @@ exports.downloadPayslipsZip = async (req, res, next) => {
 exports.getTurnoverMetrics = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     const turnoverService = require('../services/turnover.service');
     const Employee = require('../models/employee.model');
 
-    const allEmployees = await Employee.find({ createdBy: userId }).lean();
+    const allEmployees = await Employee.find({ tenantId }).lean();
 
     const now = new Date();
     const monthsBack = 12;

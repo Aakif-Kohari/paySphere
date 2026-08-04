@@ -52,19 +52,21 @@ function parsePeriod(rawYear, rawMonth) {
 /**
  * Load an employee, asserting the caller owns it.
  *
- * Every controller in this codebase scopes by `createdBy`; attendance carries
- * the same salary-adjacent data as payroll and gets the same treatment.
+ * Every controller in this codebase scopes by `tenantId`; attendance carries
+ * the same salary-adjacent data as payroll and gets the same treatment. This
+ * lookup was left on `createdBy` when #585 moved the writes over, so an
+ * employee added after it could never be found again (#613).
  *
  * @param {string} employeeId
- * @param {string} userId
+ * @param {string} tenantId
  * @returns {Promise<{ok: true, employee: object} | {ok: false, status: number, message: string}>}
  */
-async function loadOwnedEmployee(employeeId, userId) {
+async function loadOwnedEmployee(employeeId, tenantId) {
   if (!mongoose.Types.ObjectId.isValid(employeeId)) {
     return { ok: false, status: 400, message: 'Invalid employee id format' };
   }
 
-  const employee = await Employee.findOne({ _id: employeeId, createdBy: userId });
+  const employee = await Employee.findOne({ _id: employeeId, tenantId });
 
   if (!employee) {
     // Deliberately indistinguishable from "does not exist": the caller must not
@@ -85,15 +87,15 @@ async function loadOwnedEmployee(employeeId, userId) {
  * employee's inbox unreproducible.
  *
  * @param {string} employeeId
- * @param {string} userId
+ * @param {string} tenantId
  * @param {number} year
  * @param {number} month
  * @returns {Promise<object|null>} the paid payroll row, or null
  */
-async function findPaidPayroll(employeeId, userId, year, month) {
+async function findPaidPayroll(employeeId, tenantId, year, month) {
   return PayrollUpdate.findOne({
     employeeId,
-    createdBy: userId,
+    tenantId,
     year,
     month,
     status: 'paid',
@@ -123,7 +125,7 @@ async function loadLeavePolicy(userId) {
 async function buildBalance(employee, policy, year, month) {
   const history = await Attendance.find({
     employeeId: employee._id,
-    createdBy: employee.createdBy,
+    tenantId: employee.tenantId,
   }).select('year month totals');
 
   return computeLeaveBalance({
@@ -148,7 +150,7 @@ exports.getAttendance = async (req, res, next) => {
     const period = parsePeriod(req.query.year, req.query.month);
     if (!period.ok) return res.status(400).json({ message: period.message });
 
-    const owned = await loadOwnedEmployee(req.query.employeeId, req.userId);
+    const owned = await loadOwnedEmployee(req.query.employeeId, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -165,7 +167,7 @@ exports.getAttendance = async (req, res, next) => {
 
     const policy = await loadLeavePolicy(req.userId);
     const balance = await buildBalance(employee, policy, year, month);
-    const paidPayroll = await findPaidPayroll(employee._id, req.userId, year, month);
+    const paidPayroll = await findPaidPayroll(employee._id, req.tenantId, year, month);
 
     const days = existing ? existing.days : buildDefaultGrid(year, month);
     const totals = existing ? existing.totals : computeTotals(days);
@@ -199,7 +201,7 @@ exports.upsertAttendance = async (req, res, next) => {
     const period = parsePeriod(req.params.year, req.params.month);
     if (!period.ok) return res.status(400).json({ message: period.message });
 
-    const owned = await loadOwnedEmployee(req.params.employeeId, req.userId);
+    const owned = await loadOwnedEmployee(req.params.employeeId, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -215,7 +217,7 @@ exports.upsertAttendance = async (req, res, next) => {
     });
 
     // A month whose payroll has been paid is settled.
-    const paidPayroll = await findPaidPayroll(employee._id, req.userId, year, month);
+    const paidPayroll = await findPaidPayroll(employee._id, req.tenantId, year, month);
 
     if (paidPayroll || (existing && existing.lockedAt)) {
       // Stamp the lock so subsequent reads can show the state without
@@ -263,6 +265,10 @@ exports.upsertAttendance = async (req, res, next) => {
         },
         $setOnInsert: {
           employeeId: employee._id,
+          // `createdBy` is required by the schema and is only written on
+          // insert, so it belongs in $setOnInsert alongside the tenant. #585
+          // dropped it, which made every upsert that had to insert throw (#613).
+          createdBy: req.userId,
           tenantId: req.tenantId,
           year,
           month,
@@ -394,7 +400,7 @@ exports.bulkMarkAttendance = async (req, res, next) => {
 
       const locked =
         (existing && existing.lockedAt) ||
-        (await findPaidPayroll(employee._id, req.userId, year, month));
+        (await findPaidPayroll(employee._id, req.tenantId, year, month));
 
       if (locked) {
         skipped.push({
@@ -435,7 +441,13 @@ exports.bulkMarkAttendance = async (req, res, next) => {
             totals,
             lastEditedBy: req.userId,
           },
-          $setOnInsert: { employeeId: employee._id, tenantId: req.tenantId, year, month },
+          $setOnInsert: {
+            employeeId: employee._id,
+            createdBy: req.userId,
+            tenantId: req.tenantId,
+            year,
+            month,
+          },
         },
         { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
       );
@@ -534,7 +546,7 @@ exports.getLeaveBalance = async (req, res, next) => {
     const period = parsePeriod(req.query.year, req.query.month);
     if (!period.ok) return res.status(400).json({ message: period.message });
 
-    const owned = await loadOwnedEmployee(req.query.employeeId, req.userId);
+    const owned = await loadOwnedEmployee(req.query.employeeId, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
