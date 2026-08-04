@@ -154,6 +154,7 @@ export default function Reports() {
             overtime: `₹${p.overtimePay.toLocaleString('en-IN')}`,
             deduction: `₹${(p.deductions + p.leaveDeduction).toLocaleString('en-IN')}`,
             net: `₹${p.netSalary.toLocaleString('en-IN')}`,
+            netSalary: p.netSalary,
             status: p.status || "Paid", // Backend uses Paid/Draft
             date: p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : "-",
           }))
