@@ -548,14 +548,12 @@ exports.downloadPayslipsZip = async (req, res, next) => {
 };
 
 
-// GET /api/reports/turnover
-// Calculates employee turnover metrics and headcount trends
 exports.getTurnoverMetrics = async (req, res, next) => {
   try {
     const userId = req.userId;
-    // We need to fetch all employees (active and soft-deleted) created by this user
-    // Employee model might have a `deleted` or `deletedAt` field for soft deletes.
+    const turnoverService = require('../services/turnover.service');
     const Employee = require('../models/employee.model');
+
     const allEmployees = await Employee.find({ createdBy: userId }).lean();
 
     const now = new Date();
@@ -573,17 +571,14 @@ exports.getTurnoverMetrics = async (req, res, next) => {
       let terminatedThisMonth = 0;
 
       for (const emp of allEmployees) {
-        const joinDate = new Date(emp.joinDate || emp.createdAt);
-        const termDate = emp.deletedAt ? new Date(emp.deletedAt) : null;
+        const joinDate = new Date(emp.joinDate || emp.joiningDate || emp.createdAt);
+        const termDate = emp.deletedAt ? new Date(emp.deletedAt) : (emp.exitDetails?.lastWorkingDay ? new Date(emp.exitDetails.lastWorkingDay) : null);
         
-        // Employee is active in this month if they joined before/during the month
-        // and were NOT terminated before the end of the month
         if (joinDate <= monthEnd) {
           if (!termDate || termDate > monthEnd) {
             activeCount++;
           } else if (termDate >= monthStart && termDate <= monthEnd) {
             terminatedThisMonth++;
-            // Calculate tenure if they were terminated this month
             const tenureDays = (termDate - joinDate) / (1000 * 60 * 60 * 24);
             totalTenureDays += tenureDays;
             terminatedCount++;
@@ -610,11 +605,14 @@ exports.getTurnoverMetrics = async (req, res, next) => {
     
     const averageTenureMonths = (averageTenureDays / 30).toFixed(1);
 
+    const { departuresByReason } = await turnoverService.getTurnoverMetrics(userId, monthsBack);
+
     res.status(200).json({
       turnoverRate: parseFloat(turnoverRate),
       averageTenureDays,
       averageTenureMonths: parseFloat(averageTenureMonths),
       totalTerminated: terminatedCount,
+      departuresByReason,
       trends
     });
   } catch (error) {
