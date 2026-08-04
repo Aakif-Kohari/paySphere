@@ -67,16 +67,32 @@ const payrollUpdateSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  /**
+   * Who created this row. An audit fact, not a scoping key.
+   *
+   * #585's codemod rewrote every `createdBy: req.userId` in the controllers to
+   * `tenantId: req.tenantId` while leaving this field `required: true`, so
+   * every insert omitted a field the schema demanded and `create()` threw
+   * before reaching Mongo (#613). Both fields are written now: this one records
+   * the actor, `tenantId` below decides who can see the row.
+   */
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: true,
   },
-    tenantId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Tenant',
-      required: true,
-    },
+
+  /**
+   * Which company this row belongs to — the field every read filters on.
+   *
+   * Separate from `createdBy` because a company can have more than one admin,
+   * and a row created by one of them has to stay visible to the others.
+   */
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tenant',
+    required: true,
+  },
   // The approval workflow added in #438 writes "PENDING_APPROVAL"/"APPROVED"/
   // "REJECTED", none of which were in this enum — so every save() path threw a
   // ValidationError and the workflow only appeared to work because it went
@@ -195,22 +211,31 @@ const payrollUpdateSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-// Ensure one payroll record per employee per month
-payrollUpdateSchema.index({ employeeId: 1, month: 1, year: 1, createdBy: 1 }, { unique: true });
+// Every index below leads with `tenantId` because that is what every query
+// filters on since #585. They led with `createdBy` until #613 — which meant the
+// rewritten queries had no index behind them and collection-scanned the largest
+// collection in the product, while the indexes that did exist covered a field
+// nothing filtered by any more.
 
-payrollUpdateSchema.index({ createdBy: 1, year: -1, month: -1 });
+// Ensure one payroll record per employee per month, per company. Scoped to the
+// tenant rather than the creator: two admins at the same company must not each
+// be able to run August for the same employee.
+payrollUpdateSchema.index({ employeeId: 1, month: 1, year: 1, tenantId: 1 }, { unique: true });
+
+payrollUpdateSchema.index({ tenantId: 1, year: -1, month: -1 });
 
 // The approvals queue reads "everything pending, newest first, for this
-// account". Without a compound index on the two fields it filters by, that is a
+// company". Without a compound index on the two fields it filters by, that is a
 // collection scan on the single largest collection in the product — the exact
 // class of problem #241 fixed for the other hot paths.
-payrollUpdateSchema.index({ createdBy: 1, status: 1, createdAt: -1 });
+payrollUpdateSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
 
-// Summary, exports and analytics all filter { createdBy, month, year, status }.
-payrollUpdateSchema.index({ createdBy: 1, year: -1, month: -1, status: 1 });
+// Summary, exports and analytics all filter { tenantId, month, year, status }.
+payrollUpdateSchema.index({ tenantId: 1, year: -1, month: -1, status: 1 });
 
 // "What did I submit, and where has it got to?" — the maker's own view of the
 // queue, and the lookup an approver-is-not-the-submitter check needs (#559).
-payrollUpdateSchema.index({ createdBy: 1, submittedBy: 1, status: 1 });
+// `submittedBy` is a user, so this one is genuinely per-actor within a company.
+payrollUpdateSchema.index({ tenantId: 1, submittedBy: 1, status: 1 });
 
 module.exports = mongoose.model("PayrollUpdate", payrollUpdateSchema);

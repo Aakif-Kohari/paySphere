@@ -24,12 +24,15 @@ const { REVISION_REASON } = require('../config/salaryComponents');
  * @param {string} userId
  * @returns {Promise<{ok: true, employee: object} | {ok: false, status: number, message: string}>}
  */
-async function loadOwnedEmployee(employeeId, userId) {
+async function loadOwnedEmployee(employeeId, tenantId) {
   if (!mongoose.Types.ObjectId.isValid(employeeId)) {
     return { ok: false, status: 400, message: 'Invalid employee id format' };
   }
 
-  const employee = await Employee.findOne({ _id: employeeId, createdBy: userId });
+  // Scoped by tenant, not by creator. #585 moved the writes to `tenantId` but
+  // left this lookup on `createdBy`, so an employee added after it could never
+  // be found again (#613).
+  const employee = await Employee.findOne({ _id: employeeId, tenantId });
 
   if (!employee) {
     return { ok: false, status: 404, message: 'Employee not found' };
@@ -42,13 +45,13 @@ async function loadOwnedEmployee(employeeId, userId) {
  * Every revision for an employee, oldest first.
  *
  * @param {string} employeeId
- * @param {string} userId
+ * @param {string} tenantId
  * @returns {Promise<object[]>}
  */
-async function loadRevisions(employeeId, userId) {
+async function loadRevisions(employeeId, tenantId) {
   const revisions = await SalaryStructure.find({
     employeeId,
-    createdBy: userId,
+    tenantId,
   }).sort({ effectiveFrom: 1 });
 
   return revisions;
@@ -89,13 +92,13 @@ function resolveOrSynthesise(employee, revisions, onDate) {
  */
 exports.getSalaryStructure = async (req, res, next) => {
   try {
-    const owned = await loadOwnedEmployee(req.params.id, req.userId);
+    const owned = await loadOwnedEmployee(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
 
     const { employee } = owned;
-    const revisions = await loadRevisions(employee._id, req.userId);
+    const revisions = await loadRevisions(employee._id, req.tenantId);
 
     // A period query answers "what was this person on in March?" — the question
     // the single mutable field made unanswerable.
@@ -178,14 +181,14 @@ exports.getSalaryStructure = async (req, res, next) => {
  */
 exports.getSalaryHistory = async (req, res, next) => {
   try {
-    const owned = await loadOwnedEmployee(req.params.id, req.userId);
+    const owned = await loadOwnedEmployee(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
 
     const { employee } = owned;
     const revisions = sortByEffectiveDate(
-      await loadRevisions(employee._id, req.userId),
+      await loadRevisions(employee._id, req.tenantId),
     );
 
     const timeline = revisions.map((revision, index) => {
@@ -223,7 +226,7 @@ exports.getSalaryHistory = async (req, res, next) => {
  */
 exports.createSalaryRevision = async (req, res, next) => {
   try {
-    const owned = await loadOwnedEmployee(req.params.id, req.userId);
+    const owned = await loadOwnedEmployee(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -276,12 +279,16 @@ exports.createSalaryRevision = async (req, res, next) => {
       });
     }
 
-    const revisions = await loadRevisions(employee._id, req.userId);
+    const revisions = await loadRevisions(employee._id, req.tenantId);
     const previous = resolveStructureOnDate(revisions, effectiveFrom);
 
     let created;
     try {
       created = await SalaryStructure.create({
+        // Both: `createdBy` records who filed the revision, `tenantId` decides
+        // who can see it. #585 dropped the first while the schema still
+        // required it, so this create() threw on every call (#613).
+        createdBy: req.userId,
         employeeId: employee._id,
         tenantId: req.tenantId,
         effectiveFrom,
@@ -372,7 +379,7 @@ exports.createSalaryRevision = async (req, res, next) => {
  */
 exports.previewSalaryStructure = async (req, res, next) => {
   try {
-    const owned = await loadOwnedEmployee(req.params.id, req.userId);
+    const owned = await loadOwnedEmployee(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -396,7 +403,7 @@ exports.previewSalaryStructure = async (req, res, next) => {
         .json({ message: 'Invalid salary structure', errors: validation.errors });
     }
 
-    const revisions = await loadRevisions(employee._id, req.userId);
+    const revisions = await loadRevisions(employee._id, req.tenantId);
     const current = resolveOrSynthesise(employee, revisions, new Date()).structure;
 
     res.status(200).json({

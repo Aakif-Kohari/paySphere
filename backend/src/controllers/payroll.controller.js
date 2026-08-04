@@ -123,7 +123,7 @@ function splitFieldUpdates(fields = {}) {
  * Apply a status transition to a batch of payroll records owned by the caller.
  *
  * This is the whole fix for the cross-tenant hole in #458 concentrated in one
- * place: the query is *always* scoped by `createdBy`, and every id is
+ * place: the query is *always* scoped by `tenantId`, and every id is
  * classified so the response can tell the client precisely which records moved,
  * which were not theirs, and which were in a state the transition table
  * forbids. The previous implementation issued a blind `updateMany` keyed only
@@ -131,7 +131,7 @@ function splitFieldUpdates(fields = {}) {
  * ids that matched nothing.
  *
  * @param {object} params
- * @param {string} params.userId caller — the ownership scope
+ * @param {string} params.tenantId caller's company — the ownership scope
  * @param {string[]} params.ids payroll ids to transition
  * @param {string} params.targetStatus a PAYROLL_STATUS value
  * @param {object} params.extraFields fields to write alongside the status; a
@@ -140,7 +140,7 @@ function splitFieldUpdates(fields = {}) {
  * @returns {Promise<{applied: object[], notFound: string[], invalidTransition: object[]}>}
  */
 async function transitionPayrollBatch({
-  userId,
+  tenantId,
   ids,
   targetStatus,
   extraFields = {},
@@ -151,7 +151,7 @@ async function transitionPayrollBatch({
   // answer to give.
   const owned = await PayrollUpdate.find({
     _id: { $in: ids },
-    createdBy: userId,
+    tenantId,
   }).select("_id status employeeName month year netSalary __v");
 
   const ownedById = new Map(owned.map((p) => [String(p._id), p]));
@@ -191,7 +191,7 @@ async function transitionPayrollBatch({
 
     const filter = {
       _id: { $in: targetIds },
-      createdBy: userId,
+      tenantId,
       $or: transitionable.map((r) => ({ _id: r._id, __v: r.__v })),
     };
 
@@ -235,7 +235,7 @@ async function transitionPayrollBatch({
  * The original implementation ran `PayrollUpdate.find({ status:
  * "PENDING_APPROVAL" })` with the comment "Admin sees all in this demo". On a
  * shared deployment that returns every company's employee names, base salaries
- * and net salaries to any logged-in account. Scoped by `createdBy` like every
+ * and net salaries to any logged-in account. Scoped by `tenantId` like every
  * other read in the codebase (#458).
  */
 exports.getPendingApprovals = async (req, res, next) => {
@@ -324,7 +324,7 @@ exports.approvePayroll = async (req, res, next) => {
     const approvedAt = new Date();
 
     const { applied, notFound, invalidTransition, versionConflicts } = await transitionPayrollBatch({
-      userId: req.userId,
+      tenantId: req.tenantId,
       ids: batch.ids,
       targetStatus: PAYROLL_STATUS.APPROVED,
       extraFields: {
@@ -420,7 +420,7 @@ exports.rejectPayroll = async (req, res, next) => {
     const rejectedAt = new Date();
 
     const { applied, notFound, invalidTransition, versionConflicts } = await transitionPayrollBatch({
-      userId: req.userId,
+      tenantId: req.tenantId,
       ids: batch.ids,
       targetStatus: PAYROLL_STATUS.REJECTED,
       extraFields: {
@@ -503,7 +503,7 @@ exports.markPayrollPaid = async (req, res, next) => {
     const paidAt = new Date();
 
     const { applied, notFound, invalidTransition, versionConflicts } = await transitionPayrollBatch({
-      userId: req.userId,
+      tenantId: req.tenantId,
       ids: batch.ids,
       targetStatus: PAYROLL_STATUS.PAID,
       extraFields: { paidAt },
@@ -564,7 +564,10 @@ exports.parsePayrollCSV = async (req, res, next) => {
     const bonusIdx = headers.findIndex(h => h.includes("bonus"));
     const leaveIdx = headers.findIndex(h => h.includes("leave"));
 
-    const employees = await Employee.find({ tenantId: req.tenantId });
+    const employees = await Employee.find({ 
+      tenantId: req.tenantId,
+      isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
+    });
     const activities = [];
     // `require('uuid')` threw MODULE_NOT_FOUND — uuid is not a dependency of
     // this package — and because the throw happens while evaluating the left
@@ -651,7 +654,10 @@ exports.submitPayrollForReview = async (req, res, next) => {
     }
 
     // Fetch all employees for this user
-    const employees = await Employee.find({ tenantId: req.tenantId });
+    const employees = await Employee.find({ 
+      tenantId: req.tenantId,
+      isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
+    });
 
     if (employees.length === 0) {
       return res.status(400).json({ message: "No employees found. Add employees first." });
@@ -1223,33 +1229,47 @@ exports.getPayrollSummary = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
+    // Parse department filter from query parameters
+    const departments = req.query.departments ? 
+      req.query.departments.split(',').map(d => d.trim()).filter(d => d.length > 0) : 
+      [];
+    
+    let employeeIds = null;
+    if (departments.length > 0) {
+      // Fetch employee IDs that match the selected departments
+      const employees = await Employee.find({
+        createdBy: req.userId,
+        deletedAt: null,
+        $or: [
+          { department: { $in: departments } },
+          { role: { $in: departments } }
+        ]
+      }).select('_id');
+      
+      employeeIds = employees.map(emp => emp._id.toString());
+    }
+
     // Pagination parameters — default to page 1, 20 records per page.
-    // A limit of 0 disables paging and returns the full set (kept for
-    // backward-compatibility with callers that aggregate the whole month).
     let page = parseInt(req.query.page, 10);
     if (isNaN(page) || page < 1) page = 1;
 
     let limit = parseInt(req.query.limit, 10);
-    // Allow limit=0 to opt out of pagination (legacy callers / aggregation)
     if (isNaN(limit) || limit < 0) limit = 20;
     if (limit > 100) limit = 100;
 
     const skip = limit > 0 ? (page - 1) * limit : 0;
 
-    // The summary now has to distinguish "submitted" from "signed off". Before
-    // #458 it summed every row for the month regardless of status, so a run
-    // sitting in pending_approval — or one a checker had explicitly rejected —
-    // was reported to the owner as money owed this month.
-    //
-    // `totalPayout` therefore counts payable rows only. The pending figure is
-    // returned alongside it rather than folded in, so the review screen can
-    // still show what is in flight without overstating the payout.
     const baseQuery = {
       tenantId: req.tenantId,
       month,
       year,
       ...excludeRejectedFilter(),
     };
+
+    // Add employee filter if departments are specified
+    if (employeeIds && employeeIds.length > 0) {
+      baseQuery.employeeId = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
+    }
 
     // Run the count and the paginated page fetch in parallel.
     const [totalCount, payrolls] = await Promise.all([
@@ -1261,8 +1281,7 @@ exports.getPayrollSummary = async (req, res, next) => {
 
     const totalPages = limit > 0 ? Math.ceil(totalCount / limit) : 1;
 
-    // Aggregate-level totals across the *entire* month (not just the current
-    // page), so the dashboard summary cards are always accurate.
+    // Aggregate-level totals across the *entire* month (not just the current page)
     const [aggResult] = await PayrollUpdate.aggregate([
       { $match: baseQuery },
       {
@@ -1317,12 +1336,11 @@ exports.getPayrollSummary = async (req, res, next) => {
       employeeCount: aggResult ? aggResult.payableCount : 0,
       pendingApprovalTotal: round2(aggResult ? aggResult.pendingApprovalTotal : 0),
       pendingApprovalCount: aggResult ? aggResult.pendingApprovalCount : 0,
-      // Paginated page of records
       payrolls,
-      // Pagination meta
       currentPage: page,
       totalPages,
       totalCount,
+      departments: departments, // Include filtered departments in response
     });
   } catch (error) {
     next(error);
@@ -1407,6 +1425,16 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
       return res.status(404).json({ message: "Employee not found" });
     }
     
+    // Optional: Warn if employee is soft-deleted but still allow sending
+    // since this might be for historical payroll records
+    if (employee.isDeleted) {
+      logger.warn(`Sending payslip email to soft-deleted employee`, {
+        userId: req.userId,
+        employeeId: employee._id,
+        employeeName: employee.fullName,
+      });
+    }
+    
     if (!employee.email) {
       return res.status(400).json({ message: "Employee does not have an email address set" });
     }
@@ -1473,7 +1501,10 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
     }
 
     const employeeIds = [...new Set(payrolls.map(p => p.employeeId))];
-    const employees = await Employee.find({ _id: { $in: employeeIds } });
+    const employees = await Employee.find({ 
+      _id: { $in: employeeIds },
+      isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
+    });
     const employeeMap = new Map(employees.map(e => [String(e._id), e]));
 
     const results = [];

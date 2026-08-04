@@ -8,6 +8,7 @@ const {
   exportEmployeesCSV,
   updateEmployee,
   deleteEmployee,
+  bulkDeleteEmployees,
   toggleEmployeeStatus,
   restoreEmployee,
 } = require("../controllers/employee.controller");
@@ -31,6 +32,10 @@ router.post("/import", auth, requirePermission("WRITE_EMPLOYEE"), writeRateLimit
 router.get("/export-csv", auth, requirePermission("READ_EMPLOYEE"), exportEmployeesCSV);
 router.get("/", auth, requirePermission("READ_EMPLOYEE"), getEmployees);
 router.get("/recent", auth, requirePermission("READ_EMPLOYEE"), getRecentEmployees);
+
+// BULK DELETE (Must be before /:id)
+router.delete("/bulk", auth, requirePermission("DELETE_EMPLOYEE"), writeRateLimiter, bulkDeleteEmployees);
+
 router.delete("/:id", auth, requirePermission("DELETE_EMPLOYEE"), writeRateLimiter, deleteEmployee);
 router.put("/:id", auth, requirePermission("WRITE_EMPLOYEE"), writeRateLimiter, updateEmployee);
 router.put("/:id/restore", auth, requirePermission("WRITE_EMPLOYEE"), writeRateLimiter, restoreEmployee);

@@ -57,6 +57,10 @@ const samplePayrolls = [
   },
 ];
 
+// The company. Distinct from the user id: since #613 the scope is the tenant,
+// not the account that created the row.
+const TENANT = "507f1f77bcf86cd799439021";
+
 describe("exportPayrollCSV — regression coverage for #412", () => {
   let req;
   let res;
@@ -66,6 +70,7 @@ describe("exportPayrollCSV — regression coverage for #412", () => {
     jest.clearAllMocks();
     req = {
       userId: "507f1f77bcf86cd799439011",
+      tenantId: TENANT,
       query: { month: "7", year: "2026" },
     };
     res = {
@@ -274,7 +279,7 @@ describe("exportPayrollCSV — regression coverage for #412", () => {
   });
 
   describe("scoping and empty results", () => {
-    test("scopes the query to the authenticated user", async () => {
+    test("scopes the query to the caller's company", async () => {
       PayrollUpdate.find.mockImplementation(() =>
         createQueryMock(samplePayrolls),
       );
@@ -285,7 +290,7 @@ describe("exportPayrollCSV — regression coverage for #412", () => {
       // financial record and must contain approved rows only, never a run a
       // checker has not seen or has explicitly rejected.
       expect(PayrollUpdate.find).toHaveBeenCalledWith({
-        createdBy: "507f1f77bcf86cd799439011",
+        tenantId: TENANT,
         month: 7,
         year: 2026,
         status: { $in: ["approved", "paid", "finalized"] },

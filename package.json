@@ -8,6 +8,10 @@
     "packages/*"
   ],
   "packageManager": "npm@10.8.1",
+  "overrides": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",

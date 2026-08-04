@@ -8,11 +8,39 @@ const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
 const Settlement = require("../models/settlement.model");
+
+/**
+ * Does this record belong to the caller's company?
+ *
+ * Replaces four copies of
+ *
+ *     if (employee.createdBy.toString() !== req.userId) { ... 403 }
+ *
+ * which had two problems. It compared the *creator*, so a second admin at the
+ * same company could not edit an employee their colleague had added — the
+ * record is the company's, not one person's. And after #585 stopped writing
+ * `createdBy`, `employee.createdBy` was undefined on every record written since,
+ * so the guard threw `TypeError: Cannot read properties of undefined (reading
+ * 'toString')` and turned a 403 into a 500 (#613).
+ *
+ * Compared as strings because one side is an ObjectId off a document and the
+ * other is whatever `auth.middleware` resolved — which may be either.
+ *
+ * @param {object} record any document carrying `tenantId`
+ * @param {object} req the authenticated request
+ * @returns {boolean}
+ */
+function belongsToCaller(record, req) {
+  if (!record?.tenantId || !req?.tenantId) return false;
+
+  return String(record.tenantId) === String(req.tenantId);
+}
+
 /**
  * Normalize an employee email for storage.
  *
  * Returns `undefined` for a blank/absent address rather than `""`, so the
- * partial unique index on { email, createdBy } skips the document entirely.
+ * partial unique index on { email, tenantId } skips the document entirely.
  * Storing empty strings would put every email-less employee back into the same
  * index bucket and re-create the duplicate-key collision (#414).
  *
@@ -51,7 +79,13 @@ exports.addEmployee = async (req, res, next) => {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ message: 'Request body is required' });
     }
-    const { fullName, role, monthlySalary, overtimeRate, dateOfBirth, joiningDate, email, bankDetails } = req.body;
+    // `department` is read further down when the document is built. It was
+    // never destructured here, so `addEmployee` threw
+    // `ReferenceError: department is not defined` before it reached the save —
+    // which is why the #414 email-persistence suite could not run at all. That
+    // is #605; pulled in here only because #613's fix to this same handler
+    // cannot otherwise be exercised.
+    const { fullName, role, department, monthlySalary, overtimeRate, dateOfBirth, joiningDate, email, bankDetails } = req.body;
 
     if (email && typeof email === 'string' && email.trim() !== '') {
       if (!regex.test(email.trim())) {
@@ -129,6 +163,11 @@ exports.addEmployee = async (req, res, next) => {
       companyName: sanitizeText(user.companyName),
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
       joiningDate: joiningDate ? new Date(joiningDate) : undefined,
+      // Both: `createdBy` records who added the employee, `tenantId` decides
+      // who can see them. #585 dropped the first while the schema still
+      // required it, so this save() threw a ValidationError and
+      // POST /api/employees was a hard 500 on every call (#613).
+      createdBy: req.userId,
       tenantId: req.tenantId,
       ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
     });
@@ -191,7 +230,9 @@ exports.getEmployees = async (req, res, next) => {
       tenantId: req.tenantId,
     };
 
+    // Filter out soft-deleted employees unless explicitly requested
     if (!includeDeleted) {
+      query.isDeleted = { $ne: true };
       query.deletedAt = null;
     }
 
@@ -230,7 +271,11 @@ exports.getEmployees = async (req, res, next) => {
 // GET RECENTLY ADDED EMPLOYEES (last 5)
 exports.getRecentEmployees = async (req, res, next) => {
   try {
-    const employees = await Employee.find({ tenantId: req.tenantId, deletedAt: null })
+    const employees = await Employee.find({ 
+      tenantId: req.tenantId, 
+      deletedAt: null,
+      isDeleted: { $ne: true } // Filter soft-deleted
+    })
       .sort({ createdAt: -1 })
       .limit(5);
 
@@ -419,6 +464,7 @@ exports.importEmployees = async (req, res, next) => {
               monthlySalary,
               overtimeRate,
               companyName: sanitizeText(user.companyName),
+              createdBy: req.userId,
               tenantId: req.tenantId,
               // The address was validated above and then dropped on the floor,
               // so imported employees never had an email either (#414, #236).
@@ -520,12 +566,12 @@ exports.updateEmployee = async (req, res, next) => {
     if (department !== undefined) employee.department = sanitizeText(department);
     const employee = await Employee.findById(id);
 
-    if (!employee || employee.deletedAt) {
+    // Check if employee exists and is not soft-deleted
+    if (!employee || employee.deletedAt || employee.isDeleted) {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    // Ensure the logged-in user is the creator of this employee
-    if (employee.createdBy.toString() !== req.userId) {
+    if (!belongsToCaller(employee, req)) {
       return res
         .status(403)
         .json({ message: 'Not authorized to update this employee' });
@@ -591,12 +637,15 @@ exports.updateEmployee = async (req, res, next) => {
         .json({ message: 'Invalid email address format' });
     }
 
-    // Capture old name for payroll propagation check (#253)
+    // Capture old values for history tracking
+    const oldSalary = employee.monthlySalary;
     const oldName = employee.fullName;
+    const salaryChanged = monthlySalary !== undefined && Number(monthlySalary) !== oldSalary;
 
     // Apply updates only for provided fields
     if (fullName !== undefined) employee.fullName = sanitizeText(fullName);
     if (role !== undefined) employee.role = sanitizeText(role);
+    if (department !== undefined) employee.department = sanitizeText(department);
     if (monthlySalary !== undefined) employee.monthlySalary = monthlySalary;
     if (overtimeRate !== undefined) employee.overtimeRate = overtimeRate;
     if (isActive !== undefined) employee.isActive = isActive;
@@ -614,7 +663,7 @@ exports.updateEmployee = async (req, res, next) => {
       }
     }
 
-    // Patch bank details: merge only the provided sub-fields
+    // Patch bank details
     if (bankDetails && typeof bankDetails === 'object') {
       employee.bankDetails = {
         bankName: sanitizeText(bankDetails.bankName ?? employee.bankDetails?.bankName ?? ''),
@@ -625,7 +674,43 @@ exports.updateEmployee = async (req, res, next) => {
 
     await employee.save();
 
-    // Propagate name change to finalized (unpaid) PayrollUpdate records (#253)
+    // Create salary history entry if salary changed (Issue #505)
+    if (salaryChanged) {
+      try {
+        const SalaryHistory = require('../models/salaryHistory.model');
+        const User = require('../models/user.model');
+        const user = await User.findById(req.userId);
+        
+        await SalaryHistory.createHistory({
+          employeeId: employee._id,
+          employeeName: employee.fullName,
+          previousSalary: oldSalary,
+          newSalary: employee.monthlySalary,
+          changedBy: req.userId,
+          changedByName: user?.fullName || user?.email || 'Unknown',
+          tenantId: req.tenantId,
+          reason: req.body.salaryChangeReason || 'other',
+          note: req.body.salaryChangeNote || '',
+          currency: employee.currency || 'INR',
+        });
+        
+        logger.info('Salary history created', {
+          userId: req.userId,
+          employeeId: id,
+          oldSalary,
+          newSalary: employee.monthlySalary,
+        });
+      } catch (historyError) {
+        // Don't fail the update if history creation fails
+        logger.error('Failed to create salary history', {
+          userId: req.userId,
+          employeeId: id,
+          error: historyError.message,
+        });
+      }
+    }
+
+    // Propagate name change to finalized PayrollUpdate records
     if (fullName !== undefined && employee.fullName !== oldName) {
       try {
         const result = await PayrollUpdate.updateMany(
@@ -656,7 +741,10 @@ exports.updateEmployee = async (req, res, next) => {
       details: {
         fullName: employee.fullName,
         role: employee.role,
-        changes: Object.keys(req.body).filter((k) => k !== 'id'),
+        salaryChanged,
+        oldSalary: salaryChanged ? oldSalary : undefined,
+        newSalary: salaryChanged ? employee.monthlySalary : undefined,
+        changes: Object.keys(req.body).filter((k) => k !== 'id' && !k.startsWith('salaryChange')),
       },
       req,
     });
@@ -665,10 +753,17 @@ exports.updateEmployee = async (req, res, next) => {
       userId: req.userId,
       employeeId: employee._id,
       fullName: employee.fullName,
+      salaryChanged,
     });
 
     await cacheService.invalidateAnalytics(req.userId);
-    res.status(200).json({ message: "Employee updated successfully", employee });
+    res.status(200).json({ 
+      message: "Employee updated successfully", 
+      employee,
+      salaryChanged,
+      oldSalary: salaryChanged ? oldSalary : undefined,
+      newSalary: salaryChanged ? employee.monthlySalary : undefined,
+    });
   } catch (error) {
     if (handleDuplicateEmail(error, res)) return;
     next(error);
@@ -685,11 +780,12 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
 
     const employee = await Employee.findById(id);
 
-    if (!employee || employee.deletedAt) {
+    // Check if employee exists and is not soft-deleted
+    if (!employee || employee.deletedAt || employee.isDeleted) {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    if (employee.createdBy.toString() !== req.userId) {
+    if (!belongsToCaller(employee, req)) {
       return res
         .status(403)
         .json({ message: 'Not authorized to update this employee' });
@@ -744,8 +840,7 @@ exports.deleteEmployee = async (req, res, next) => {
       });
     }
 
-    // Check ownership
-    if (employee.createdBy.toString() !== req.userId) {
+    if (!belongsToCaller(employee, req)) {
       return res.status(403).json({
         message: 'Not authorized to delete this employee',
       });
@@ -764,7 +859,7 @@ exports.deleteEmployee = async (req, res, next) => {
       });
     }
 
-    // Same principle as #345: an employee who has been formally settled has a
+        // Same principle as #345: an employee who has been formally settled has a
     // final statement on record, and destroying them would destroy the
     // counterpart to a payment that has already been made (#462).
     let hasSettlement = false;
@@ -795,8 +890,10 @@ exports.deleteEmployee = async (req, res, next) => {
       });
     }
 
+    // Soft delete: set both deletedAt and isDeleted flag
     employee.deletedAt = new Date();
     employee.isActive = false;
+    employee.isDeleted = true;
     await employee.save();
 
     eventBus.emit("AUDIT_LOG", {
@@ -835,16 +932,19 @@ exports.restoreEmployee = async (req, res, next) => {
 
     const employee = await Employee.findById(id);
 
-    if (!employee || !employee.deletedAt) {
+    // Check if employee exists and is actually soft-deleted
+    if (!employee || (!employee.deletedAt && !employee.isDeleted)) {
       return res.status(404).json({ message: 'Soft-deleted employee not found' });
     }
 
-    if (employee.createdBy.toString() !== req.userId) {
+    if (!belongsToCaller(employee, req)) {
       return res.status(403).json({ message: 'Not authorized to restore this employee' });
     }
 
+    // Restore: clear both deletedAt and isDeleted flagZ
     employee.deletedAt = null;
     employee.isActive = true;
+    employee.isDeleted = false;
     await employee.save();
 
     eventBus.emit("AUDIT_LOG", {
@@ -872,12 +972,14 @@ exports.restoreEmployee = async (req, res, next) => {
     next(error);
   }
 };
+
 // EXPORT EMPLOYEES TO CSV
 exports.exportEmployeesCSV = async (req, res, next) => {
   try {
     const query = {
       tenantId: req.tenantId,
       deletedAt: null,
+      isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
     };
 
     const employees = await Employee.find(query).sort({ createdAt: -1 });
@@ -934,6 +1036,156 @@ exports.exportEmployeesCSV = async (req, res, next) => {
 
     return res.status(200).send(csvContent);
   } catch (error) {
+    next(error);
+  }
+};
+
+// BULK DELETE EMPLOYEES (SOFT DELETE)
+exports.bulkDeleteEmployees = async (req, res, next) => {
+  try {
+    const { employeeIds } = req.body;
+
+    // Validate input structure
+    if (!Array.isArray(employeeIds) || employeeIds.length === 0) {
+      return res.status(400).json({
+        message: 'employeeIds must be a non-empty array of valid ID strings'
+      });
+    }
+
+    // Prevent excessively large bulk operations that could timeout or lock the DB
+    if (employeeIds.length > 100) {
+      return res.status(400).json({
+        message: 'Cannot delete more than 100 employees in a single request'
+      });
+    }
+
+    // Validate all IDs are valid MongoDB ObjectIds
+    const invalidIds = employeeIds.filter(id => !mongoose.Types.ObjectId.isValid(id));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        message: `Invalid ID format detected for: ${invalidIds.slice(0, 5).join(', ')}${invalidIds.length > 5 ? '...' : ''}`
+      });
+    }
+
+    const deleted = [];
+    const failed = [];
+
+    // Fetch all target employees in a single query to minimize DB roundtrips
+    const employees = await Employee.find({
+      _id: { $in: employeeIds },
+      tenantId: req.tenantId,
+    });
+
+    const employeeMap = new Map();
+    employees.forEach(emp => employeeMap.set(emp._id.toString(), emp));
+
+    // Bulk check for historical paid payroll records (prevents deletion of employees with financial history)
+    const paidPayrolls = await PayrollUpdate.find({
+      employeeId: { $in: employeeIds },
+      tenantId: req.tenantId,
+      status: 'paid',
+    }).select('employeeId').lean();
+
+    const paidPayrollEmployeeIds = new Set(paidPayrolls.map(p => p.employeeId.toString()));
+
+    // Bulk check for approved/paid settlements (prevents deletion of settled employees)
+    const settlements = await Settlement.find({
+      employeeId: { $in: employeeIds },
+      tenantId: req.tenantId,
+      status: { $in: ['approved', 'paid'] },
+    }).select('employeeId').lean();
+
+    const settledEmployeeIds = new Set(settlements.map(s => s.employeeId.toString()));
+
+    // Use a transaction to ensure atomicity - either all deletions succeed or none do
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      for (const id of employeeIds) {
+        const employee = employeeMap.get(id);
+
+        // Check if employee exists and isn't already deleted
+        if (!employee || employee.deletedAt) {
+          failed.push({ id, reason: 'Employee not found or already deleted' });
+          continue;
+        }
+
+        // Verify ownership - user can only delete employees they created
+        if (employee.createdBy.toString() !== req.userId) {
+          failed.push({ id, reason: 'Not authorized to delete this employee' });
+          continue;
+        }
+
+        // Check for paid payroll history
+        if (paidPayrollEmployeeIds.has(id)) {
+          failed.push({ id, reason: 'Cannot delete employee with historical paid payroll records' });
+          continue;
+        }
+
+        // Check for settlement history
+        if (settledEmployeeIds.has(id)) {
+          failed.push({ id, reason: 'Cannot delete employee with an approved or paid full & final settlement' });
+          continue;
+        }
+
+        // Perform soft delete - consistent with single delete endpoint
+        employee.deletedAt = new Date();
+        employee.isActive = false;
+        await employee.save({ session });
+        deleted.push(id);
+      }
+
+      await session.commitTransaction();
+    } catch (txError) {
+      await session.abortTransaction();
+      throw txError;
+    } finally {
+      session.endSession();
+    }
+
+    // Emit audit log and invalidate cache only if successful deletions occurred
+    if (deleted.length > 0) {
+      eventBus.emit("AUDIT_LOG", {
+        userId: req.userId,
+        action: 'EMPLOYEE_BULK_DELETE',
+        resourceType: 'Employee',
+        resourceIds: deleted,
+        details: {
+          deletedCount: deleted.length,
+          failedCount: failed.length,
+          requestedCount: employeeIds.length
+        },
+        req,
+      });
+
+      logger.info(`Employees bulk soft deleted`, {
+        userId: req.userId,
+        deletedCount: deleted.length,
+        failedCount: failed.length,
+        requestedCount: employeeIds.length,
+      });
+
+      // Invalidate analytics cache since employee count and salary aggregates changed
+      await cacheService.invalidateAnalytics(req.userId);
+    }
+
+    res.status(200).json({
+      message: `Bulk deletion completed. ${deleted.length} deleted, ${failed.length} failed.`,
+      summary: {
+        requested: employeeIds.length,
+        deleted: deleted.length,
+        failed: failed.length,
+      },
+      deleted,
+      failed,
+    });
+
+  } catch (error) {
+    logger.error('Bulk employee deletion failed', {
+      userId: req.userId,
+      error: error.message,
+    });
     next(error);
   }
 };

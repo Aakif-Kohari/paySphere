@@ -33,6 +33,9 @@ jest.mock('../../services/cache.service', () => ({
 }));
 
 const OWNER = '507f1f77bcf86cd799439011';
+// The company. A different id from OWNER on purpose: since #613 the scope is
+// the tenant, not the account that created the row.
+const TENANT = '507f1f77bcf86cd799439099';
 const EMP_A = '607f1f77bcf86cd7994390a1';
 const LOAN_ID = '707f1f77bcf86cd7994390b1';
 
@@ -73,6 +76,7 @@ const activeLoan = (overrides = {}) => {
     _id: oid(LOAN_ID),
     employeeId: oid(EMP_A),
     createdBy: oid(OWNER),
+    tenantId: oid(TENANT),
     status: LOAN_STATUS.ACTIVE,
     principal: 12000,
     totalPayable: 12000,
@@ -108,6 +112,7 @@ const unaffordableLoan = () => {
     _id: oid(LOAN_ID),
     employeeId: oid(EMP_A),
     createdBy: oid(OWNER),
+    tenantId: oid(TENANT),
     status: LOAN_STATUS.ACTIVE,
     principal: 60000,
     totalPayable: 60000,
@@ -136,6 +141,7 @@ beforeEach(() => {
 
   req = {
     userId: OWNER,
+    tenantId: TENANT,
     body: {
       month: 3,
       year: 2026,
@@ -194,7 +200,7 @@ describe('loan recovery during payroll', () => {
 
     expect(Loan.updateOne).toHaveBeenCalledTimes(1);
     const [filter, update] = Loan.updateOne.mock.calls[0];
-    expect(filter.createdBy).toBe(OWNER);
+    expect(filter.tenantId).toBe(TENANT);
     expect(update.$set.totalRepaid).toBe(1000);
     expect(update.$set.outstanding).toBe(11000);
     expect(update.$set.repayments).toHaveLength(1);
@@ -284,11 +290,11 @@ describe('loan recovery during payroll', () => {
     expect(update.completedAt).toBeInstanceOf(Date);
   });
 
-  test('the loan query is scoped to the caller and to active loans only', async () => {
+  test("the loan query is scoped to the caller's company and to active loans only", async () => {
     await submitPayrollForReview(req, res, next);
 
     expect(Loan.find).toHaveBeenCalledWith({
-      createdBy: OWNER,
+      tenantId: TENANT,
       status: LOAN_STATUS.ACTIVE,
     });
   });
