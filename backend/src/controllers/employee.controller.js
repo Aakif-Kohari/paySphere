@@ -45,12 +45,19 @@ function handleDuplicateEmail(error, res) {
   return false;
 }
 // ADD EMPLOYEE
+const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 exports.addEmployee = async (req, res, next) => {
   try {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ message: 'Request body is required' });
     }
     const { fullName, role, monthlySalary, overtimeRate, dateOfBirth, joiningDate, email, bankDetails } = req.body;
+
+    if (email && typeof email === 'string' && email.trim() !== '') {
+      if (!regex.test(email.trim())) {
+        return res.status(400).json({ message: 'Invalid email address format' });
+      }
+    }
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(role)) {
       return res
