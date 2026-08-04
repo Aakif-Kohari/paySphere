@@ -122,7 +122,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
         `/api/employees/${employeeId}/salary-structure/preview`,
         {
           grossMonthly: Number(form.grossMonthly),
-          effectiveFrom: form.effectiveFrom,
+          effectiveFrom: form.effectiveFrom ? new Date(form.effectiveFrom + 'T12:00:00.000Z') : undefined,
           reason: form.reason,
         },
       );
@@ -144,7 +144,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
     try {
       const res = await api.post(`/api/employees/${employeeId}/salary-revision`, {
         grossMonthly: Number(form.grossMonthly),
-        effectiveFrom: form.effectiveFrom,
+        effectiveFrom: form.effectiveFrom ? new Date(form.effectiveFrom + 'T12:00:00.000Z') : undefined,
         reason: form.reason,
         note: form.note,
       });
