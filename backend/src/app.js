@@ -14,6 +14,7 @@ const settlementRoutes = require("./routes/settlement.routes");
 const loanRoutes = require("./routes/loan.routes");
 const schedulerRoutes = require("./routes/scheduler.routes");
 const employeePortalRoutes = require("./routes/employeePortal.routes");
+const workflowRoutes = require("./routes/workflow.routes");
 const logger = require("./utils/logger");
 
 const app = express();
@@ -69,6 +70,12 @@ app.use("/api/audit-logs", auditRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/settlements", settlementRoutes);
 app.use("/api/loans", loanRoutes);
+// #590 shipped the controller, the models, the router and a WorkflowBuilder
+// page, and never registered the router — so the whole engine was a 404 and the
+// builder had nothing to talk to. It could not simply be added either: the
+// router destructured a `verifyToken` export that does not exist, so mounting
+// it threw at require time and took the process down at boot (#614).
+app.use("/api/workflows", workflowRoutes);
 
 // CORS error handler — return 403 for blocked origins
 app.use((err, req, res, next) => {
