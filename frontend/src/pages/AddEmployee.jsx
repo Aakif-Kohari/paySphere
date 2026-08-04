@@ -86,7 +86,6 @@ export default function AddEmployee() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
 
@@ -134,8 +133,6 @@ export default function AddEmployee() {
     }
   }, [token]);
 
-
-
   const handleCsvUpload = async () => {
     if (!csvFile) {
       setError("Please select a CSV file.");
@@ -161,7 +158,6 @@ export default function AddEmployee() {
       );
 
       setSuccess(`${res.data.imported} employees imported successfully.`);
-
       setCsvFile(null);
 
       const recent = await api.get("/api/employees/recent");
@@ -176,6 +172,7 @@ export default function AddEmployee() {
       setUploadingCsv(false);
     }
   };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -220,6 +217,19 @@ export default function AddEmployee() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancel = () => {
+    setFullName("");
+    setRole("");
+    setDepartment("");
+    setMonthlySalary("");
+    setOvertimeRate("");
+    setDateOfBirth("");
+    setJoiningDate("");
+    setError("");
+    setSuccess("");
+    navigate("/dashboard");
   };
 
   const sidebarItems = [
@@ -495,16 +505,25 @@ export default function AddEmployee() {
                   </div>
                 )}
 
-                {/* Submit */}
-                <button
-                  id="add-employee-btn"
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-                >
-                  <PersonPlusIcon />
-                  {loading ? "Adding..." : "Add Employee"}
-                </button>
+                {/* Submit and Cancel Buttons */}
+                <div className="flex flex-col-reverse sm:flex-row gap-4">
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    className="w-full sm:w-1/2 py-3.5 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-slate-600"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    id="add-employee-btn"
+                    type="submit"
+                    disabled={loading}
+                    className="w-full sm:w-1/2 py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                  >
+                    <PersonPlusIcon />
+                    {loading ? "Adding..." : "Add Employee"}
+                  </button>
+                </div>
               </form>
             </div>
 
@@ -651,14 +670,12 @@ export default function AddEmployee() {
                   <p className="text-gray-300 text-sm leading-relaxed">
                     You can bulk upload employees via CSV in the Settings menu for larger teams.
                   </p>
-
                 </div>
               </div>
             </div>
 
           </div>
         </main>
-
 
       </div>
     </div>
