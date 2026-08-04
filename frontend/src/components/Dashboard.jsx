@@ -1,6 +1,9 @@
 import dashboardMockup from "../assets/dashboard-mockup.png";
+import { getCurrencySymbol, formatCurrency } from '../utils/currency';
 
 export default function Dashboard() {
+  const totalPayout = 48251.50;
+
   return (
     <section id="features" className="px-4 sm:px-6 pb-16 sm:pb-24 overflow-hidden">
       <div className="max-w-6xl mx-auto relative">
@@ -18,14 +21,14 @@ export default function Dashboard() {
             
             <div className="flex items-center gap-3 mb-3 sm:mb-4">
               <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-400">
-                <span className="text-lg sm:text-xl font-bold">₹</span>
+                <span className="text-lg sm:text-xl font-bold">{getCurrencySymbol(localStorage.getItem('currency') || 'INR')}</span>
               </div>
               <div>
                 <div className="text-[9px] sm:text-[10px] font-bold text-gray-500 dark:text-slate-500 uppercase tracking-widest">
                   Total Net Payout
                 </div>
                 <div className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white">
-                  ₹4,82,51.50
+                  {formatCurrency(totalPayout, localStorage.getItem('currency') || 'INR')}
                 </div>
               </div>
             </div>

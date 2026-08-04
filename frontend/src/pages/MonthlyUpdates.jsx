@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useSelector, useDispatch } from "react-redux";
-import { logoutUser } from "../features/auth/authSlice";import ThemeToggle from "../components/ThemeToggle";
+import { logoutUser } from "../features/auth/authSlice";
+import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
+import { getCurrencySymbol, formatCurrency } from "../utils/currency";
 import AttendanceCalendarModal from "../components/AttendanceCalendarModal";
 import { Snackbar, Alert } from '@mui/material';
 import PayrollWizard from "../components/PayrollWizard";
@@ -108,15 +110,16 @@ const Avatar = ({ name, color, size = 36 }) => {
 };
 
 // ── Quick Actions ──────────────────────────────────────────────────────────
-const QUICK_ACTIONS = [
+const getQuickActions = (currency) => [
   { icon: "📋", label: "2 days leave", template: " took 2 days leave" },
   { icon: "⚡", label: "5 hrs overtime", template: " logged 5 hours overtime" },
-  { icon: "🎁", label: "₹2,000 bonus", template: " got ₹2,000 bonus" },
-  { icon: "💸", label: "₹500 deduction", template: " had ₹500 deduction" },
+  { icon: "🎁", label: `${formatCurrency(2000, currency)} bonus`, template: ` got ${formatCurrency(2000, currency)} bonus` },
+  { icon: "💸", label: `${formatCurrency(500, currency)} deduction`, template: ` had ${formatCurrency(500, currency)} deduction` },
 ];
 
-function parseInput(text, employeeList) {
+function parseInput(text, employeeList, currency = 'INR') {
   const lower = text.toLowerCase();
+  const symbol = getCurrencySymbol(currency);
 
   // Parse tags early so they're available even in ambiguous cases
   const tags = [];
@@ -124,10 +127,10 @@ function parseInput(text, employeeList) {
   if (leaveMatch) tags.push({ label: `\u2013 ${leaveMatch[1]} day${leaveMatch[1]>1?"s":""} leave`, bg: "#FEF2F2", color: "#DC2626" });
   const overtimeMatch = lower.match(/(\d+)\s*hour[s]?\s*overtime/);
   if (overtimeMatch) tags.push({ label: `+ ${overtimeMatch[1]} hr overtime`, bg: "#EFF6FF", color: "#2563EB" });
-  const bonusMatch = lower.match(/\u20b9?([\d,]+)\s*bonus/);
-  if (bonusMatch) tags.push({ label: `+ \u20b9${bonusMatch[1]} bonus`, bg: "#F0FDF4", color: "#16A34A" });
-  const dedMatch = lower.match(/\u20b9?([\d,]+)\s*deduction/);
-  if (dedMatch) tags.push({ label: `\u2013 \u20b9${dedMatch[1]} deduction`, bg: "#FEF2F2", color: "#DC2626" });
+  const bonusMatch = lower.match(/(?:[\u20b9$€£])?([\d,]+)\s*bonus/);
+  if (bonusMatch) tags.push({ label: `+ ${symbol}${bonusMatch[1]} bonus`, bg: "#F0FDF4", color: "#16A34A" });
+  const dedMatch = lower.match(/(?:[\u20b9$€£])?([\d,]+)\s*deduction/);
+  if (dedMatch) tags.push({ label: `\u2013 ${symbol}${dedMatch[1]} deduction`, bg: "#FEF2F2", color: "#DC2626" });
   if (tags.length === 0) tags.push({ label: text.slice(0,30), bg: "#F3F4F6", color: "#374151" });
 
   // 1. Try exact full-name match
@@ -214,6 +217,7 @@ export default function MonthlyUpdates() {
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
   const reduxToken = useSelector((state) => state.auth.token);
   const token = reduxToken || localStorage.getItem("token");
+  const currency = localStorage.getItem("currency") || "INR";
 
   useEffect(() => {
     if (!token) {
@@ -264,7 +268,7 @@ export default function MonthlyUpdates() {
 
   const handleSubmit = () => {
     if (!input.trim()) return;
-    const parsed = parseInput(input.trim(), employees);
+    const parsed = parseInput(input.trim(), employees, currency);
     if (parsed.ambiguousMatches && parsed.ambiguousMatches.length > 1) {
       setDisambiguationMatches(parsed.ambiguousMatches);
       setPendingParsed(parsed);
@@ -311,8 +315,6 @@ export default function MonthlyUpdates() {
   };
 
   const pendingCount = activity.filter(a => a.pending).length;
-
-  const fmt = (n, c = "INR") => new Intl.NumberFormat('en-IN', { style: 'currency', currency: c }).format(n);
 
   // Finalize payroll
   const handleFinalize = async () => {
@@ -379,11 +381,11 @@ export default function MonthlyUpdates() {
     let summaryText = `💰 PaySphere Payroll Summary (${monthName} ${year})\n`;
     summaryText += `-----------------------------------\n`;
     summaryText += `👥 Total Employees: ${payrollResults.results.length}\n`;
-    summaryText += `💵 Total Payout: ${fmt(totalPayout, 'INR')} (Base Currency)\n`;
+    summaryText += `💵 Total Payout: ${formatCurrency(totalPayout, currency)}\n`;
     summaryText += `-----------------------------------\n`;
 
     payrollResults.results.forEach((r) => {
-      summaryText += `• ${r.employeeName}: ${fmt(r.netSalary, r.currency)}\n`;
+      summaryText += `• ${r.employeeName}: ${formatCurrency(r.netSalary, r.currency)}\n`;
     });
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -701,9 +703,9 @@ export default function MonthlyUpdates() {
             >
               📅 Open Attendance Calendar
             </button>
-            {QUICK_ACTIONS.map(a => (
-              <button key={a.label} className="chip-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => insertTemplate(a.template)}>
-                {a.icon} {a.label}
+            {getQuickActions(currency).map((action) => (
+              <button key={action.label} className="chip-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => insertTemplate(action.template)}>
+                {action.icon} {action.label}
               </button>
             ))}
           </div>

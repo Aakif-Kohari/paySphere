@@ -5,7 +5,11 @@ import { useDispatch } from "react-redux";
 import { logout } from "../features/auth/authSlice";
 import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
+<<<<<<< Updated upstream
 import useCtrlEnterSubmit from "../hooks/useCtrlEnterSubmit";
+=======
+import { getCurrencySymbol } from "../utils/currency";
+>>>>>>> Stashed changes
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const GridIcon = () => (
@@ -268,7 +272,7 @@ export default function AddEmployee() {
         <div className="p-5 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md shadow-blue-200 dark:shadow-none">
-              ₹
+              {getCurrencySymbol(currency)}
             </div>
             <div>
               <p className="font-bold text-sm text-gray-900 dark:text-white">{companyName}</p>
@@ -397,7 +401,7 @@ export default function AddEmployee() {
                     <label className="flex-1">
                       <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Monthly Salary</span>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500 font-semibold text-sm">{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'}</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 font-semibold text-sm">{getCurrencySymbol(currency)}</span>
                         <input
                           id="employee-salary"
                           type="text"
@@ -413,7 +417,7 @@ export default function AddEmployee() {
                     <label className="flex-1">
                       <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Overtime Rate (Optional)</span>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500 font-semibold text-sm">{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'}</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 font-semibold text-sm">{getCurrencySymbol(currency)}</span>
                         <input
                           id="employee-overtime"
                           type="text"
