@@ -6,6 +6,7 @@ const User = require("../models/user.model");
 const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
+const { getCurrencySymbol, formatCurrency } = require("../utils/currency");
 
 // GET /api/reports/analytics
 // Returns aggregated financial stats for the authenticated user's company
@@ -166,6 +167,7 @@ exports.downloadPDFReport = async (req, res, next) => {
 
     const user = await User.findById(userId);
     const companyLogo = user?.settings?.companyInfo?.companyLogo;
+    const currency = user?.settings?.payrollConfig?.currency || "INR";
 
     // Fetch employee details for roles
     const employeeIds = payrolls.map((p) => p.employeeId);
@@ -223,7 +225,8 @@ exports.downloadPDFReport = async (req, res, next) => {
         totalOvertime,
         totalBonus,
         totalDeductions,
-        totalPayout
+        totalPayout,
+        currency
       }
     });
 
@@ -280,7 +283,7 @@ exports.downloadPDFReport = async (req, res, next) => {
 };
 
 // Helper: Generate a single payslip PDF buffer for zip bundle
-const generatePayslipBuffer = (employee, payroll) => {
+const generatePayslipBuffer = (employee, payroll, currency = "INR") => {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50 });
     const buffers = [];
@@ -302,14 +305,14 @@ const generatePayslipBuffer = (employee, payroll) => {
 
     doc.fontSize(11).font("Helvetica-Bold").fillColor("#333333").text("Earnings & Deductions");
     doc.fontSize(10).font("Helvetica").fillColor("#555555");
-    doc.text(`Base Salary: Rs. ${(payroll.baseSalary || 0).toFixed(2)}`);
-    doc.text(`Leave Days: ${payroll.leaveDays || 0} (Rs. -${(payroll.leaveDeduction || 0).toFixed(2)})`);
-    doc.text(`Overtime Hours: ${payroll.overtimeHours || 0} (Rs. +${(payroll.overtimePay || 0).toFixed(2)})`);
-    doc.text(`Bonus: Rs. +${(payroll.bonus || 0).toFixed(2)}`);
-    doc.text(`Deductions: Rs. -${(payroll.deductions || 0).toFixed(2)}`);
+    doc.text(`Base Salary: ${formatCurrency(payroll.baseSalary || 0, currency)}`);
+    doc.text(`Leave Days: ${payroll.leaveDays || 0} (-${formatCurrency(payroll.leaveDeduction || 0, currency)})`);
+    doc.text(`Overtime Hours: ${payroll.overtimeHours || 0} (+${formatCurrency(payroll.overtimePay || 0, currency)})`);
+    doc.text(`Bonus: +${formatCurrency(payroll.bonus || 0, currency)}`);
+    doc.text(`Deductions: -${formatCurrency(payroll.deductions || 0, currency)}`);
     doc.moveDown(1);
 
-    doc.fontSize(12).font("Helvetica-Bold").fillColor("#1e3a5f").text(`Net Salary: Rs. ${(payroll.netSalary || 0).toFixed(2)}`, { underline: true });
+    doc.fontSize(12).font("Helvetica-Bold").fillColor("#1e3a5f").text(`Net Salary: ${formatCurrency(payroll.netSalary || 0, currency)}`, { underline: true });
 
     // Bank Details section (if available)
     const bd = employee.bankDetails;
@@ -321,7 +324,6 @@ const generatePayslipBuffer = (employee, payroll) => {
       if (bd.accountNumber) doc.text(`Account Number: ${bd.accountNumber}`);
       if (bd.routingCode) doc.text(`Routing / IFSC Code: ${bd.routingCode}`);
     }
-
     doc.end();
   });
 };
@@ -373,19 +375,23 @@ exports.exportExcelReport = async (req, res, next) => {
     workbook.creator = "PaySphere";
     workbook.created = new Date();
 
+    const user = await User.findById(userId);
+    const currency = user?.settings?.payrollConfig?.currency || "INR";
+    const symbol = getCurrencySymbol(currency);
+
     const worksheet = workbook.addWorksheet(`Payroll Summary ${monthName} ${year}`);
 
     worksheet.columns = [
       { header: "Employee Name", key: "employeeName", width: 25 },
       { header: "Role / Department", key: "role", width: 20 },
-      { header: "Base Salary (Rs.)", key: "baseSalary", width: 16 },
+      { header: `Base Salary (${symbol})`, key: "baseSalary", width: 16 },
       { header: "Leave Days", key: "leaveDays", width: 12 },
-      { header: "Leave Deduction (Rs.)", key: "leaveDeduction", width: 20 },
+      { header: `Leave Deduction (${symbol})`, key: "leaveDeduction", width: 20 },
       { header: "Overtime Hours", key: "overtimeHours", width: 15 },
-      { header: "Overtime Pay (Rs.)", key: "overtimePay", width: 18 },
-      { header: "Bonus (Rs.)", key: "bonus", width: 14 },
-      { header: "Deductions (Rs.)", key: "deductions", width: 16 },
-      { header: "Net Payout (Rs.)", key: "netSalary", width: 18 },
+      { header: `Overtime Pay (${symbol})`, key: "overtimePay", width: 18 },
+      { header: `Bonus (${symbol})`, key: "bonus", width: 14 },
+      { header: `Deductions (${symbol})`, key: "deductions", width: 16 },
+      { header: `Net Payout (${symbol})`, key: "netSalary", width: 18 },
       { header: "Status", key: "status", width: 12 },
     ];
 
@@ -513,6 +519,9 @@ exports.downloadPayslipsZip = async (req, res, next) => {
     ];
     const monthName = monthNames[month - 1];
 
+    const user = await User.findById(userId);
+    const currency = user?.settings?.payrollConfig?.currency || "INR";
+
     const archiver = require("archiver");
     const archive = archiver("zip", { zlib: { level: 9 } });
 
@@ -526,7 +535,7 @@ exports.downloadPayslipsZip = async (req, res, next) => {
 
     for (const payroll of payrolls) {
       const emp = employeeMap[String(payroll.employeeId)] || { fullName: payroll.employeeName };
-      const pdfBuffer = await generatePayslipBuffer(emp, payroll);
+      const pdfBuffer = await generatePayslipBuffer(emp, payroll, currency);
       const safeName = (payroll.employeeName || "Employee").replace(/[^a-zA-Z0-9_-]/g, "_");
       archive.append(pdfBuffer, { name: `Payslip_${safeName}_${monthName}_${year}.pdf` });
     }
