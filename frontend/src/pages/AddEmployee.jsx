@@ -5,11 +5,8 @@ import { useDispatch } from "react-redux";
 import { logout } from "../features/auth/authSlice";
 import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
-<<<<<<< Updated upstream
 import useCtrlEnterSubmit from "../hooks/useCtrlEnterSubmit";
-=======
 import { getCurrencySymbol } from "../utils/currency";
->>>>>>> Stashed changes
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const GridIcon = () => (
