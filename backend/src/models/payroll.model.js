@@ -72,6 +72,11 @@ const payrollUpdateSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: true,
+    },
   // The approval workflow added in #438 writes "PENDING_APPROVAL"/"APPROVED"/
   // "REJECTED", none of which were in this enum — so every save() path threw a
   // ValidationError and the workflow only appeared to work because it went

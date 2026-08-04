@@ -129,7 +129,7 @@ exports.addEmployee = async (req, res, next) => {
       companyName: sanitizeText(user.companyName),
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
       joiningDate: joiningDate ? new Date(joiningDate) : undefined,
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
     });
 
@@ -188,7 +188,7 @@ exports.getEmployees = async (req, res, next) => {
     const skip = (page - 1) * limit;
 
     const query = {
-      createdBy: req.userId,
+      tenantId: req.tenantId,
     };
 
     if (!includeDeleted) {
@@ -230,7 +230,7 @@ exports.getEmployees = async (req, res, next) => {
 // GET RECENTLY ADDED EMPLOYEES (last 5)
 exports.getRecentEmployees = async (req, res, next) => {
   try {
-    const employees = await Employee.find({ createdBy: req.userId, deletedAt: null })
+    const employees = await Employee.find({ tenantId: req.tenantId, deletedAt: null })
       .sort({ createdAt: -1 })
       .limit(5);
 
@@ -292,7 +292,7 @@ exports.importEmployees = async (req, res, next) => {
           const existingEmployees =
             nameRegexes.length > 0
               ? await Employee.find({
-                createdBy: req.userId,
+                tenantId: req.tenantId,
                 fullName: { $in: nameRegexes },
               }).select('fullName role')
               : [];
@@ -419,7 +419,7 @@ exports.importEmployees = async (req, res, next) => {
               monthlySalary,
               overtimeRate,
               companyName: sanitizeText(user.companyName),
-              createdBy: req.userId,
+              tenantId: req.tenantId,
               // The address was validated above and then dropped on the floor,
               // so imported employees never had an email either (#414, #236).
               ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
@@ -629,7 +629,7 @@ exports.updateEmployee = async (req, res, next) => {
     if (fullName !== undefined && employee.fullName !== oldName) {
       try {
         const result = await PayrollUpdate.updateMany(
-          { employeeId: id, createdBy: req.userId, status: 'finalized' },
+          { employeeId: id, tenantId: req.tenantId, status: 'finalized' },
           { $set: { employeeName: employee.fullName } },
         );
         logger.info(`PayrollUpdate employeeName propagated`, {
@@ -754,7 +754,7 @@ exports.deleteEmployee = async (req, res, next) => {
     // Check if employee has historical "paid" payroll records (#345)
     const hasPaidPayroll = await PayrollUpdate.exists({
       employeeId: id,
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       status: 'paid',
     });
 
@@ -772,7 +772,7 @@ exports.deleteEmployee = async (req, res, next) => {
       hasSettlement = Boolean(
         await Settlement.exists({
           employeeId: id,
-          createdBy: req.userId,
+          tenantId: req.tenantId,
           status: { $in: ['approved', 'paid'] },
         }),
       );
@@ -876,7 +876,7 @@ exports.restoreEmployee = async (req, res, next) => {
 exports.exportEmployeesCSV = async (req, res, next) => {
   try {
     const query = {
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       deletedAt: null,
     };
 

@@ -24,6 +24,7 @@ const auth = async (req, res, next) => {
     }
 
     req.userId = decoded.id;
+    req.tenantId = decoded.tenantId;
     req.user = user;
     // Resolved once here so every downstream guard agrees on the answer, and so
     // an account on a not-yet-migrated database still gets a defensible type

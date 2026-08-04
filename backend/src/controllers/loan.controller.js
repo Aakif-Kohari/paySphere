@@ -112,7 +112,7 @@ exports.createLoan = async (req, res, next) => {
     const existingOutstanding = (
       await Loan.find({
         employeeId: employee._id,
-        createdBy: req.userId,
+        tenantId: req.tenantId,
         status: { $in: [LOAN_STATUS.ACTIVE, LOAN_STATUS.ON_HOLD] },
       }).select('outstanding')
     ).reduce((sum, l) => sum + (Number(l.outstanding) || 0), 0);
@@ -130,7 +130,7 @@ exports.createLoan = async (req, res, next) => {
     const loan = await Loan.create({
       employeeId: employee._id,
       employeeName: employee.fullName,
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       type: Object.values(LOAN_TYPE).includes(body.type)
         ? body.type
         : LOAN_TYPE.ADVANCE,
@@ -192,7 +192,7 @@ exports.getLoans = async (req, res, next) => {
     let limit = parseInt(req.query.limit, 10);
     if (isNaN(limit) || limit < 1 || limit > 100) limit = 20;
 
-    const query = { createdBy: req.userId };
+    const query = { tenantId: req.tenantId };
 
     if (req.query.status) {
       if (!Object.values(LOAN_STATUS).includes(req.query.status)) {

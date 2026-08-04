@@ -36,6 +36,10 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Role"
   },
+  tenantId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Tenant',
+  },
   /**
    * What kind of login this is: the owner's console or an employee's
    * self-service portal (#443). Orthogonal to `role` — an account has a type

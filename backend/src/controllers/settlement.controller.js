@@ -189,7 +189,7 @@ exports.initiateExit = async (req, res, next) => {
     const nextStatus = EMPLOYMENT_STATUS.NOTICE_PERIOD;
 
     await Employee.updateOne(
-      { _id: employee._id, createdBy: req.userId },
+      { _id: employee._id, tenantId: req.tenantId },
       {
         $set: {
           employmentStatus: nextStatus,
@@ -298,7 +298,7 @@ exports.createSettlement = async (req, res, next) => {
       created = await Settlement.create({
         employeeId: employee._id,
         employeeName: employee.fullName,
-        createdBy: req.userId,
+        tenantId: req.tenantId,
         lastWorkingDay: lwd,
         joiningDate: employee.joiningDate,
         exitType: employee.exitDetails?.exitType || EXIT_TYPE.RESIGNATION,
@@ -470,7 +470,7 @@ function makeTransitionHandler(target, decorate = () => ({})) {
       // Marking an F&F paid is the moment the employee actually leaves.
       if (target === SETTLEMENT_STATUS.PAID) {
         await Employee.updateOne(
-          { _id: settlement.employeeId, createdBy: req.userId },
+          { _id: settlement.employeeId, tenantId: req.tenantId },
           {
             $set: {
               employmentStatus: EMPLOYMENT_STATUS.EXITED,
@@ -553,7 +553,7 @@ exports.getSettlements = async (req, res, next) => {
     let limit = parseInt(req.query.limit, 10);
     if (isNaN(limit) || limit < 1 || limit > 100) limit = 20;
 
-    const query = { createdBy: req.userId };
+    const query = { tenantId: req.tenantId };
 
     if (req.query.status) {
       if (!Object.values(SETTLEMENT_STATUS).includes(req.query.status)) {
@@ -602,7 +602,7 @@ exports.getSettlementById = async (req, res, next) => {
     // `deleteEmployee` would have destroyed.
     const payrollHistoryCount = await PayrollUpdate.countDocuments({
       employeeId: owned.settlement.employeeId,
-      createdBy: req.userId,
+      tenantId: req.tenantId,
     });
 
     res.status(200).json({
