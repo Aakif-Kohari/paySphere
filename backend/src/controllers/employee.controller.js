@@ -986,3 +986,153 @@ exports.exportEmployeesCSV = async (req, res, next) => {
     next(error);
   }
 };
+
+// BULK DELETE EMPLOYEES (SOFT DELETE)
+exports.bulkDeleteEmployees = async (req, res, next) => {
+  try {
+    const { employeeIds } = req.body;
+
+    // Validate input structure
+    if (!Array.isArray(employeeIds) || employeeIds.length === 0) {
+      return res.status(400).json({
+        message: 'employeeIds must be a non-empty array of valid ID strings'
+      });
+    }
+
+    // Prevent excessively large bulk operations that could timeout or lock the DB
+    if (employeeIds.length > 100) {
+      return res.status(400).json({
+        message: 'Cannot delete more than 100 employees in a single request'
+      });
+    }
+
+    // Validate all IDs are valid MongoDB ObjectIds
+    const invalidIds = employeeIds.filter(id => !mongoose.Types.ObjectId.isValid(id));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        message: `Invalid ID format detected for: ${invalidIds.slice(0, 5).join(', ')}${invalidIds.length > 5 ? '...' : ''}`
+      });
+    }
+
+    const deleted = [];
+    const failed = [];
+
+    // Fetch all target employees in a single query to minimize DB roundtrips
+    const employees = await Employee.find({
+      _id: { $in: employeeIds },
+      tenantId: req.tenantId,
+    });
+
+    const employeeMap = new Map();
+    employees.forEach(emp => employeeMap.set(emp._id.toString(), emp));
+
+    // Bulk check for historical paid payroll records (prevents deletion of employees with financial history)
+    const paidPayrolls = await PayrollUpdate.find({
+      employeeId: { $in: employeeIds },
+      tenantId: req.tenantId,
+      status: 'paid',
+    }).select('employeeId').lean();
+
+    const paidPayrollEmployeeIds = new Set(paidPayrolls.map(p => p.employeeId.toString()));
+
+    // Bulk check for approved/paid settlements (prevents deletion of settled employees)
+    const settlements = await Settlement.find({
+      employeeId: { $in: employeeIds },
+      tenantId: req.tenantId,
+      status: { $in: ['approved', 'paid'] },
+    }).select('employeeId').lean();
+
+    const settledEmployeeIds = new Set(settlements.map(s => s.employeeId.toString()));
+
+    // Use a transaction to ensure atomicity - either all deletions succeed or none do
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      for (const id of employeeIds) {
+        const employee = employeeMap.get(id);
+
+        // Check if employee exists and isn't already deleted
+        if (!employee || employee.deletedAt) {
+          failed.push({ id, reason: 'Employee not found or already deleted' });
+          continue;
+        }
+
+        // Verify ownership - user can only delete employees they created
+        if (employee.createdBy.toString() !== req.userId) {
+          failed.push({ id, reason: 'Not authorized to delete this employee' });
+          continue;
+        }
+
+        // Check for paid payroll history
+        if (paidPayrollEmployeeIds.has(id)) {
+          failed.push({ id, reason: 'Cannot delete employee with historical paid payroll records' });
+          continue;
+        }
+
+        // Check for settlement history
+        if (settledEmployeeIds.has(id)) {
+          failed.push({ id, reason: 'Cannot delete employee with an approved or paid full & final settlement' });
+          continue;
+        }
+
+        // Perform soft delete - consistent with single delete endpoint
+        employee.deletedAt = new Date();
+        employee.isActive = false;
+        await employee.save({ session });
+        deleted.push(id);
+      }
+
+      await session.commitTransaction();
+    } catch (txError) {
+      await session.abortTransaction();
+      throw txError;
+    } finally {
+      session.endSession();
+    }
+
+    // Emit audit log and invalidate cache only if successful deletions occurred
+    if (deleted.length > 0) {
+      eventBus.emit("AUDIT_LOG", {
+        userId: req.userId,
+        action: 'EMPLOYEE_BULK_DELETE',
+        resourceType: 'Employee',
+        resourceIds: deleted,
+        details: {
+          deletedCount: deleted.length,
+          failedCount: failed.length,
+          requestedCount: employeeIds.length
+        },
+        req,
+      });
+
+      logger.info(`Employees bulk soft deleted`, {
+        userId: req.userId,
+        deletedCount: deleted.length,
+        failedCount: failed.length,
+        requestedCount: employeeIds.length,
+      });
+
+      // Invalidate analytics cache since employee count and salary aggregates changed
+      await cacheService.invalidateAnalytics(req.userId);
+    }
+
+    res.status(200).json({
+      message: `Bulk deletion completed. ${deleted.length} deleted, ${failed.length} failed.`,
+      summary: {
+        requested: employeeIds.length,
+        deleted: deleted.length,
+        failed: failed.length,
+      },
+      deleted,
+      failed,
+    });
+
+  } catch (error) {
+    logger.error('Bulk employee deletion failed', {
+      userId: req.userId,
+      error: error.message,
+    });
+    next(error);
+  }
+};
