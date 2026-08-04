@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { io } from "socket.io-client";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import api from "../services/api";
@@ -79,7 +80,9 @@ export default function PayrollWizard() {
   // Email status state
   const [sendingEmails, setSendingEmails] = useState(false);
   const [emailMsg, setEmailMsg] = useState("");
-  const [emailStatus, setEmailStatus] = useState(""); // "success" | "error"
+  const [emailStatus, setEmailStatus] = useState("");
+  const [activeUsers, setActiveUsers] = useState([]);
+  const socketRef = useRef(null); // "success" | "error"
 
   // Fetch employees
   useEffect(() => {
