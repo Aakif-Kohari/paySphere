@@ -356,6 +356,19 @@ describe("approvePayroll — ownership and transitions (#458)", () => {
     expect(auditCall[1].result).toBe("partial");
     emitSpy.mockRestore();
   });
+
+  test("returns 409 Conflict when a concurrent update causes a version mismatch", async () => {
+    PayrollUpdate.find.mockImplementation(() =>
+      selectMock([payrollRow(ID_A, "pending_approval", { __v: 0 })]),
+    );
+    req.body = { payrollIds: [ID_A] };
+    PayrollUpdate.updateMany.mockResolvedValue({ matchedCount: 0, modifiedCount: 0 });
+
+    await approvePayroll(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json.mock.calls[0][0].message).toContain("concurrent update");
+  });
 });
 
 describe("rejectPayroll — reason handling (#458)", () => {

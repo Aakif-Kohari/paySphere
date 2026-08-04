@@ -151,7 +151,7 @@ async function transitionPayrollBatch({
   const owned = await PayrollUpdate.find({
     _id: { $in: ids },
     createdBy: userId,
-  }).select("_id status employeeName month year netSalary");
+  }).select("_id status employeeName month year netSalary __v");
 
   const ownedById = new Map(owned.map((p) => [String(p._id), p]));
 
@@ -176,38 +176,53 @@ async function transitionPayrollBatch({
   }
 
   let applied = [];
+  const versionConflicts = [];
 
   if (transitionable.length > 0) {
     const targetIds = transitionable.map((r) => r._id);
 
     const { set, unset } = splitFieldUpdates(extraFields);
-    const update = { $set: { status: targetStatus, ...set } };
+    const update = {
+      $set: { status: targetStatus, ...set },
+      $inc: { __v: 1 },
+    };
     if (Object.keys(unset).length > 0) update.$unset = unset;
 
-    await PayrollUpdate.updateMany(
-      // Re-assert ownership and the source states on the write itself, so a
-      // concurrent approval between the read above and this update cannot slip
-      // a record through a transition that was legal a moment ago.
-      {
-        _id: { $in: targetIds },
-        createdBy: userId,
-      },
+    const filter = {
+      _id: { $in: targetIds },
+      createdBy: userId,
+      $or: transitionable.map((r) => ({ _id: r._id, __v: r.__v })),
+    };
+
+    const res = await PayrollUpdate.updateMany(
+      filter,
       update,
       { runValidators: true },
     );
 
-    applied = transitionable.map((r) => ({
-      payrollId: String(r._id),
-      employeeName: r.employeeName,
-      month: r.month,
-      year: r.year,
-      netSalary: r.netSalary,
-      previousStatus: normalizeStatus(r.status) || r.status,
-      status: targetStatus,
-    }));
+    const matched = res.matchedCount !== undefined ? res.matchedCount : res.modifiedCount;
+
+    if (matched < transitionable.length) {
+      transitionable.forEach((r) => {
+        versionConflicts.push({
+          payrollId: String(r._id),
+          employeeName: r.employeeName,
+        });
+      });
+    } else {
+      applied = transitionable.map((r) => ({
+        payrollId: String(r._id),
+        employeeName: r.employeeName,
+        month: r.month,
+        year: r.year,
+        netSalary: r.netSalary,
+        previousStatus: normalizeStatus(r.status) || r.status,
+        status: targetStatus,
+      }));
+    }
   }
 
-  return { applied, notFound, invalidTransition };
+  return { applied, notFound, invalidTransition, versionConflicts };
 }
 
 // FINALIZE PAYROLL — process activity entries and save payroll records
@@ -307,7 +322,7 @@ exports.approvePayroll = async (req, res, next) => {
 
     const approvedAt = new Date();
 
-    const { applied, notFound, invalidTransition } = await transitionPayrollBatch({
+    const { applied, notFound, invalidTransition, versionConflicts } = await transitionPayrollBatch({
       userId: req.userId,
       ids: batch.ids,
       targetStatus: PAYROLL_STATUS.APPROVED,
@@ -321,6 +336,13 @@ exports.approvePayroll = async (req, res, next) => {
         rejectedAt: undefined,
       },
     });
+
+    if (versionConflicts && versionConflicts.length > 0) {
+      return res.status(409).json({
+        message: "A concurrent update was detected. Please reload and try again.",
+        versionConflicts,
+      });
+    }
 
     if (applied.length === 0) {
       // Nothing moved. A 409 rather than a 200 so the UI does not tell the user
@@ -396,7 +418,7 @@ exports.rejectPayroll = async (req, res, next) => {
     const reason = rawReason.trim().slice(0, MAX_REJECTION_REASON_LENGTH);
     const rejectedAt = new Date();
 
-    const { applied, notFound, invalidTransition } = await transitionPayrollBatch({
+    const { applied, notFound, invalidTransition, versionConflicts } = await transitionPayrollBatch({
       userId: req.userId,
       ids: batch.ids,
       targetStatus: PAYROLL_STATUS.REJECTED,
@@ -408,6 +430,13 @@ exports.rejectPayroll = async (req, res, next) => {
         approvedAt: undefined,
       },
     });
+
+    if (versionConflicts && versionConflicts.length > 0) {
+      return res.status(409).json({
+        message: "A concurrent update was detected. Please reload and try again.",
+        versionConflicts,
+      });
+    }
 
     if (applied.length === 0) {
       return res.status(409).json({
@@ -472,12 +501,19 @@ exports.markPayrollPaid = async (req, res, next) => {
 
     const paidAt = new Date();
 
-    const { applied, notFound, invalidTransition } = await transitionPayrollBatch({
+    const { applied, notFound, invalidTransition, versionConflicts } = await transitionPayrollBatch({
       userId: req.userId,
       ids: batch.ids,
       targetStatus: PAYROLL_STATUS.PAID,
       extraFields: { paidAt },
     });
+
+    if (versionConflicts && versionConflicts.length > 0) {
+      return res.status(409).json({
+        message: "A concurrent update was detected. Please reload and try again.",
+        versionConflicts,
+      });
+    }
 
     if (applied.length === 0) {
       return res.status(409).json({

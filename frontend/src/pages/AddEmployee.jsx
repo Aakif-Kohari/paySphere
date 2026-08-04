@@ -192,6 +192,9 @@ export default function AddEmployee() {
     }
 
     try {
+      const dobDate = dateOfBirth ? new Date(dateOfBirth + "T12:00:00.000Z") : undefined;
+      const joiningDateDate = joiningDate ? new Date(joiningDate + "T12:00:00.000Z") : undefined;
+
       await api.post(`/api/employees`, {
         fullName,
         role,
@@ -199,8 +202,8 @@ export default function AddEmployee() {
         monthlySalary: salaryNum,
         overtimeRate: otNum,
         currency,
-        dateOfBirth: dateOfBirth || undefined,
-        joiningDate: joiningDate || undefined,
+        dateOfBirth: dobDate,
+        joiningDate: joiningDateDate,
       });
 
       setSuccess("Employee added successfully!");
