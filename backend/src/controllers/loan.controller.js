@@ -24,18 +24,22 @@ const {
 const MAX_SALARY_MULTIPLE = 6;
 
 /**
- * Load an employee, asserting the caller owns it.
+ * Load an employee, asserting it belongs to the caller's company.
+ *
+ * Scoped by tenant, not by creator. #585 moved the writes to `tenantId` but
+ * left this lookup on `createdBy`, so every employee added after it became
+ * invisible to the loan endpoints — the row had no `createdBy` to match (#613).
  *
  * @param {string} employeeId
- * @param {string} userId
+ * @param {string} tenantId
  * @returns {Promise<{ok: true, employee: object} | {ok: false, status: number, message: string}>}
  */
-async function loadOwnedEmployee(employeeId, userId) {
+async function loadOwnedEmployee(employeeId, tenantId) {
   if (!mongoose.Types.ObjectId.isValid(employeeId)) {
     return { ok: false, status: 400, message: 'Invalid employee id format' };
   }
 
-  const employee = await Employee.findOne({ _id: employeeId, createdBy: userId });
+  const employee = await Employee.findOne({ _id: employeeId, tenantId });
 
   if (!employee) {
     // Indistinguishable from "does not exist", so the caller cannot probe for
@@ -47,18 +51,18 @@ async function loadOwnedEmployee(employeeId, userId) {
 }
 
 /**
- * Load a loan, asserting the caller owns it.
+ * Load a loan, asserting it belongs to the caller's company.
  *
  * @param {string} loanId
- * @param {string} userId
+ * @param {string} tenantId
  * @returns {Promise<{ok: true, loan: object} | {ok: false, status: number, message: string}>}
  */
-async function loadOwnedLoan(loanId, userId) {
+async function loadOwnedLoan(loanId, tenantId) {
   if (!mongoose.Types.ObjectId.isValid(loanId)) {
     return { ok: false, status: 400, message: 'Invalid loan id format' };
   }
 
-  const loan = await Loan.findOne({ _id: loanId, createdBy: userId });
+  const loan = await Loan.findOne({ _id: loanId, tenantId });
 
   if (!loan) {
     return { ok: false, status: 404, message: 'Loan not found' };
@@ -74,7 +78,7 @@ exports.createLoan = async (req, res, next) => {
   try {
     const body = req.body || {};
 
-    const owned = await loadOwnedEmployee(body.employeeId, req.userId);
+    const owned = await loadOwnedEmployee(body.employeeId, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -130,6 +134,10 @@ exports.createLoan = async (req, res, next) => {
     const loan = await Loan.create({
       employeeId: employee._id,
       employeeName: employee.fullName,
+      // Both: `createdBy` records who issued it, `tenantId` decides who can see
+      // it. #585 dropped the first while the schema still required it, so this
+      // create() threw a ValidationError on every call (#613).
+      createdBy: req.userId,
       tenantId: req.tenantId,
       type: Object.values(LOAN_TYPE).includes(body.type)
         ? body.type
@@ -235,7 +243,7 @@ exports.getLoans = async (req, res, next) => {
 exports.getLoanSummary = async (req, res, next) => {
   try {
     const rows = await Loan.aggregate([
-      { $match: { createdBy: new mongoose.Types.ObjectId(req.userId) } },
+      { $match: { tenantId: new mongoose.Types.ObjectId(req.tenantId) } },
       {
         $group: {
           _id: '$status',
@@ -277,7 +285,7 @@ exports.getLoanSummary = async (req, res, next) => {
  */
 exports.getLoanById = async (req, res, next) => {
   try {
-    const owned = await loadOwnedLoan(req.params.id, req.userId);
+    const owned = await loadOwnedLoan(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -305,7 +313,7 @@ exports.getLoanById = async (req, res, next) => {
  */
 exports.getLoanSchedule = async (req, res, next) => {
   try {
-    const owned = await loadOwnedLoan(req.params.id, req.userId);
+    const owned = await loadOwnedLoan(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -381,7 +389,7 @@ exports.previewLoanSchedule = async (req, res, next) => {
  */
 exports.updateLoanStatus = async (req, res, next) => {
   try {
-    const owned = await loadOwnedLoan(req.params.id, req.userId);
+    const owned = await loadOwnedLoan(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -445,7 +453,7 @@ exports.updateLoanStatus = async (req, res, next) => {
  */
 exports.recordManualRepayment = async (req, res, next) => {
   try {
-    const owned = await loadOwnedLoan(req.params.id, req.userId);
+    const owned = await loadOwnedLoan(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }

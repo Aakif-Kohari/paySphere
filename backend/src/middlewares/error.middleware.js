@@ -11,6 +11,19 @@ const errorHandler = (err, req, res, next) => {
     ip: req?.ip,
   });
 
+  // A scoped query was attempted without a tenant (#612). This is an
+  // authorization outcome, not a crash: the request reached a handler that can
+  // only answer for one company and could not tell which one. The alternative —
+  // letting the query run — is what returned every customer's rows, because
+  // mongoose deletes `{ tenantId: undefined }` out of a filter rather than
+  // matching nothing. See utils/tenantScope.js.
+  if (err.name === 'MissingTenantError') {
+    return res.status(err.status || 403).json({
+      message:
+        'Your account is not linked to a company yet. Sign in again to continue.',
+    });
+  }
+
   // Mongoose validation error
   if (err.name === 'ValidationError') {
     return res

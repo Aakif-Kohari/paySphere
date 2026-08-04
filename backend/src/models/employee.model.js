@@ -97,11 +97,27 @@ const employeeSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    /**
+     * Who created this row. An audit fact, not a scoping key.
+     *
+     * #585's codemod rewrote every `createdBy: req.userId` in the controllers
+     * to `tenantId: req.tenantId` while leaving this field `required: true`, so
+     * every insert omitted a field the schema demanded and `create()` threw
+     * before reaching Mongo (#613). Both fields are written now: this one
+     * records the actor, `tenantId` below decides who can see the row.
+     */
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
     },
+
+    /**
+     * Which company this row belongs to — the field every read filters on.
+     *
+     * Separate from `createdBy` because a company can have more than one admin,
+     * and a row created by one of them has to stay visible to the others.
+     */
     tenantId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Tenant',
@@ -129,8 +145,30 @@ const employeeSchema = new mongoose.Schema(
 );
 
 employeeSchema.index({ tenantId: 1, fullName: 1, role: 1 }, { unique: true });
+// Note: the index above is a prefix of this one and is also unique, so it is
+// the one that decides. Adding `department` here cannot loosen a constraint the
+// shorter index already enforces — two people with the same name and role in
+// different departments are still rejected. Left as-is because relaxing it
+// changes who can be hired, which is a product decision, not a scoping fix.
 employeeSchema.index({ tenantId: 1, fullName: 1, role: 1, department: 1 }, { unique: true });
 
+/**
+ * Email is unique within a company, for the employees that have one.
+ *
+ * Scoped by `tenantId` rather than `createdBy`: an address must not be usable
+ * twice inside one company, and it must be usable in a different one. Scoping
+ * it to the creator would let two admins at the same company each add the same
+ * person.
+ *
+ * The invariants from #414 still hold and are what the model test checks:
+ *
+ *   - `partialFilterExpression`, not `sparse`. `sparse` on a compound index
+ *     only skips a document when *every* indexed key is missing, and the second
+ *     key is required — so every email-less employee was indexed with
+ *     `email: null` and the second one hit E11000.
+ *   - The filter is `$type: 'string'`, so a document with no email is outside
+ *     the index entirely rather than sharing a null slot.
+ */
 employeeSchema.index(
   { email: 1, tenantId: 1 },
   {

@@ -55,6 +55,9 @@ describe("PayrollUpdate schema — approval trail (#559)", () => {
       baseSalary: 90000,
       netSalary: 88000,
       createdBy: new mongoose.Types.ObjectId(),
+      // Required since #585. `createdBy` records the actor, `tenantId` scopes
+      // the row — a document needs both to validate (#613).
+      tenantId: new mongoose.Types.ObjectId(),
       status: "approved",
       submittedBy: submitter,
       submittedAt: new Date("2026-07-31T09:00:00Z"),
@@ -77,6 +80,7 @@ describe("PayrollUpdate schema — approval trail (#559)", () => {
       baseSalary: 90000,
       netSalary: 88000,
       createdBy: new mongoose.Types.ObjectId(),
+      tenantId: new mongoose.Types.ObjectId(),
       status: "rejected",
       rejectionReason: "x".repeat(501),
     });
@@ -88,15 +92,49 @@ describe("PayrollUpdate schema — approval trail (#559)", () => {
   });
 
   test("indexes the maker's own view of the queue", () => {
+    // Leads with `tenantId` since #613: that is the field the queue filters on,
+    // so an index leading with `createdBy` covered nothing the query asked for.
+    // `submittedBy` stays, because "what did *I* submit" is genuinely per-actor
+    // within a company.
     const indexed = PayrollUpdate.schema
       .indexes()
       .some(
         ([fields]) =>
-          fields.createdBy === 1 &&
+          fields.tenantId === 1 &&
           fields.submittedBy === 1 &&
           fields.status === 1,
       );
 
     expect(indexed).toBe(true);
+  });
+
+  test("both the actor and the scope are required on every row", () => {
+    // #585's codemod stopped writing `createdBy` while leaving it required, so
+    // every create() threw before reaching Mongo (#613). Both fields are
+    // declared required, and both are written by the controllers.
+    const row = new PayrollUpdate({
+      employeeId: new mongoose.Types.ObjectId(),
+      employeeName: "Ada Lovelace",
+      month: 7,
+      year: 2026,
+      baseSalary: 90000,
+      netSalary: 88000,
+    });
+
+    const error = row.validateSync();
+
+    expect(error.errors.createdBy).toBeDefined();
+    expect(error.errors.tenantId).toBeDefined();
+  });
+
+  test("every scoped index leads with the field the queries filter on", () => {
+    const scoped = PayrollUpdate.schema
+      .indexes()
+      .filter(([fields]) => "tenantId" in fields || "createdBy" in fields);
+
+    expect(scoped.length).toBeGreaterThan(0);
+    for (const [fields] of scoped) {
+      expect(fields.createdBy).toBeUndefined();
+    }
   });
 });

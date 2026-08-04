@@ -34,6 +34,9 @@ jest.mock('../../services/cache.service', () => ({
 const cacheService = require('../../services/cache.service');
 
 const OWNER = '507f1f77bcf86cd799439011';
+// The company. A different id from OWNER on purpose: since #613 the scope is
+// the tenant, not the account that created the row.
+const TENANT = '507f1f77bcf86cd799439099';
 const EMP_A = '607f1f77bcf86cd7994390a1';
 const SETTLEMENT_ID = '707f1f77bcf86cd7994390b1';
 
@@ -57,6 +60,7 @@ const employeeDoc = (overrides = {}) => ({
   fullName: 'Alice Smith',
   monthlySalary: 26000,
   createdBy: oid(OWNER),
+  tenantId: oid(TENANT),
   joiningDate: new Date('2018-01-01'),
   employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
   isActive: true,
@@ -68,6 +72,7 @@ const settlementDoc = (overrides = {}) => ({
   employeeId: oid(EMP_A),
   employeeName: 'Alice Smith',
   createdBy: oid(OWNER),
+  tenantId: oid(TENANT),
   lastWorkingDay: new Date('2026-07-15'),
   status: SETTLEMENT_STATUS.DRAFT,
   earnings: { encashableDays: 5, bonus: 0, other: 0 },
@@ -100,6 +105,7 @@ describe('previewSettlement — writes nothing (#462)', () => {
   beforeEach(() => {
     req = {
       userId: OWNER,
+      tenantId: TENANT,
       query: { employeeId: EMP_A, lastWorkingDay: '2026-07-15' },
     };
     res = makeRes();
@@ -118,12 +124,12 @@ describe('previewSettlement — writes nothing (#462)', () => {
     expect(payload.settlement.earnings.gratuity).toBeGreaterThan(0);
   });
 
-  test('scopes the employee lookup by createdBy', async () => {
+  test('scopes the employee lookup by tenant', async () => {
     await previewSettlement(req, res, next);
 
     expect(Employee.findOne).toHaveBeenCalledWith({
       _id: EMP_A,
-      createdBy: OWNER,
+      tenantId: TENANT,
     });
   });
 
@@ -159,6 +165,7 @@ describe('initiateExit (#462)', () => {
   beforeEach(() => {
     req = {
       userId: OWNER,
+      tenantId: TENANT,
       body: { employeeId: EMP_A, lastWorkingDay: '2026-07-15' },
     };
     res = makeRes();
@@ -228,10 +235,10 @@ describe('initiateExit (#462)', () => {
     emitSpy.mockRestore();
   });
 
-  test('scopes the update by createdBy', async () => {
+  test('scopes the update by tenant', async () => {
     await initiateExit(req, res, next);
 
-    expect(Employee.updateOne.mock.calls[0][0].createdBy).toBe(OWNER);
+    expect(Employee.updateOne.mock.calls[0][0].tenantId).toBe(TENANT);
   });
 });
 
@@ -241,6 +248,7 @@ describe('createSettlement (#462)', () => {
   beforeEach(() => {
     req = {
       userId: OWNER,
+      tenantId: TENANT,
       body: {
         employeeId: EMP_A,
         lastWorkingDay: '2026-07-15',
@@ -334,6 +342,7 @@ describe('updateSettlement (#462)', () => {
   beforeEach(() => {
     req = {
       userId: OWNER,
+      tenantId: TENANT,
       params: { id: SETTLEMENT_ID },
       body: { assetRecovery: 2000 },
     };
@@ -394,7 +403,7 @@ describe('settlement status ladder (#462)', () => {
   let req, res, next;
 
   beforeEach(() => {
-    req = { userId: OWNER, params: { id: SETTLEMENT_ID }, body: {} };
+    req = { userId: OWNER, tenantId: TENANT, params: { id: SETTLEMENT_ID }, body: {} };
     res = makeRes();
     next = jest.fn();
   });
@@ -507,30 +516,30 @@ describe('settlement status ladder (#462)', () => {
     emitSpy.mockRestore();
   });
 
-  test('every transition scopes its lookup by createdBy', async () => {
+  test('every transition scopes its lookup by tenant', async () => {
     Settlement.findOne.mockResolvedValue(settlementDoc());
 
     await submitSettlement(req, res, next);
 
     expect(Settlement.findOne).toHaveBeenCalledWith({
       _id: SETTLEMENT_ID,
-      createdBy: OWNER,
+      tenantId: TENANT,
     });
   });
 });
 
 describe('getSettlements / getSettlementById (#462)', () => {
-  test('lists scoped by createdBy', async () => {
-    const req = { userId: OWNER, query: {} };
+  test('lists scoped by tenant', async () => {
+    const req = { userId: OWNER, tenantId: TENANT, query: {} };
     const res = makeRes();
 
     await getSettlements(req, res, jest.fn());
 
-    expect(Settlement.find).toHaveBeenCalledWith({ createdBy: OWNER });
+    expect(Settlement.find).toHaveBeenCalledWith({ tenantId: TENANT });
   });
 
   test('rejects an unknown status filter', async () => {
-    const req = { userId: OWNER, query: { status: 'settled' } };
+    const req = { userId: OWNER, tenantId: TENANT, query: { status: 'settled' } };
     const res = makeRes();
 
     await getSettlements(req, res, jest.fn());
@@ -539,7 +548,7 @@ describe('getSettlements / getSettlementById (#462)', () => {
   });
 
   test('clamps pagination', async () => {
-    const req = { userId: OWNER, query: { page: '-3', limit: '9999' } };
+    const req = { userId: OWNER, tenantId: TENANT, query: { page: '-3', limit: '9999' } };
     const res = makeRes();
 
     await getSettlements(req, res, jest.fn());
@@ -551,7 +560,7 @@ describe('getSettlements / getSettlementById (#462)', () => {
     Settlement.findOne.mockResolvedValue(settlementDoc());
     PayrollUpdate.countDocuments.mockResolvedValue(14);
 
-    const req = { userId: OWNER, params: { id: SETTLEMENT_ID } };
+    const req = { userId: OWNER, tenantId: TENANT, params: { id: SETTLEMENT_ID } };
     const res = makeRes();
 
     await getSettlementById(req, res, jest.fn());

@@ -9,6 +9,10 @@ exports.createSchedule = async (req, res, next) => {
       frequency,
       recipients,
       config,
+      // Both: `createdBy` records who scheduled the report, `tenantId` decides
+      // who can see it. #585 dropped the first while the schema still required
+      // it, so this save() threw on every call (#613).
+      createdBy: req.userId,
       tenantId: req.tenantId,
     });
 

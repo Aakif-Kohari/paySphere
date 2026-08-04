@@ -77,6 +77,8 @@ app.use("/api/loans", loanRoutes);
 // it threw at require time and took the process down at boot (#614).
 app.use("/api/workflows", workflowRoutes);
 
+app.use('/api', salaryHistoryRoutes);
+
 // CORS error handler — return 403 for blocked origins
 app.use((err, req, res, next) => {
   if (err.message === "Not allowed by CORS") {
@@ -99,5 +101,6 @@ app.use((err, req, res, next) => {
 
 // Centralized error handler
 app.use(errorHandler);
+
 
 module.exports = app;

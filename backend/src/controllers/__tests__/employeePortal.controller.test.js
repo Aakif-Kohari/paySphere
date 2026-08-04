@@ -21,6 +21,10 @@ const OWNER_A = new mongoose.Types.ObjectId();
 const OWNER_B = new mongoose.Types.ObjectId();
 const EMPLOYEE_A = new mongoose.Types.ObjectId();
 const EMPLOYEE_B = new mongoose.Types.ObjectId();
+// The companies. The portal's tenant anchor moved from `createdBy` to
+// `tenantId` in #613, when #585 made the latter the scoping key everywhere else.
+const TENANT_A = new mongoose.Types.ObjectId();
+const TENANT_B = new mongoose.Types.ObjectId();
 
 const makeRes = () => ({
   status: jest.fn().mockReturnThis(),
@@ -47,9 +51,9 @@ const payslipChain = (rows) => ({
   limit: jest.fn().mockResolvedValue(rows),
 });
 
-const employeeDoc = (id, createdBy, overrides = {}) => ({
+const employeeDoc = (id, tenantId, overrides = {}) => ({
   _id: id,
-  createdBy,
+  tenantId,
   fullName: "Sam Carter",
   email: "sam@example.com",
   monthlySalary: 90000,
@@ -72,6 +76,7 @@ describe("employee portal — tenant scoping (#561)", () => {
       email: "sam@example.com",
       companyName: "Company B",
       employeeId: null,
+      tenantId: TENANT_B,
     });
     Employee.findOne.mockReturnValue(selectResolving(null));
 
@@ -80,7 +85,7 @@ describe("employee portal — tenant scoping (#561)", () => {
 
     expect(Employee.findOne).toHaveBeenCalledWith({
       email: "sam@example.com",
-      createdBy: OWNER_B,
+      tenantId: TENANT_B,
     });
     expect(res.json.mock.calls[0][0].employee).toBeNull();
   });
@@ -91,9 +96,10 @@ describe("employee portal — tenant scoping (#561)", () => {
       email: "sam@example.com",
       companyName: "Company A",
       employeeId: null,
+      tenantId: TENANT_A,
     });
     Employee.findOne.mockReturnValue(
-      selectResolving(employeeDoc(EMPLOYEE_A, OWNER_A)),
+      selectResolving(employeeDoc(EMPLOYEE_A, TENANT_A)),
     );
 
     const res = makeRes();
@@ -110,7 +116,7 @@ describe("employee portal — tenant scoping (#561)", () => {
       employeeId: EMPLOYEE_B,
     });
     Employee.findById.mockReturnValue(
-      selectResolving(employeeDoc(EMPLOYEE_B, OWNER_B)),
+      selectResolving(employeeDoc(EMPLOYEE_B, TENANT_B)),
     );
 
     const res = makeRes();
@@ -142,8 +148,8 @@ describe("employee portal — tenant scoping (#561)", () => {
   });
 
   test("does not expose bank details or salary history in the projection", async () => {
-    mockUser({ _id: OWNER_A, email: "sam@example.com", employeeId: EMPLOYEE_A });
-    const select = jest.fn().mockResolvedValue(employeeDoc(EMPLOYEE_A, OWNER_A));
+    mockUser({ _id: OWNER_A, email: "sam@example.com", employeeId: EMPLOYEE_A, tenantId: TENANT_A });
+    const select = jest.fn().mockResolvedValue(employeeDoc(EMPLOYEE_A, TENANT_A));
     Employee.findById.mockReturnValue({ select });
 
     await getEmployeeProfile({ userId: String(OWNER_A) }, makeRes(), jest.fn());
@@ -163,7 +169,7 @@ describe("employee portal — tenant scoping (#561)", () => {
   });
 
   test("a dangling employee link yields no profile rather than throwing", async () => {
-    mockUser({ _id: OWNER_A, email: "sam@example.com", employeeId: EMPLOYEE_A });
+    mockUser({ _id: OWNER_A, email: "sam@example.com", employeeId: EMPLOYEE_A, tenantId: TENANT_A });
     Employee.findById.mockReturnValue(selectResolving(null));
 
     const res = makeRes();
@@ -180,9 +186,9 @@ describe("getMyPayslips — scoping and filtering (#561)", () => {
   });
 
   beforeEach(() => {
-    mockUser({ _id: OWNER_B, email: "sam@example.com", employeeId: EMPLOYEE_B });
+    mockUser({ _id: OWNER_B, email: "sam@example.com", employeeId: EMPLOYEE_B, tenantId: TENANT_B });
     Employee.findById.mockReturnValue(
-      selectResolving(employeeDoc(EMPLOYEE_B, OWNER_B)),
+      selectResolving(employeeDoc(EMPLOYEE_B, TENANT_B)),
     );
   });
 
@@ -191,7 +197,22 @@ describe("getMyPayslips — scoping and filtering (#561)", () => {
 
     const query = PayrollUpdate.find.mock.calls[0][0];
     expect(query.employeeId).toEqual(EMPLOYEE_B);
-    expect(query.createdBy).toBe(String(OWNER_B));
+    expect(query.tenantId).toBe(String(TENANT_B));
+  });
+
+  test("an employee row with no tenant resolves to nothing rather than everything", async () => {
+    // A row the tenant backfill has not reached. Falling through to an
+    // unscoped query is the failure mode #612 documents: mongoose drops an
+    // undefined clause, so the filter would have matched every company's rows.
+    Employee.findById.mockReturnValue(
+      selectResolving(employeeDoc(EMPLOYEE_B, undefined)),
+    );
+
+    const res = makeRes();
+    await getMyPayslips(linkedRequest(), res, jest.fn());
+
+    expect(PayrollUpdate.find).not.toHaveBeenCalled();
+    expect(res.json.mock.calls[0][0].payrolls).toEqual([]);
   });
 
   test("shows only payable rows — never a pending or rejected figure", async () => {
@@ -246,7 +267,7 @@ describe("getMyPayslips — scoping and filtering (#561)", () => {
   });
 
   test("an unlinked login gets an empty history, not somebody else's", async () => {
-    mockUser({ _id: OWNER_B, email: "sam@example.com", employeeId: null });
+    mockUser({ _id: OWNER_B, email: "sam@example.com", employeeId: null, tenantId: TENANT_B });
     Employee.findOne.mockReturnValue(selectResolving(null));
 
     const res = makeRes();

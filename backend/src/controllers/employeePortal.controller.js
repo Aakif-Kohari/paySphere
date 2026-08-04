@@ -13,7 +13,7 @@ const logger = require("../utils/logger");
  * reason to cross the wire for it.
  */
 const EMPLOYEE_PROFILE_FIELDS =
-  "fullName email role department joiningDate dateOfBirth currency employmentStatus createdBy";
+  "fullName email role department joiningDate dateOfBirth currency employmentStatus tenantId";
 
 /** The payslip fields the portal renders. Excludes the internal audit trail. */
 const PAYSLIP_FIELDS =
@@ -30,8 +30,8 @@ const DEFAULT_PAYSLIP_PAGE_SIZE = 12;
  *
  *     employee = await Employee.findOne({ email: user.email });
  *
- * PaySphere is multi-tenant by `createdBy`, and `Employee.email` is only unique
- * *within* a tenant — the partial index is `{ email: 1, createdBy: 1 }`. The
+ * PaySphere is multi-tenant by `tenantId`, and `Employee.email` is only unique
+ * *within* a tenant — the partial index is `{ email: 1, tenantId: 1 }`. The
  * same address can therefore legitimately exist in two companies' directories,
  * and an unscoped `findOne` returns whichever document Mongo reaches first,
  * with no regard for who is asking. That served another company's salary, bank
@@ -40,11 +40,15 @@ const DEFAULT_PAYSLIP_PAGE_SIZE = 12;
  * There are only two honest anchors:
  *
  *   1. `user.employeeId`, which an administrator set deliberately when they
- *      linked the login to a record. The record's own `createdBy` is then the
+ *      linked the login to a record. The record's own `tenantId` is then the
  *      tenant, and nothing has to be guessed.
- *   2. For an owner account — one with no employee link — their own directory,
- *      scoped by `createdBy: user._id`. An owner who also appears in their own
- *      employee list still sees themself.
+ *   2. For an owner account — one with no employee link — their own company's
+ *      directory, scoped by the tenant on their account. An owner who also
+ *      appears in their own employee list still sees themself.
+ *
+ * The anchors moved from `createdBy` to `tenantId` when #585 made the latter
+ * the scoping key; leaving them behind pointed the portal at a field nothing
+ * writes any more (#613).
  *
  * An unlinked login belonging to nobody's directory has no anchor at all, and
  * matching it on an email address is guessing. It gets nothing.
@@ -66,18 +70,20 @@ async function resolveLinkedEmployee(user) {
       return { employee: null, tenantId: null };
     }
 
-    return { employee, tenantId: String(employee.createdBy) };
+    return { employee, tenantId: employee.tenantId ? String(employee.tenantId) : null };
   }
 
   // No link. Only an owner can be resolved from here, and only inside their own
   // directory.
+  if (!user.tenantId) return { employee: null, tenantId: null };
+
   const employee = await Employee.findOne({
     email: user.email,
-    createdBy: user._id,
+    tenantId: user.tenantId,
   }).select(EMPLOYEE_PROFILE_FIELDS);
 
   return employee
-    ? { employee, tenantId: String(user._id) }
+    ? { employee, tenantId: String(user.tenantId) }
     : { employee: null, tenantId: null };
 }
 
@@ -145,7 +151,7 @@ exports.getMyPayslips = async (req, res, next) => {
       // Belt and braces alongside the resolution above: even if a link were
       // ever pointed at another tenant's record, the payroll rows still have to
       // belong to the tenant that owns the employee.
-      createdBy: tenantId,
+      tenantId,
       // A pending row is a figure no checker has signed off, and a rejected one
       // has been thrown out. Neither is a payslip. Every other read path that
       // reports money already filters this way.
