@@ -1223,33 +1223,47 @@ exports.getPayrollSummary = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
+    // Parse department filter from query parameters
+    const departments = req.query.departments ? 
+      req.query.departments.split(',').map(d => d.trim()).filter(d => d.length > 0) : 
+      [];
+    
+    let employeeIds = null;
+    if (departments.length > 0) {
+      // Fetch employee IDs that match the selected departments
+      const employees = await Employee.find({
+        createdBy: req.userId,
+        deletedAt: null,
+        $or: [
+          { department: { $in: departments } },
+          { role: { $in: departments } }
+        ]
+      }).select('_id');
+      
+      employeeIds = employees.map(emp => emp._id.toString());
+    }
+
     // Pagination parameters — default to page 1, 20 records per page.
-    // A limit of 0 disables paging and returns the full set (kept for
-    // backward-compatibility with callers that aggregate the whole month).
     let page = parseInt(req.query.page, 10);
     if (isNaN(page) || page < 1) page = 1;
 
     let limit = parseInt(req.query.limit, 10);
-    // Allow limit=0 to opt out of pagination (legacy callers / aggregation)
     if (isNaN(limit) || limit < 0) limit = 20;
     if (limit > 100) limit = 100;
 
     const skip = limit > 0 ? (page - 1) * limit : 0;
 
-    // The summary now has to distinguish "submitted" from "signed off". Before
-    // #458 it summed every row for the month regardless of status, so a run
-    // sitting in pending_approval — or one a checker had explicitly rejected —
-    // was reported to the owner as money owed this month.
-    //
-    // `totalPayout` therefore counts payable rows only. The pending figure is
-    // returned alongside it rather than folded in, so the review screen can
-    // still show what is in flight without overstating the payout.
     const baseQuery = {
       tenantId: req.tenantId,
       month,
       year,
       ...excludeRejectedFilter(),
     };
+
+    // Add employee filter if departments are specified
+    if (employeeIds && employeeIds.length > 0) {
+      baseQuery.employeeId = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
+    }
 
     // Run the count and the paginated page fetch in parallel.
     const [totalCount, payrolls] = await Promise.all([
@@ -1261,8 +1275,7 @@ exports.getPayrollSummary = async (req, res, next) => {
 
     const totalPages = limit > 0 ? Math.ceil(totalCount / limit) : 1;
 
-    // Aggregate-level totals across the *entire* month (not just the current
-    // page), so the dashboard summary cards are always accurate.
+    // Aggregate-level totals across the *entire* month (not just the current page)
     const [aggResult] = await PayrollUpdate.aggregate([
       { $match: baseQuery },
       {
@@ -1317,12 +1330,11 @@ exports.getPayrollSummary = async (req, res, next) => {
       employeeCount: aggResult ? aggResult.payableCount : 0,
       pendingApprovalTotal: round2(aggResult ? aggResult.pendingApprovalTotal : 0),
       pendingApprovalCount: aggResult ? aggResult.pendingApprovalCount : 0,
-      // Paginated page of records
       payrolls,
-      // Pagination meta
       currentPage: page,
       totalPages,
       totalCount,
+      departments: departments, // Include filtered departments in response
     });
   } catch (error) {
     next(error);

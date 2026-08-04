@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { Snackbar, Alert } from '@mui/material';
+import Select from 'react-select';
 
 import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
@@ -20,6 +21,7 @@ import PayrollTable from '../components/reports/PayrollTable';
 import ScheduleReportModal from '../components/reports/ScheduleReportModal';
 import CustomReportBuilder from '../components/reports/CustomReportBuilder';
 import TurnoverMetrics from '../components/reports/TurnoverMetrics';
+
 // --- Month-Year Selector ---
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -27,7 +29,7 @@ const MONTH_NAMES = [
 ];
 
 const MonthYearSelector = ({ month, year, onChange }) => (
-  <div className="flex gap-3">
+  <div className="flex gap-2">
     <select
       value={month}
       onChange={(e) => onChange(Number(e.target.value), year)}
@@ -90,6 +92,7 @@ export default function Reports() {
   const token = useSelector((state) => state.auth.token);
   const [activePage, setActivePage] = useState('Reports');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('analytics');
 
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -100,7 +103,11 @@ export default function Reports() {
   const [reportData, setReportData] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  
+
+  // Multi-select department filter state
+  const [selectedDepartments, setSelectedDepartments] = useState([]);
+  const [availableDepartments, setAvailableDepartments] = useState([]);
+
   const companyName = localStorage.getItem('companyName') || 'PaySphere';
   const currency = localStorage.getItem('currency') || 'INR';
 
@@ -108,17 +115,58 @@ export default function Reports() {
     if (!token) navigate('/auth');
   }, [token, navigate]);
 
+  // Fetch available departments from employees
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const res = await api.get('/api/employees?limit=1000');
+        const employees = res.data.employees || [];
+
+        // Extract unique departments (excluding empty strings)
+        const departments = [...new Set(
+          employees
+            .map(emp => emp.department || emp.role)
+            .filter(dept => dept && dept.trim() !== '')
+        )].sort();
+
+        const departmentOptions = departments.map(dept => ({
+          value: dept,
+          label: dept,
+        }));
+
+        setAvailableDepartments(departmentOptions);
+      } catch (err) {
+        console.error('Failed to fetch departments:', err);
+      }
+    };
+
+    if (token) fetchDepartments();
+  }, [token]);
+
   useEffect(() => {
     const fetchReportsData = async () => {
       setLoading(true);
       try {
+        // Build query parameters for department filtering
+        const departmentParams = selectedDepartments.length > 0
+          ? `&departments=${selectedDepartments.map(d => d.value).join(',')}`
+          : '';
+
         const [analyticsRes, summaryRes] = await Promise.all([
-          api.get('/api/reports/analytics?months=6'),
-          api.get(`/api/payroll/summary?month=${month}&year=${year}`)
+          api.get(`/api/reports/analytics?months=6${departmentParams}`),
+          api.get(`/api/payroll/summary?month=${month}&year=${year}${departmentParams}`)
         ]);
 
         const analytics = analyticsRes.data;
         const payrolls = summaryRes.data.payrolls || [];
+
+        // Filter payrolls by selected departments if any are selected
+        const filteredPayrolls = selectedDepartments.length > 0
+          ? payrolls.filter(p => {
+            const dept = p.role || p.department;
+            return selectedDepartments.some(selected => selected.value === dept);
+          })
+          : payrolls;
 
         // Format for Recharts components
         const formattedData = {
@@ -133,31 +181,33 @@ export default function Reports() {
             month: t.label,
             payroll: t.totalPayout
           })),
-          department: analytics.roleBreakdown.map(r => ({
-            department: r.role,
-            payroll: r.totalPayout
-          })),
+          department: analytics.roleBreakdown
+            .filter(r => selectedDepartments.length === 0 || selectedDepartments.some(d => d.value === r.role))
+            .map(r => ({
+              department: r.role,
+              payroll: r.totalPayout
+            })),
           salary: [
             { name: "Salary", value: analytics.summary.totalBase },
             { name: "Bonus", value: analytics.summary.totalBonus },
             { name: "Overtime", value: analytics.summary.totalOvertime }
           ],
-          overtime: payrolls.map(p => ({
+          overtime: filteredPayrolls.map(p => ({
             employee: p.employeeName,
             overtime: p.overtimePay,
             deductions: p.deductions + p.leaveDeduction
           })),
-          table: payrolls.map(p => ({
+          table: filteredPayrolls.map(p => ({
             id: p._id,
             name: p.employeeName,
-            department: p.role,
+            department: p.role || p.department,
             salary: formatCurrency(p.baseSalary, currency),
             bonus: formatCurrency(p.bonus, currency),
             overtime: formatCurrency(p.overtimePay, currency),
             deduction: formatCurrency(p.deductions + p.leaveDeduction, currency),
             net: formatCurrency(p.netSalary, currency),
             netSalary: p.netSalary,
-            status: p.status || "Paid", // Backend uses Paid/Draft
+            status: p.status || "Paid",
             date: p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : "-",
           }))
         };
@@ -171,16 +221,23 @@ export default function Reports() {
     };
 
     if (token) fetchReportsData();
-  }, [token, month, year]);
+  }, [token, month, year, selectedDepartments]);
 
   const handleMonthChange = (m, y) => {
     setMonth(m);
     setYear(y);
   };
 
+  const handleDepartmentChange = (selectedOptions) => {
+    setSelectedDepartments(selectedOptions || []);
+  };
+
   const handleDownloadPDF = () => {
+    const departmentParams = selectedDepartments.length > 0
+      ? `&departments=${selectedDepartments.map(d => d.value).join(',')}`
+      : '';
     downloadFileWithProgress(
-      `/api/reports/download-pdf?month=${month}&year=${year}`,
+      `/api/reports/download-pdf?month=${month}&year=${year}${departmentParams}`,
       `payroll-report-${MONTH_NAMES[month - 1]}-${year}.pdf`,
       'pdf',
       setExportingType,
@@ -189,8 +246,11 @@ export default function Reports() {
   };
 
   const handleExportCSV = () => {
+    const departmentParams = selectedDepartments.length > 0
+      ? `&departments=${selectedDepartments.map(d => d.value).join(',')}`
+      : '';
     downloadFileWithProgress(
-      `/api/payroll/export-csv?month=${month}&year=${year}`,
+      `/api/payroll/export-csv?month=${month}&year=${year}${departmentParams}`,
       `payroll-export-${MONTH_NAMES[month - 1]}-${year}.csv`,
       'csv',
       setExportingType,
@@ -199,8 +259,11 @@ export default function Reports() {
   };
 
   const handleExportXLSX = () => {
+    const departmentParams = selectedDepartments.length > 0
+      ? `&departments=${selectedDepartments.map(d => d.value).join(',')}`
+      : '';
     downloadFileWithProgress(
-      `/api/reports/export-xlsx?month=${month}&year=${year}`,
+      `/api/reports/export-xlsx?month=${month}&year=${year}${departmentParams}`,
       `payroll-summary-${MONTH_NAMES[month - 1]}-${year}.xlsx`,
       'xlsx',
       setExportingType,
@@ -209,8 +272,11 @@ export default function Reports() {
   };
 
   const handleDownloadZIP = () => {
+    const departmentParams = selectedDepartments.length > 0
+      ? `&departments=${selectedDepartments.map(d => d.value).join(',')}`
+      : '';
     downloadFileWithProgress(
-      `/api/reports/download-zip?month=${month}&year=${year}`,
+      `/api/reports/download-zip?month=${month}&year=${year}${departmentParams}`,
       `payslips-${MONTH_NAMES[month - 1]}-${year}.zip`,
       'zip',
       setExportingType,
@@ -226,224 +292,315 @@ export default function Reports() {
   const getInitials = (name) =>
     name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 
+  // Custom styles for react-select to match the app's theme
+  const selectStyles = {
+    control: (base, state) => ({
+      ...base,
+      backgroundColor: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff',
+      borderColor: state.isFocused ? '#3b82f6' : (document.documentElement.classList.contains('dark') ? '#475569' : '#e5e7eb'),
+      borderWidth: '1px',
+      borderRadius: '0.5rem',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(59, 130, 246, 0.2)' : 'none',
+      '&:hover': {
+        borderColor: '#3b82f6',
+      },
+      minHeight: '42px',
+    }),
+    menu: (base) => ({
+      ...base,
+      backgroundColor: document.documentElement.classList.contains('dark') ? '#1e293b' : '#ffffff',
+      border: `1px solid ${document.documentElement.classList.contains('dark') ? '#475569' : '#e5e7eb'}`,
+      borderRadius: '0.5rem',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+    }),
+    option: (base, state) => ({
+      ...base,
+      backgroundColor: state.isSelected
+        ? '#3b82f6'
+        : state.isFocused
+          ? (document.documentElement.classList.contains('dark') ? '#334155' : '#f3f4f6')
+          : 'transparent',
+      color: state.isSelected ? '#ffffff' : (document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b'),
+      '&:hover': {
+        backgroundColor: state.isSelected ? '#3b82f6' : (document.documentElement.classList.contains('dark') ? '#334155' : '#f3f4f6'),
+      },
+      cursor: 'pointer',
+    }),
+    multiValue: (base) => ({
+      ...base,
+      backgroundColor: document.documentElement.classList.contains('dark') ? '#334155' : '#dbeafe',
+      borderRadius: '0.375rem',
+    }),
+    multiValueLabel: (base) => ({
+      ...base,
+      color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e40af',
+      fontSize: '0.875rem',
+      fontWeight: 500,
+    }),
+    multiValueRemove: (base) => ({
+      ...base,
+      color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#3b82f6',
+      '&:hover': {
+        backgroundColor: document.documentElement.classList.contains('dark') ? '#475569' : '#bfdbfe',
+        color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e40af',
+      },
+    }),
+    placeholder: (base) => ({
+      ...base,
+      color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#6b7280',
+    }),
+    input: (base) => ({
+      ...base,
+      color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b',
+    }),
+    singleValue: (base) => ({
+      ...base,
+      color: document.documentElement.classList.contains('dark') ? '#e2e8f0' : '#1e293b',
+    }),
+    noOptionsMessage: (base) => ({
+      ...base,
+      color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#6b7280',
+    }),
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-slate-950 flex font-sans text-slate-800 dark:text-slate-200 transition-colors duration-200">
+    <>
       <Helmet>
         <title>Reports & Analytics | PaySphere</title>
-        <meta name="description" content={`View payroll analytics and generate reports for ${companyName}.`} />
       </Helmet>
 
-      <Sidebar
-        companyName={companyName}
-        activePage={activePage}
-        setActivePage={(page) => {
-          setActivePage(page);
-          if (page !== 'Reports') navigate(`/${page.toLowerCase()}`);
-        }}
-        isSidebarOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-      />
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 transition-colors duration-200">
+        {/* Sidebar */}
+        <Sidebar
+          activePage={activePage}
+          setActivePage={(page) => {
+            setActivePage(page);
+            if (page !== 'Reports') navigate(`/${page.toLowerCase()}`);
+          }}
+          isSidebarOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+        />
 
-      <div className="flex-1 flex flex-col md:ml-56 transition-all duration-300">
         {/* Topbar */}
-        <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 transition-colors">
-          <div className="flex items-center gap-4 sm:gap-6">
+        <div className="lg:ml-64">
+          <div className="sticky top-0 z-30 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 lg:px-8 py-4 flex items-center justify-between">
             <button
-              className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => setIsSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition"
             >
-              ☰
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
             </button>
-            <span className="font-bold text-blue-900 dark:text-blue-400 truncate">Ledger Payroll</span>
-          </div>
-          <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
-            <ThemeToggle />
-            <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
-              {getInitials(companyName)}
-            </div>
-            <button
-              onClick={() => { localStorage.removeItem('token'); localStorage.removeItem('companyName'); navigate('/'); }}
-              className="px-3 py-1.5 cursor-pointer text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"
-            >
-              Sign Out
-            </button>
-          </div>
-        </header>
-
-        {/* Content */}
-        <main className="p-4 sm:p-8">
-          {/* Page Header */}
-          <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <button
-                  onClick={() => navigate("/dashboard")}
-                  className="p-1 rounded-md text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition"
-                >
-                  <ArrowBackIcon fontSize="small" />
-                </button>
-                <p className="text-sm text-gray-500 dark:text-slate-500">Payroll Analytics</p>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="p-1 rounded-md text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition"
+              >
+                <ArrowBackIcon />
+              </button>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-slate-400">Payroll Analytics</p>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">Reports</h1>
               </div>
-              <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white">Reports</h1>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-4 sm:mt-0 items-center">
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-4 lg:p-8">
+            {/* Page Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-3">
+                <MonthYearSelector month={month} year={year} onChange={handleMonthChange} />
+              </div>
               <button
                 onClick={() => setIsScheduleModalOpen(true)}
                 className="px-4 py-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700 transition"
               >
                 Schedule Report
               </button>
-              <MonthYearSelector month={month} year={year} onChange={handleMonthChange} />
             </div>
-          </div>
 
-          {/* Export Action Bar */}
-          {activeTab === 'analytics' && (
-          <div className="flex flex-wrap gap-3 mb-8 items-center">
-            <button
-              onClick={handleDownloadPDF}
-              disabled={Boolean(exportingType)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition-colors cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-            >
-              {exportingType === 'pdf' ? (
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+            {/* Department Filter */}
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                Filter by Department(s)
+              </label>
+              <Select
+                isMulti
+                options={availableDepartments}
+                value={selectedDepartments}
+                onChange={handleDepartmentChange}
+                styles={selectStyles}
+                placeholder="All Departments"
+                noOptionsMessage={() => 'No departments found'}
+                isClearable
+                className="max-w-md"
+              />
+              {selectedDepartments.length > 0 && (
+                <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
+                  Showing data for {selectedDepartments.length} department{selectedDepartments.length > 1 ? 's' : ''}
+                </p>
               )}
-              {exportingType === 'pdf' ? 'Compiling PDF...' : 'Download PDF Report'}
-            </button>
-
-            <button
-              onClick={handleDownloadZIP}
-              disabled={Boolean(exportingType)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-md shadow-indigo-200 dark:shadow-none transition-colors cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-            >
-              {exportingType === 'zip' ? (
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                </svg>
-              )}
-              {exportingType === 'zip' ? 'Compiling Payslips ZIP...' : 'Download All Payslips (ZIP)'}
-            </button>
-
-            <button
-              onClick={handleExportXLSX}
-              disabled={Boolean(exportingType)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-md shadow-emerald-200 dark:shadow-none transition-colors cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-            >
-              {exportingType === 'xlsx' ? (
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              )}
-              {exportingType === 'xlsx' ? 'Compiling Excel...' : 'Export Payroll Summary (.xlsx)'}
-            </button>
-
-            <button
-              onClick={handleExportCSV}
-              disabled={Boolean(exportingType)}
-              className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 disabled:opacity-50 transition-colors cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-            >
-              {exportingType === 'csv' ? (
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              )}
-              {exportingType === 'csv' ? 'Exporting CSV...' : 'Export Accounting CSV'}
-            </button>
-          </div>
-          )}
-
-          {exportingType && (
-            <div className="mb-6 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 flex items-center gap-3">
-              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                Compiling and generating exported file for {MONTH_NAMES[month - 1]} {year}... Please wait.
-              </span>
             </div>
-          )}
 
+            {/* Export Action Bar */}
+            {activeTab === 'analytics' && (
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-4 mb-6 flex flex-wrap gap-3">
+                <button
+                  onClick={handleDownloadPDF}
+                  disabled={exportingType !== null}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg text-sm font-semibold transition"
+                >
+                  {exportingType === 'pdf' ? (
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  )}
+                  {exportingType === 'pdf' ? 'Compiling PDF...' : 'Download PDF Report'}
+                </button>
 
-          {activeTab === 'hr' ? (
-            <TurnoverMetrics />
-          ) : activeTab === 'custom' ? (
-            <CustomReportBuilder />
-          ) : loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-28 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 animate-pulse" />
-              ))}
-            </div>
-          ) : !reportData || reportData.table.length === 0 ? (
-            <div className="text-center py-20">
-              <svg className="w-20 h-20 mx-auto text-gray-300 dark:text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No payroll data yet</h3>
-              <p className="text-gray-500 dark:text-slate-500 text-sm mb-6 max-w-sm mx-auto">
-                Run payroll for at least one month to see analytics and generate reports.
-              </p>
-              <button
-                onClick={() => navigate('/monthly-updates')}
-                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition shadow-md shadow-blue-200 dark:shadow-none"
-              >
-                Run Payroll
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Recharts Components from PR #245 */}
-              <SummaryCards data={reportData.summary} />
-              
-              <PayrollTrendChart data={reportData.trend} />
-              
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <DepartmentChart data={reportData.department} />
-                <SalaryDistributionChart data={reportData.salary} />
+                <button
+                  onClick={handleDownloadZIP}
+                  disabled={exportingType !== null}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white rounded-lg text-sm font-semibold transition"
+                >
+                  {exportingType === 'zip' ? (
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                  )}
+                  {exportingType === 'zip' ? 'Compiling Payslips ZIP...' : 'Download All Payslips (ZIP)'}
+                </button>
+
+                <button
+                  onClick={handleExportXLSX}
+                  disabled={exportingType !== null}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg text-sm font-semibold transition"
+                >
+                  {exportingType === 'xlsx' ? (
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  )}
+                  {exportingType === 'xlsx' ? 'Compiling Excel...' : 'Export Payroll Summary (.xlsx)'}
+                </button>
+
+                <button
+                  onClick={handleExportCSV}
+                  disabled={exportingType !== null}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-semibold transition"
+                >
+                  {exportingType === 'csv' ? (
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                  )}
+                  {exportingType === 'csv' ? 'Exporting CSV...' : 'Export Accounting CSV'}
+                </button>
               </div>
-              
-              <OvertimeChart data={reportData.overtime} />
-              
-              <PayrollTable data={reportData.table} />
-            </div>
-          )}
-        </main>
+            )}
+
+            {exportingType && (
+              <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-center gap-3">
+                <svg className="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  Compiling and generating exported file for {MONTH_NAMES[month - 1]} {year}... Please wait.
+                </p>
+              </div>
+            )}
+
+            {activeTab === 'hr' ? (
+              <TurnoverMetrics />
+            ) : activeTab === 'custom' ? (
+              <CustomReportBuilder />
+            ) : loading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="h-32 bg-gray-200 dark:bg-slate-800 rounded-xl animate-pulse"></div>
+                ))}
+              </div>
+            ) : !reportData || reportData.table.length === 0 ? (
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-12 text-center">
+                <svg className="mx-auto h-16 w-16 text-gray-400 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">No payroll data yet</h3>
+                <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
+                  Run payroll for at least one month to see analytics and generate reports.
+                </p>
+                <button
+                  onClick={() => navigate('/monthly-updates')}
+                  className="mt-4 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition shadow-md shadow-blue-200 dark:shadow-none"
+                >
+                  Run Payroll
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Recharts Components from PR #245 */}
+                <SummaryCards summary={reportData.summary} />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <PayrollTrendChart data={reportData.trend} />
+                  <DepartmentChart data={reportData.department} />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <SalaryDistributionChart data={reportData.salary} />
+                  <OvertimeChart data={reportData.overtime} />
+                </div>
+                <PayrollTable data={reportData.table} currency={currency} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <ScheduleReportModal
+          isOpen={isScheduleModalOpen}
+          onClose={() => setIsScheduleModalOpen(false)}
+          onScheduled={() => setSnackbar({ open: true, message: 'Report scheduled successfully!', severity: 'success' })}
+        />
+
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        >
+          <Alert
+            onClose={handleCloseSnackbar}
+            severity={snackbar.severity}
+            sx={{ width: '100%' }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </div>
-
-      <ScheduleReportModal 
-        isOpen={isScheduleModalOpen} 
-        onClose={() => setIsScheduleModalOpen(false)}
-        onScheduled={() => setSnackbar({ open: true, message: 'Report scheduled successfully!', severity: 'success' })}
-      />
-
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </div>
+    </>
   );
 }

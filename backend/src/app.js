@@ -14,6 +14,7 @@ const settlementRoutes = require("./routes/settlement.routes");
 const loanRoutes = require("./routes/loan.routes");
 const schedulerRoutes = require("./routes/scheduler.routes");
 const employeePortalRoutes = require("./routes/employeePortal.routes");
+const salaryHistoryRoutes = require('./routes/salaryHistory.routes');
 const logger = require("./utils/logger");
 
 const app = express();
@@ -70,6 +71,8 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/settlements", settlementRoutes);
 app.use("/api/loans", loanRoutes);
 
+app.use('/api', salaryHistoryRoutes);
+
 // CORS error handler — return 403 for blocked origins
 app.use((err, req, res, next) => {
   if (err.message === "Not allowed by CORS") {
@@ -92,5 +95,6 @@ app.use((err, req, res, next) => {
 
 // Centralized error handler
 app.use(errorHandler);
+
 
 module.exports = app;
