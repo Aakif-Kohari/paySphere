@@ -94,7 +94,7 @@ exports.getAnalytics = async (req, res, next) => {
           month: { $gte: startDate.getMonth() + 1 },
         },
       ],
-    };
+    });
 
     // Fetch all employees for role breakdown - filter by departments if specified
     const employeeQuery = { 
@@ -213,8 +213,7 @@ exports.downloadPDFReport = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
-    // Fetch payroll records for the selected month
-    const payrolls = await PayrollUpdate.find({
+    const payrollQuery = {
       tenantId,
       month,
       year,
@@ -414,7 +413,7 @@ exports.exportExcelReport = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
-    const payrolls = await PayrollUpdate.find({
+    const payrollQuery = {
       tenantId,
       month,
       year,
@@ -572,7 +571,7 @@ exports.downloadPayslipsZip = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
-    const payrolls = await PayrollUpdate.find({
+    const payrollQuery = {
       tenantId,
       month,
       year,

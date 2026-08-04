@@ -15,6 +15,7 @@ const loanRoutes = require("./routes/loan.routes");
 const schedulerRoutes = require("./routes/scheduler.routes");
 const employeePortalRoutes = require("./routes/employeePortal.routes");
 const workflowRoutes = require("./routes/workflow.routes");
+const salaryHistoryRoutes = require("./routes/salaryHistory.routes");
 const logger = require("./utils/logger");
 
 const app = express();
