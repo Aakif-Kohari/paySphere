@@ -13,6 +13,7 @@ import Settlements from './Settlements';
 import Loans from './Loans';
 import SettingsModal from '../components/SettingsModal';
 import EmptyState from '../components/common/EmptyState';
+import { getCurrencySymbol, formatCurrency } from '../utils/currency';
 import {
   EmployeeBreakdownSkeleton,
   EmployeeCardSkeleton,
@@ -70,6 +71,7 @@ const DashboardOverview = ({
   payrolls,
   onEditEmployee,
 }) => {
+  const currency = localStorage.getItem('currency') || 'INR';
   const payrollMap = {};
   (payrolls || []).forEach((p) => {
     payrollMap[p.employeeId] = p;
@@ -154,7 +156,7 @@ const DashboardOverview = ({
                 Total Monthly Payout
               </p>
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-                ₹{totalPayout.toLocaleString('en-IN')}
+                {formatCurrency(totalPayout, currency)}
               </h2>
               <p className="text-gray-500 dark:text-slate-500 text-sm mt-2">
                 {employeeCount} employees on payroll
@@ -310,6 +312,7 @@ const EmployeeManagement = ({
   onDeleteEmployee,
   onEditEmployee,
 }) => {
+  const currency = localStorage.getItem('currency') || 'INR';
   const payrollMap = {};
   (payrolls || []).forEach((p) => {
     payrollMap[p.employeeId] = p;
@@ -332,7 +335,7 @@ const EmployeeManagement = ({
             Final Summary
           </p>
           <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white mb-2">
-            ₹{totalNet.toLocaleString('en-IN')}
+            {formatCurrency(totalNet, currency)}
           </h1>
           <p className="text-sm text-gray-500 dark:text-slate-500">
             Total Monthly Payout for{' '}
@@ -444,6 +447,7 @@ const EmployeeManagement = ({
 const EditEmployeeModal = ({ employee, onClose, onSave }) => {
   const formRef = useRef(null);
   useCtrlEnterSubmit(formRef);
+  const currency = localStorage.getItem('currency') || 'INR';
   const [formData, setFormData] = useState({
     fullName: employee?.fullName || '',
     role: employee?.role || '',
@@ -535,21 +539,20 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Monthly Salary (₹)
+                Monthly Salary ({getCurrencySymbol(currency)})
               </label>
               <input
                 required
                 type="number"
                 name="monthlySalary"
-                min="1"
                 value={formData.monthlySalary}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+                className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Overtime Rate (₹)
+                Overtime Rate ({getCurrencySymbol(currency)})
               </label>
               <input
                 required

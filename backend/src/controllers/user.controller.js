@@ -118,6 +118,7 @@ exports.signup = async (req, res, next) => {
       companyName: newUser.companyName,
       role: resolveAccountType(newUser),
       employeeId: newUser.employeeId,
+      currency: newUser.settings?.payrollConfig?.currency || 'INR'
     });
   } catch (error) {
     next(error);
@@ -154,6 +155,7 @@ exports.login = async (req, res, next) => {
       companyName: user.companyName,
       role: resolveAccountType(user),
       employeeId: user.employeeId,
+      currency: user.settings?.payrollConfig?.currency || 'INR'
     });
   } catch (error) {
     next(error);
@@ -491,6 +493,7 @@ exports.googleAuth = async (req, res, next) => {
       companyName: user.companyName,
       role: resolveAccountType(user),
       employeeId: user.employeeId,
+      currency: user.settings?.payrollConfig?.currency || 'INR',
       message: isNewUser
         ? 'Account created successfully'
         : 'Logged in successfully',

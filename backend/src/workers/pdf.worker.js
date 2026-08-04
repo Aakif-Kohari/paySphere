@@ -1,12 +1,13 @@
 const { workerData, parentPort } = require("worker_threads");
 const PDFDocument = require("pdfkit");
+const { formatCurrency } = require("../utils/currency");
 
 async function generatePDF() {
   try {
     const { type, payload } = data;
 
     if (type === "GENERATE_COMPANY_REPORT") {
-      const { payrolls, employeeMap, companyName, companyLogo, monthName, year, totalBase, totalOvertime, totalBonus, totalDeductions, totalPayout } = payload;
+      const { payrolls, employeeMap, companyName, companyLogo, monthName, year, totalBase, totalOvertime, totalBonus, totalDeductions, totalPayout, currency = "INR" } = payload;
       
       const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
       const buffers = [];
@@ -38,11 +39,11 @@ async function generatePDF() {
 
       const summaryData = [
         ["Total Employees", String(payrolls.length)],
-        ["Total Base Salary", `Rs. ${totalBase.toLocaleString("en-IN")}`],
-        ["Total Overtime Pay", `Rs. ${totalOvertime.toLocaleString("en-IN")}`],
-        ["Total Bonuses", `Rs. ${totalBonus.toLocaleString("en-IN")}`],
-        ["Total Deductions", `Rs. ${totalDeductions.toLocaleString("en-IN")}`],
-        ["Net Payout", `Rs. ${totalPayout.toLocaleString("en-IN")}`],
+        ["Total Base Salary", formatCurrency(totalBase, currency)],
+        ["Total Overtime Pay", formatCurrency(totalOvertime, currency)],
+        ["Total Bonuses", formatCurrency(totalBonus, currency)],
+        ["Total Deductions", formatCurrency(totalDeductions, currency)],
+        ["Net Payout", formatCurrency(totalPayout, currency)],
       ];
 
 
@@ -108,6 +109,8 @@ async function generatePDF() {
       }
 
       const rowY = doc.y;
+      const emp = employeeMap[String(p.employeeId)];
+      const role = emp?.role ? ` (${emp.role})` : "";
 
       // Alternating row background
       if (idx % 2 === 0) {
@@ -115,50 +118,32 @@ async function generatePDF() {
       }
 
       const rowData = [
-        p.employeeName,
-        `Rs. ${p.baseSalary.toLocaleString("en-IN")}`,
+        `${p.employeeName}${role}`,
+        formatCurrency(p.baseSalary, currency),
         String(p.leaveDays),
-        `Rs. ${p.overtimePay.toLocaleString("en-IN")}`,
-        `Rs. ${p.bonus.toLocaleString("en-IN")}`,
-        `Rs. ${(p.deductions + p.leaveDeduction).toLocaleString("en-IN")}`,
-        `Rs. ${p.netSalary.toLocaleString("en-IN")}`,
+        formatCurrency(p.overtimePay, currency),
+        formatCurrency(p.bonus, currency),
+        formatCurrency(p.deductions + p.leaveDeduction, currency),
+        formatCurrency(p.netSalary, currency),
       ];
 
       xPos = startX + 5;
       rowData.forEach((cell, i) => {
         doc
           .fontSize(8)
-          .font(i === 0 ? "Helvetica" : "Helvetica")
+          .font("Helvetica")
           .fillColor("#444444")
           .text(cell, xPos, rowY, { width: colWidths[i] });
         xPos += colWidths[i];
       });
 
       doc.y = rowY + 14;
-    });
-
-    // Table footer / totals
-    doc.moveDown(0.5);
-    doc
-      .moveTo(startX, doc.y)
-      .lineTo(startX + 515, doc.y)
-      .strokeColor("#cccccc")
-      .lineWidth(0.5)
-      .stroke();
-
-    doc.moveDown(0.3);
-    doc
-      .fontSize(9)
-      .font("Helvetica-Bold")
-      .fillColor("#1e3a5f")
-      .text(`Total Payout: Rs. ${totalPayout.toLocaleString("en-IN")}`, startX, doc.y, {
-        align: "right",
       });
 
       doc.moveDown(0.5);
       doc.moveTo(startX, doc.y).lineTo(startX + 515, doc.y).strokeColor("#cccccc").lineWidth(0.5).stroke();
       doc.moveDown(0.3);
-      doc.fontSize(9).font("Helvetica-Bold").fillColor("#1e3a5f").text(`Total Payout: Rs. ${totalPayout.toLocaleString("en-IN")}`, startX, doc.y, { align: "right" });
+      doc.fontSize(9).font("Helvetica-Bold").fillColor("#1e3a5f").text(`Total Payout: ${formatCurrency(totalPayout, currency)}`, startX, doc.y, { align: "right" });
 
       const pageCount = doc.bufferedPageRange().count;
       for (let i = 0; i < pageCount; i++) {
@@ -169,7 +154,7 @@ async function generatePDF() {
       doc.end();
 
     } else if (type === "GENERATE_PAYSLIP") {
-      const { employee, payroll, companyLogo } = payload;
+      const { employee, payroll, companyLogo, currency = "INR" } = payload;
       
       const doc = new PDFDocument({ margin: 50 });
       const buffers = [];
@@ -196,14 +181,14 @@ async function generatePDF() {
       doc.text(`Company: ${employee.companyName}`);
       doc.moveDown();
 
-      doc.text(`Base Salary: Rs. ${payroll.baseSalary.toFixed(2)}`);
-      doc.text(`Leave Days: ${payroll.leaveDays} (Rs. -${payroll.leaveDeduction.toFixed(2)})`);
-      doc.text(`Overtime Hours: ${payroll.overtimeHours} (Rs. +${payroll.overtimePay.toFixed(2)})`);
-      doc.text(`Bonus: Rs. +${payroll.bonus.toFixed(2)}`);
-      doc.text(`Deductions: Rs. -${payroll.deductions.toFixed(2)}`);
+      doc.text(`Base Salary: ${formatCurrency(payroll.baseSalary, currency)}`);
+      doc.text(`Leave Days: ${payroll.leaveDays} (-${formatCurrency(payroll.leaveDeduction, currency)})`);
+      doc.text(`Overtime Hours: ${payroll.overtimeHours} (+${formatCurrency(payroll.overtimePay, currency)})`);
+      doc.text(`Bonus: +${formatCurrency(payroll.bonus, currency)}`);
+      doc.text(`Deductions: -${formatCurrency(payroll.deductions, currency)}`);
       doc.moveDown();
 
-      doc.fontSize(14).text(`Net Salary: Rs. ${payroll.netSalary.toFixed(2)}`, { underline: true });
+      doc.fontSize(14).text(`Net Salary: ${formatCurrency(payroll.netSalary, currency)}`, { underline: true });
       doc.end();
     }
 

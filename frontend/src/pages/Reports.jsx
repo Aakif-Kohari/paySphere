@@ -13,6 +13,7 @@ import api from '../services/api';
 import SummaryCards from '../components/reports/SummaryCards';
 import PayrollTrendChart from '../components/reports/PayrollTrendChart';
 import DepartmentChart from '../components/reports/DepartmentChart';
+import { getCurrencySymbol, formatCurrency } from "../utils/currency";
 import SalaryDistributionChart from '../components/reports/SalaryDistributionChart';
 import OvertimeChart from '../components/reports/OvertimeChart';
 import PayrollTable from '../components/reports/PayrollTable';
@@ -101,6 +102,7 @@ export default function Reports() {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   
   const companyName = localStorage.getItem('companyName') || 'PaySphere';
+  const currency = localStorage.getItem('currency') || 'INR';
 
   useEffect(() => {
     if (!token) navigate('/auth');
@@ -121,11 +123,11 @@ export default function Reports() {
         // Format for Recharts components
         const formattedData = {
           summary: {
-            totalPayroll: `₹${analytics.summary.totalPayout.toLocaleString('en-IN')}`,
-            employeesPaid: analytics.summary.totalRecords, // Backend doesn't return Paid vs Draft count in analytics
-            averageSalary: `₹${(analytics.summary.totalRecords > 0 ? Math.round(analytics.summary.totalPayout / analytics.summary.totalRecords) : 0).toLocaleString('en-IN')}`,
-            overtime: `₹${analytics.summary.totalOvertime.toLocaleString('en-IN')}`,
-            deductions: `₹${analytics.summary.totalDeductions.toLocaleString('en-IN')}`,
+            totalPayroll: formatCurrency(analytics.summary.totalPayout, currency),
+            employeesCount: analytics.summary.totalRecords,
+            averageSalary: formatCurrency(analytics.summary.totalRecords > 0 ? Math.round(analytics.summary.totalPayout / analytics.summary.totalRecords) : 0, currency),
+            overtime: formatCurrency(analytics.summary.totalOvertime, currency),
+            deductions: formatCurrency(analytics.summary.totalDeductions, currency),
           },
           trend: analytics.monthlyTrends.map(t => ({
             month: t.label,
@@ -149,11 +151,11 @@ export default function Reports() {
             id: p._id,
             name: p.employeeName,
             department: p.role,
-            salary: `₹${p.baseSalary.toLocaleString('en-IN')}`,
-            bonus: `₹${p.bonus.toLocaleString('en-IN')}`,
-            overtime: `₹${p.overtimePay.toLocaleString('en-IN')}`,
-            deduction: `₹${(p.deductions + p.leaveDeduction).toLocaleString('en-IN')}`,
-            net: `₹${p.netSalary.toLocaleString('en-IN')}`,
+            salary: formatCurrency(p.baseSalary, currency),
+            bonus: formatCurrency(p.bonus, currency),
+            overtime: formatCurrency(p.overtimePay, currency),
+            deduction: formatCurrency(p.deductions + p.leaveDeduction, currency),
+            net: formatCurrency(p.netSalary, currency),
             netSalary: p.netSalary,
             status: p.status || "Paid", // Backend uses Paid/Draft
             date: p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : "-",
