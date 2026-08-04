@@ -591,12 +591,15 @@ exports.updateEmployee = async (req, res, next) => {
         .json({ message: 'Invalid email address format' });
     }
 
-    // Capture old name for payroll propagation check (#253)
+    // Capture old values for history tracking
+    const oldSalary = employee.monthlySalary;
     const oldName = employee.fullName;
+    const salaryChanged = monthlySalary !== undefined && Number(monthlySalary) !== oldSalary;
 
     // Apply updates only for provided fields
     if (fullName !== undefined) employee.fullName = sanitizeText(fullName);
     if (role !== undefined) employee.role = sanitizeText(role);
+    if (department !== undefined) employee.department = sanitizeText(department);
     if (monthlySalary !== undefined) employee.monthlySalary = monthlySalary;
     if (overtimeRate !== undefined) employee.overtimeRate = overtimeRate;
     if (isActive !== undefined) employee.isActive = isActive;
@@ -614,7 +617,7 @@ exports.updateEmployee = async (req, res, next) => {
       }
     }
 
-    // Patch bank details: merge only the provided sub-fields
+    // Patch bank details
     if (bankDetails && typeof bankDetails === 'object') {
       employee.bankDetails = {
         bankName: sanitizeText(bankDetails.bankName ?? employee.bankDetails?.bankName ?? ''),
@@ -625,7 +628,43 @@ exports.updateEmployee = async (req, res, next) => {
 
     await employee.save();
 
-    // Propagate name change to finalized (unpaid) PayrollUpdate records (#253)
+    // Create salary history entry if salary changed (Issue #505)
+    if (salaryChanged) {
+      try {
+        const SalaryHistory = require('../models/salaryHistory.model');
+        const User = require('../models/user.model');
+        const user = await User.findById(req.userId);
+        
+        await SalaryHistory.createHistory({
+          employeeId: employee._id,
+          employeeName: employee.fullName,
+          previousSalary: oldSalary,
+          newSalary: employee.monthlySalary,
+          changedBy: req.userId,
+          changedByName: user?.fullName || user?.email || 'Unknown',
+          tenantId: req.tenantId,
+          reason: req.body.salaryChangeReason || 'other',
+          note: req.body.salaryChangeNote || '',
+          currency: employee.currency || 'INR',
+        });
+        
+        logger.info('Salary history created', {
+          userId: req.userId,
+          employeeId: id,
+          oldSalary,
+          newSalary: employee.monthlySalary,
+        });
+      } catch (historyError) {
+        // Don't fail the update if history creation fails
+        logger.error('Failed to create salary history', {
+          userId: req.userId,
+          employeeId: id,
+          error: historyError.message,
+        });
+      }
+    }
+
+    // Propagate name change to finalized PayrollUpdate records
     if (fullName !== undefined && employee.fullName !== oldName) {
       try {
         const result = await PayrollUpdate.updateMany(
@@ -656,7 +695,10 @@ exports.updateEmployee = async (req, res, next) => {
       details: {
         fullName: employee.fullName,
         role: employee.role,
-        changes: Object.keys(req.body).filter((k) => k !== 'id'),
+        salaryChanged,
+        oldSalary: salaryChanged ? oldSalary : undefined,
+        newSalary: salaryChanged ? employee.monthlySalary : undefined,
+        changes: Object.keys(req.body).filter((k) => k !== 'id' && !k.startsWith('salaryChange')),
       },
       req,
     });
@@ -665,10 +707,17 @@ exports.updateEmployee = async (req, res, next) => {
       userId: req.userId,
       employeeId: employee._id,
       fullName: employee.fullName,
+      salaryChanged,
     });
 
     await cacheService.invalidateAnalytics(req.userId);
-    res.status(200).json({ message: "Employee updated successfully", employee });
+    res.status(200).json({ 
+      message: "Employee updated successfully", 
+      employee,
+      salaryChanged,
+      oldSalary: salaryChanged ? oldSalary : undefined,
+      newSalary: salaryChanged ? employee.monthlySalary : undefined,
+    });
   } catch (error) {
     if (handleDuplicateEmail(error, res)) return;
     next(error);
