@@ -68,11 +68,27 @@ const attendanceSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    /**
+     * Who created this row. An audit fact, not a scoping key.
+     *
+     * #585's codemod rewrote every `createdBy: req.userId` in the controllers
+     * to `tenantId: req.tenantId` while leaving this field `required: true`, so
+     * every insert omitted a field the schema demanded and `create()` threw
+     * before reaching Mongo (#613). Both fields are written now: this one
+     * records the actor, `tenantId` below decides who can see the row.
+     */
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
     },
+
+    /**
+     * Which company this row belongs to — the field every read filters on.
+     *
+     * Separate from `createdBy` because a company can have more than one admin,
+     * and a row created by one of them has to stay visible to the others.
+     */
     tenantId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Tenant',
@@ -128,14 +144,16 @@ const attendanceSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// One ledger per employee per month, per account.
+// One ledger per employee per month, per company. Scoped to the tenant rather
+// than the creator: a second admin marking attendance must land on the same
+// ledger row, not a duplicate one (#613).
 attendanceSchema.index(
-  { employeeId: 1, year: 1, month: 1, createdBy: 1 },
+  { employeeId: 1, year: 1, month: 1, tenantId: 1 },
   { unique: true },
 );
 
 // The payroll screen reads "every employee's totals for this month".
-attendanceSchema.index({ createdBy: 1, year: -1, month: -1 });
+attendanceSchema.index({ tenantId: 1, year: -1, month: -1 });
 
 /**
  * @returns {boolean} whether the month is settled and immutable

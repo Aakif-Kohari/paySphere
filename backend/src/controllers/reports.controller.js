@@ -8,13 +8,67 @@ const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
 const { getCurrencySymbol, formatCurrency } = require("../utils/currency");
 
+/**
+ * Helper function to parse department filter from query parameters
+ * Supports both single department (backward compatibility) and comma-separated list
+ * 
+ * @param {string} departmentsParam - Comma-separated department names from query
+ * @returns {string[]} Array of department names
+ */
+function parseDepartments(departmentsParam) {
+  if (!departmentsParam || typeof departmentsParam !== 'string') {
+    return [];
+  }
+
+  // Split by comma, trim whitespace, and filter out empty strings
+  const departments = departmentsParam
+    .split(',')
+    .map(dept => dept.trim())
+    .filter(dept => dept.length > 0);
+
+  return departments;
+}
+
+/**
+ * Helper function to get employee IDs filtered by departments
+ * 
+ * @param {string} userId - The user's ID
+ * @param {string[]} departments - Array of department names to filter by
+ * @returns {Promise<string[]>} Array of employee IDs matching the departments
+ */
+async function getEmployeeIdsByDepartments(userId, departments) {
+  if (!departments || departments.length === 0) {
+    return null; // null means no filter (all employees)
+  }
+
+  // Find employees whose department or role matches any of the selected departments
+  const employees = await Employee.find({
+    createdBy: userId,
+    deletedAt: null,
+    $or: [
+      { department: { $in: departments } },
+      { role: { $in: departments } }
+    ]
+  }).select('_id');
+
+  return employees.map(emp => emp._id.toString());
+}
+
 // GET /api/reports/analytics
 // Returns aggregated financial stats for the authenticated user's company
 exports.getAnalytics = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     const monthsBack = Math.min(Math.max(parseInt(req.query.months) || 6, 1), 12);
-    const cacheKey = `analytics:${userId}:${monthsBack}`;
+
+    // Parse department filter
+    const departments = parseDepartments(req.query.departments);
+    const employeeIds = await getEmployeeIdsByDepartments(userId, departments);
+
+    // Include departments in cache key for proper cache invalidation
+    const departmentKey = departments.length > 0 ? departments.sort().join(',') : 'all';
+    const cacheKey = `analytics:${userId}:${monthsBack}:${departmentKey}`;
 
     // 1. Check cache first
     const cachedData = await cacheService.get(cacheKey);
@@ -31,7 +85,7 @@ exports.getAnalytics = async (req, res, next) => {
     // waiting on a checker — or ones a checker rejected — are not a cost and
     // must not appear in the trend, the department split or the totals (#458).
     const payrolls = await PayrollUpdate.find({
-      createdBy: userId,
+      tenantId,
       ...payableStatusFilter(),
       $or: [
         { year: { $gt: startDate.getFullYear() } },
@@ -40,7 +94,7 @@ exports.getAnalytics = async (req, res, next) => {
           month: { $gte: startDate.getMonth() + 1 },
         },
       ],
-    }).sort({ year: 1, month: 1 });
+    };
 
     // Fetch all employees for role breakdown - filter by departments if specified
     const employeeQuery = { 
@@ -90,7 +144,7 @@ exports.getAnalytics = async (req, res, next) => {
     const roleMap = {};
     payrolls.forEach((p) => {
       const emp = employeeMap[String(p.employeeId)];
-      const role = emp?.role || "Unassigned";
+      const role = emp?.department || emp?.role || "Unassigned";
       if (!roleMap[role]) {
         roleMap[role] = {
           role,
@@ -148,6 +202,7 @@ exports.getAnalytics = async (req, res, next) => {
 exports.downloadPDFReport = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     let month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
     let year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
 
@@ -160,12 +215,18 @@ exports.downloadPDFReport = async (req, res, next) => {
 
     // Fetch payroll records for the selected month
     const payrolls = await PayrollUpdate.find({
-      createdBy: userId,
+      tenantId,
       month,
       year,
-      // A generated report is a financial document — approved rows only (#458).
       ...payableStatusFilter(),
-    }).sort({ employeeName: 1 });
+    };
+
+    if (employeeIds && employeeIds.length > 0) {
+      payrollQuery.employeeId = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
+    }
+
+    // Fetch payroll records for the selected month
+    const payrolls = await PayrollUpdate.find(payrollQuery).sort({ employeeName: 1 });
 
     if (payrolls.length === 0) {
       return res
@@ -178,8 +239,8 @@ exports.downloadPDFReport = async (req, res, next) => {
     const currency = user?.settings?.payrollConfig?.currency || "INR";
 
     // Fetch employee details for roles
-    const employeeIds = payrolls.map((p) => p.employeeId);
-    const employees = await Employee.find({ _id: { $in: employeeIds } });
+    const payrollEmployeeIds = payrolls.map((p) => p.employeeId);
+    const employees = await Employee.find({ _id: { $in: payrollEmployeeIds } });
     const employeeMap = {};
     employees.forEach((emp) => {
       employeeMap[String(emp._id)] = emp;
@@ -210,7 +271,7 @@ exports.downloadPDFReport = async (req, res, next) => {
     const path = require("path");
 
     const pdfWorker = new Worker(path.join(__dirname, "../workers/pdf.worker.js"));
-    
+
     let isHandled = false;
     const workerTimeout = setTimeout(() => {
       if (!isHandled) {
@@ -256,11 +317,11 @@ exports.downloadPDFReport = async (req, res, next) => {
           userId: req.userId,
           action: "REPORT_DOWNLOAD",
           resourceType: "Report",
-          details: { month, year, type: "payroll-pdf", employeeCount: payrolls.length },
+          details: { month, year, type: "payroll-pdf", employeeCount: payrolls.length, departments },
           req,
         });
-    
-        logger.info(`PDF report downloaded`, { userId: req.userId, month, year, employeeCount: payrolls.length });
+
+        logger.info(`PDF report downloaded`, { userId: req.userId, month, year, employeeCount: payrolls.length, departments });
       } else {
         next(new Error("Failed to generate PDF: " + result.error));
       }
@@ -308,6 +369,7 @@ const generatePayslipBuffer = (employee, payroll, currency = "INR") => {
     doc.fontSize(10).font("Helvetica").fillColor("#555555");
     doc.text(`Employee Name: ${employee.fullName || payroll.employeeName}`);
     doc.text(`Role: ${employee.role || "N/A"}`);
+    doc.text(`Department: ${employee.department || "N/A"}`);
     doc.text(`Company: ${employee.companyName || "PaySphere"}`);
     doc.moveDown(1);
 
@@ -341,6 +403,7 @@ const generatePayslipBuffer = (employee, payroll, currency = "INR") => {
 exports.exportExcelReport = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     let month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
     let year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
 
@@ -352,12 +415,17 @@ exports.exportExcelReport = async (req, res, next) => {
     }
 
     const payrolls = await PayrollUpdate.find({
-      createdBy: userId,
+      tenantId,
       month,
       year,
-      // A generated report is a financial document — approved rows only (#458).
       ...payableStatusFilter(),
-    }).sort({ employeeName: 1 });
+    };
+
+    if (employeeIds && employeeIds.length > 0) {
+      payrollQuery.employeeId = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
+    }
+
+    const payrolls = await PayrollUpdate.find(payrollQuery).sort({ employeeName: 1 });
 
     if (payrolls.length === 0) {
       return res
@@ -365,8 +433,8 @@ exports.exportExcelReport = async (req, res, next) => {
         .json({ message: "No payroll data found for the selected period." });
     }
 
-    const employeeIds = payrolls.map((p) => p.employeeId);
-    const employees = await Employee.find({ _id: { $in: employeeIds } });
+    const payrollEmployeeIds = payrolls.map((p) => p.employeeId);
+    const employees = await Employee.find({ _id: { $in: payrollEmployeeIds } });
     const employeeMap = {};
     employees.forEach((emp) => {
       employeeMap[String(emp._id)] = emp;
@@ -391,7 +459,8 @@ exports.exportExcelReport = async (req, res, next) => {
 
     worksheet.columns = [
       { header: "Employee Name", key: "employeeName", width: 25 },
-      { header: "Role / Department", key: "role", width: 20 },
+      { header: "Role", key: "role", width: 20 },
+      { header: "Department", key: "department", width: 20 },
       { header: `Base Salary (${symbol})`, key: "baseSalary", width: 16 },
       { header: "Leave Days", key: "leaveDays", width: 12 },
       { header: `Leave Deduction (${symbol})`, key: "leaveDeduction", width: 20 },
@@ -432,6 +501,7 @@ exports.exportExcelReport = async (req, res, next) => {
       worksheet.addRow({
         employeeName: p.employeeName,
         role: emp?.role || "N/A",
+        department: emp?.department || "N/A",
         baseSalary: p.baseSalary,
         leaveDays: p.leaveDays || 0,
         leaveDeduction: p.leaveDeduction || 0,
@@ -447,6 +517,7 @@ exports.exportExcelReport = async (req, res, next) => {
     const summaryRow = worksheet.addRow({
       employeeName: "TOTAL",
       role: "",
+      department: "",
       baseSalary: totalBase,
       leaveDays: "",
       leaveDeduction: totalLeaveDed,
@@ -475,11 +546,11 @@ exports.exportExcelReport = async (req, res, next) => {
       userId: req.userId,
       action: "REPORT_DOWNLOAD",
       resourceType: "Report",
-      details: { month, year, type: "payroll-xlsx", employeeCount: payrolls.length },
+      details: { month, year, type: "payroll-xlsx", employeeCount: payrolls.length, departments },
       req,
     });
 
-    logger.info(`XLSX report downloaded`, { userId: req.userId, month, year, employeeCount: payrolls.length });
+    logger.info(`XLSX report downloaded`, { userId: req.userId, month, year, employeeCount: payrolls.length, departments });
   } catch (error) {
     next(error);
   }
@@ -490,6 +561,7 @@ exports.exportExcelReport = async (req, res, next) => {
 exports.downloadPayslipsZip = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     let month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
     let year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
 
@@ -501,12 +573,17 @@ exports.downloadPayslipsZip = async (req, res, next) => {
     }
 
     const payrolls = await PayrollUpdate.find({
-      createdBy: userId,
+      tenantId,
       month,
       year,
-      // A generated report is a financial document — approved rows only (#458).
       ...payableStatusFilter(),
-    }).sort({ employeeName: 1 });
+    };
+
+    if (employeeIds && employeeIds.length > 0) {
+      payrollQuery.employeeId = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
+    }
+
+    const payrolls = await PayrollUpdate.find(payrollQuery).sort({ employeeName: 1 });
 
     if (payrolls.length === 0) {
       return res
@@ -514,8 +591,8 @@ exports.downloadPayslipsZip = async (req, res, next) => {
         .json({ message: "No payroll data found for the selected period." });
     }
 
-    const employeeIds = payrolls.map((p) => p.employeeId);
-    const employees = await Employee.find({ _id: { $in: employeeIds } });
+    const payrollEmployeeIds = payrolls.map((p) => p.employeeId);
+    const employees = await Employee.find({ _id: { $in: payrollEmployeeIds } });
     const employeeMap = {};
     employees.forEach((emp) => {
       employeeMap[String(emp._id)] = emp;
@@ -554,20 +631,20 @@ exports.downloadPayslipsZip = async (req, res, next) => {
       userId: req.userId,
       action: "REPORT_DOWNLOAD",
       resourceType: "Report",
-      details: { month, year, type: "payslips-zip", employeeCount: payrolls.length },
+      details: { month, year, type: "payslips-zip", employeeCount: payrolls.length, departments },
       req,
     });
 
-    logger.info(`ZIP payslips report downloaded`, { userId: req.userId, month, year, employeeCount: payrolls.length });
+    logger.info(`ZIP payslips report downloaded`, { userId: req.userId, month, year, employeeCount: payrolls.length, departments });
   } catch (error) {
     next(error);
   }
 };
 
-
 exports.getTurnoverMetrics = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     const turnoverService = require('../services/turnover.service');
     const Employee = require('../models/employee.model');
 
@@ -580,21 +657,21 @@ exports.getTurnoverMetrics = async (req, res, next) => {
     const now = new Date();
     const monthsBack = 12;
     const trends = [];
-    
+
     let totalTenureDays = 0;
     let terminatedCount = 0;
 
     for (let i = monthsBack - 1; i >= 0; i--) {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
-      
+
       let activeCount = 0;
       let terminatedThisMonth = 0;
 
       for (const emp of allEmployees) {
         const joinDate = new Date(emp.joinDate || emp.joiningDate || emp.createdAt);
         const termDate = emp.deletedAt ? new Date(emp.deletedAt) : (emp.exitDetails?.lastWorkingDay ? new Date(emp.exitDetails.lastWorkingDay) : null);
-        
+
         if (joinDate <= monthEnd) {
           if (!termDate || termDate > monthEnd) {
             activeCount++;
@@ -616,14 +693,14 @@ exports.getTurnoverMetrics = async (req, res, next) => {
     }
 
     const averageActiveEmployees = trends.reduce((acc, curr) => acc + curr.active, 0) / monthsBack;
-    const turnoverRate = averageActiveEmployees > 0 
-      ? ((terminatedCount / averageActiveEmployees) * 100).toFixed(2) 
+    const turnoverRate = averageActiveEmployees > 0
+      ? ((terminatedCount / averageActiveEmployees) * 100).toFixed(2)
       : 0;
 
-    const averageTenureDays = terminatedCount > 0 
-      ? Math.round(totalTenureDays / terminatedCount) 
+    const averageTenureDays = terminatedCount > 0
+      ? Math.round(totalTenureDays / terminatedCount)
       : 0;
-    
+
     const averageTenureMonths = (averageTenureDays / 30).toFixed(1);
 
     const { departuresByReason } = await turnoverService.getTurnoverMetrics(userId, monthsBack);
@@ -640,6 +717,7 @@ exports.getTurnoverMetrics = async (req, res, next) => {
     next(error);
   }
 };
+
 // POST /api/reports/custom
 // Generates a custom report dynamically with NoSQL injection prevention
 exports.generateCustomReport = async (req, res, next) => {
@@ -660,7 +738,7 @@ exports.generateCustomReport = async (req, res, next) => {
     };
     const allowed = validColumns[dataset];
     const project = { _id: 1 };
-    
+
     for (const col of columns) {
       if (allowed.includes(col)) {
         project[col] = 1;
@@ -669,12 +747,12 @@ exports.generateCustomReport = async (req, res, next) => {
 
     // Secure query construction
     const query = { tenantId: req.tenantId }; // always scope by tenant/user
-    
+
     if (Array.isArray(filters)) {
       for (const filter of filters) {
         // filter format: { field: "role", operator: "equals", value: "Manager" }
         if (!allowed.includes(filter.field)) continue;
-        
+
         // Prevent NoSQL injection by strictly casting/building the query object
         const val = filter.value;
         switch (filter.operator) {
@@ -685,7 +763,7 @@ exports.generateCustomReport = async (req, res, next) => {
             query[filter.field] = { $ne: val };
             break;
           case 'contains':
-            query[filter.field] = { $regex: String(val).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'), $options: 'i' };
+            query[filter.field] = { $regex: String(val).replace(/[.*+?^${}()|[\]\\]/g, '$&'), $options: 'i' };
             break;
           case 'gt':
             query[filter.field] = { $gt: Number(val) };
