@@ -230,7 +230,9 @@ exports.getEmployees = async (req, res, next) => {
       tenantId: req.tenantId,
     };
 
+    // Filter out soft-deleted employees unless explicitly requested
     if (!includeDeleted) {
+      query.isDeleted = { $ne: true };
       query.deletedAt = null;
     }
 
@@ -269,7 +271,11 @@ exports.getEmployees = async (req, res, next) => {
 // GET RECENTLY ADDED EMPLOYEES (last 5)
 exports.getRecentEmployees = async (req, res, next) => {
   try {
-    const employees = await Employee.find({ tenantId: req.tenantId, deletedAt: null })
+    const employees = await Employee.find({ 
+      tenantId: req.tenantId, 
+      deletedAt: null,
+      isDeleted: { $ne: true } // Filter soft-deleted
+    })
       .sort({ createdAt: -1 })
       .limit(5);
 
@@ -560,7 +566,8 @@ exports.updateEmployee = async (req, res, next) => {
     if (department !== undefined) employee.department = sanitizeText(department);
     const employee = await Employee.findById(id);
 
-    if (!employee || employee.deletedAt) {
+    // Check if employee exists and is not soft-deleted
+    if (!employee || employee.deletedAt || employee.isDeleted) {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
@@ -773,7 +780,8 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
 
     const employee = await Employee.findById(id);
 
-    if (!employee || employee.deletedAt) {
+    // Check if employee exists and is not soft-deleted
+    if (!employee || employee.deletedAt || employee.isDeleted) {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
@@ -851,7 +859,7 @@ exports.deleteEmployee = async (req, res, next) => {
       });
     }
 
-    // Same principle as #345: an employee who has been formally settled has a
+        // Same principle as #345: an employee who has been formally settled has a
     // final statement on record, and destroying them would destroy the
     // counterpart to a payment that has already been made (#462).
     let hasSettlement = false;
@@ -882,8 +890,10 @@ exports.deleteEmployee = async (req, res, next) => {
       });
     }
 
+    // Soft delete: set both deletedAt and isDeleted flag
     employee.deletedAt = new Date();
     employee.isActive = false;
+    employee.isDeleted = true;
     await employee.save();
 
     eventBus.emit("AUDIT_LOG", {
@@ -922,7 +932,8 @@ exports.restoreEmployee = async (req, res, next) => {
 
     const employee = await Employee.findById(id);
 
-    if (!employee || !employee.deletedAt) {
+    // Check if employee exists and is actually soft-deleted
+    if (!employee || (!employee.deletedAt && !employee.isDeleted)) {
       return res.status(404).json({ message: 'Soft-deleted employee not found' });
     }
 
@@ -930,8 +941,10 @@ exports.restoreEmployee = async (req, res, next) => {
       return res.status(403).json({ message: 'Not authorized to restore this employee' });
     }
 
+    // Restore: clear both deletedAt and isDeleted flagZ
     employee.deletedAt = null;
     employee.isActive = true;
+    employee.isDeleted = false;
     await employee.save();
 
     eventBus.emit("AUDIT_LOG", {
@@ -959,12 +972,14 @@ exports.restoreEmployee = async (req, res, next) => {
     next(error);
   }
 };
+
 // EXPORT EMPLOYEES TO CSV
 exports.exportEmployeesCSV = async (req, res, next) => {
   try {
     const query = {
       tenantId: req.tenantId,
       deletedAt: null,
+      isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
     };
 
     const employees = await Employee.find(query).sort({ createdAt: -1 });
