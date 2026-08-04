@@ -123,7 +123,7 @@ function splitFieldUpdates(fields = {}) {
  * Apply a status transition to a batch of payroll records owned by the caller.
  *
  * This is the whole fix for the cross-tenant hole in #458 concentrated in one
- * place: the query is *always* scoped by `createdBy`, and every id is
+ * place: the query is *always* scoped by `tenantId`, and every id is
  * classified so the response can tell the client precisely which records moved,
  * which were not theirs, and which were in a state the transition table
  * forbids. The previous implementation issued a blind `updateMany` keyed only
@@ -131,7 +131,7 @@ function splitFieldUpdates(fields = {}) {
  * ids that matched nothing.
  *
  * @param {object} params
- * @param {string} params.userId caller — the ownership scope
+ * @param {string} params.tenantId caller's company — the ownership scope
  * @param {string[]} params.ids payroll ids to transition
  * @param {string} params.targetStatus a PAYROLL_STATUS value
  * @param {object} params.extraFields fields to write alongside the status; a
@@ -140,7 +140,7 @@ function splitFieldUpdates(fields = {}) {
  * @returns {Promise<{applied: object[], notFound: string[], invalidTransition: object[]}>}
  */
 async function transitionPayrollBatch({
-  userId,
+  tenantId,
   ids,
   targetStatus,
   extraFields = {},
@@ -151,7 +151,7 @@ async function transitionPayrollBatch({
   // answer to give.
   const owned = await PayrollUpdate.find({
     _id: { $in: ids },
-    createdBy: userId,
+    tenantId,
   }).select("_id status employeeName month year netSalary __v");
 
   const ownedById = new Map(owned.map((p) => [String(p._id), p]));
@@ -191,7 +191,7 @@ async function transitionPayrollBatch({
 
     const filter = {
       _id: { $in: targetIds },
-      createdBy: userId,
+      tenantId,
       $or: transitionable.map((r) => ({ _id: r._id, __v: r.__v })),
     };
 
@@ -235,7 +235,7 @@ async function transitionPayrollBatch({
  * The original implementation ran `PayrollUpdate.find({ status:
  * "PENDING_APPROVAL" })` with the comment "Admin sees all in this demo". On a
  * shared deployment that returns every company's employee names, base salaries
- * and net salaries to any logged-in account. Scoped by `createdBy` like every
+ * and net salaries to any logged-in account. Scoped by `tenantId` like every
  * other read in the codebase (#458).
  */
 exports.getPendingApprovals = async (req, res, next) => {
@@ -324,7 +324,7 @@ exports.approvePayroll = async (req, res, next) => {
     const approvedAt = new Date();
 
     const { applied, notFound, invalidTransition, versionConflicts } = await transitionPayrollBatch({
-      userId: req.userId,
+      tenantId: req.tenantId,
       ids: batch.ids,
       targetStatus: PAYROLL_STATUS.APPROVED,
       extraFields: {
@@ -420,7 +420,7 @@ exports.rejectPayroll = async (req, res, next) => {
     const rejectedAt = new Date();
 
     const { applied, notFound, invalidTransition, versionConflicts } = await transitionPayrollBatch({
-      userId: req.userId,
+      tenantId: req.tenantId,
       ids: batch.ids,
       targetStatus: PAYROLL_STATUS.REJECTED,
       extraFields: {
@@ -503,7 +503,7 @@ exports.markPayrollPaid = async (req, res, next) => {
     const paidAt = new Date();
 
     const { applied, notFound, invalidTransition, versionConflicts } = await transitionPayrollBatch({
-      userId: req.userId,
+      tenantId: req.tenantId,
       ids: batch.ids,
       targetStatus: PAYROLL_STATUS.PAID,
       extraFields: { paidAt },

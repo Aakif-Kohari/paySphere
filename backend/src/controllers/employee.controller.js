@@ -8,11 +8,39 @@ const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
 const Settlement = require("../models/settlement.model");
+
+/**
+ * Does this record belong to the caller's company?
+ *
+ * Replaces four copies of
+ *
+ *     if (employee.createdBy.toString() !== req.userId) { ... 403 }
+ *
+ * which had two problems. It compared the *creator*, so a second admin at the
+ * same company could not edit an employee their colleague had added — the
+ * record is the company's, not one person's. And after #585 stopped writing
+ * `createdBy`, `employee.createdBy` was undefined on every record written since,
+ * so the guard threw `TypeError: Cannot read properties of undefined (reading
+ * 'toString')` and turned a 403 into a 500 (#613).
+ *
+ * Compared as strings because one side is an ObjectId off a document and the
+ * other is whatever `auth.middleware` resolved — which may be either.
+ *
+ * @param {object} record any document carrying `tenantId`
+ * @param {object} req the authenticated request
+ * @returns {boolean}
+ */
+function belongsToCaller(record, req) {
+  if (!record?.tenantId || !req?.tenantId) return false;
+
+  return String(record.tenantId) === String(req.tenantId);
+}
+
 /**
  * Normalize an employee email for storage.
  *
  * Returns `undefined` for a blank/absent address rather than `""`, so the
- * partial unique index on { email, createdBy } skips the document entirely.
+ * partial unique index on { email, tenantId } skips the document entirely.
  * Storing empty strings would put every email-less employee back into the same
  * index bucket and re-create the duplicate-key collision (#414).
  *
@@ -51,7 +79,13 @@ exports.addEmployee = async (req, res, next) => {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ message: 'Request body is required' });
     }
-    const { fullName, role, monthlySalary, overtimeRate, dateOfBirth, joiningDate, email, bankDetails } = req.body;
+    // `department` is read further down when the document is built. It was
+    // never destructured here, so `addEmployee` threw
+    // `ReferenceError: department is not defined` before it reached the save —
+    // which is why the #414 email-persistence suite could not run at all. That
+    // is #605; pulled in here only because #613's fix to this same handler
+    // cannot otherwise be exercised.
+    const { fullName, role, department, monthlySalary, overtimeRate, dateOfBirth, joiningDate, email, bankDetails } = req.body;
 
     if (email && typeof email === 'string' && email.trim() !== '') {
       if (!regex.test(email.trim())) {
@@ -129,6 +163,11 @@ exports.addEmployee = async (req, res, next) => {
       companyName: sanitizeText(user.companyName),
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
       joiningDate: joiningDate ? new Date(joiningDate) : undefined,
+      // Both: `createdBy` records who added the employee, `tenantId` decides
+      // who can see them. #585 dropped the first while the schema still
+      // required it, so this save() threw a ValidationError and
+      // POST /api/employees was a hard 500 on every call (#613).
+      createdBy: req.userId,
       tenantId: req.tenantId,
       ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
     });
@@ -419,6 +458,7 @@ exports.importEmployees = async (req, res, next) => {
               monthlySalary,
               overtimeRate,
               companyName: sanitizeText(user.companyName),
+              createdBy: req.userId,
               tenantId: req.tenantId,
               // The address was validated above and then dropped on the floor,
               // so imported employees never had an email either (#414, #236).
@@ -524,8 +564,7 @@ exports.updateEmployee = async (req, res, next) => {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    // Ensure the logged-in user is the creator of this employee
-    if (employee.createdBy.toString() !== req.userId) {
+    if (!belongsToCaller(employee, req)) {
       return res
         .status(403)
         .json({ message: 'Not authorized to update this employee' });
@@ -689,7 +728,7 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    if (employee.createdBy.toString() !== req.userId) {
+    if (!belongsToCaller(employee, req)) {
       return res
         .status(403)
         .json({ message: 'Not authorized to update this employee' });
@@ -744,8 +783,7 @@ exports.deleteEmployee = async (req, res, next) => {
       });
     }
 
-    // Check ownership
-    if (employee.createdBy.toString() !== req.userId) {
+    if (!belongsToCaller(employee, req)) {
       return res.status(403).json({
         message: 'Not authorized to delete this employee',
       });
@@ -839,7 +877,7 @@ exports.restoreEmployee = async (req, res, next) => {
       return res.status(404).json({ message: 'Soft-deleted employee not found' });
     }
 
-    if (employee.createdBy.toString() !== req.userId) {
+    if (!belongsToCaller(employee, req)) {
       return res.status(403).json({ message: 'Not authorized to restore this employee' });
     }
 

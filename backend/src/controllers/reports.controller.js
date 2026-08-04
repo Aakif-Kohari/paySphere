@@ -13,6 +13,7 @@ const { getCurrencySymbol, formatCurrency } = require("../utils/currency");
 exports.getAnalytics = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     const monthsBack = Math.min(Math.max(parseInt(req.query.months) || 6, 1), 12);
     const cacheKey = `analytics:${userId}:${monthsBack}`;
 
@@ -31,7 +32,7 @@ exports.getAnalytics = async (req, res, next) => {
     // waiting on a checker — or ones a checker rejected — are not a cost and
     // must not appear in the trend, the department split or the totals (#458).
     const payrolls = await PayrollUpdate.find({
-      createdBy: userId,
+      tenantId,
       ...payableStatusFilter(),
       $or: [
         { year: { $gt: startDate.getFullYear() } },
@@ -43,7 +44,7 @@ exports.getAnalytics = async (req, res, next) => {
     }).sort({ year: 1, month: 1 });
 
     // Fetch all employees for role breakdown
-    const employees = await Employee.find({ createdBy: userId });
+    const employees = await Employee.find({ tenantId });
     const employeeMap = {};
     employees.forEach((emp) => {
       employeeMap[String(emp._id)] = emp;
@@ -140,6 +141,7 @@ exports.getAnalytics = async (req, res, next) => {
 exports.downloadPDFReport = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     let month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
     let year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
 
@@ -152,7 +154,7 @@ exports.downloadPDFReport = async (req, res, next) => {
 
     // Fetch payroll records for the selected month
     const payrolls = await PayrollUpdate.find({
-      createdBy: userId,
+      tenantId,
       month,
       year,
       // A generated report is a financial document — approved rows only (#458).
@@ -333,6 +335,7 @@ const generatePayslipBuffer = (employee, payroll, currency = "INR") => {
 exports.exportExcelReport = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     let month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
     let year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
 
@@ -344,7 +347,7 @@ exports.exportExcelReport = async (req, res, next) => {
     }
 
     const payrolls = await PayrollUpdate.find({
-      createdBy: userId,
+      tenantId,
       month,
       year,
       // A generated report is a financial document — approved rows only (#458).
@@ -482,6 +485,7 @@ exports.exportExcelReport = async (req, res, next) => {
 exports.downloadPayslipsZip = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     let month = req.query.month ? Number(req.query.month) : new Date().getMonth() + 1;
     let year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
 
@@ -493,7 +497,7 @@ exports.downloadPayslipsZip = async (req, res, next) => {
     }
 
     const payrolls = await PayrollUpdate.find({
-      createdBy: userId,
+      tenantId,
       month,
       year,
       // A generated report is a financial document — approved rows only (#458).
@@ -560,10 +564,11 @@ exports.downloadPayslipsZip = async (req, res, next) => {
 exports.getTurnoverMetrics = async (req, res, next) => {
   try {
     const userId = req.userId;
+    const tenantId = req.tenantId;
     const turnoverService = require('../services/turnover.service');
     const Employee = require('../models/employee.model');
 
-    const allEmployees = await Employee.find({ createdBy: userId }).lean();
+    const allEmployees = await Employee.find({ tenantId }).lean();
 
     const now = new Date();
     const monthsBack = 12;

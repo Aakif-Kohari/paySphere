@@ -180,8 +180,12 @@ exports.getSettings = async (req, res, next) => {
     const user = await User.findById(req.userId).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // Scoped by tenant like every other employee read since #585. Left on
+    // `createdBy`, this counted only the employees this particular admin had
+    // added, and after #585 stopped writing that field it counted zero — the
+    // Settings page reported an empty company (#613).
     const employeeCount = await Employee.countDocuments({
-      createdBy: req.userId,
+      tenantId: req.tenantId,
     });
 
     res.status(200).json({
@@ -703,8 +707,12 @@ exports.deleteAccount = async (req, res, next) => {
 
     const AuditLog = require('../models/auditLog.model');
 
-    await Employee.deleteMany({ createdBy: req.userId }, deleteOptions);
-    await PayrollUpdate.deleteMany({ createdBy: req.userId }, deleteOptions);
+    // Scoped by tenant: these rows are the company's, and since #585 they no
+    // longer carry a `createdBy` to match on. Filtering by the old key deleted
+    // nothing and left the company's employee and payroll records behind after
+    // the account that owned them was gone (#613).
+    await Employee.deleteMany({ tenantId: req.tenantId }, deleteOptions);
+    await PayrollUpdate.deleteMany({ tenantId: req.tenantId }, deleteOptions);
     await AuditLog.deleteMany({ userId: req.userId }, deleteOptions);
     await User.findByIdAndDelete(req.userId, deleteOptions);
 
