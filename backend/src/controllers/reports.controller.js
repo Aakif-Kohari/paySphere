@@ -42,8 +42,16 @@ exports.getAnalytics = async (req, res, next) => {
       ],
     }).sort({ year: 1, month: 1 });
 
-    // Fetch all employees for role breakdown
-    const employees = await Employee.find({ createdBy: userId });
+    // Fetch all employees for role breakdown - filter by departments if specified
+    const employeeQuery = { 
+      createdBy: userId,
+      isDeleted: { $ne: true } // Filter soft-deleted
+    };
+    if (employeeIds && employeeIds.length > 0) {
+      employeeQuery._id = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
+    }
+    
+    const employees = await Employee.find(employeeQuery);
     const employeeMap = {};
     employees.forEach((emp) => {
       employeeMap[String(emp._id)] = emp;
@@ -563,7 +571,11 @@ exports.getTurnoverMetrics = async (req, res, next) => {
     const turnoverService = require('../services/turnover.service');
     const Employee = require('../models/employee.model');
 
-    const allEmployees = await Employee.find({ createdBy: userId }).lean();
+    // Include all employees (even deleted) for historical turnover analysis
+    const allEmployees = await Employee.find({ 
+      createdBy: userId,
+      isDeleted: { $ne: true } // Filter soft-deleted for active analysis
+    }).lean();
 
     const now = new Date();
     const monthsBack = 12;

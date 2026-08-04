@@ -564,7 +564,10 @@ exports.parsePayrollCSV = async (req, res, next) => {
     const bonusIdx = headers.findIndex(h => h.includes("bonus"));
     const leaveIdx = headers.findIndex(h => h.includes("leave"));
 
-    const employees = await Employee.find({ tenantId: req.tenantId });
+    const employees = await Employee.find({ 
+      tenantId: req.tenantId,
+      isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
+    });
     const activities = [];
     // `require('uuid')` threw MODULE_NOT_FOUND — uuid is not a dependency of
     // this package — and because the throw happens while evaluating the left
@@ -651,7 +654,10 @@ exports.submitPayrollForReview = async (req, res, next) => {
     }
 
     // Fetch all employees for this user
-    const employees = await Employee.find({ tenantId: req.tenantId });
+    const employees = await Employee.find({ 
+      tenantId: req.tenantId,
+      isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
+    });
 
     if (employees.length === 0) {
       return res.status(400).json({ message: "No employees found. Add employees first." });
@@ -1407,6 +1413,16 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
       return res.status(404).json({ message: "Employee not found" });
     }
     
+    // Optional: Warn if employee is soft-deleted but still allow sending
+    // since this might be for historical payroll records
+    if (employee.isDeleted) {
+      logger.warn(`Sending payslip email to soft-deleted employee`, {
+        userId: req.userId,
+        employeeId: employee._id,
+        employeeName: employee.fullName,
+      });
+    }
+    
     if (!employee.email) {
       return res.status(400).json({ message: "Employee does not have an email address set" });
     }
@@ -1473,7 +1489,10 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
     }
 
     const employeeIds = [...new Set(payrolls.map(p => p.employeeId))];
-    const employees = await Employee.find({ _id: { $in: employeeIds } });
+    const employees = await Employee.find({ 
+      _id: { $in: employeeIds },
+      isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
+    });
     const employeeMap = new Map(employees.map(e => [String(e._id), e]));
 
     const results = [];

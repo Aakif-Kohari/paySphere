@@ -97,6 +97,11 @@ const employeeSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -138,5 +143,8 @@ employeeSchema.index(
     partialFilterExpression: { email: { $type: 'string' } },
   },
 );
+
+// Index for efficient soft delete filtering
+employeeSchema.index({ tenantId: 1, isDeleted: 1, isActive: 1 });
 
 module.exports = mongoose.model('Employee', employeeSchema);
