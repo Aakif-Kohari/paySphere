@@ -656,7 +656,7 @@ exports.generateCustomReport = async (req, res, next) => {
     }
 
     // Secure query construction
-    const query = { createdBy: req.userId }; // always scope by tenant/user
+    const query = { tenantId: req.tenantId }; // always scope by tenant/user
     
     if (Array.isArray(filters)) {
       for (const filter of filters) {

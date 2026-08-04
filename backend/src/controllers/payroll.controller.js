@@ -248,7 +248,7 @@ exports.getPendingApprovals = async (req, res, next) => {
     const skip = (page - 1) * limit;
 
     const query = {
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       status: PAYROLL_STATUS.PENDING_APPROVAL,
     };
 
@@ -563,7 +563,7 @@ exports.parsePayrollCSV = async (req, res, next) => {
     const bonusIdx = headers.findIndex(h => h.includes("bonus"));
     const leaveIdx = headers.findIndex(h => h.includes("leave"));
 
-    const employees = await Employee.find({ createdBy: req.userId });
+    const employees = await Employee.find({ tenantId: req.tenantId });
     const activities = [];
     // `require('uuid')` threw MODULE_NOT_FOUND — uuid is not a dependency of
     // this package — and because the throw happens while evaluating the left
@@ -650,7 +650,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
     }
 
     // Fetch all employees for this user
-    const employees = await Employee.find({ createdBy: req.userId });
+    const employees = await Employee.find({ tenantId: req.tenantId });
 
     if (employees.length === 0) {
       return res.status(400).json({ message: "No employees found. Add employees first." });
@@ -674,7 +674,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
 
     try {
       const attendanceRecords = await Attendance.find({
-        createdBy: req.userId,
+        tenantId: req.tenantId,
         year: currentYear,
         month: currentMonth,
       }).select("employeeId totals");
@@ -699,7 +699,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
 
     try {
       const activeLoans = await Loan.find({
-        createdBy: req.userId,
+        tenantId: req.tenantId,
         status: LOAN_STATUS.ACTIVE,
       });
 
@@ -727,7 +727,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
 
     try {
       const revisions = await SalaryStructure.find({
-        createdBy: req.userId,
+        tenantId: req.tenantId,
       }).sort({ effectiveFrom: 1 });
 
       (revisions || []).forEach((revision) => {
@@ -953,7 +953,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
       employeeId: { $in: employeeIds },
       month: currentMonth,
       year: currentYear,
-      createdBy: req.userId,
+      createdBy: req.userId, tenantId: req.tenantId,
       status: { $in: [PAYROLL_STATUS.PAID, PAYROLL_STATUS.APPROVED, "finalized"] },
     });
 
@@ -1014,7 +1014,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
         // from the validated ledger or from a parsed display string (#459).
         attendanceSource: item.attendanceSource,
         salarySnapshot: item.salarySnapshot,
-        createdBy: req.userId,
+        tenantId: req.tenantId,
         status: PAYROLL_STATUS.PENDING_APPROVAL,
         submittedBy: req.userId,
         submittedAt: new Date(),
@@ -1034,7 +1034,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
             employeeId: item.employee._id,
             month: currentMonth,
             year: currentYear,
-            createdBy: req.userId,
+            tenantId: req.tenantId,
           },
           update: { $set: payrollData },
           upsert: true,
@@ -1049,7 +1049,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
     const fetchOptions = session ? { session } : {};
     const updatedPayrolls = await PayrollUpdate.find(
       {
-        createdBy: req.userId,
+        tenantId: req.tenantId,
         month: currentMonth,
         year: currentYear,
         employeeId: { $in: preparedItems.map((item) => item.employee._id) },
@@ -1108,7 +1108,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
           });
 
           await Loan.updateOne(
-            { _id: loan._id, createdBy: req.userId },
+            { _id: loan._id, tenantId: req.tenantId },
             {
               $set: {
                 repayments: applied.repayments,
@@ -1244,7 +1244,7 @@ exports.getPayrollSummary = async (req, res, next) => {
     // returned alongside it rather than folded in, so the review screen can
     // still show what is in flight without overstating the payout.
     const baseQuery = {
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       month,
       year,
       ...excludeRejectedFilter(),
@@ -1346,7 +1346,7 @@ exports.exportPayrollCSV = async (req, res, next) => {
     // was actually approved for payment, not a mixture of approved rows,
     // unreviewed drafts and rows a checker threw out (#458).
     const payrolls = await PayrollUpdate.find({
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       month,
       year,
       ...payableStatusFilter(),
@@ -1395,7 +1395,7 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
     if (!mongoose.Types.ObjectId.isValid(payrollId)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
-    const payroll = await PayrollUpdate.findOne({ _id: payrollId, createdBy: req.userId });
+    const payroll = await PayrollUpdate.findOne({ _id: payrollId, tenantId: req.tenantId });
     
     if (!payroll) {
       return res.status(404).json({ message: "Payroll record not found" });
@@ -1457,7 +1457,7 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
     // dispatchable. Previously this swept up every unemailed row for the month
     // including pending and rejected ones (#458).
     const payrolls = await PayrollUpdate.find({
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       month,
       year,
       payslipEmailed: false,

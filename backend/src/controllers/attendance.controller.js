@@ -158,7 +158,7 @@ exports.getAttendance = async (req, res, next) => {
 
     const existing = await Attendance.findOne({
       employeeId: employee._id,
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       year,
       month,
     });
@@ -209,7 +209,7 @@ exports.upsertAttendance = async (req, res, next) => {
 
     const existing = await Attendance.findOne({
       employeeId: employee._id,
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       year,
       month,
     });
@@ -253,7 +253,7 @@ exports.upsertAttendance = async (req, res, next) => {
     const leaveCheck = canTakePaidLeave(priorBalance, totals.paidLeave);
 
     const saved = await Attendance.findOneAndUpdate(
-      { employeeId: employee._id, createdBy: req.userId, year, month },
+      { employeeId: employee._id, tenantId: req.tenantId, year, month },
       {
         $set: {
           employeeName: employee.fullName,
@@ -263,7 +263,7 @@ exports.upsertAttendance = async (req, res, next) => {
         },
         $setOnInsert: {
           employeeId: employee._id,
-          createdBy: req.userId,
+          tenantId: req.tenantId,
           year,
           month,
         },
@@ -366,7 +366,7 @@ exports.bulkMarkAttendance = async (req, res, next) => {
     // Scoped: ids belonging to another account simply do not come back.
     const employees = await Employee.find({
       _id: { $in: ids },
-      createdBy: req.userId,
+      createdBy: req.userId, tenantId: req.tenantId,
     });
 
     if (employees.length === 0) {
@@ -375,7 +375,7 @@ exports.bulkMarkAttendance = async (req, res, next) => {
 
     const existingDocs = await Attendance.find({
       employeeId: { $in: employees.map((e) => e._id) },
-      createdBy: req.userId,
+      createdBy: req.userId, tenantId: req.tenantId,
       year,
       month,
     });
@@ -427,7 +427,7 @@ exports.bulkMarkAttendance = async (req, res, next) => {
       const totals = computeTotals(validation.days);
 
       await Attendance.findOneAndUpdate(
-        { employeeId: employee._id, createdBy: req.userId, year, month },
+        { employeeId: employee._id, tenantId: req.tenantId, year, month },
         {
           $set: {
             employeeName: employee.fullName,
@@ -435,7 +435,7 @@ exports.bulkMarkAttendance = async (req, res, next) => {
             totals,
             lastEditedBy: req.userId,
           },
-          $setOnInsert: { employeeId: employee._id, createdBy: req.userId, year, month },
+          $setOnInsert: { employeeId: employee._id, tenantId: req.tenantId, year, month },
         },
         { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
       );
@@ -488,7 +488,7 @@ exports.getMonthSummary = async (req, res, next) => {
     const { year, month } = period;
 
     const records = await Attendance.find({
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       year,
       month,
     }).sort({ employeeName: 1 });

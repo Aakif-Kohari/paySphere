@@ -255,7 +255,7 @@ exports.createSalaryRevision = async (req, res, next) => {
     // stored payroll row unreproducible.
     const paidInPeriod = await PayrollUpdate.findOne({
       employeeId: employee._id,
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       status: 'paid',
       $or: [
         { year: { $gt: effectiveFrom.getFullYear() } },
@@ -283,7 +283,7 @@ exports.createSalaryRevision = async (req, res, next) => {
     try {
       created = await SalaryStructure.create({
         employeeId: employee._id,
-        createdBy: req.userId,
+        tenantId: req.tenantId,
         effectiveFrom,
         components: validation.value.components,
         grossMonthly: validation.value.grossMonthly,
@@ -308,7 +308,7 @@ exports.createSalaryRevision = async (req, res, next) => {
 
     if (isCurrent) {
       await Employee.updateOne(
-        { _id: employee._id, createdBy: req.userId },
+        { _id: employee._id, tenantId: req.tenantId },
         { $set: { monthlySalary: validation.value.grossMonthly } },
       );
 

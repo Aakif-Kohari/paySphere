@@ -9,7 +9,7 @@ exports.createSchedule = async (req, res, next) => {
       frequency,
       recipients,
       config,
-      createdBy: req.userId,
+      tenantId: req.tenantId,
     });
 
     await schedule.save();
@@ -21,7 +21,7 @@ exports.createSchedule = async (req, res, next) => {
 
 exports.getSchedules = async (req, res, next) => {
   try {
-    const schedules = await ReportSchedule.find({ createdBy: req.userId }).sort("-createdAt");
+    const schedules = await ReportSchedule.find({ tenantId: req.tenantId }).sort("-createdAt");
     res.status(200).json(schedules);
   } catch (error) {
     next(error);
@@ -31,7 +31,7 @@ exports.getSchedules = async (req, res, next) => {
 exports.deleteSchedule = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const schedule = await ReportSchedule.findOneAndDelete({ _id: id, createdBy: req.userId });
+    const schedule = await ReportSchedule.findOneAndDelete({ _id: id, tenantId: req.tenantId });
     
     if (!schedule) {
       return res.status(404).json({ message: "Schedule not found" });
