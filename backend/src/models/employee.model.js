@@ -102,6 +102,11 @@ const employeeSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: true,
+    },
     bankDetails: {
       bankName: {
         type: String,
@@ -123,11 +128,11 @@ const employeeSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-employeeSchema.index({ createdBy: 1, fullName: 1, role: 1 }, { unique: true });
-employeeSchema.index({ createdBy: 1, fullName: 1, role: 1, department: 1 }, { unique: true });
+employeeSchema.index({ tenantId: 1, fullName: 1, role: 1 }, { unique: true });
+employeeSchema.index({ tenantId: 1, fullName: 1, role: 1, department: 1 }, { unique: true });
 
 employeeSchema.index(
-  { email: 1, createdBy: 1 },
+  { email: 1, tenantId: 1 },
   {
     unique: true,
     partialFilterExpression: { email: { $type: 'string' } },

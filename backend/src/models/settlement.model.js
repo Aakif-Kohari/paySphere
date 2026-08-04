@@ -26,6 +26,11 @@ const settlementSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: true,
+    },
 
     lastWorkingDay: { type: Date, required: true },
     joiningDate: { type: Date },

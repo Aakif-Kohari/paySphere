@@ -1,3 +1,4 @@
+const Tenant = require('../models/tenant.model');
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -30,13 +31,17 @@ const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
 
 const generateTokens = (user, res) => {
   const accessToken = jwt.sign(
-    { id: user._id, tokenVersion: user.tokenVersion || 0 },
+    { id: user._id,
+      role: user.role,
+      tenantId: user.tenantId, tokenVersion: user.tokenVersion || 0 },
     process.env.JWT_SECRET,
     { expiresIn: '15m' },
   );
 
   const refreshToken = jwt.sign(
-    { id: user._id, tokenVersion: user.tokenVersion || 0 },
+    { id: user._id,
+      role: user.role,
+      tenantId: user.tenantId, tokenVersion: user.tokenVersion || 0 },
     process.env.JWT_SECRET,
     { expiresIn: '7d' },
   );
@@ -925,6 +930,8 @@ exports.validate2FALogin = async (req, res, next) => {
       token: accessToken,
       user: {
         id: user._id,
+      role: user.role,
+      tenantId: user.tenantId,
         email: user.email,
         fullName: user.fullName,
         companyName: user.companyName,
