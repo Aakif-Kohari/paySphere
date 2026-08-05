@@ -155,6 +155,52 @@ class CacheService {
       }
     }
   }
+
+  /**
+   * Invalidates the dashboard summary cache for a specific user.
+   * Called when payroll is finalized, approved, or employee data changes.
+   * Issue: #519
+   * 
+   * @param {string} userId - The user whose dashboard cache to clear
+   */
+  async invalidateDashboardSummary(userId) {
+    if (!userId) return;
+    try {
+      const cacheKey = `dashboard:summary:${userId}`;
+      await this.del(cacheKey);
+      logger.info(`Dashboard summary cache invalidated for user ${userId}`);
+    } catch (error) {
+      logger.error(`Failed to invalidate dashboard summary cache for user ${userId}:`, error);
+    }
+  }
+
+  /**
+   * Invalidates all dashboard-related caches for a user.
+   * Useful for bulk operations or account-level changes.
+   * Issue: #519
+   * 
+   * @param {string} userId - The user whose dashboard caches to clear
+   */
+  async invalidateAllDashboardCaches(userId) {
+    if (!userId) return;
+    try {
+      if (!this.isRedisEnabled) {
+        // In-memory fallback: manually match keys since Map doesn't support wildcards natively.
+        // We check for the prefix and suffix to ensure we only clear this specific user's caches.
+        for (const key of this.memoryCache.keys()) {
+          if (key.startsWith('dashboard:') && key.endsWith(`:${userId}`)) {
+            this.memoryCache.delete(key);
+          }
+        }
+      } else {
+        // Redis: use the existing pattern invalidator (SCAN)
+        await this.invalidatePattern(`dashboard:*:${userId}`);
+      }
+      logger.info(`All dashboard caches invalidated for user ${userId}`);
+    } catch (error) {
+      logger.error(`Failed to invalidate all dashboard caches for user ${userId}:`, error);
+    }
+  }
 }
 
 const instance = new CacheService();

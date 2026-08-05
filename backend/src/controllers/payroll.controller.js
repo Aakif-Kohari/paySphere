@@ -358,7 +358,9 @@ exports.approvePayroll = async (req, res, next) => {
 
     // Approved rows enter every payable total, so the cached analytics are now
     // stale — the same invalidation contract the finalize path follows (#415).
+    // Invalidate analytics and dashboard caches since financial data changed (Issue #519)
     await cacheService.invalidateAnalytics(req.userId);
+    await cacheService.invalidateDashboardSummary(req.userId);
 
     eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
@@ -448,7 +450,9 @@ exports.rejectPayroll = async (req, res, next) => {
       });
     }
 
+    // Invalidate analytics and dashboard caches since financial data changed (Issue #519)
     await cacheService.invalidateAnalytics(req.userId);
+    await cacheService.invalidateDashboardSummary(req.userId);
 
     eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
@@ -525,7 +529,9 @@ exports.markPayrollPaid = async (req, res, next) => {
       });
     }
 
+    // Invalidate analytics and dashboard caches since financial data changed (Issue #519)
     await cacheService.invalidateAnalytics(req.userId);
+    await cacheService.invalidateDashboardSummary(req.userId);
 
     logger.info("Payroll marked paid", {
       userId: req.userId,
@@ -1159,7 +1165,9 @@ exports.submitPayrollForReview = async (req, res, next) => {
     // Finalizing payroll is the single biggest change to the analytics figures,
     // and it was the one mutation that never cleared the cache — so Reports kept
     // serving pre-run totals for up to an hour afterwards (#415).
+    // Invalidate analytics and dashboard caches since financial data changed (Issue #519)
     await cacheService.invalidateAnalytics(req.userId);
+    await cacheService.invalidateDashboardSummary(req.userId);
 
     const resourceIds = results.map(r => r.payrollId).filter(Boolean);
 

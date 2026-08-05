@@ -18,6 +18,7 @@ const employeePortalRoutes = require("./routes/employeePortal.routes");
 const workflowRoutes = require("./routes/workflow.routes");
 const salaryHistoryRoutes = require("./routes/salaryHistory.routes");
 const logger = require("./utils/logger");
+const dashboardRoutes = require('./routes/dashboard.routes');
 
 const app = express();
 app.use('/api/dashboard', dashboardRoutes)
@@ -81,6 +82,8 @@ app.use("/api/loans", loanRoutes);
 app.use("/api/workflows", workflowRoutes);
 
 app.use('/api', salaryHistoryRoutes);
+
+app.use('/api/dashboard', dashboardRoutes);
 
 // CORS error handler — return 403 for blocked origins
 app.use((err, req, res, next) => {
