@@ -1,25 +1,34 @@
 import DownloadIcon from '@mui/icons-material/Download';
 import { useEffect, useRef, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
+import { useTranslation } from 'react-i18next';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { logout } from '../features/auth/authSlice';
-import ThemeToggle from '../components/ThemeToggle';
-import Sidebar from '../components/Sidebar';
 import EmployeeCard from '../components/EmployeeCard';
-import Approvals from './Approvals';
-import Settlements from './Settlements';
-import Loans from './Loans';
+import EmployeeExportActions from '../components/EmployeeExportActions';
 import SettingsModal from '../components/SettingsModal';
+import Sidebar from '../components/Sidebar';
+import ThemeToggle from '../components/ThemeToggle';
 import EmptyState from '../components/common/EmptyState';
+import { getCurrencySymbol, formatCurrency } from '../utils/currency';
 import {
-  EmployeeBreakdownSkeleton,
-  EmployeeCardSkeleton,
-  StatCardSkeleton,
+    EmployeeBreakdownSkeleton,
+    EmployeeCardSkeleton,
+    StatCardSkeleton,
 } from '../components/common/Skeleton';
+import { logout } from '../features/auth/authSlice';
+import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 import api from '../services/api';
 import { exportEmployeesToCsv } from '../utils/exportEmployeesToCsv';
-import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
+import Approvals from './Approvals';
+import Loans from './Loans';
+import Settlements from './Settlements';
+
+// Accept international phone numbers with an optional leading "+" and
+// a national number of 7-15 digits. Mirrors backend validation behavior.
+const PHONE_REGEX = /^\+?[1-9]\d{6,14}$/;
+
+const normalizePhoneValue = (value) => value.trim().replace(/[()\s-]/g, "");
 
 // Trigger a file download from the browser
 const downloadFile = (url, filename) => {
@@ -69,6 +78,9 @@ const DashboardOverview = ({
   payrolls,
   onEditEmployee,
 }) => {
+  const { t } = useTranslation();
+
+  const currency = localStorage.getItem('currency') || 'INR';
   const payrollMap = {};
   (payrolls || []).forEach((p) => {
     payrollMap[p.employeeId] = p;
@@ -87,11 +99,11 @@ const DashboardOverview = ({
   }
 
   return (
-    <main className="p-4 sm:p-8">
-      {/* Title */}
-      <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-4">
+    <>
+      {/* Overview Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-gray-200 dark:border-slate-800">
         <div>
-          <p className="text-sm text-gray-500 dark:text-slate-500">
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1">
             Monthly Overview
           </p>
           <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white">
@@ -106,7 +118,7 @@ const DashboardOverview = ({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search employees..."
+            placeholder={t('dashboard.searchEmployees', 'Search employees...')}
             className="w-full sm:w-auto px-4 py-3 border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-sm focus:border-blue-500 outline-none transition-colors"
           />
         </div>
@@ -116,7 +128,7 @@ const DashboardOverview = ({
             onClick={() => navigate('/reports')}
             className="flex-1 cursor-pointer sm:flex-none px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 transition-colors"
           >
-            Reports
+            {t('dashboard.reports', 'Reports')}
           </button>
 
           <button
@@ -125,14 +137,14 @@ const DashboardOverview = ({
             }
             className="flex-1 cursor-pointer sm:flex-none px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 transition-colors"
           >
-            Export CSV
+            {t('dashboard.exportCsv', 'Export CSV')}
           </button>
 
           <button
             onClick={onAddUpdate}
             className="flex-1 cursor-pointer sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           >
-            Run Payroll
+            {t('dashboard.runPayroll', 'Run Payroll')}
           </button>
         </div>
       </div>
@@ -153,7 +165,7 @@ const DashboardOverview = ({
                 Total Monthly Payout
               </p>
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-                ₹{totalPayout.toLocaleString('en-IN')}
+                {formatCurrency(totalPayout, currency)}
               </h2>
               <p className="text-gray-500 dark:text-slate-500 text-sm mt-2">
                 {employeeCount} employees on payroll
@@ -212,32 +224,16 @@ const DashboardOverview = ({
           Employee Directory
         </h2>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+        <div className="flex flex-wrap gap-3 items-center w-full sm:w-auto">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search employees..."
-            className="w-full sm:w-auto px-4 py-2 border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
+            className="flex-1 sm:flex-none sm:w-auto px-4 py-2 border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
           />
 
-          <button
-            type="button"
-            disabled={loading || filtered.length === 0}
-            onClick={() =>
-              exportEmployeesToCsv(filtered, {
-                companyName: localStorage.getItem('companyName') || 'PaySphere',
-              })
-            }
-            title={
-              filtered.length === 0
-                ? 'No employees to export'
-                : `Export ${filtered.length} employee${filtered.length === 1 ? '' : 's'} to CSV`
-            }
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-blue-500 text-blue-600 dark:text-blue-400 dark:border-blue-500 rounded-lg text-sm font-semibold hover:bg-blue-50 dark:hover:bg-blue-950/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent transition-colors"
-          >
-            <DownloadIcon sx={{ fontSize: 18 }} />
-            Export Roster
-          </button>
+          {/* New Export Actions Component (Issue #511) */}
+          <EmployeeExportActions employees={filtered} />
         </div>
       </div>
 
@@ -292,7 +288,7 @@ const DashboardOverview = ({
           </div>
         )}
       </div>
-    </main>
+    </>
   );
 };
 
@@ -309,6 +305,7 @@ const EmployeeManagement = ({
   onDeleteEmployee,
   onEditEmployee,
 }) => {
+  const currency = localStorage.getItem('currency') || 'INR';
   const payrollMap = {};
   (payrolls || []).forEach((p) => {
     payrollMap[p.employeeId] = p;
@@ -331,7 +328,7 @@ const EmployeeManagement = ({
             Final Summary
           </p>
           <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white mb-2">
-            ₹{totalNet.toLocaleString('en-IN')}
+            {formatCurrency(totalNet, currency)}
           </h1>
           <p className="text-sm text-gray-500 dark:text-slate-500">
             Total Monthly Payout for{' '}
@@ -443,18 +440,26 @@ const EmployeeManagement = ({
 const EditEmployeeModal = ({ employee, onClose, onSave }) => {
   const formRef = useRef(null);
   useCtrlEnterSubmit(formRef);
+  const { phoneCountryCode: initialPhoneCountryCode, phone: initialPhone } = getPhoneParts(employee?.phone);
+  const currency = localStorage.getItem('currency') || 'INR';
   const [formData, setFormData] = useState({
     fullName: employee?.fullName || '',
     role: employee?.role || '',
     monthlySalary: employee?.monthlySalary || '',
     overtimeRate: employee?.overtimeRate || '',
+    phoneCountryCode: initialPhoneCountryCode,
+    // Phone number (#8) — optional, editable after creation.
+    phone: initialPhone,
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === 'phone' ? value.replace(/\D/g, '') : value,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -472,6 +477,15 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
       return setError('Overtime rate cannot be negative.');
     }
 
+    // Phone is optional, but if provided it must match a valid international
+    // phone-number format.
+    const trimmedPhone = formData.phone.trim();
+    const trimmedCountryCode = formData.phoneCountryCode?.trim() || '+91';
+    const normalizedPhone = normalizePhoneValue(`${trimmedCountryCode}${trimmedPhone}`);
+    if (trimmedPhone && !PHONE_REGEX.test(normalizedPhone)) {
+      return setError('Enter a valid international phone number.');
+    }
+
     try {
       setSubmitting(true);
       await onSave(employee._id, {
@@ -479,6 +493,7 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
         role: formData.role,
         monthlySalary: salary,
         overtimeRate: otRate,
+        phone: normalizedPhone || undefined,
       });
     } catch {
       setError('Failed to update employee details.');
@@ -531,24 +546,52 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+              Phone Number
+            </label>
+            <div className="flex gap-2">
+              <select
+                name="phoneCountryCode"
+                value={formData.phoneCountryCode}
+                onChange={handleChange}
+                className="w-36 px-3 py-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+              >
+                {COUNTRY_CODE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="tel"
+                inputMode="numeric"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="9876543210"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Monthly Salary (₹)
+                Monthly Salary ({getCurrencySymbol(currency)})
               </label>
               <input
                 required
                 type="number"
                 name="monthlySalary"
-                min="1"
                 value={formData.monthlySalary}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+                className="w-full px-4 py-2 border border-gray-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Overtime Rate (₹)
+                Overtime Rate ({getCurrencySymbol(currency)})
               </label>
               <input
                 required
@@ -715,7 +758,6 @@ export default function PaySphereDashboard() {
   const [payrollPage, setPayrollPage] = useState(1);
   const [payrollTotalPages, setPayrollTotalPages] = useState(1);
   const [payrollTotalCount, setPayrollTotalCount] = useState(0);
-  const [payrollTotalPayout, setPayrollTotalPayout] = useState(0);
   const [payrollLoading, setPayrollLoading] = useState(false);
   const [paginatedPayrolls, setPaginatedPayrolls] = useState([]);
 
@@ -781,7 +823,6 @@ export default function PaySphereDashboard() {
         setTotalPages(empRes.data.totalPages);
         setTotalEmployees(empRes.data.totalEmployees || 0);
         setPayrolls(payRes.data.payrolls || []);
-        setPayrollTotalPayout(payRes.data.totalPayout || 0);
       } catch (err) {
         console.error('Failed to fetch data:', err);
       } finally {

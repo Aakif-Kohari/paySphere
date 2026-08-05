@@ -98,10 +98,14 @@ describe('Google Authentication Controller tests', () => {
     await googleAuth(req, res);
 
     expect(User.findOne).toHaveBeenCalledWith({ email: 'newuser@example.com' });
-    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.status).toHaveBeenCalledWith(201);
+    // The Google path returns the account type and employee link too, so the
+    // client gets the same shape from every sign-in route (#558).
     expect(res.json).toHaveBeenCalledWith({
       token: 'dummy_jwt_token',
       companyName: 'Test Company',
+      role: 'ADMIN',
+      employeeId: undefined,
       message: 'Account created successfully',
     });
   });
@@ -124,6 +128,8 @@ describe('Google Authentication Controller tests', () => {
     expect(res.json).toHaveBeenCalledWith({
       token: 'dummy_jwt_token',
       companyName: 'Test Company',
+      role: 'ADMIN',
+      employeeId: undefined,
       message: 'Logged in successfully',
     });
   });
@@ -159,7 +165,7 @@ describe('Google Authentication Controller tests', () => {
     expect(User.findOne).toHaveBeenCalledWith({
       email: 'tokenuser@example.com',
     });
-    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.status).toHaveBeenCalledWith(201);
     delete process.env.GOOGLE_CLIENT_ID;
   });
 

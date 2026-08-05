@@ -1,3 +1,4 @@
+const TaxService = require('../services/tax.service');
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const Employee = require("../models/employee.model");
@@ -89,10 +90,40 @@ function parsePayrollIdBatch(value) {
 }
 
 /**
+ * Split a field map into the `$set` and `$unset` halves of an update.
+ *
+ * `approvePayroll` clears the rejection trail by passing `rejectionReason:
+ * undefined`, and `rejectPayroll` clears the approval trail the same way. That
+ * only ever worked by accident: mongoose strips `undefined` values out of a
+ * `$set`, so those keys were dropped and the stale verdict stayed on the
+ * document — a row approved after a rejection kept showing the old reason.
+ *
+ * Anything explicitly cleared belongs in `$unset` instead, which is what the
+ * callers meant.
+ *
+ * @param {object} fields
+ * @returns {{ set: object, unset: object }}
+ */
+function splitFieldUpdates(fields = {}) {
+  const set = {};
+  const unset = {};
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined || value === null) {
+      unset[key] = "";
+    } else {
+      set[key] = value;
+    }
+  }
+
+  return { set, unset };
+}
+
+/**
  * Apply a status transition to a batch of payroll records owned by the caller.
  *
  * This is the whole fix for the cross-tenant hole in #458 concentrated in one
- * place: the query is *always* scoped by `createdBy`, and every id is
+ * place: the query is *always* scoped by `tenantId`, and every id is
  * classified so the response can tell the client precisely which records moved,
  * which were not theirs, and which were in a state the transition table
  * forbids. The previous implementation issued a blind `updateMany` keyed only
@@ -100,14 +131,16 @@ function parsePayrollIdBatch(value) {
  * ids that matched nothing.
  *
  * @param {object} params
- * @param {string} params.userId caller — the ownership scope
+ * @param {string} params.tenantId caller's company — the ownership scope
  * @param {string[]} params.ids payroll ids to transition
  * @param {string} params.targetStatus a PAYROLL_STATUS value
- * @param {object} params.extraFields fields to $set alongside the status
+ * @param {object} params.extraFields fields to write alongside the status; a
+ *   key whose value is `undefined` or `null` is removed from the document
+ *   rather than written, see `splitFieldUpdates`
  * @returns {Promise<{applied: object[], notFound: string[], invalidTransition: object[]}>}
  */
 async function transitionPayrollBatch({
-  userId,
+  tenantId,
   ids,
   targetStatus,
   extraFields = {},
@@ -118,8 +151,8 @@ async function transitionPayrollBatch({
   // answer to give.
   const owned = await PayrollUpdate.find({
     _id: { $in: ids },
-    createdBy: userId,
-  }).select("_id status employeeName month year netSalary");
+    tenantId,
+  }).select("_id status employeeName month year netSalary __v");
 
   const ownedById = new Map(owned.map((p) => [String(p._id), p]));
 
@@ -144,34 +177,53 @@ async function transitionPayrollBatch({
   }
 
   let applied = [];
+  const versionConflicts = [];
 
   if (transitionable.length > 0) {
     const targetIds = transitionable.map((r) => r._id);
 
-    await PayrollUpdate.updateMany(
-      // Re-assert ownership and the source states on the write itself, so a
-      // concurrent approval between the read above and this update cannot slip
-      // a record through a transition that was legal a moment ago.
-      {
-        _id: { $in: targetIds },
-        createdBy: userId,
-      },
-      { $set: { status: targetStatus, ...extraFields } },
+    const { set, unset } = splitFieldUpdates(extraFields);
+    const update = {
+      $set: { status: targetStatus, ...set },
+      $inc: { __v: 1 },
+    };
+    if (Object.keys(unset).length > 0) update.$unset = unset;
+
+    const filter = {
+      _id: { $in: targetIds },
+      tenantId,
+      $or: transitionable.map((r) => ({ _id: r._id, __v: r.__v })),
+    };
+
+    const res = await PayrollUpdate.updateMany(
+      filter,
+      update,
       { runValidators: true },
     );
 
-    applied = transitionable.map((r) => ({
-      payrollId: String(r._id),
-      employeeName: r.employeeName,
-      month: r.month,
-      year: r.year,
-      netSalary: r.netSalary,
-      previousStatus: normalizeStatus(r.status) || r.status,
-      status: targetStatus,
-    }));
+    const matched = res.matchedCount !== undefined ? res.matchedCount : res.modifiedCount;
+
+    if (matched < transitionable.length) {
+      transitionable.forEach((r) => {
+        versionConflicts.push({
+          payrollId: String(r._id),
+          employeeName: r.employeeName,
+        });
+      });
+    } else {
+      applied = transitionable.map((r) => ({
+        payrollId: String(r._id),
+        employeeName: r.employeeName,
+        month: r.month,
+        year: r.year,
+        netSalary: r.netSalary,
+        previousStatus: normalizeStatus(r.status) || r.status,
+        status: targetStatus,
+      }));
+    }
   }
 
-  return { applied, notFound, invalidTransition };
+  return { applied, notFound, invalidTransition, versionConflicts };
 }
 
 // FINALIZE PAYROLL — process activity entries and save payroll records
@@ -183,7 +235,7 @@ async function transitionPayrollBatch({
  * The original implementation ran `PayrollUpdate.find({ status:
  * "PENDING_APPROVAL" })` with the comment "Admin sees all in this demo". On a
  * shared deployment that returns every company's employee names, base salaries
- * and net salaries to any logged-in account. Scoped by `createdBy` like every
+ * and net salaries to any logged-in account. Scoped by `tenantId` like every
  * other read in the codebase (#458).
  */
 exports.getPendingApprovals = async (req, res, next) => {
@@ -197,7 +249,7 @@ exports.getPendingApprovals = async (req, res, next) => {
     const skip = (page - 1) * limit;
 
     const query = {
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       status: PAYROLL_STATUS.PENDING_APPROVAL,
     };
 
@@ -271,8 +323,8 @@ exports.approvePayroll = async (req, res, next) => {
 
     const approvedAt = new Date();
 
-    const { applied, notFound, invalidTransition } = await transitionPayrollBatch({
-      userId: req.userId,
+    const { applied, notFound, invalidTransition, versionConflicts } = await transitionPayrollBatch({
+      tenantId: req.tenantId,
       ids: batch.ids,
       targetStatus: PAYROLL_STATUS.APPROVED,
       extraFields: {
@@ -285,6 +337,13 @@ exports.approvePayroll = async (req, res, next) => {
         rejectedAt: undefined,
       },
     });
+
+    if (versionConflicts && versionConflicts.length > 0) {
+      return res.status(409).json({
+        message: "A concurrent update was detected. Please reload and try again.",
+        versionConflicts,
+      });
+    }
 
     if (applied.length === 0) {
       // Nothing moved. A 409 rather than a 200 so the UI does not tell the user
@@ -360,8 +419,8 @@ exports.rejectPayroll = async (req, res, next) => {
     const reason = rawReason.trim().slice(0, MAX_REJECTION_REASON_LENGTH);
     const rejectedAt = new Date();
 
-    const { applied, notFound, invalidTransition } = await transitionPayrollBatch({
-      userId: req.userId,
+    const { applied, notFound, invalidTransition, versionConflicts } = await transitionPayrollBatch({
+      tenantId: req.tenantId,
       ids: batch.ids,
       targetStatus: PAYROLL_STATUS.REJECTED,
       extraFields: {
@@ -372,6 +431,13 @@ exports.rejectPayroll = async (req, res, next) => {
         approvedAt: undefined,
       },
     });
+
+    if (versionConflicts && versionConflicts.length > 0) {
+      return res.status(409).json({
+        message: "A concurrent update was detected. Please reload and try again.",
+        versionConflicts,
+      });
+    }
 
     if (applied.length === 0) {
       return res.status(409).json({
@@ -436,12 +502,19 @@ exports.markPayrollPaid = async (req, res, next) => {
 
     const paidAt = new Date();
 
-    const { applied, notFound, invalidTransition } = await transitionPayrollBatch({
-      userId: req.userId,
+    const { applied, notFound, invalidTransition, versionConflicts } = await transitionPayrollBatch({
+      tenantId: req.tenantId,
       ids: batch.ids,
       targetStatus: PAYROLL_STATUS.PAID,
       extraFields: { paidAt },
     });
+
+    if (versionConflicts && versionConflicts.length > 0) {
+      return res.status(409).json({
+        message: "A concurrent update was detected. Please reload and try again.",
+        versionConflicts,
+      });
+    }
 
     if (applied.length === 0) {
       return res.status(409).json({
@@ -491,7 +564,10 @@ exports.parsePayrollCSV = async (req, res, next) => {
     const bonusIdx = headers.findIndex(h => h.includes("bonus"));
     const leaveIdx = headers.findIndex(h => h.includes("leave"));
 
-    const employees = await Employee.find({ createdBy: req.userId });
+    const employees = await Employee.find({ 
+      tenantId: req.tenantId,
+      isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
+    });
     const activities = [];
     // `require('uuid')` threw MODULE_NOT_FOUND — uuid is not a dependency of
     // this package — and because the throw happens while evaluating the left
@@ -578,7 +654,10 @@ exports.submitPayrollForReview = async (req, res, next) => {
     }
 
     // Fetch all employees for this user
-    const employees = await Employee.find({ createdBy: req.userId });
+    const employees = await Employee.find({ 
+      tenantId: req.tenantId,
+      isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
+    });
 
     if (employees.length === 0) {
       return res.status(400).json({ message: "No employees found. Add employees first." });
@@ -602,7 +681,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
 
     try {
       const attendanceRecords = await Attendance.find({
-        createdBy: req.userId,
+        tenantId: req.tenantId,
         year: currentYear,
         month: currentMonth,
       }).select("employeeId totals");
@@ -627,7 +706,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
 
     try {
       const activeLoans = await Loan.find({
-        createdBy: req.userId,
+        tenantId: req.tenantId,
         status: LOAN_STATUS.ACTIVE,
       });
 
@@ -655,7 +734,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
 
     try {
       const revisions = await SalaryStructure.find({
-        createdBy: req.userId,
+        tenantId: req.tenantId,
       }).sort({ effectiveFrom: 1 });
 
       (revisions || []).forEach((revision) => {
@@ -881,7 +960,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
       employeeId: { $in: employeeIds },
       month: currentMonth,
       year: currentYear,
-      createdBy: req.userId,
+      createdBy: req.userId, tenantId: req.tenantId,
       status: { $in: [PAYROLL_STATUS.PAID, PAYROLL_STATUS.APPROVED, "finalized"] },
     });
 
@@ -942,7 +1021,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
         // from the validated ledger or from a parsed display string (#459).
         attendanceSource: item.attendanceSource,
         salarySnapshot: item.salarySnapshot,
-        createdBy: req.userId,
+        tenantId: req.tenantId,
         status: PAYROLL_STATUS.PENDING_APPROVAL,
         submittedBy: req.userId,
         submittedAt: new Date(),
@@ -962,7 +1041,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
             employeeId: item.employee._id,
             month: currentMonth,
             year: currentYear,
-            createdBy: req.userId,
+            tenantId: req.tenantId,
           },
           update: { $set: payrollData },
           upsert: true,
@@ -977,7 +1056,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
     const fetchOptions = session ? { session } : {};
     const updatedPayrolls = await PayrollUpdate.find(
       {
-        createdBy: req.userId,
+        tenantId: req.tenantId,
         month: currentMonth,
         year: currentYear,
         employeeId: { $in: preparedItems.map((item) => item.employee._id) },
@@ -1036,7 +1115,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
           });
 
           await Loan.updateOne(
-            { _id: loan._id, createdBy: req.userId },
+            { _id: loan._id, tenantId: req.tenantId },
             {
               $set: {
                 repayments: applied.repayments,
@@ -1150,33 +1229,47 @@ exports.getPayrollSummary = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
+    // Parse department filter from query parameters
+    const departments = req.query.departments ? 
+      req.query.departments.split(',').map(d => d.trim()).filter(d => d.length > 0) : 
+      [];
+    
+    let employeeIds = null;
+    if (departments.length > 0) {
+      // Fetch employee IDs that match the selected departments
+      const employees = await Employee.find({
+        createdBy: req.userId,
+        deletedAt: null,
+        $or: [
+          { department: { $in: departments } },
+          { role: { $in: departments } }
+        ]
+      }).select('_id');
+      
+      employeeIds = employees.map(emp => emp._id.toString());
+    }
+
     // Pagination parameters — default to page 1, 20 records per page.
-    // A limit of 0 disables paging and returns the full set (kept for
-    // backward-compatibility with callers that aggregate the whole month).
     let page = parseInt(req.query.page, 10);
     if (isNaN(page) || page < 1) page = 1;
 
     let limit = parseInt(req.query.limit, 10);
-    // Allow limit=0 to opt out of pagination (legacy callers / aggregation)
     if (isNaN(limit) || limit < 0) limit = 20;
     if (limit > 100) limit = 100;
 
     const skip = limit > 0 ? (page - 1) * limit : 0;
 
-    // The summary now has to distinguish "submitted" from "signed off". Before
-    // #458 it summed every row for the month regardless of status, so a run
-    // sitting in pending_approval — or one a checker had explicitly rejected —
-    // was reported to the owner as money owed this month.
-    //
-    // `totalPayout` therefore counts payable rows only. The pending figure is
-    // returned alongside it rather than folded in, so the review screen can
-    // still show what is in flight without overstating the payout.
     const baseQuery = {
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       month,
       year,
       ...excludeRejectedFilter(),
     };
+
+    // Add employee filter if departments are specified
+    if (employeeIds && employeeIds.length > 0) {
+      baseQuery.employeeId = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
+    }
 
     // Run the count and the paginated page fetch in parallel.
     const [totalCount, payrolls] = await Promise.all([
@@ -1188,8 +1281,7 @@ exports.getPayrollSummary = async (req, res, next) => {
 
     const totalPages = limit > 0 ? Math.ceil(totalCount / limit) : 1;
 
-    // Aggregate-level totals across the *entire* month (not just the current
-    // page), so the dashboard summary cards are always accurate.
+    // Aggregate-level totals across the *entire* month (not just the current page)
     const [aggResult] = await PayrollUpdate.aggregate([
       { $match: baseQuery },
       {
@@ -1244,12 +1336,11 @@ exports.getPayrollSummary = async (req, res, next) => {
       employeeCount: aggResult ? aggResult.payableCount : 0,
       pendingApprovalTotal: round2(aggResult ? aggResult.pendingApprovalTotal : 0),
       pendingApprovalCount: aggResult ? aggResult.pendingApprovalCount : 0,
-      // Paginated page of records
       payrolls,
-      // Pagination meta
       currentPage: page,
       totalPages,
       totalCount,
+      departments: departments, // Include filtered departments in response
     });
   } catch (error) {
     next(error);
@@ -1274,7 +1365,7 @@ exports.exportPayrollCSV = async (req, res, next) => {
     // was actually approved for payment, not a mixture of approved rows,
     // unreviewed drafts and rows a checker threw out (#458).
     const payrolls = await PayrollUpdate.find({
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       month,
       year,
       ...payableStatusFilter(),
@@ -1323,7 +1414,7 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
     if (!mongoose.Types.ObjectId.isValid(payrollId)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
-    const payroll = await PayrollUpdate.findOne({ _id: payrollId, createdBy: req.userId });
+    const payroll = await PayrollUpdate.findOne({ _id: payrollId, tenantId: req.tenantId });
     
     if (!payroll) {
       return res.status(404).json({ message: "Payroll record not found" });
@@ -1332,6 +1423,16 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
     const employee = await Employee.findById(payroll.employeeId);
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
+    }
+    
+    // Optional: Warn if employee is soft-deleted but still allow sending
+    // since this might be for historical payroll records
+    if (employee.isDeleted) {
+      logger.warn(`Sending payslip email to soft-deleted employee`, {
+        userId: req.userId,
+        employeeId: employee._id,
+        employeeName: employee.fullName,
+      });
     }
     
     if (!employee.email) {
@@ -1385,7 +1486,7 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
     // dispatchable. Previously this swept up every unemailed row for the month
     // including pending and rejected ones (#458).
     const payrolls = await PayrollUpdate.find({
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       month,
       year,
       payslipEmailed: false,
@@ -1400,7 +1501,10 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
     }
 
     const employeeIds = [...new Set(payrolls.map(p => p.employeeId))];
-    const employees = await Employee.find({ _id: { $in: employeeIds } });
+    const employees = await Employee.find({ 
+      _id: { $in: employeeIds },
+      isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
+    });
     const employeeMap = new Map(employees.map(e => [String(e._id), e]));
 
     const results = [];

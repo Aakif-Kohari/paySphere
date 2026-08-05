@@ -12,7 +12,7 @@ if (cacheService.isRedisEnabled && cacheService.client) {
 
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 15, // Limit each IP to 15 requests per `window`
+  limit: parseInt(process.env.AUTH_RATE_LIMIT, 10) || 30, // Default 30 (increased from 15)
   message: {
     message: "Too many authentication attempts from this IP, please try again after 15 minutes."
   },
@@ -23,7 +23,7 @@ const authRateLimiter = rateLimit({
 
 const generalRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 100, // Limit each IP to 100 requests per `window`
+  limit: parseInt(process.env.GENERAL_RATE_LIMIT, 10) || 1000, // Increased threshold for high-volume read/list operations during peak hours (from 100)
   message: {
     message: "Too many requests from this IP, please try again after 15 minutes."
   },
@@ -34,7 +34,7 @@ const generalRateLimiter = rateLimit({
 
 const writeRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 200, // Limit each IP to 200 write requests per `window`
+  limit: parseInt(process.env.WRITE_RATE_LIMIT, 10) || 500, // Increased limit for bulk payroll processing & edits (from 200)
   message: {
     message: "Too many write operations from this IP, please try again after 15 minutes."
   },

@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -7,6 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import { getCurrencySymbol, formatCurrency } from '../../utils/currency';
 
 export default function DepartmentChart({ data }) {
   return (
@@ -24,8 +26,9 @@ export default function DepartmentChart({ data }) {
 
             <YAxis />
 
-            <Tooltip
-              formatter={(value) => `₹${Number(value).toLocaleString()}`}
+            <Tooltip 
+              formatter={(value) => formatCurrency(Number(value), localStorage.getItem('currency') || 'INR')}
+              labelStyle={{ color: '#64748b' }}
             />
 
             <Bar
