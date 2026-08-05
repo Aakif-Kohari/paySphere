@@ -82,6 +82,8 @@ app.use("/api/workflows", workflowRoutes);
 
 app.use('/api', salaryHistoryRoutes);
 
+app.use('/api/dashboard', dashboardRoutes);
+
 // CORS error handler — return 403 for blocked origins
 app.use((err, req, res, next) => {
   if (err.message === "Not allowed by CORS") {
