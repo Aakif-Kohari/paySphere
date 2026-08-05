@@ -14,7 +14,7 @@ import api from '../services/api';
 import SummaryCards from '../components/reports/SummaryCards';
 import PayrollTrendChart from '../components/reports/PayrollTrendChart';
 import DepartmentChart from '../components/reports/DepartmentChart';
-import { getCurrencySymbol, formatCurrency } from "../utils/currency";
+import { formatCurrency } from "../utils/currency";
 import SalaryDistributionChart from '../components/reports/SalaryDistributionChart';
 import OvertimeChart from '../components/reports/OvertimeChart';
 import PayrollTable from '../components/reports/PayrollTable';
