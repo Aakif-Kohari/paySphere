@@ -1,0 +1,185 @@
+# ============================================================================
+# Dependabot Configuration for PaySphere
+# ============================================================================
+# 
+# This file configures GitHub's Dependabot to automatically monitor and create
+# pull requests for outdated or vulnerable npm dependencies in both the frontend
+# and backend directories.
+# 
+# Issue: #530
+# 
+# Documentation: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+# ============================================================================
+
+version: 2
+
+updates:
+  # --------------------------------------------------------------------------
+  # FRONTEND DEPENDENCIES (React, Vite, MUI, etc.)
+  # --------------------------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    
+    # Check for updates every Monday at 09:00 UTC
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    
+    # Automatically add these labels to Dependabot PRs for easy filtering
+    labels:
+      - "dependencies"
+      - "frontend"
+      - "automated"
+    
+    # Group minor and patch updates together to reduce PR noise
+    # Major updates will still get individual PRs for careful review
+    groups:
+      frontend-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    
+    # Limit the number of open PRs to prevent overwhelming reviewers
+    open-pull-requests-limit: 10
+    
+    # Assign the core maintainers to review dependency updates
+    reviewers:
+      - "Dev1822"
+    
+    # Commit message configuration to match project conventions
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    
+    # Ignore specific packages that should not be auto-updated
+    # Add packages here if they cause breaking changes on update
+    ignore:
+      # Example: Ignore major updates to React until we're ready
+      # - dependency-name: "react"
+      #   update-types: ["version-update:semver-major"]
+      
+      # Ignore all updates for packages managed outside npm
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+
+    # Allow both direct and indirect dependency updates
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+
+    # Rebase stale PRs automatically when conflicts are resolved
+    rebase-strategy: "auto"
+
+  # --------------------------------------------------------------------------
+  # BACKEND DEPENDENCIES (Express, Mongoose, Redis, etc.)
+  # --------------------------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    
+    # Check for updates every Monday at 09:00 UTC (same as frontend)
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    
+    labels:
+      - "dependencies"
+      - "backend"
+      - "automated"
+    
+    # Group minor and patch updates to reduce PR noise
+    groups:
+      backend-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    
+    open-pull-requests-limit: 10
+    
+    reviewers:
+      - "Dev1822"
+    
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    
+    ignore:
+      # Express v5 is still relatively new; ignore major updates until stable
+      - dependency-name: "express"
+        update-types: ["version-update:semver-major"]
+      
+      # Mongoose major updates often require schema migrations
+      - dependency-name: "mongoose"
+        update-types: ["version-update:semver-major"]
+
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+
+    rebase-strategy: "auto"
+
+  # --------------------------------------------------------------------------
+  # GITHUB ACTIONS DEPENDENCIES
+  # --------------------------------------------------------------------------
+  # Keep our CI/CD workflows secure and up-to-date
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "automated"
+    
+    reviewers:
+      - "Dev1822"
+    
+    commit-message:
+      prefix: "chore(actions)"
+      include: "scope"
+
+  # --------------------------------------------------------------------------
+  # ROOT PACKAGE DEPENDENCIES (Turborepo, Husky, etc.)
+  # --------------------------------------------------------------------------
+  - package-ecosystem: "npm"
+    directory: "/"
+    
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    
+    labels:
+      - "dependencies"
+      - "root"
+      - "automated"
+    
+    groups:
+      root-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    
+    open-pull-requests-limit: 5
+    
+    reviewers:
+      - "Dev1822"
+    
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
