@@ -115,6 +115,26 @@ describe('addEmployee — email persistence (#414)', () => {
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
+  test('accepts international phone numbers with a country code', async () => {
+    req.body.phone = '+1 (415) 555-1234';
+
+    await addEmployee(req, res, next);
+
+    expect(constructed.phone).toBe('+1 (415) 555-1234');
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+  test('rejects malformed phone numbers with 400', async () => {
+    req.body.phone = '91-12345';
+
+    await addEmployee(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Phone number must be a valid international phone number',
+    });
+  });
+
   test('omits the field entirely when no email is given', async () => {
     // Storing "" would put every email-less employee into the same bucket of
     // the unique index and re-create the collision.
@@ -260,6 +280,27 @@ describe('updateEmployee — email persistence (#414)', () => {
 
     expect(employee.email).toBeUndefined();
     expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  test('accepts an international phone number on update', async () => {
+    req.body.phone = '+44 20 7946 0958';
+
+    await updateEmployee(req, res, next);
+
+    expect(employee.phone).toBe('+44 20 7946 0958');
+    expect(employee.markModified).toHaveBeenCalledWith('phone');
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  test('rejects a malformed phone number with 400', async () => {
+    req.body.phone = '12345';
+
+    await updateEmployee(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Phone number must be a valid international phone number',
+    });
   });
 
   test('leaves the existing address untouched when email is omitted', async () => {
