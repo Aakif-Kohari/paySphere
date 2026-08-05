@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const {
   MONTHLY_SALARY_MAX,
   OVERTIME_RATE_MAX,
+  PHONE_REGEX,
 } = require('../utils/validators');
 const { EMPLOYMENT_STATUS, EXIT_TYPE } = require('../config/employment');
 
@@ -15,6 +16,20 @@ const employeeSchema = new mongoose.Schema(
     email: {
       type: String,
       required: false,
+    },
+    /**
+     * Employee contact number, validated as an international phone number
+     * with an optional leading "+" and a national number of 7-15 digits.
+     * Optional on creation, same as `email`.
+     */
+    phone: {
+      type: String,
+      required: false,
+      trim: true,
+      match: [
+        PHONE_REGEX,
+        'Phone number must be a valid international phone number',
+      ],
     },
     role: {
       type: String,

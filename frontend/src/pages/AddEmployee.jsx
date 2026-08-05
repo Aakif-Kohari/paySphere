@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { logout } from "../features/auth/authSlice";
+import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
-import api from "../services/api";
+import { logout } from "../features/auth/authSlice";
 import useCtrlEnterSubmit from "../hooks/useCtrlEnterSubmit";
+import api from "../services/api";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const GridIcon = () => (
@@ -60,6 +60,15 @@ const ArrowRightIcon = () => (
 // ── Avatar ─────────────────────────────────────────────────────────────────
 const AVATAR_COLORS = ["#6366F1", "#EC4899", "#F59E0B", "#10B981", "#3B82F6", "#8B5CF6", "#EF4444", "#14B8A6"];
 
+const COUNTRY_CODE_OPTIONS = [
+  { label: "+91 (India)", value: "+91" },
+  { label: "+1 (USA/Canada)", value: "+1" },
+  { label: "+44 (UK)", value: "+44" },
+  { label: "+61 (Australia)", value: "+61" },
+  { label: "+65 (Singapore)", value: "+65" },
+  { label: "+971 (UAE)", value: "+971" },
+];
+
 const Avatar = ({ name, size = 36 }) => {
   const initials = name
     .split(" ")
@@ -82,6 +91,13 @@ const Avatar = ({ name, size = 36 }) => {
   );
 };
 
+// Accept international phone numbers with an optional leading "+" and
+// a national number of 7-15 digits. Mirrors backend validation behavior.
+const PHONE_REGEX = /^\+?[1-9]\d{6,14}$/;
+
+const normalizePhoneValue = (value) =>
+  value.trim().replace(/[()\s-]/g, "");
+
 export default function AddEmployee() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -97,6 +113,9 @@ export default function AddEmployee() {
   const [department, setDepartment] = useState("");
   const [overtimeRate, setOvertimeRate] = useState("");
   const [currency, setCurrency] = useState("INR");
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+91");
+  const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [joiningDate, setJoiningDate] = useState("");
   const [loading, setLoading] = useState(false);
@@ -176,6 +195,26 @@ export default function AddEmployee() {
       setUploadingCsv(false);
     }
   };
+
+  const validatePhone = (countryCode, localNumber) => {
+    const trimmedCountryCode = (countryCode || "+91").trim();
+    const trimmedLocalNumber = normalizePhoneValue(localNumber || "");
+
+    if (!trimmedLocalNumber) {
+      setPhoneError("");
+      return true;
+    }
+
+    const normalized = normalizePhoneValue(`${trimmedCountryCode}${trimmedLocalNumber}`);
+    if (!PHONE_REGEX.test(normalized)) {
+      setPhoneError("Enter a valid international phone number, e.g. +91 98765 43210.");
+      return false;
+    }
+
+    setPhoneError("");
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -191,6 +230,14 @@ export default function AddEmployee() {
       return;
     }
 
+    if (!validatePhone(phoneCountryCode, phone)) {
+      setError("Please enter a valid international phone number.");
+      setLoading(false);
+      return;
+    }
+
+    const fullPhoneNumber = normalizePhoneValue(`${phoneCountryCode}${phone}`);
+
     try {
       await api.post(`/api/employees`, {
         fullName,
@@ -199,6 +246,7 @@ export default function AddEmployee() {
         monthlySalary: salaryNum,
         overtimeRate: otNum,
         currency,
+        phone: fullPhoneNumber || undefined,
         dateOfBirth: dateOfBirth || undefined,
         joiningDate: joiningDate || undefined,
       });
@@ -209,6 +257,9 @@ export default function AddEmployee() {
       setDepartment("");
       setMonthlySalary("");
       setOvertimeRate("");
+      setPhoneCountryCode("+91");
+      setPhone("");
+      setPhoneError("");
       setDateOfBirth("");
       setJoiningDate("");
       fetchRecent(); // Refresh recent list
@@ -362,6 +413,41 @@ export default function AddEmployee() {
                     required
                     className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
                   />
+                </label>
+
+                {/* Phone Number */}
+                <label className="block mb-5">
+                  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Phone Number (Optional)</span>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <select
+                      value={phoneCountryCode}
+                      onChange={(e) => setPhoneCountryCode(e.target.value)}
+                      className="w-full sm:w-44 px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white border border-transparent dark:border-slate-800 outline-none transition text-sm focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                      {COUNTRY_CODE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      id="employee-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                      onBlur={() => validatePhone(phoneCountryCode, phone)}
+                      placeholder="e.g. 9876543210"
+                      className={`w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border outline-none transition text-sm ${
+                        phoneError
+                          ? "border-red-500"
+                          : "border-transparent dark:border-slate-800"
+                      }`}
+                    />
+                  </div>
+                  {phoneError && (
+                    <p className="text-xs text-red-500 mt-1.5">{phoneError}</p>
+                  )}
                 </label>
 
                 {/* Salary Row */}

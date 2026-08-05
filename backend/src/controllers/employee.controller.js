@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const Employee = require("../models/employee.model");
 const User = require("../models/user.model");
 const { parse } = require("csv-parse");
-const { isNonEmptyString, isValidEmail, escapeRegex, sanitizeText, MONTHLY_SALARY_MAX, OVERTIME_RATE_MAX, FULLNAME_MAX_LENGTH, ROLE_MAX_LENGTH } = require("../utils/validators");
+const { isNonEmptyString, isValidEmail, isValidPhone, escapeRegex, sanitizeText, MONTHLY_SALARY_MAX, OVERTIME_RATE_MAX, FULLNAME_MAX_LENGTH, ROLE_MAX_LENGTH } = require("../utils/validators");
 const PayrollUpdate = require("../models/payroll.model");
 const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
@@ -30,6 +30,28 @@ function normalizeEmployeeEmail(value) {
 }
 
 /**
+ * Normalize an employee phone number for storage (#8).
+ *
+ * Mirrors normalizeEmployeeEmail: blank/absent means "not provided" (or
+ * "clear it" on update), so we return undefined rather than an empty
+ * string. Only validates format when a non-empty value is actually given,
+ * since phone is optional on creation.
+ *
+ * @param {*} value raw value from the request body
+ * @returns {{ ok: true, value: string|undefined } | { ok: false }}
+ */
+function normalizeEmployeePhone(value) {
+  if (value === undefined) return { ok: true, value: undefined };
+  if (value === null || (typeof value === "string" && value.trim() === "")) {
+    return { ok: true, value: undefined };
+  }
+  if (!isValidPhone(value)) return { ok: false };
+
+  const normalized = value.trim().replace(/[()\s-]/g, "");
+  return { ok: true, value: normalized };
+}
+
+/**
  * Translate a duplicate-key violation on the employee email index into a 409
  * the client can act on, instead of leaking a raw driver error as a 500.
  *
@@ -50,7 +72,7 @@ exports.addEmployee = async (req, res, next) => {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ message: 'Request body is required' });
     }
-    const { fullName, role, monthlySalary, overtimeRate, dateOfBirth, joiningDate, email, bankDetails } = req.body;
+    const { fullName, role, department, monthlySalary, overtimeRate, dateOfBirth, joiningDate, email, phone, bankDetails } = req.body;
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(role)) {
       return res
@@ -109,6 +131,15 @@ exports.addEmployee = async (req, res, next) => {
         .json({ message: 'Invalid email address format' });
     }
 
+    // Phone is optional, but if provided it must match a valid international
+    // phone-number format.
+    const normalizedPhone = normalizeEmployeePhone(phone);
+    if (!normalizedPhone.ok) {
+      return res
+        .status(400)
+        .json({ message: 'Phone number must be a valid international phone number' });
+    }
+
     // Get the user's company name
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -116,6 +147,9 @@ exports.addEmployee = async (req, res, next) => {
     const employee = new Employee({
       fullName: sanitizeText(fullName),
       role: sanitizeText(role),
+      // `department` used to be referenced here without being destructured
+      // from req.body above, which threw a ReferenceError on every call to
+      // this endpoint.
       department: department ? sanitizeText(department) : '',
       monthlySalary: numSalary,
       overtimeRate: numOvertime,
@@ -124,6 +158,7 @@ exports.addEmployee = async (req, res, next) => {
       joiningDate: joiningDate ? new Date(joiningDate) : undefined,
       createdBy: req.userId,
       ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
+      ...(normalizedPhone.value ? { phone: normalizedPhone.value } : {}),
     });
 
     // Optionally store bank details if provided
@@ -390,6 +425,18 @@ exports.importEmployees = async (req, res, next) => {
               seenEmails.add(normalizedEmail.value);
             }
 
+            // Same validation as single-row creation (#8): only rejects the
+            // row if a phone value is present but malformed.
+            const normalizedPhone = normalizeEmployeePhone(record.phone);
+            if (!normalizedPhone.ok) {
+              skipped++;
+              errors.push({
+                row: index + 2,
+                reason: `Invalid phone number format: "${record.phone}"`,
+              });
+              return;
+            }
+
             const sanitizedName = sanitizeText(rawName);
             const sanitizedRole = sanitizeText(rawRole);
             const key = `${sanitizedName.toLowerCase()}|${sanitizedRole.toLowerCase()}`;
@@ -416,6 +463,7 @@ exports.importEmployees = async (req, res, next) => {
               // The address was validated above and then dropped on the floor,
               // so imported employees never had an email either (#414, #236).
               ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
+              ...(normalizedPhone.value ? { phone: normalizedPhone.value } : {}),
             });
           });
 
@@ -509,8 +557,10 @@ exports.updateEmployee = async (req, res, next) => {
       return res.status(400).json({ message: 'Request body is required' });
     }
     const { id } = req.params;
-    const { fullName, role, department, monthlySalary, overtimeRate, isActive, email, bankDetails } = req.body;
-    if (department !== undefined) employee.department = sanitizeText(department);
+    const { fullName, role, department, monthlySalary, overtimeRate, isActive, email, phone, bankDetails } = req.body;
+
+    // `employee` used to be referenced (for the `department` update) before
+    // this declaration ran, which threw a ReferenceError on every update.
     const employee = await Employee.findById(id);
 
     if (!employee || employee.deletedAt) {
@@ -584,12 +634,21 @@ exports.updateEmployee = async (req, res, next) => {
         .json({ message: 'Invalid email address format' });
     }
 
+    // Same pattern for phone: optional, validated only if provided.
+    const normalizedPhone = normalizeEmployeePhone(phone);
+    if (!normalizedPhone.ok) {
+      return res
+        .status(400)
+        .json({ message: 'Phone number must be a valid international phone number' });
+    }
+
     // Capture old name for payroll propagation check (#253)
     const oldName = employee.fullName;
 
     // Apply updates only for provided fields
     if (fullName !== undefined) employee.fullName = sanitizeText(fullName);
     if (role !== undefined) employee.role = sanitizeText(role);
+    if (department !== undefined) employee.department = sanitizeText(department);
     if (monthlySalary !== undefined) employee.monthlySalary = monthlySalary;
     if (overtimeRate !== undefined) employee.overtimeRate = overtimeRate;
     if (isActive !== undefined) employee.isActive = isActive;
@@ -604,6 +663,16 @@ exports.updateEmployee = async (req, res, next) => {
       } else {
         employee.email = undefined;
         employee.markModified('email');
+      }
+    }
+
+    if (phone !== undefined) {
+      // Same "clear on empty" semantics as email above.
+      if (normalizedPhone.value) {
+        employee.phone = normalizedPhone.value;
+      } else {
+        employee.phone = undefined;
+        employee.markModified('phone');
       }
     }
 
@@ -879,6 +948,7 @@ exports.exportEmployeesCSV = async (req, res, next) => {
       "Name",
       "Role",
       "Email",
+      "Phone",
       "Status",
       "Monthly Salary",
       "Overtime Rate",
@@ -909,6 +979,7 @@ exports.exportEmployeesCSV = async (req, res, next) => {
       escapeCsvField(emp.fullName || ""),
       escapeCsvField(emp.role || ""),
       escapeCsvField(emp.email || ""),
+      escapeCsvField(emp.phone || ""),
       escapeCsvField(emp.isActive ? "Active" : "Inactive"),
       emp.monthlySalary || 0,
       emp.overtimeRate || 0,
