@@ -6,7 +6,6 @@ import ThemeToggle from '../components/ThemeToggle';
 import { logout } from '../features/auth/authSlice';
 import { setThemeMode } from '../features/ui/uiSlice';
 import api from '../services/api';
-import ThemeToggle from '../components/ThemeToggle';
 import { getCurrencySymbol } from '../utils/currency';
 
 // ── Icons for Sidebar (Copied from AddEmployee for consistency) ──
