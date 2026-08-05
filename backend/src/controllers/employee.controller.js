@@ -563,7 +563,6 @@ exports.updateEmployee = async (req, res, next) => {
     }
     const { id } = req.params;
     const { fullName, role, department, monthlySalary, overtimeRate, isActive, email, bankDetails } = req.body;
-    if (department !== undefined) employee.department = sanitizeText(department);
     const employee = await Employee.findById(id);
 
     // Check if employee exists and is not soft-deleted

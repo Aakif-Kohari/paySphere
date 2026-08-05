@@ -60,8 +60,8 @@ export default function PaySphereLogin() {
       // Save to localStorage
       localStorage.setItem('token', token);
       localStorage.setItem('companyName', savedCompanyName);
-      if (data.currency) {
-        localStorage.setItem('currency', data.currency);
+      if (response.data.currency) {
+        localStorage.setItem('currency', response.data.currency);
       }
 
       // Navigate to dashboard
@@ -122,8 +122,8 @@ export default function PaySphereLogin() {
           const { token, companyName: savedCompanyName } = response.data;
           localStorage.setItem('token', token);
           localStorage.setItem('companyName', savedCompanyName);
-          if (data.currency) {
-            localStorage.setItem('currency', data.currency);
+          if (response.data.currency) {
+            localStorage.setItem('currency', response.data.currency);
           }
           navigate('/dashboard');
         }
