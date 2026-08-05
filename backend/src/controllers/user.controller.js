@@ -517,7 +517,8 @@ exports.googleAuth = async (req, res, next) => {
 
     const token = generateTokens(user, res);
 
-    res.status(200).json({
+    const statusCode = isNewUser ? 201 : 200;
+    res.status(statusCode).json({
       token,
       companyName: user.companyName,
       role: resolveAccountType(user),
