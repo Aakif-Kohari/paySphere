@@ -18,7 +18,6 @@ const employeePortalRoutes = require("./routes/employeePortal.routes");
 const workflowRoutes = require("./routes/workflow.routes");
 const salaryHistoryRoutes = require("./routes/salaryHistory.routes");
 const logger = require("./utils/logger");
-const dashboardRoutes = require('./routes/dashboard.routes');
 
 const app = express();
 app.use('/api/dashboard', dashboardRoutes)
