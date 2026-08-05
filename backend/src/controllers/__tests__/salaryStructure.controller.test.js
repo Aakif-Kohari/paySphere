@@ -22,6 +22,9 @@ jest.mock('../../services/cache.service', () => ({
 const cacheService = require('../../services/cache.service');
 
 const OWNER = '507f1f77bcf86cd799439011';
+// The company. A different id from OWNER on purpose: since #613 the scope is
+// the tenant, not the account that created the row.
+const TENANT = '507f1f77bcf86cd799439099';
 const EMP_A = '607f1f77bcf86cd7994390a1';
 
 const oid = (hex) => new mongoose.Types.ObjectId(hex);
@@ -39,6 +42,7 @@ const employeeDoc = (overrides = {}) => ({
   fullName: 'Alice Smith',
   monthlySalary: 30000,
   createdBy: oid(OWNER),
+  tenantId: oid(TENANT),
   joiningDate: new Date('2024-01-01'),
   createdAt: new Date('2024-01-01'),
   ...overrides,
@@ -48,6 +52,7 @@ const revisionDoc = (effectiveFrom, grossMonthly, overrides = {}) => ({
   _id: oid('707f1f77bcf86cd7994390b1'),
   employeeId: oid(EMP_A),
   createdBy: oid(OWNER),
+  tenantId: oid(TENANT),
   effectiveFrom: new Date(effectiveFrom),
   grossMonthly,
   ctcAnnual: grossMonthly * 12,
@@ -74,17 +79,17 @@ describe('getSalaryStructure — ownership and synthesis (#461)', () => {
   let req, res, next;
 
   beforeEach(() => {
-    req = { userId: OWNER, params: { id: EMP_A }, query: {} };
+    req = { userId: OWNER, tenantId: TENANT, params: { id: EMP_A }, query: {} };
     res = makeRes();
     next = jest.fn();
   });
 
-  test('scopes the employee lookup by createdBy', async () => {
+  test('scopes the employee lookup by tenant', async () => {
     await getSalaryStructure(req, res, next);
 
     expect(Employee.findOne).toHaveBeenCalledWith({
       _id: EMP_A,
-      createdBy: OWNER,
+      tenantId: TENANT,
     });
   });
 
@@ -174,7 +179,7 @@ describe('getSalaryHistory — the timeline (#461)', () => {
   let req, res, next;
 
   beforeEach(() => {
-    req = { userId: OWNER, params: { id: EMP_A } };
+    req = { userId: OWNER, tenantId: TENANT, params: { id: EMP_A } };
     res = makeRes();
     next = jest.fn();
   });
@@ -206,13 +211,13 @@ describe('getSalaryHistory — the timeline (#461)', () => {
     expect(res.json.mock.calls[0][0].timeline).toEqual([]);
   });
 
-  test('scopes by createdBy', async () => {
+  test('scopes by tenant', async () => {
     SalaryStructure.find.mockImplementation(() => sortMock([]));
 
     await getSalaryHistory(req, res, next);
 
     expect(SalaryStructure.find).toHaveBeenCalledWith(
-      expect.objectContaining({ createdBy: OWNER }),
+      expect.objectContaining({ tenantId: TENANT }),
     );
   });
 });
@@ -223,6 +228,7 @@ describe('createSalaryRevision (#461)', () => {
   beforeEach(() => {
     req = {
       userId: OWNER,
+      tenantId: TENANT,
       params: { id: EMP_A },
       body: { grossMonthly: 36000, effectiveFrom: '2026-07-01', reason: 'revision' },
     };
@@ -262,7 +268,7 @@ describe('createSalaryRevision (#461)', () => {
     await createSalaryRevision(req, res, next);
 
     expect(Employee.updateOne).toHaveBeenCalledWith(
-      { _id: expect.anything(), createdBy: OWNER },
+      { _id: expect.anything(), tenantId: TENANT },
       { $set: { monthlySalary: 36000 } },
     );
     expect(cacheService.invalidateAnalytics).toHaveBeenCalledWith(OWNER);
@@ -370,6 +376,7 @@ describe('previewSalaryStructure — writes nothing (#461)', () => {
   beforeEach(() => {
     req = {
       userId: OWNER,
+      tenantId: TENANT,
       params: { id: EMP_A },
       body: { grossMonthly: 40000, effectiveFrom: '2026-08-01' },
     };

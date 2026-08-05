@@ -23,18 +23,22 @@ const {
 } = require('../config/employment');
 
 /**
- * Load an employee, asserting the caller owns it.
+ * Load an employee, asserting it belongs to the caller's company.
+ *
+ * Scoped by tenant, not by creator. #585 moved the writes to `tenantId` but left
+ * this lookup on `createdBy`, so a row written after it could never be found
+ * again — it had no `createdBy` to match (#613).
  *
  * @param {string} employeeId
- * @param {string} userId
+ * @param {string} tenantId
  * @returns {Promise<{ok: true, employee: object} | {ok: false, status: number, message: string}>}
  */
-async function loadOwnedEmployee(employeeId, userId) {
+async function loadOwnedEmployee(employeeId, tenantId) {
   if (!mongoose.Types.ObjectId.isValid(employeeId)) {
     return { ok: false, status: 400, message: 'Invalid employee id format' };
   }
 
-  const employee = await Employee.findOne({ _id: employeeId, createdBy: userId });
+  const employee = await Employee.findOne({ _id: employeeId, tenantId });
 
   if (!employee) {
     return { ok: false, status: 404, message: 'Employee not found' };
@@ -44,20 +48,20 @@ async function loadOwnedEmployee(employeeId, userId) {
 }
 
 /**
- * Load a settlement, asserting the caller owns it.
+ * Load a settlement, asserting it belongs to the caller's company.
  *
  * @param {string} settlementId
- * @param {string} userId
+ * @param {string} tenantId
  * @returns {Promise<{ok: true, settlement: object} | {ok: false, status: number, message: string}>}
  */
-async function loadOwnedSettlement(settlementId, userId) {
+async function loadOwnedSettlement(settlementId, tenantId) {
   if (!mongoose.Types.ObjectId.isValid(settlementId)) {
     return { ok: false, status: 400, message: 'Invalid settlement id format' };
   }
 
   const settlement = await Settlement.findOne({
     _id: settlementId,
-    createdBy: userId,
+    tenantId,
   });
 
   if (!settlement) {
@@ -111,7 +115,7 @@ async function computeFor({ employee, policy, body }) {
  */
 exports.previewSettlement = async (req, res, next) => {
   try {
-    const owned = await loadOwnedEmployee(req.query.employeeId, req.userId);
+    const owned = await loadOwnedEmployee(req.query.employeeId, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -156,7 +160,7 @@ exports.initiateExit = async (req, res, next) => {
   try {
     const body = req.body || {};
 
-    const owned = await loadOwnedEmployee(body.employeeId, req.userId);
+    const owned = await loadOwnedEmployee(body.employeeId, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -189,7 +193,7 @@ exports.initiateExit = async (req, res, next) => {
     const nextStatus = EMPLOYMENT_STATUS.NOTICE_PERIOD;
 
     await Employee.updateOne(
-      { _id: employee._id, createdBy: req.userId },
+      { _id: employee._id, tenantId: req.tenantId },
       {
         $set: {
           employmentStatus: nextStatus,
@@ -248,7 +252,7 @@ exports.createSettlement = async (req, res, next) => {
   try {
     const body = req.body || {};
 
-    const owned = await loadOwnedEmployee(body.employeeId, req.userId);
+    const owned = await loadOwnedEmployee(body.employeeId, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -298,7 +302,11 @@ exports.createSettlement = async (req, res, next) => {
       created = await Settlement.create({
         employeeId: employee._id,
         employeeName: employee.fullName,
+        // Both: `createdBy` records who opened the settlement, `tenantId`
+        // decides who can see it. #585 dropped the first while the schema still
+        // required it, so this create() threw on every call (#613).
         createdBy: req.userId,
+        tenantId: req.tenantId,
         lastWorkingDay: lwd,
         joiningDate: employee.joiningDate,
         exitType: employee.exitDetails?.exitType || EXIT_TYPE.RESIGNATION,
@@ -356,7 +364,7 @@ exports.createSettlement = async (req, res, next) => {
  */
 exports.updateSettlement = async (req, res, next) => {
   try {
-    const owned = await loadOwnedSettlement(req.params.id, req.userId);
+    const owned = await loadOwnedSettlement(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -374,7 +382,7 @@ exports.updateSettlement = async (req, res, next) => {
 
     const employeeResult = await loadOwnedEmployee(
       String(settlement.employeeId),
-      req.userId,
+      req.tenantId,
     );
     if (!employeeResult.ok) {
       return res
@@ -442,7 +450,7 @@ exports.updateSettlement = async (req, res, next) => {
 function makeTransitionHandler(target, decorate = () => ({})) {
   return async (req, res, next) => {
     try {
-      const owned = await loadOwnedSettlement(req.params.id, req.userId);
+      const owned = await loadOwnedSettlement(req.params.id, req.tenantId);
       if (!owned.ok) {
         return res.status(owned.status).json({ message: owned.message });
       }
@@ -470,7 +478,7 @@ function makeTransitionHandler(target, decorate = () => ({})) {
       // Marking an F&F paid is the moment the employee actually leaves.
       if (target === SETTLEMENT_STATUS.PAID) {
         await Employee.updateOne(
-          { _id: settlement.employeeId, createdBy: req.userId },
+          { _id: settlement.employeeId, tenantId: req.tenantId },
           {
             $set: {
               employmentStatus: EMPLOYMENT_STATUS.EXITED,
@@ -553,7 +561,7 @@ exports.getSettlements = async (req, res, next) => {
     let limit = parseInt(req.query.limit, 10);
     if (isNaN(limit) || limit < 1 || limit > 100) limit = 20;
 
-    const query = { createdBy: req.userId };
+    const query = { tenantId: req.tenantId };
 
     if (req.query.status) {
       if (!Object.values(SETTLEMENT_STATUS).includes(req.query.status)) {
@@ -593,7 +601,7 @@ exports.getSettlements = async (req, res, next) => {
  */
 exports.getSettlementById = async (req, res, next) => {
   try {
-    const owned = await loadOwnedSettlement(req.params.id, req.userId);
+    const owned = await loadOwnedSettlement(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -602,7 +610,7 @@ exports.getSettlementById = async (req, res, next) => {
     // `deleteEmployee` would have destroyed.
     const payrollHistoryCount = await PayrollUpdate.countDocuments({
       employeeId: owned.settlement.employeeId,
-      createdBy: req.userId,
+      tenantId: req.tenantId,
     });
 
     res.status(200).json({

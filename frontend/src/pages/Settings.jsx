@@ -6,6 +6,8 @@ import ThemeToggle from '../components/ThemeToggle';
 import { logout } from '../features/auth/authSlice';
 import { setThemeMode } from '../features/ui/uiSlice';
 import api from '../services/api';
+import ThemeToggle from '../components/ThemeToggle';
+import { getCurrencySymbol } from '../utils/currency';
 
 // ── Icons for Sidebar (Copied from AddEmployee for consistency) ──
 const GridIcon = () => (
@@ -337,6 +339,9 @@ export default function Settings() {
         companyName: userProfile.companyName,
         avatar: userProfile.avatar,
       });
+      if (settings?.payrollConfig?.currency) {
+        localStorage.setItem('currency', settings.payrollConfig.currency);
+      }
       alert('Settings updated successfully!');
     } catch (err) {
       console.error(err);
@@ -446,6 +451,7 @@ export default function Settings() {
       alert('Account successfully deleted.');
       localStorage.removeItem('token');
       localStorage.removeItem('companyName');
+      localStorage.removeItem('currency');
       navigate('/auth');
     } catch (err) {
       alert(err.response?.data?.message || 'Error deleting account.');
@@ -1082,7 +1088,7 @@ export default function Settings() {
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500 font-bold text-sm">
-                      ₹
+                      {getCurrencySymbol(settings.payrollConfig.currency)}
                     </span>
                     <input
                       type="number"
@@ -1104,7 +1110,7 @@ export default function Settings() {
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500 font-bold text-sm">
-                      ₹
+                      {getCurrencySymbol(settings.payrollConfig.currency)}
                     </span>
                     <input
                       type="number"
@@ -1298,7 +1304,7 @@ export default function Settings() {
 
             <div className="border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm overflow-hidden p-6 text-center">
               <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-3xl text-white font-bold mx-auto mb-4 shadow-lg shadow-blue-500/30">
-                ₹
+                {getCurrencySymbol(settings.payrollConfig.currency)}
               </div>
               <h3 className="text-xl font-serif text-gray-900 dark:text-white font-bold mb-1">
                 PaySphere
@@ -1506,6 +1512,7 @@ export default function Settings() {
               onClick={() => {
                 dispatch(logout());
                 localStorage.removeItem('companyName');
+                localStorage.removeItem('currency');
                 navigate('/auth');
               }}
               className="px-3 py-1.5 text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"

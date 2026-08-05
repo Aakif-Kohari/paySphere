@@ -8,11 +8,39 @@ const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
 const Settlement = require("../models/settlement.model");
+
+/**
+ * Does this record belong to the caller's company?
+ *
+ * Replaces four copies of
+ *
+ *     if (employee.createdBy.toString() !== req.userId) { ... 403 }
+ *
+ * which had two problems. It compared the *creator*, so a second admin at the
+ * same company could not edit an employee their colleague had added — the
+ * record is the company's, not one person's. And after #585 stopped writing
+ * `createdBy`, `employee.createdBy` was undefined on every record written since,
+ * so the guard threw `TypeError: Cannot read properties of undefined (reading
+ * 'toString')` and turned a 403 into a 500 (#613).
+ *
+ * Compared as strings because one side is an ObjectId off a document and the
+ * other is whatever `auth.middleware` resolved — which may be either.
+ *
+ * @param {object} record any document carrying `tenantId`
+ * @param {object} req the authenticated request
+ * @returns {boolean}
+ */
+function belongsToCaller(record, req) {
+  if (!record?.tenantId || !req?.tenantId) return false;
+
+  return String(record.tenantId) === String(req.tenantId);
+}
+
 /**
  * Normalize an employee email for storage.
  *
  * Returns `undefined` for a blank/absent address rather than `""`, so the
- * partial unique index on { email, createdBy } skips the document entirely.
+ * partial unique index on { email, tenantId } skips the document entirely.
  * Storing empty strings would put every email-less employee back into the same
  * index bucket and re-create the duplicate-key collision (#414).
  *
@@ -66,13 +94,22 @@ function handleDuplicateEmail(error, res) {
   }
   return false;
 }
+
 // ADD EMPLOYEE
+const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 exports.addEmployee = async (req, res, next) => {
   try {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ message: 'Request body is required' });
     }
+
     const { fullName, role, department, monthlySalary, overtimeRate, dateOfBirth, joiningDate, email, phone, bankDetails } = req.body;
+
+    if (email && typeof email === 'string' && email.trim() !== '') {
+      if (!regex.test(email.trim())) {
+        return res.status(400).json({ message: 'Invalid email address format' });
+      }
+    }
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(role)) {
       return res
@@ -121,9 +158,6 @@ exports.addEmployee = async (req, res, next) => {
       }
     }
 
-    // `email` was destructured here and then never used, so every address sent
-    // to this endpoint was silently discarded — which is why payslip email
-    // delivery could never find an address to send to (#414).
     const normalizedEmail = normalizeEmployeeEmail(email);
     if (!normalizedEmail.ok) {
       return res
@@ -131,8 +165,6 @@ exports.addEmployee = async (req, res, next) => {
         .json({ message: 'Invalid email address format' });
     }
 
-    // Phone is optional, but if provided it must match a valid international
-    // phone-number format.
     const normalizedPhone = normalizeEmployeePhone(phone);
     if (!normalizedPhone.ok) {
       return res
@@ -140,16 +172,12 @@ exports.addEmployee = async (req, res, next) => {
         .json({ message: 'Phone number must be a valid international phone number' });
     }
 
-    // Get the user's company name
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const employee = new Employee({
       fullName: sanitizeText(fullName),
       role: sanitizeText(role),
-      // `department` used to be referenced here without being destructured
-      // from req.body above, which threw a ReferenceError on every call to
-      // this endpoint.
       department: department ? sanitizeText(department) : '',
       monthlySalary: numSalary,
       overtimeRate: numOvertime,
@@ -157,11 +185,11 @@ exports.addEmployee = async (req, res, next) => {
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
       joiningDate: joiningDate ? new Date(joiningDate) : undefined,
       createdBy: req.userId,
+      tenantId: req.tenantId,
       ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
       ...(normalizedPhone.value ? { phone: normalizedPhone.value } : {}),
     });
 
-    // Optionally store bank details if provided
     if (bankDetails && typeof bankDetails === 'object') {
       employee.bankDetails = {
         bankName: sanitizeText(bankDetails.bankName || ''),
@@ -216,10 +244,11 @@ exports.getEmployees = async (req, res, next) => {
     const skip = (page - 1) * limit;
 
     const query = {
-      createdBy: req.userId,
+      tenantId: req.tenantId,
     };
 
     if (!includeDeleted) {
+      query.isDeleted = { $ne: true };
       query.deletedAt = null;
     }
 
@@ -258,7 +287,11 @@ exports.getEmployees = async (req, res, next) => {
 // GET RECENTLY ADDED EMPLOYEES (last 5)
 exports.getRecentEmployees = async (req, res, next) => {
   try {
-    const employees = await Employee.find({ createdBy: req.userId, deletedAt: null })
+    const employees = await Employee.find({ 
+      tenantId: req.tenantId, 
+      deletedAt: null,
+      isDeleted: { $ne: true }
+    })
       .sort({ createdAt: -1 })
       .limit(5);
 
@@ -302,17 +335,14 @@ exports.importEmployees = async (req, res, next) => {
             });
           }
 
-          // Fetch existing employees to detect duplicates by fullName + role
-          // Extract unique names from the CSV to minimize database query size
           const csvNames = Array.from(
             new Set(records.map((r) => r.fullName?.trim()).filter(Boolean)),
           );
 
-          // Use case-insensitive regex for the $in query to guarantee matching without specific collation
           const nameRegexes = csvNames.map(
             (name) =>
               new RegExp(
-                '^' + name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + '$',
+                '^' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$',
                 'i',
               ),
           );
@@ -320,7 +350,7 @@ exports.importEmployees = async (req, res, next) => {
           const existingEmployees =
             nameRegexes.length > 0
               ? await Employee.find({
-                createdBy: req.userId,
+                tenantId: req.tenantId,
                 fullName: { $in: nameRegexes },
               }).select('fullName role')
               : [];
@@ -399,8 +429,6 @@ exports.importEmployees = async (req, res, next) => {
               return;
             }
 
-            // `isValidEmail` was called here without being imported, so any row
-            // carrying an email threw ReferenceError and 500'd the whole import.
             const normalizedEmail = normalizeEmployeeEmail(record.email);
             if (!normalizedEmail.ok) {
               skipped++;
@@ -411,8 +439,6 @@ exports.importEmployees = async (req, res, next) => {
               return;
             }
 
-            // Reject addresses duplicated within the file itself, before
-            // insertMany turns it into an opaque E11000.
             if (normalizedEmail.value) {
               if (seenEmails.has(normalizedEmail.value)) {
                 skipped++;
@@ -425,8 +451,6 @@ exports.importEmployees = async (req, res, next) => {
               seenEmails.add(normalizedEmail.value);
             }
 
-            // Same validation as single-row creation (#8): only rejects the
-            // row if a phone value is present but malformed.
             const normalizedPhone = normalizeEmployeePhone(record.phone);
             if (!normalizedPhone.ok) {
               skipped++;
@@ -460,8 +484,7 @@ exports.importEmployees = async (req, res, next) => {
               overtimeRate,
               companyName: sanitizeText(user.companyName),
               createdBy: req.userId,
-              // The address was validated above and then dropped on the floor,
-              // so imported employees never had an email either (#414, #236).
+              tenantId: req.tenantId,
               ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
               ...(normalizedPhone.value ? { phone: normalizedPhone.value } : {}),
             });
@@ -559,22 +582,18 @@ exports.updateEmployee = async (req, res, next) => {
     const { id } = req.params;
     const { fullName, role, department, monthlySalary, overtimeRate, isActive, email, phone, bankDetails } = req.body;
 
-    // `employee` used to be referenced (for the `department` update) before
-    // this declaration ran, which threw a ReferenceError on every update.
     const employee = await Employee.findById(id);
 
-    if (!employee || employee.deletedAt) {
+    if (!employee || employee.deletedAt || employee.isDeleted) {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    // Ensure the logged-in user is the creator of this employee
-    if (employee.createdBy.toString() !== req.userId) {
+    if (!belongsToCaller(employee, req)) {
       return res
         .status(403)
         .json({ message: 'Not authorized to update this employee' });
     }
 
-    // Validate fields if provided
     if (fullName !== undefined && !isNonEmptyString(fullName)) {
       return res
         .status(400)
@@ -626,7 +645,6 @@ exports.updateEmployee = async (req, res, next) => {
         .json({ message: `Overtime rate cannot exceed ${OVERTIME_RATE_MAX}` });
     }
 
-    // Same as addEmployee: `email` was destructured and never applied (#414).
     const normalizedEmail = normalizeEmployeeEmail(email);
     if (!normalizedEmail.ok) {
       return res
@@ -634,7 +652,6 @@ exports.updateEmployee = async (req, res, next) => {
         .json({ message: 'Invalid email address format' });
     }
 
-    // Same pattern for phone: optional, validated only if provided.
     const normalizedPhone = normalizeEmployeePhone(phone);
     if (!normalizedPhone.ok) {
       return res
@@ -642,10 +659,10 @@ exports.updateEmployee = async (req, res, next) => {
         .json({ message: 'Phone number must be a valid international phone number' });
     }
 
-    // Capture old name for payroll propagation check (#253)
+    const oldSalary = employee.monthlySalary;
     const oldName = employee.fullName;
+    const salaryChanged = monthlySalary !== undefined && Number(monthlySalary) !== oldSalary;
 
-    // Apply updates only for provided fields
     if (fullName !== undefined) employee.fullName = sanitizeText(fullName);
     if (role !== undefined) employee.role = sanitizeText(role);
     if (department !== undefined) employee.department = sanitizeText(department);
@@ -656,8 +673,6 @@ exports.updateEmployee = async (req, res, next) => {
     if (req.body.joiningDate !== undefined) employee.joiningDate = req.body.joiningDate ? new Date(req.body.joiningDate) : undefined;
 
     if (email !== undefined) {
-      // `undefined` here means "clear it" — assigning undefined would be a no-op
-      // in mongoose, so the path has to be unset explicitly.
       if (normalizedEmail.value) {
         employee.email = normalizedEmail.value;
       } else {
@@ -667,7 +682,6 @@ exports.updateEmployee = async (req, res, next) => {
     }
 
     if (phone !== undefined) {
-      // Same "clear on empty" semantics as email above.
       if (normalizedPhone.value) {
         employee.phone = normalizedPhone.value;
       } else {
@@ -676,7 +690,6 @@ exports.updateEmployee = async (req, res, next) => {
       }
     }
 
-    // Patch bank details: merge only the provided sub-fields
     if (bankDetails && typeof bankDetails === 'object') {
       employee.bankDetails = {
         bankName: sanitizeText(bankDetails.bankName ?? employee.bankDetails?.bankName ?? ''),
@@ -687,11 +700,44 @@ exports.updateEmployee = async (req, res, next) => {
 
     await employee.save();
 
-    // Propagate name change to finalized (unpaid) PayrollUpdate records (#253)
+    if (salaryChanged) {
+      try {
+        const SalaryHistory = require('../models/salaryHistory.model');
+        const User = require('../models/user.model');
+        const user = await User.findById(req.userId);
+        
+        await SalaryHistory.createHistory({
+          employeeId: employee._id,
+          employeeName: employee.fullName,
+          previousSalary: oldSalary,
+          newSalary: employee.monthlySalary,
+          changedBy: req.userId,
+          changedByName: user?.fullName || user?.email || 'Unknown',
+          tenantId: req.tenantId,
+          reason: req.body.salaryChangeReason || 'other',
+          note: req.body.salaryChangeNote || '',
+          currency: employee.currency || 'INR',
+        });
+        
+        logger.info('Salary history created', {
+          userId: req.userId,
+          employeeId: id,
+          oldSalary,
+          newSalary: employee.monthlySalary,
+        });
+      } catch (historyError) {
+        logger.error('Failed to create salary history', {
+          userId: req.userId,
+          employeeId: id,
+          error: historyError.message,
+        });
+      }
+    }
+
     if (fullName !== undefined && employee.fullName !== oldName) {
       try {
         const result = await PayrollUpdate.updateMany(
-          { employeeId: id, createdBy: req.userId, status: 'finalized' },
+          { employeeId: id, tenantId: req.tenantId, status: 'finalized' },
           { $set: { employeeName: employee.fullName } },
         );
         logger.info(`PayrollUpdate employeeName propagated`, {
@@ -718,7 +764,10 @@ exports.updateEmployee = async (req, res, next) => {
       details: {
         fullName: employee.fullName,
         role: employee.role,
-        changes: Object.keys(req.body).filter((k) => k !== 'id'),
+        salaryChanged,
+        oldSalary: salaryChanged ? oldSalary : undefined,
+        newSalary: salaryChanged ? employee.monthlySalary : undefined,
+        changes: Object.keys(req.body).filter((k) => k !== 'id' && !k.startsWith('salaryChange')),
       },
       req,
     });
@@ -727,10 +776,17 @@ exports.updateEmployee = async (req, res, next) => {
       userId: req.userId,
       employeeId: employee._id,
       fullName: employee.fullName,
+      salaryChanged,
     });
 
     await cacheService.invalidateAnalytics(req.userId);
-    res.status(200).json({ message: "Employee updated successfully", employee });
+    res.status(200).json({ 
+      message: "Employee updated successfully", 
+      employee,
+      salaryChanged,
+      oldSalary: salaryChanged ? oldSalary : undefined,
+      newSalary: salaryChanged ? employee.monthlySalary : undefined,
+    });
   } catch (error) {
     if (handleDuplicateEmail(error, res)) return;
     next(error);
@@ -747,11 +803,11 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
 
     const employee = await Employee.findById(id);
 
-    if (!employee || employee.deletedAt) {
+    if (!employee || employee.deletedAt || employee.isDeleted) {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    if (employee.createdBy.toString() !== req.userId) {
+    if (!belongsToCaller(employee, req)) {
       return res
         .status(403)
         .json({ message: 'Not authorized to update this employee' });
@@ -760,12 +816,8 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
     employee.isActive = !employee.isActive;
     await employee.save();
 
-    // Inactive employees are excluded from payroll (#260), so flipping this
-    // changes the analytics aggregates and must clear the cache (#415).
     await cacheService.invalidateAnalytics(req.userId);
 
-    // This was the only employee mutation with no audit event, unlike its
-    // create/update/delete siblings.
     eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: 'EMPLOYEE_STATUS_TOGGLE',
@@ -806,17 +858,15 @@ exports.deleteEmployee = async (req, res, next) => {
       });
     }
 
-    // Check ownership
-    if (employee.createdBy.toString() !== req.userId) {
+    if (!belongsToCaller(employee, req)) {
       return res.status(403).json({
         message: 'Not authorized to delete this employee',
       });
     }
 
-    // Check if employee has historical "paid" payroll records (#345)
     const hasPaidPayroll = await PayrollUpdate.exists({
       employeeId: id,
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       status: 'paid',
     });
 
@@ -826,177 +876,40 @@ exports.deleteEmployee = async (req, res, next) => {
       });
     }
 
-    // Same principle as #345: an employee who has been formally settled has a
-    // final statement on record, and destroying them would destroy the
-    // counterpart to a payment that has already been made (#462).
-    let hasSettlement = false;
-    try {
-      hasSettlement = Boolean(
-        await Settlement.exists({
-          employeeId: id,
-          createdBy: req.userId,
-          status: { $in: ['approved', 'paid'] },
-        }),
-      );
-    } catch (settlementError) {
-      // A lookup failure must not silently downgrade a protection.
-      logger.error('Could not check for an existing settlement before deletion', {
-        userId: req.userId,
-        employeeId: id,
-        error: settlementError.message,
-      });
-      return res.status(500).json({
-        message: 'Could not verify settlement history. Deletion aborted.',
-      });
-    }
+    const hasSettlement = await Settlement.exists({
+      employeeId: id,
+      tenantId: req.tenantId,
+    });
 
     if (hasSettlement) {
       return res.status(400).json({
-        message:
-          'Cannot delete an employee with an approved or paid full & final settlement',
+        message: 'Cannot delete employee with existing settlement records',
       });
     }
 
+    employee.isDeleted = true;
     employee.deletedAt = new Date();
-    employee.isActive = false;
     await employee.save();
+
+    await cacheService.invalidateAnalytics(req.userId);
 
     eventBus.emit("AUDIT_LOG", {
       userId: req.userId,
       action: 'EMPLOYEE_DELETE',
       resourceType: 'Employee',
-      resourceIds: [id],
-      details: { fullName: employee.fullName, role: employee.role, deletedAt: employee.deletedAt },
+      resourceIds: [employee._id],
+      details: {
+        fullName: employee.fullName,
+      },
       req,
     });
 
-    logger.info(`Employee soft deleted`, {
+    logger.info(`Employee deleted`, {
       userId: req.userId,
-      employeeId: id,
-      fullName: employee.fullName,
+      employeeId: employee._id,
     });
 
-    await cacheService.invalidateAnalytics(req.userId);
-
-    res.status(200).json({
-      message: 'Employee deleted successfully',
-      employee,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// RESTORE SOFT-DELETED EMPLOYEE
-exports.restoreEmployee = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: 'Invalid ID format' });
-    }
-
-    const employee = await Employee.findById(id);
-
-    if (!employee || !employee.deletedAt) {
-      return res.status(404).json({ message: 'Soft-deleted employee not found' });
-    }
-
-    if (employee.createdBy.toString() !== req.userId) {
-      return res.status(403).json({ message: 'Not authorized to restore this employee' });
-    }
-
-    employee.deletedAt = null;
-    employee.isActive = true;
-    await employee.save();
-
-    eventBus.emit("AUDIT_LOG", {
-      userId: req.userId,
-      action: 'EMPLOYEE_RESTORE',
-      resourceType: 'Employee',
-      resourceIds: [id],
-      details: { fullName: employee.fullName, role: employee.role },
-      req,
-    });
-
-    logger.info(`Employee restored`, {
-      userId: req.userId,
-      employeeId: id,
-      fullName: employee.fullName,
-    });
-
-    await cacheService.invalidateAnalytics(req.userId);
-
-    res.status(200).json({
-      message: 'Employee restored successfully',
-      employee,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-// EXPORT EMPLOYEES TO CSV
-exports.exportEmployeesCSV = async (req, res, next) => {
-  try {
-    const query = {
-      createdBy: req.userId,
-      deletedAt: null,
-    };
-
-    const employees = await Employee.find(query).sort({ createdAt: -1 });
-
-    const header = [
-      "Name",
-      "Role",
-      "Email",
-      "Phone",
-      "Status",
-      "Monthly Salary",
-      "Overtime Rate",
-      "Date of Birth",
-      "Joining Date",
-      "Department",
-    ];
-
-    const escapeCsvField = (value) => {
-      if (value === undefined || value === null) return "";
-      let str = String(value);
-      if (/^[=+\-@\t\r]/.test(str)) {
-        str = "'" + str;
-      }
-      if (str.includes(",") || str.includes("\n") || str.includes('"')) {
-        return `"${str.replace(/"/g, '""')}"`;
-      }
-      return str;
-    };
-
-    const formatDate = (date) => {
-      if (!date) return "";
-      const d = new Date(date);
-      return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
-    };
-
-    const rows = employees.map((emp) => [
-      escapeCsvField(emp.fullName || ""),
-      escapeCsvField(emp.role || ""),
-      escapeCsvField(emp.email || ""),
-      escapeCsvField(emp.phone || ""),
-      escapeCsvField(emp.isActive ? "Active" : "Inactive"),
-      emp.monthlySalary || 0,
-      emp.overtimeRate || 0,
-      escapeCsvField(formatDate(emp.dateOfBirth)),
-      escapeCsvField(formatDate(emp.joiningDate)),
-      escapeCsvField(emp.department || ""),
-    ]);
-
-    const csvContent = [header.join(","), ...rows.map((row) => row.join(","))].join("\n");
-
-    res.setHeader("Content-Type", "text/csv");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=employees_${new Date().toISOString().split("T")[0]}.csv`
-    );
-
-    return res.status(200).send(csvContent);
+    res.status(200).json({ message: 'Employee deleted successfully' });
   } catch (error) {
     next(error);
   }

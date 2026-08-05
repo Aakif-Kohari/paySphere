@@ -21,6 +21,7 @@ const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const { getDefaultRole } = require('../seeds/rbac.seed');
 const { resolveAccountType } = require('../config/accountTypes');
+const { ensureTenantForUser } = require('../services/tenant.service');
 
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
@@ -30,13 +31,17 @@ const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
 
 const generateTokens = (user, res) => {
   const accessToken = jwt.sign(
-    { id: user._id, tokenVersion: user.tokenVersion || 0 },
+    { id: user._id,
+      role: user.role,
+      tenantId: user.tenantId, tokenVersion: user.tokenVersion || 0 },
     process.env.JWT_SECRET,
     { expiresIn: '15m' },
   );
 
   const refreshToken = jwt.sign(
-    { id: user._id, tokenVersion: user.tokenVersion || 0 },
+    { id: user._id,
+      role: user.role,
+      tenantId: user.tenantId, tokenVersion: user.tokenVersion || 0 },
     process.env.JWT_SECRET,
     { expiresIn: '7d' },
   );
@@ -109,6 +114,16 @@ exports.signup = async (req, res, next) => {
       });
     }
 
+    // Create the company this account is registering, and bind the account to
+    // it, *before* the token is minted — `generateTokens` reads `user.tenantId`
+    // into the claim, and every scoped query in the backend then filters on it.
+    //
+    // #585 skipped this step entirely, which is why `Tenant` was imported at
+    // the top of this file and never used. The consequence was not that scoped
+    // reads returned nothing: mongoose strips `{ tenantId: undefined }` out of a
+    // filter, so they returned every company's rows (#612).
+    await ensureTenantForUser(newUser);
+
     const token = generateTokens(newUser, res);
 
     // `role` here is the *account type* the client renders navigation from, not
@@ -118,6 +133,7 @@ exports.signup = async (req, res, next) => {
       companyName: newUser.companyName,
       role: resolveAccountType(newUser),
       employeeId: newUser.employeeId,
+      currency: newUser.settings?.payrollConfig?.currency || 'INR'
     });
   } catch (error) {
     next(error);
@@ -147,6 +163,19 @@ exports.login = async (req, res, next) => {
     if (!isMatch)
       return res.status(400).json({ message: 'Invalid credentials' });
 
+    if (user.isTwoFactorEnabled) {
+      return res.status(200).json({
+        requires2FA: true,
+        userId: user._id,
+        message: "Two-Factor Authentication code required",
+      });
+    }
+
+    // Self-heal on the way in, for accounts that predate #585 or that the
+    // boot-time backfill has not reached. A no-op — one indexed read — once the
+    // account has a tenant, which is every account created after this change.
+    await ensureTenantForUser(user);
+
     const token = generateTokens(user, res);
 
     res.status(200).json({
@@ -154,16 +183,10 @@ exports.login = async (req, res, next) => {
       companyName: user.companyName,
       role: resolveAccountType(user),
       employeeId: user.employeeId,
+      currency: user.settings?.payrollConfig?.currency || 'INR'
     });
   } catch (error) {
     next(error);
-  }
-  if (user.isTwoFactorEnabled) {
-    return res.status(200).json({
-      requires2FA: true,
-      userId: user._id,
-      message: "Two-Factor Authentication code required",
-    });
   }
 };
 
@@ -173,8 +196,12 @@ exports.getSettings = async (req, res, next) => {
     const user = await User.findById(req.userId).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // Scoped by tenant like every other employee read since #585. Left on
+    // `createdBy`, this counted only the employees this particular admin had
+    // added, and after #585 stopped writing that field it counted zero — the
+    // Settings page reported an empty company (#613).
     const employeeCount = await Employee.countDocuments({
-      createdBy: req.userId,
+      tenantId: req.tenantId,
     });
 
     res.status(200).json({
@@ -484,13 +511,20 @@ exports.googleAuth = async (req, res, next) => {
       await user.save();
     }
 
+    // Same as the password paths: provision on registration, self-heal on
+    // return. Google sign-in is a first-class way to create a company here, so
+    // it needs a tenant just as much as `signup` does (#612).
+    await ensureTenantForUser(user);
+
     const token = generateTokens(user, res);
 
-    res.status(200).json({
+    const statusCode = isNewUser ? 201 : 200;
+    res.status(statusCode).json({
       token,
       companyName: user.companyName,
       role: resolveAccountType(user),
       employeeId: user.employeeId,
+      currency: user.settings?.payrollConfig?.currency || 'INR',
       message: isNewUser
         ? 'Account created successfully'
         : 'Logged in successfully',
@@ -695,8 +729,12 @@ exports.deleteAccount = async (req, res, next) => {
 
     const AuditLog = require('../models/auditLog.model');
 
-    await Employee.deleteMany({ createdBy: req.userId }, deleteOptions);
-    await PayrollUpdate.deleteMany({ createdBy: req.userId }, deleteOptions);
+    // Scoped by tenant: these rows are the company's, and since #585 they no
+    // longer carry a `createdBy` to match on. Filtering by the old key deleted
+    // nothing and left the company's employee and payroll records behind after
+    // the account that owned them was gone (#613).
+    await Employee.deleteMany({ tenantId: req.tenantId }, deleteOptions);
+    await PayrollUpdate.deleteMany({ tenantId: req.tenantId }, deleteOptions);
     await AuditLog.deleteMany({ userId: req.userId }, deleteOptions);
     await User.findByIdAndDelete(req.userId, deleteOptions);
 
@@ -747,8 +785,13 @@ exports.refresh = async (req, res, next) => {
         .json({ message: 'Invalid or expired refresh token' });
     }
 
+    // `role`, `tenantId`, `companyName` and `employeeId` are selected because
+    // `generateTokens` reads all four into the claim. The projection used to
+    // stop at `tokenVersion`, so every refresh minted a token carrying
+    // `role: undefined, tenantId: undefined` — a session lost its tenant fifteen
+    // minutes after logging in, whatever `login` had put there (#612).
     const user = await User.findById(decoded.id).select(
-      '_id isActive tokenVersion',
+      '_id isActive tokenVersion role tenantId companyName fullName employeeId',
     );
     if (!user || user.isActive === false) {
       return res.status(401).json({ message: 'User not found or deactivated' });
@@ -761,6 +804,8 @@ exports.refresh = async (req, res, next) => {
     ) {
       return res.status(401).json({ message: 'Token is no longer valid' });
     }
+
+    await ensureTenantForUser(user);
 
     const token = generateTokens(user, res);
     res.status(200).json({ token });
@@ -915,13 +960,15 @@ exports.validate2FALogin = async (req, res, next) => {
     }
 
     // Generate full JWT access token after successful 2FA
-    const accessToken = generateAccessToken(user._id); // Use your existing token helper function
+    const accessToken = generateTokens(user, res);
 
     return res.status(200).json({
       message: "2FA verification successful",
       token: accessToken,
       user: {
         id: user._id,
+      role: user.role,
+      tenantId: user.tenantId,
         email: user.email,
         fullName: user.fullName,
         companyName: user.companyName,

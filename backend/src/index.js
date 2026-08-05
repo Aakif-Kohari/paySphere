@@ -9,6 +9,7 @@ const { backfillPayrollStatus } = require("./migrations/backfillPayrollStatus");
 const {
   backfillSalaryStructures,
 } = require("./migrations/backfillSalaryStructures");
+const { backfillTenants } = require("./migrations/backfillTenants");
 const logger = require("./utils/logger");
 
 const startServer = async () => {
@@ -37,11 +38,19 @@ const startServer = async () => {
   // migrations/backfillSalaryStructures.js (#461).
   await backfillSalaryStructures();
 
+  // Create one tenant per existing company and stamp `tenantId` onto the
+  // accounts and business rows that predate #585, deriving ownership from
+  // `createdBy`. Runs last of the migrations because it reads the account
+  // shapes the earlier ones normalise. Idempotent, a no-op on an already-scoped
+  // database, and never throws — see migrations/backfillTenants.js (#612).
+  await backfillTenants();
+
   // Start background jobs
   startCronJobs();
   
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
+  const server = app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
+  require("./sockets/payroll.socket").init(server);
 };
 
 startServer();

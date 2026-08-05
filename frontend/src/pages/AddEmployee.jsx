@@ -6,6 +6,7 @@ import ThemeToggle from "../components/ThemeToggle";
 import { logout } from "../features/auth/authSlice";
 import useCtrlEnterSubmit from "../hooks/useCtrlEnterSubmit";
 import api from "../services/api";
+import { getCurrencySymbol } from "../utils/currency";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const GridIcon = () => (
@@ -42,12 +43,6 @@ const HelpCircleIcon = () => (
 const SupportIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
-  </svg>
-);
-const CheckCircleIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-    <polyline points="22 4 12 14.01 9 11.01" />
   </svg>
 );
 const ArrowRightIcon = () => (
@@ -91,8 +86,6 @@ const Avatar = ({ name, size = 36 }) => {
   );
 };
 
-// Accept international phone numbers with an optional leading "+" and
-// a national number of 7-15 digits. Mirrors backend validation behavior.
 const PHONE_REGEX = /^\+?[1-9]\d{6,14}$/;
 
 const normalizePhoneValue = (value) =>
@@ -101,7 +94,6 @@ const normalizePhoneValue = (value) =>
 export default function AddEmployee() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
@@ -127,6 +119,7 @@ export default function AddEmployee() {
   const fileInputRef = useRef(null);
   const formRef = useRef(null);
   useCtrlEnterSubmit(formRef);
+
   // Recently added employees
   const [recentEmployees, setRecentEmployees] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
@@ -153,8 +146,6 @@ export default function AddEmployee() {
     }
   }, [token]);
 
-
-
   const handleCsvUpload = async () => {
     if (!csvFile) {
       setError("Please select a CSV file.");
@@ -180,11 +171,10 @@ export default function AddEmployee() {
       );
 
       setSuccess(`${res.data.imported} employees imported successfully.`);
-
       setCsvFile(null);
 
       const recent = await api.get("/api/employees/recent");
-      setRecentEmployees(recent.data.employees);
+      setRecentEmployees(recent.data.employees || []);
 
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -239,6 +229,9 @@ export default function AddEmployee() {
     const fullPhoneNumber = normalizePhoneValue(`${phoneCountryCode}${phone}`);
 
     try {
+      const dobDate = dateOfBirth ? new Date(dateOfBirth + "T12:00:00.000Z") : undefined;
+      const joiningDateDate = joiningDate ? new Date(joiningDate + "T12:00:00.000Z") : undefined;
+
       await api.post(`/api/employees`, {
         fullName,
         role,
@@ -247,8 +240,8 @@ export default function AddEmployee() {
         overtimeRate: otNum,
         currency,
         phone: fullPhoneNumber || undefined,
-        dateOfBirth: dateOfBirth || undefined,
-        joiningDate: joiningDate || undefined,
+        dateOfBirth: dobDate,
+        joiningDate: joiningDateDate,
       });
 
       setSuccess("Employee added successfully!");
@@ -268,6 +261,19 @@ export default function AddEmployee() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancel = () => {
+    setFullName("");
+    setRole("");
+    setDepartment("");
+    setMonthlySalary("");
+    setOvertimeRate("");
+    setDateOfBirth("");
+    setJoiningDate("");
+    setError("");
+    setSuccess("");
+    navigate("/dashboard");
   };
 
   const sidebarItems = [
@@ -306,7 +312,7 @@ export default function AddEmployee() {
         <div className="p-5 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md shadow-blue-200 dark:shadow-none">
-              ₹
+              {getCurrencySymbol(currency)}
             </div>
             <div>
               <p className="font-bold text-sm text-gray-900 dark:text-white">{companyName}</p>
@@ -470,7 +476,7 @@ export default function AddEmployee() {
                     <label className="flex-1">
                       <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Monthly Salary</span>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500 font-semibold text-sm">{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'}</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 font-semibold text-sm">{getCurrencySymbol(currency)}</span>
                         <input
                           id="employee-salary"
                           type="text"
@@ -486,7 +492,7 @@ export default function AddEmployee() {
                     <label className="flex-1">
                       <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Overtime Rate (Optional)</span>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500 font-semibold text-sm">{currency === 'INR' ? '₹' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'}</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 font-semibold text-sm">{getCurrencySymbol(currency)}</span>
                         <input
                           id="employee-overtime"
                           type="text"
@@ -578,171 +584,154 @@ export default function AddEmployee() {
                   </div>
                 )}
 
-                {/* Submit */}
-                <button
-                  id="add-employee-btn"
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-                >
-                  <PersonPlusIcon />
-                  {loading ? "Adding..." : "Add Employee"}
-                </button>
-              </form>
-            </div>
-
-
-            <div className="border-t border-gray-200 pt-6">
-              <h3 className="text-sm font-bold text-gray-900 mb-2">
-                Bulk Upload Employees
-              </h3>
-
-              <p className="text-xs text-gray-500 mb-4">
-                Upload a CSV file to add multiple employees at once.
-              </p>
-
-              <div
-                className={`border-2 border-dashed rounded-xl p-5 text-center transition ${csvFile
-                  ? "border-green-400 bg-green-50"
-                  : "border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50"
-                  }`}
-              >
-                {!csvFile ? (
-                  <>
-                    <div className="text-3xl mb-2">📄</div>
-
-                    <p className="text-sm font-semibold text-gray-700">
-                      Choose CSV file
-                    </p>
-
-                    <p className="text-xs text-gray-500 mt-1 mb-3">
-                      Only .csv files are supported
-                    </p>
-
-                    <label className="inline-block cursor-pointer px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition">
-                      Browse File
-
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".csv"
-                        hidden
-                        onChange={(e) =>
-                          setCsvFile(e.target.files?.[0] || null)
-                        }
-                      />
-                    </label>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-between bg-white rounded-lg px-3 py-3 border border-green-200">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="text-2xl">
-                        📄
-                      </div>
-
-                      <div className="text-left min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 truncate">
-                          {csvFile.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {(csvFile.size / 1024).toFixed(1)} KB
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCsvFile(null);
-
-                        if (fileInputRef.current) {
-                          fileInputRef.current.value = "";
-                        }
-                      }}
-                      className="ml-3 w-7 h-7 rounded-full bg-red-100 text-red-600 hover:bg-red-200 font-bold"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCsvUpload}
-                disabled={!csvFile || uploadingCsv}
-                className="mt-4 w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-              >
-                {uploadingCsv ? "Uploading..." : "Upload CSV"}
-              </button>
-            </div>
-            {/* ── RIGHT: Sidebar Cards ── */}
-            <div className="w-full lg:w-72 xl:w-80 flex flex-col gap-6">
-
-              {/* Recently Added */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-5 sm:p-6 transition-colors duration-200">
-                <div className="flex items-start gap-3 mb-4">
-                  <CheckCircleIcon />
-                  <div>
-                    <h3 className="font-bold text-gray-900 dark:text-white text-sm">Recently Added</h3>
-                    <p className="text-xs text-gray-500 dark:text-slate-450 mt-0.5 leading-relaxed">
-                      Employees added here will automatically appear in your {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} payroll worksheet.
-                    </p>
-                  </div>
+                {/* Submit and Cancel Buttons */}
+                <div className="flex flex-col-reverse sm:flex-row gap-4">
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    className="w-full sm:w-1/2 py-3.5 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-slate-600"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    id="add-employee-btn"
+                    type="submit"
+                    disabled={loading}
+                    className="w-full sm:w-1/2 py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                  >
+                    <PersonPlusIcon />
+                    {loading ? "Adding..." : "Add Employee"}
+                  </button>
                 </div>
+              </form>
 
-                <div className="space-y-0">
-                  {loadingRecent ? (
-                    <div className="py-6 text-center text-sm text-gray-500">Loading...</div>
-                  ) : recentEmployees.length === 0 ? (
-                    <div className="py-6 text-center text-sm text-gray-500">No employees added yet.</div>
+              {/* Bulk CSV Upload Card */}
+              <div className="mt-8 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 transition-colors duration-200">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                  Bulk Upload Employees
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-500 mb-4">
+                  Upload a CSV file to add multiple employees at once.
+                </p>
+
+                <div
+                  className={`border-2 border-dashed rounded-xl p-5 text-center transition ${csvFile
+                    ? "border-green-400 bg-green-50 dark:bg-green-950/20"
+                    : "border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800/50"
+                    }`}
+                >
+                  {!csvFile ? (
+                    <>
+                      <div className="text-3xl mb-2">📄</div>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-slate-300">
+                        Choose CSV file
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-slate-500 mt-1 mb-3">
+                        Only .csv files are supported
+                      </p>
+                      <label className="inline-block cursor-pointer px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition">
+                        Browse File
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".csv"
+                          hidden
+                          onChange={(e) =>
+                            setCsvFile(e.target.files?.[0] || null)
+                          }
+                        />
+                      </label>
+                    </>
                   ) : (
-                    recentEmployees.slice(0, 3).map((emp) => (
-                      <div key={emp._id} className="flex items-center gap-3 py-3 border-b border-gray-100 dark:border-slate-800 last:border-0">
-                        <Avatar name={emp.fullName} size={36} />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">{emp.fullName}</p>
-                          <p className="text-xs text-gray-500 dark:text-slate-500 truncate">
-                            {emp.role || "Employee"} {emp.department ? `• ${emp.department}` : ""}
+                    <div className="flex items-center justify-between bg-white dark:bg-slate-900 rounded-lg px-4 py-3 border border-green-200 dark:border-green-900/50">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="text-2xl">📄</div>
+                        <div className="text-left min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                            {csvFile.name}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-slate-500">
+                            {(csvFile.size / 1024).toFixed(1)} KB
                           </p>
                         </div>
-                        <span className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
-                          {fmt(emp.monthlySalary, emp.currency)}
-                        </span>
                       </div>
-                    ))
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCsvUpload}
+                          disabled={uploadingCsv}
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50"
+                        >
+                          {uploadingCsv ? "Uploading..." : "Upload"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCsvFile(null)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 transition"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                <button
-                  onClick={() => navigate("/dashboard")}
-                  className="mt-3 text-blue-600 dark:text-blue-450 text-sm font-semibold hover:text-blue-700 dark:hover:text-blue-300 transition flex items-center gap-1"
-                >
-                  View Full Directory <ArrowRightIcon />
-                </button>
               </div>
+            </div>
 
-              {/* Speed Tip Card */}
-              <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-gray-800 via-gray-900 to-gray-950 p-6 text-white shadow-lg">
-                {/* Decorative circles */}
-                <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/5" />
-                <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-white/5" />
-                <div className="absolute top-12 right-10 w-16 h-16 rounded-full bg-blue-500/10" />
-
-                <div className="relative z-10">
-                  <h3 className="font-bold text-base mb-1.5">Speed Tip</h3>
-                  <p className="text-gray-300 text-sm leading-relaxed">
-                    You can bulk upload employees via CSV in the Settings menu for larger teams.
-                  </p>
-
+            {/* ── RIGHT: Recent Employees ── */}
+            <div className="w-full lg:w-80 flex flex-col gap-6">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-serif font-bold text-gray-900 dark:text-white">Recent Additions</h2>
+                  <button
+                    onClick={() => navigate("/dashboard?tab=employees")}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
+                  >
+                    View All <ArrowRightIcon />
+                  </button>
                 </div>
+
+                {loadingRecent ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="animate-pulse flex items-center gap-3 p-2">
+                        <div className="w-9 h-9 bg-gray-200 dark:bg-slate-800 rounded-full" />
+                        <div className="flex-1 space-y-1">
+                          <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded w-24" />
+                          <div className="h-2 bg-gray-100 dark:bg-slate-800/60 rounded w-16" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : recentEmployees.length === 0 ? (
+                  <p className="text-xs text-gray-500 dark:text-slate-500 text-center py-4">
+                    No employees added yet.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-gray-100 dark:divide-slate-800">
+                    {recentEmployees.map((emp) => (
+                      <div key={emp._id} className="py-3 flex items-center gap-3">
+                        <Avatar name={emp.fullName} size={36} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                            {emp.fullName}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-slate-500 truncate">
+                            {emp.role} {emp.department ? `• ${emp.department}` : ""}
+                          </p>
+                        </div>
+                        <p className="text-xs font-bold text-gray-900 dark:text-slate-200">
+                          {fmt(emp.monthlySalary, emp.currency)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
           </div>
         </main>
-
-
       </div>
     </div>
   );

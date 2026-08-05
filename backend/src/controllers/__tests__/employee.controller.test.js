@@ -21,6 +21,11 @@ jest.mock("../../models/settlement.model", () => ({
 }));
 const { parse: mockParse } = require("csv-parse");
 
+// The company. A different value from the user id on purpose: since #613 the
+// scope is the tenant, not the account that created the row.
+const TENANT = "507f1f77bcf86cd799439098";
+const OTHER_TENANT = "507f1f77bcf86cd799439097";
+
 describe("Employee Controller - deleteEmployee (#345)", () => {
   let req, res, mockSession;
 
@@ -28,6 +33,7 @@ describe("Employee Controller - deleteEmployee (#345)", () => {
     req = {
       params: { id: "507f1f77bcf86cd799439011" },
       userId: "507f1f77bcf86cd799439012",
+      tenantId: TENANT,
     };
     res = {
       status: jest.fn().mockReturnThis(),
@@ -57,6 +63,7 @@ describe("Employee Controller - deleteEmployee (#345)", () => {
     const mockEmployee = {
       _id: "507f1f77bcf86cd799439011",
       createdBy: "507f1f77bcf86cd799439099",
+      tenantId: OTHER_TENANT,
       fullName: "John Doe",
       role: "Developer",
     };
@@ -74,6 +81,7 @@ describe("Employee Controller - deleteEmployee (#345)", () => {
     const mockEmployee = {
       _id: "507f1f77bcf86cd799439011",
       createdBy: "507f1f77bcf86cd799439012",
+      tenantId: TENANT,
       fullName: "John Doe",
       role: "Developer",
       isActive: true,
@@ -133,6 +141,7 @@ describe("Employee Controller - importEmployees", () => {
   beforeEach(() => {
     req = {
       userId: "user123",
+      tenantId: TENANT,
       file: { buffer: Buffer.from("dummy"), originalname: "employees.csv" },
     };
     res = {
@@ -338,6 +347,7 @@ describe("Employee Controller - updateEmployee", () => {
     employeeDoc = {
       _id: "emp1",
       createdBy: { toString: () => "user123" },
+      tenantId: { toString: () => TENANT },
       fullName: "Old Name",
       monthlySalary: 30000,
       overtimeRate: 100,
@@ -347,6 +357,7 @@ describe("Employee Controller - updateEmployee", () => {
     req = {
       params: { id: "507f1f77bcf86cd799439011" },
       userId: "user123",
+      tenantId: TENANT,
       body: {},
     };
     res = {
@@ -394,6 +405,7 @@ describe("Employee Controller - updateEmployee name propagation to PayrollUpdate
     employeeDoc = {
       _id: "507f1f77bcf86cd799439011",
       createdBy: { toString: () => "user123" },
+      tenantId: { toString: () => TENANT },
       fullName: "Original Name",
       role: "Engineer",
       monthlySalary: 30000,
@@ -404,6 +416,7 @@ describe("Employee Controller - updateEmployee name propagation to PayrollUpdate
     req = {
       params: { id: "507f1f77bcf86cd799439011" },
       userId: "user123",
+      tenantId: TENANT,
       body: {},
     };
     res = {
@@ -423,7 +436,7 @@ describe("Employee Controller - updateEmployee name propagation to PayrollUpdate
 
     expect(employeeDoc.fullName).toBe("New Name");
     expect(PayrollUpdate.updateMany).toHaveBeenCalledWith(
-      { employeeId: "507f1f77bcf86cd799439011", createdBy: "user123", status: "finalized" },
+      { employeeId: "507f1f77bcf86cd799439011", tenantId: TENANT, status: "finalized" },
       { $set: { employeeName: "New Name" } }
     );
     expect(res.status).toHaveBeenCalledWith(200);
@@ -466,7 +479,7 @@ describe("Employee Controller - updateEmployee name propagation to PayrollUpdate
     expect(employeeDoc.role).toBe("Senior Engineer");
     expect(employeeDoc.monthlySalary).toBe(50000);
     expect(PayrollUpdate.updateMany).toHaveBeenCalledWith(
-      { employeeId: "507f1f77bcf86cd799439011", createdBy: "user123", status: "finalized" },
+      { employeeId: "507f1f77bcf86cd799439011", tenantId: TENANT, status: "finalized" },
       { $set: { employeeName: "New Name" } }
     );
     expect(res.status).toHaveBeenCalledWith(200);

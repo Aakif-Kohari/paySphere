@@ -143,10 +143,11 @@ const Settlements = () => {
     if (!canPreview) return;
 
     try {
+      const lastWorkingDayDate = form.lastWorkingDay ? new Date(form.lastWorkingDay + 'T12:00:00.000Z') : undefined;
       const res = await api.get('/api/settlements/preview', {
         params: {
           employeeId: form.employeeId,
-          lastWorkingDay: form.lastWorkingDay,
+          lastWorkingDay: lastWorkingDayDate,
           unusedLeaveDays: form.unusedLeaveDays || undefined,
           noticePeriodDays: form.noticePeriodDays || undefined,
           noticeServedDays: form.noticeServedDays || undefined,
@@ -171,11 +172,12 @@ const Settlements = () => {
     setFormError('');
 
     try {
+      const lastWorkingDayDate = form.lastWorkingDay ? new Date(form.lastWorkingDay + 'T12:00:00.000Z') : undefined;
       // Record the exit first, so the employee moves onto notice and stays
       // payable up to their last day.
       await api.post('/api/settlements/initiate', {
         employeeId: form.employeeId,
-        lastWorkingDay: form.lastWorkingDay,
+        lastWorkingDay: lastWorkingDayDate,
         exitType: form.exitType,
         noticePeriodDays: form.noticePeriodDays || undefined,
         noticeServedDays: form.noticeServedDays || undefined,
@@ -183,7 +185,7 @@ const Settlements = () => {
 
       await api.post('/api/settlements', {
         employeeId: form.employeeId,
-        lastWorkingDay: form.lastWorkingDay,
+        lastWorkingDay: lastWorkingDayDate,
         unusedLeaveDays: Number(form.unusedLeaveDays) || 0,
         noticePeriodDays: form.noticePeriodDays ? Number(form.noticePeriodDays) : undefined,
         noticeServedDays: form.noticeServedDays ? Number(form.noticeServedDays) : undefined,

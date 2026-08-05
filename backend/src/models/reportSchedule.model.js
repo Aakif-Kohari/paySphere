@@ -22,9 +22,30 @@ const reportScheduleSchema = new mongoose.Schema(
         message: "Must provide at least one valid email address.",
       },
     },
+    /**
+     * Who created this row. An audit fact, not a scoping key.
+     *
+     * #585's codemod rewrote every `createdBy: req.userId` in the controllers
+     * to `tenantId: req.tenantId` while leaving this field `required: true`, so
+     * every insert omitted a field the schema demanded and `create()` threw
+     * before reaching Mongo (#613). Both fields are written now: this one
+     * records the actor, `tenantId` below decides who can see the row.
+     */
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
+      required: true,
+    },
+
+    /**
+     * Which company this row belongs to — the field every read filters on.
+     *
+     * Separate from `createdBy` because a company can have more than one admin,
+     * and a row created by one of them has to stay visible to the others.
+     */
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
       required: true,
     },
     lastRunAt: {
