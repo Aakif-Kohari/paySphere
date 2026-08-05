@@ -71,6 +71,7 @@ const DashboardOverview = ({
   payrolls,
   onEditEmployee,
 }) => {
+  const { t } = useTranslation();
   const currency = localStorage.getItem('currency') || 'INR';
   const payrollMap = {};
   (payrolls || []).forEach((p) => {
@@ -719,7 +720,6 @@ export default function PaySphereDashboard() {
   const [payrollPage, setPayrollPage] = useState(1);
   const [payrollTotalPages, setPayrollTotalPages] = useState(1);
   const [payrollTotalCount, setPayrollTotalCount] = useState(0);
-  const [payrollTotalPayout, setPayrollTotalPayout] = useState(0);
   const [payrollLoading, setPayrollLoading] = useState(false);
   const [paginatedPayrolls, setPaginatedPayrolls] = useState([]);
 
@@ -785,7 +785,6 @@ export default function PaySphereDashboard() {
         setTotalPages(empRes.data.totalPages);
         setTotalEmployees(empRes.data.totalEmployees || 0);
         setPayrolls(payRes.data.payrolls || []);
-        setPayrollTotalPayout(payRes.data.totalPayout || 0);
       } catch (err) {
         console.error('Failed to fetch data:', err);
       } finally {
