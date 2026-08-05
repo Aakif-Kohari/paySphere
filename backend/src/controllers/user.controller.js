@@ -163,6 +163,14 @@ exports.login = async (req, res, next) => {
     if (!isMatch)
       return res.status(400).json({ message: 'Invalid credentials' });
 
+    if (user.isTwoFactorEnabled) {
+      return res.status(200).json({
+        requires2FA: true,
+        userId: user._id,
+        message: "Two-Factor Authentication code required",
+      });
+    }
+
     // Self-heal on the way in, for accounts that predate #585 or that the
     // boot-time backfill has not reached. A no-op — one indexed read — once the
     // account has a tenant, which is every account created after this change.
@@ -179,13 +187,6 @@ exports.login = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
-  }
-  if (user.isTwoFactorEnabled) {
-    return res.status(200).json({
-      requires2FA: true,
-      userId: user._id,
-      message: "Two-Factor Authentication code required",
-    });
   }
 };
 
@@ -959,7 +960,7 @@ exports.validate2FALogin = async (req, res, next) => {
     }
 
     // Generate full JWT access token after successful 2FA
-    const accessToken = generateAccessToken(user._id); // Use your existing token helper function
+    const accessToken = generateTokens(user, res);
 
     return res.status(200).json({
       message: "2FA verification successful",
