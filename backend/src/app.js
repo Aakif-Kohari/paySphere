@@ -1,4 +1,5 @@
 const express = require("express");
+const dashboardRoutes = require('./routes/dashboard.routes')
 const cors = require("cors");
 const helmet = require("helmet");
 const multer = require("multer");
@@ -19,6 +20,7 @@ const salaryHistoryRoutes = require("./routes/salaryHistory.routes");
 const logger = require("./utils/logger");
 
 const app = express();
+app.use('/api/dashboard', dashboardRoutes)
 app.use(cookieParser());
 
 const errorHandler = require("./middlewares/error.middleware");
