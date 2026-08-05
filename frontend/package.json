@@ -26,6 +26,8 @@
     "axios": "^1.15.2",
     "cmdk": "^1.1.1",
     "i18next": "^26.3.6",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-helmet-async": "^3.0.0",
