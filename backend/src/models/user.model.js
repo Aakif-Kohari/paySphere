@@ -138,6 +138,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  isEmailVerified: {
+    type: Boolean,
+    default: false,
+  },
   employeeId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Employee",
