@@ -429,6 +429,10 @@ describe("getPayrollSummary floating-point precision unit test (#347)", () => {
     jest.resetAllMocks();
     req = {
       userId: "507f1f77bcf86cd799439011",
+      // getPayrollSummary asserts its scope with requireTenant now, instead of
+      // spreading a possibly-undefined `req.tenantId` into the filter and
+      // letting mongoose delete the key (#665). This fixture never set one.
+      tenantId: "507f1f77bcf86cd799439012",
       query: { month: "7", year: "2026" },
     };
     res = {
