@@ -58,6 +58,19 @@
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
+:root {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+@layer mui, base, components, utilities;
+
+html {
+  scroll-behavior: smooth;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* ==========================================================================

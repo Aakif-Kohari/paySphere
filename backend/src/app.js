@@ -1,5 +1,4 @@
 const express = require("express");
-const dashboardRoutes = require('./routes/dashboard.routes')
 const cors = require("cors");
 const helmet = require("helmet");
 const multer = require("multer");
@@ -17,10 +16,10 @@ const schedulerRoutes = require("./routes/scheduler.routes");
 const employeePortalRoutes = require("./routes/employeePortal.routes");
 const workflowRoutes = require("./routes/workflow.routes");
 const salaryHistoryRoutes = require("./routes/salaryHistory.routes");
+const dashboardRoutes = require("./routes/dashboard.routes");
 const logger = require("./utils/logger");
 
 const app = express();
-app.use('/api/dashboard', dashboardRoutes)
 app.use(cookieParser());
 
 const errorHandler = require("./middlewares/error.middleware");
@@ -82,7 +81,17 @@ app.use("/api/workflows", workflowRoutes);
 
 app.use('/api', salaryHistoryRoutes);
 
-app.use('/api/dashboard', dashboardRoutes);
+// Mounted here, once (#663).
+//
+// This router used to be mounted twice: on line 23, immediately after
+// `express()` and therefore *above* the cookie parser, Helmet, morgan, CORS,
+// the JSON body parser, the rate limiter and `requireBody` — and again down
+// here. Express serves the first mount that matches, so the copy that won was
+// the one with no middleware in front of it. Dashboard traffic got no security
+// headers, no origin check, no rate limit and no access log, and
+// `POST /api/dashboard/layout` threw a TypeError destructuring an unparsed
+// `req.body` on every call.
+app.use("/api/dashboard", dashboardRoutes);
 
 // CORS error handler — return 403 for blocked origins
 app.use((err, req, res, next) => {

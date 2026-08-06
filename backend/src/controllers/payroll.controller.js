@@ -35,6 +35,12 @@ const {
   resolveStructureForPeriod,
   computeComponentAmounts,
 } = require("../utils/salaryStructure");
+const { requireTenant } = require("../utils/tenantScope");
+const {
+  parseDepartments,
+  resolveDepartmentEmployeeIds,
+  applyEmployeeFilter,
+} = require("../utils/departmentFilter");
 
 // Also dropped by the #464 merge alongside the payrollStatus import: both are
 // referenced by parsePayrollIdBatch and rejectPayroll (#458).
@@ -1237,25 +1243,22 @@ exports.getPayrollSummary = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
-    // Parse department filter from query parameters
-    const departments = req.query.departments ? 
-      req.query.departments.split(',').map(d => d.trim()).filter(d => d.length > 0) : 
-      [];
-    
-    let employeeIds = null;
-    if (departments.length > 0) {
-      // Fetch employee IDs that match the selected departments
-      const employees = await Employee.find({
-        createdBy: req.userId,
-        deletedAt: null,
-        $or: [
-          { department: { $in: departments } },
-          { role: { $in: departments } }
-        ]
-      }).select('_id');
-      
-      employeeIds = employees.map(emp => emp._id.toString());
-    }
+    // Scoped by tenant, and refusing to run unscoped: the rest of this handler
+    // builds `baseQuery` from `req.tenantId`, and the employee lookup used to
+    // disagree with it by filtering on `createdBy: req.userId` — a field #585
+    // stopped writing (#665).
+    const tenantId = requireTenant(req);
+
+    // `null` means no filter was requested; an empty array means one was and
+    // nobody matched. Those are different answers and the old code conflated
+    // them, which turned a filter for an empty department into an unfiltered
+    // list of the whole month.
+    const departments = parseDepartments(req.query.departments);
+    const employeeIds = await resolveDepartmentEmployeeIds(
+      Employee,
+      tenantId,
+      departments,
+    );
 
     // Pagination parameters — default to page 1, 20 records per page.
     let page = parseInt(req.query.page, 10);
@@ -1268,16 +1271,18 @@ exports.getPayrollSummary = async (req, res, next) => {
     const skip = limit > 0 ? (page - 1) * limit : 0;
 
     const baseQuery = {
-      tenantId: req.tenantId,
+      tenantId,
       month,
       year,
       ...excludeRejectedFilter(),
     };
 
-    // Add employee filter if departments are specified
-    if (employeeIds && employeeIds.length > 0) {
-      baseQuery.employeeId = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
-    }
+    // Was: `{ $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) }`.
+    // ObjectId is an ES class since Mongoose 6 and this project runs 9.9, so
+    // calling it without `new` threw `Class constructor ObjectId cannot be
+    // invoked without 'new'` — every request with a department filter was a 500
+    // (#665).
+    applyEmployeeFilter(baseQuery, employeeIds);
 
     // Run the count and the paginated page fetch in parallel.
     const [totalCount, payrolls] = await Promise.all([
