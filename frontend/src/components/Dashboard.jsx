@@ -15,6 +15,23 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import dashboardMockup from "../assets/dashboard-mockup.png"
 
+/**
+ * Where this preview remembers the order the visitor dragged the cards into.
+ *
+ * This component is the marketing section on the public landing page — the
+ * three cards next to the product screenshot hold hardcoded sample figures, not
+ * anyone's payroll. It used to POST the order to `/api/dashboard/layout` with
+ * no credentials, which is the only reason that endpoint had no `auth` on it:
+ * the server stored every anonymous visitor's drag under one shared key, so the
+ * order you saved was whatever the last stranger had dragged (#663).
+ *
+ * A preview on a page you do not have to log in to see has nowhere to persist
+ * *to* on the server, and nothing worth persisting. It belongs in the visitor's
+ * own browser. `/api/dashboard/layout` is now authenticated and per-user, for
+ * the signed-in dashboard that actually needs it.
+ */
+const PREVIEW_LAYOUT_KEY = "paysphere.landing.preview-layout"
+
 function SortableCard({ id, title, value, subtitle }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id })
@@ -80,37 +97,35 @@ export default function Dashboard() {
   const sensors = useSensors(useSensor(PointerSensor))
 
   useEffect(() => {
-    async function loadLayout() {
-      try {
-        const res = await fetch("/api/dashboard/layout")
-        if (!res.ok) return
-        const data = await res.json()
-        if (!Array.isArray(data.order)) return
+    try {
+      const stored = window.localStorage.getItem(PREVIEW_LAYOUT_KEY)
+      if (!stored) return
 
-        const ordered = data.order
-          .map((id) => defaultCards.find((card) => card.id === id))
-          .filter(Boolean)
+      const order = JSON.parse(stored)
+      if (!Array.isArray(order)) return
 
-        if (ordered.length === defaultCards.length) {
-          setCards(ordered)
-        }
-      } catch (error) {
-        console.error("Unable to load dashboard layout", error)
+      const ordered = order
+        .map((id) => defaultCards.find((card) => card.id === id))
+        .filter(Boolean)
+
+      // Only adopt a stored order that still accounts for every card. A layout
+      // saved before a card was added or renamed is stale, and half a layout
+      // renders worse than the default one.
+      if (ordered.length === defaultCards.length) {
+        setCards(ordered)
       }
+    } catch (error) {
+      // Private browsing, a disabled storage quota, or malformed JSON. The
+      // preview just starts in its default order.
+      console.error("Unable to load the dashboard preview layout", error)
     }
-
-    loadLayout()
   }, [defaultCards])
 
-  const saveLayout = async (order) => {
+  const saveLayout = (order) => {
     try {
-      await fetch("/api/dashboard/layout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order }),
-      })
+      window.localStorage.setItem(PREVIEW_LAYOUT_KEY, JSON.stringify(order))
     } catch (error) {
-      console.error("Unable to save dashboard layout", error)
+      console.error("Unable to save the dashboard preview layout", error)
     }
   }
 
