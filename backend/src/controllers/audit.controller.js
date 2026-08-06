@@ -1,23 +1,155 @@
 const AuditLog = require("../models/auditLog.model");
+const { AUDIT_ACTIONS } = require("../models/auditLog.model");
+const { tenantFilter } = require("../utils/tenantScope");
+
+/**
+ * Reading the audit trail (#664).
+ *
+ * Both handlers filtered on `{ userId: req.userId }` and nothing else, so what
+ * came back was the caller's own actions — a personal diary rather than a
+ * company audit trail. An owner reviewing a payroll run saw only the half they
+ * performed themselves; the HR manager who submitted it and the second approver
+ * who signed it off were both invisible to them.
+ *
+ * The filter is the tenant now. `?actor=<userId>` narrows it back to one person
+ * for the cases where that is genuinely what you want.
+ */
+
+/** The most rows one page may return. */
+const MAX_PAGE_SIZE = 100;
+
+/** The default page size, unchanged. */
+const DEFAULT_PAGE_SIZE = 20;
+
+/**
+ * The most rows one CSV export may contain.
+ *
+ * The export had no bound at all: `AuditLog.find(query)` with no `limit`, every
+ * document hydrated into a mongoose model and held in memory while the CSV
+ * string is built. On a busy tenant a year of payroll activity is a lot of
+ * documents to load to answer one request.
+ */
+const MAX_EXPORT_ROWS = 10000;
+
+/**
+ * The `{ $gte, $lte }` clause for an optional date range, or null.
+ *
+ * An unparseable date used to fall through to `new Date("nonsense")`, which is
+ * an Invalid Date — mongoose then casts it and throws, so a typo in a query
+ * string was a 500.
+ *
+ * @param {object} query the request query string
+ * @returns {{ok: true, range: object|null} | {ok: false, message: string}}
+ */
+function parseDateRange({ startDate, endDate, days }) {
+  if (startDate || endDate) {
+    const range = {};
+
+    if (startDate) {
+      const from = new Date(startDate);
+      if (isNaN(from.getTime())) {
+        return { ok: false, message: "Invalid startDate format" };
+      }
+      range.$gte = from;
+    }
+
+    if (endDate) {
+      const to = new Date(endDate);
+      if (isNaN(to.getTime())) {
+        return { ok: false, message: "Invalid endDate format" };
+      }
+      range.$lte = to;
+    }
+
+    if (range.$gte && range.$lte && range.$gte > range.$lte) {
+      return { ok: false, message: "startDate must be on or before endDate" };
+    }
+
+    return { ok: true, range };
+  }
+
+  if (days) {
+    const daysNum = parseInt(days, 10);
+
+    if (isNaN(daysNum) || daysNum <= 0) {
+      return { ok: false, message: "days must be a positive integer" };
+    }
+
+    const pastDate = new Date();
+    pastDate.setDate(pastDate.getDate() - daysNum);
+
+    return { ok: true, range: { $gte: pastDate } };
+  }
+
+  return { ok: true, range: null };
+}
+
+/**
+ * Build the scoped query for both handlers.
+ *
+ * @param {object} req
+ * @returns {{ok: true, query: object} | {ok: false, message: string}}
+ */
+function buildQuery(req) {
+  // Throws MissingTenantError rather than handing back `{}` — see
+  // utils/tenantScope.js for why an unscoped audit query is the dangerous case.
+  const query = tenantFilter(req);
+
+  const parsed = parseDateRange(req.query);
+  if (!parsed.ok) return parsed;
+  if (parsed.range) query.createdAt = parsed.range;
+
+  // Narrow to one actor. `?actor=me` is the old behaviour, kept because the
+  // Settings page's "my recent activity" panel wants exactly that.
+  if (req.query.actor) {
+    query.userId = req.query.actor === "me" ? req.userId : req.query.actor;
+  }
+
+  if (req.query.action) {
+    if (!AUDIT_ACTIONS.includes(req.query.action)) {
+      return { ok: false, message: `Unknown action: ${req.query.action}` };
+    }
+    query.action = req.query.action;
+  }
+
+  return { ok: true, query };
+}
 
 exports.getAuditLogs = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    const built = buildQuery(req);
+    if (!built.ok) return res.status(400).json({ message: built.message });
+
+    let page = parseInt(req.query.page, 10);
+    if (isNaN(page) || page < 1) page = 1;
+
+    let limit = parseInt(req.query.limit, 10);
+    if (isNaN(limit) || limit < 1) limit = DEFAULT_PAGE_SIZE;
+    if (limit > MAX_PAGE_SIZE) limit = MAX_PAGE_SIZE;
+
     const skip = (page - 1) * limit;
 
-    const logs = await AuditLog.find({ userId: req.userId })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const totalLogs = await AuditLog.countDocuments({ userId: req.userId });
+    // The count and the page in parallel: they are independent, and the old
+    // code awaited them one after the other.
+    const [logs, totalLogs] = await Promise.all([
+      AuditLog.find(built.query)
+        .sort({ createdAt: -1 })
+        // Who did it matters as much as what was done, and the trail is no
+        // longer single-actor — without this the UI renders a column of raw
+        // ObjectIds.
+        .populate("userId", "fullName email")
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      AuditLog.countDocuments(built.query),
+    ]);
 
     res.status(200).json({
       logs,
-      totalPages: Math.ceil(totalLogs / limit),
+      totalPages: Math.ceil(totalLogs / limit) || 1,
       currentPage: page,
-      totalLogs
+      totalLogs,
+      pageSize: limit,
     });
   } catch (error) {
     next(error);
@@ -27,26 +159,19 @@ exports.getAuditLogs = async (req, res, next) => {
 // EXPORT AUDIT LOGS TO CSV
 exports.exportAuditLogsCSV = async (req, res, next) => {
   try {
-    const { startDate, endDate, days } = req.query;
-    const query = { userId: req.userId };
+    const built = buildQuery(req);
+    if (!built.ok) return res.status(400).json({ message: built.message });
 
-    if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
-    } else if (days) {
-      const daysNum = parseInt(days, 10);
-      if (!isNaN(daysNum) && daysNum > 0) {
-        const pastDate = new Date();
-        pastDate.setDate(pastDate.getDate() - daysNum);
-        query.createdAt = { $gte: pastDate };
-      }
-    }
-
-    const logs = await AuditLog.find(query).sort({ createdAt: -1 });
+    const logs = await AuditLog.find(built.query)
+      .sort({ createdAt: -1 })
+      .limit(MAX_EXPORT_ROWS)
+      .populate("userId", "fullName email")
+      .lean();
 
     const header = [
       "Timestamp",
+      "Actor",
+      "Actor Email",
       "Action",
       "Resource Type",
       "Resource IDs",
@@ -70,6 +195,8 @@ exports.exportAuditLogsCSV = async (req, res, next) => {
 
     const rows = logs.map((log) => [
       escapeCsvField(log.createdAt ? new Date(log.createdAt).toISOString() : ""),
+      escapeCsvField(log.userId?.fullName || ""),
+      escapeCsvField(log.userId?.email || ""),
       escapeCsvField(log.action || ""),
       escapeCsvField(log.resourceType || ""),
       escapeCsvField(Array.isArray(log.resourceIds) ? log.resourceIds.join("; ") : log.resourceIds || ""),
@@ -92,3 +219,8 @@ exports.exportAuditLogsCSV = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.MAX_PAGE_SIZE = MAX_PAGE_SIZE;
+exports.DEFAULT_PAGE_SIZE = DEFAULT_PAGE_SIZE;
+exports.MAX_EXPORT_ROWS = MAX_EXPORT_ROWS;
+exports.parseDateRange = parseDateRange;

@@ -10,6 +10,7 @@ const {
   backfillSalaryStructures,
 } = require("./migrations/backfillSalaryStructures");
 const { backfillTenants } = require("./migrations/backfillTenants");
+const { registerAuditListener } = require("./listeners/audit.listener");
 const logger = require("./utils/logger");
 
 const startServer = async () => {
@@ -44,6 +45,15 @@ const startServer = async () => {
   // shapes the earlier ones normalise. Idempotent, a no-op on an already-scoped
   // database, and never throws — see migrations/backfillTenants.js (#612).
   await backfillTenants();
+
+  // Subscribe to AUDIT_LOG. Nothing did, ever: `listeners/audit.listener.js`
+  // registered its handler as a side effect of being required, and no file in
+  // the tree required it. Thirty-three emits across nine controllers fired into
+  // an EventEmitter with no subscribers — a silent no-op — so the AuditLog
+  // collection was empty and `GET /api/audit-logs` returned [] on every account
+  // (#664). Called here rather than imported for its side effect, because a
+  // side-effect import is what got deleted the first time.
+  registerAuditListener();
 
   // Start background jobs
   startCronJobs();
