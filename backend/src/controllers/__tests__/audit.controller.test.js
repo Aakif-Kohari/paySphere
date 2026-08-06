@@ -111,6 +111,30 @@ describe('getAuditLogs — scope (#664)', () => {
 
     expect(chain.populate).toHaveBeenCalledWith('userId', 'fullName email');
   });
+
+  test('handles null userId gracefully if user was deleted', async () => {
+    const chain = queryStub([
+      {
+        createdAt: new Date('2026-08-01T10:00:00Z'),
+        userId: null,
+        action: 'PAYROLL_APPROVE',
+      },
+    ]);
+    AuditLog.find.mockReturnValue(chain);
+
+    const res = buildRes();
+    await getAuditLogs(buildReq(), res, jest.fn());
+
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        logs: [
+          expect.objectContaining({
+            userId: { fullName: 'Deleted User', email: '' },
+          }),
+        ],
+      }),
+    );
+  });
 });
 
 describe('getAuditLogs — pagination (#664)', () => {
@@ -305,5 +329,26 @@ describe('exportAuditLogsCSV (#664)', () => {
     expect(next).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'MissingTenantError' }),
     );
+  });
+
+  test('handles null userId in CSV export gracefully', async () => {
+    const chain = queryStub([
+      {
+        createdAt: new Date('2026-08-01T10:00:00Z'),
+        userId: null,
+        action: 'PAYROLL_APPROVE',
+        resourceType: 'Payroll',
+        resourceIds: [],
+        result: 'success',
+        details: {},
+      },
+    ]);
+    AuditLog.find.mockReturnValue(chain);
+
+    const res = buildRes();
+    await exportAuditLogsCSV(buildReq(), res, jest.fn());
+
+    const csv = res.send.mock.calls[0][0];
+    expect(csv).toContain('Deleted User');
   });
 });
