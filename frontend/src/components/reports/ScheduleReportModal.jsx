@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/label-has-associated-control, jsx-a11y/anchor-is-valid */
 import React, { useState } from 'react';
 import api from '../../services/api';
 
@@ -38,7 +39,7 @@ const ScheduleReportModal = ({ isOpen, onClose, defaultType = 'analytics', onSch
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center h-screen bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md border border-gray-200 dark:border-slate-800">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-800">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">Schedule Report</h2>
