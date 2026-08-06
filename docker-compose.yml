@@ -1,6 +1,7 @@
 services:
   mongo:
     image: mongo:7
+    platform: linux/amd64
     container_name: paysphere-mongo
     restart: unless-stopped
     ports:
