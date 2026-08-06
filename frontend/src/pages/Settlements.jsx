@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Snackbar } from '@mui/material';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Pagination from '../components/Pagination';
 import api from '../services/api';
 
 const STATUS_LABELS = {
@@ -72,6 +73,12 @@ const Settlements = () => {
   const [busy, setBusy] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
 
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const limit = 10;
+
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     employeeId: '',
@@ -87,10 +94,8 @@ const Settlements = () => {
     allowNegative: false,
   });
 
-  // Preview writes nothing, so the number can be modelled before committing.
   const [preview, setPreview] = useState(null);
   const [formError, setFormError] = useState('');
-
   const [toast, setToast] = useState({ open: false, severity: 'success', message: '' });
 
   const notify = useCallback((severity, message) => {
@@ -102,20 +107,34 @@ const Settlements = () => {
     setLoadError('');
 
     try {
-      const params = statusFilter ? { status: statusFilter } : {};
+      const params = {
+        page,
+        limit,
+        ...(statusFilter ? { status: statusFilter } : {}),
+      };
+
       const res = await api.get('/api/settlements', { params });
+      
       setSettlements(res.data?.settlements || []);
+      setTotalPages(res.data?.totalPages || 1);
+      setTotalCount(res.data?.totalCount || 0);
     } catch (error) {
       setSettlements([]);
       setLoadError(describeError(error, 'Could not load settlements.'));
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, page, limit]);
 
   useEffect(() => {
     fetchSettlements();
   }, [fetchSettlements]);
+
+  // Reset to page 1 whenever status filter changes
+  const handleFilterChange = (status) => {
+    setStatusFilter(status);
+    setPage(1);
+  };
 
   useEffect(() => {
     if (!showForm || employees.length > 0) return;
@@ -143,7 +162,9 @@ const Settlements = () => {
     if (!canPreview) return;
 
     try {
-      const lastWorkingDayDate = form.lastWorkingDay ? new Date(form.lastWorkingDay + 'T12:00:00.000Z') : undefined;
+      const lastWorkingDayDate = form.lastWorkingDay
+        ? new Date(form.lastWorkingDay + 'T12:00:00.000Z')
+        : undefined;
       const res = await api.get('/api/settlements/preview', {
         params: {
           employeeId: form.employeeId,
@@ -172,9 +193,10 @@ const Settlements = () => {
     setFormError('');
 
     try {
-      const lastWorkingDayDate = form.lastWorkingDay ? new Date(form.lastWorkingDay + 'T12:00:00.000Z') : undefined;
-      // Record the exit first, so the employee moves onto notice and stays
-      // payable up to their last day.
+      const lastWorkingDayDate = form.lastWorkingDay
+        ? new Date(form.lastWorkingDay + 'T12:00:00.000Z')
+        : undefined;
+
       await api.post('/api/settlements/initiate', {
         employeeId: form.employeeId,
         lastWorkingDay: lastWorkingDayDate,
@@ -199,6 +221,7 @@ const Settlements = () => {
       notify('success', 'Settlement drafted.');
       setShowForm(false);
       setPreview(null);
+      setPage(1);
       await fetchSettlements();
     } catch (error) {
       setFormError(describeError(error, 'Could not create the settlement.'));
@@ -238,8 +261,7 @@ const Settlements = () => {
             Full &amp; Final Settlements
           </h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-            Offboard an employee with a final statement — their payroll history
-            is preserved.
+            Offboard an employee with a final statement — their payroll history is preserved.
           </p>
         </div>
 
@@ -439,12 +461,13 @@ const Settlements = () => {
         </form>
       )}
 
+      {/* Status Filters */}
       <div className="flex flex-wrap gap-2 mb-4">
         {['', 'draft', 'pending_approval', 'approved', 'paid', 'cancelled'].map(
           (status) => (
             <button
               key={status || 'all'}
-              onClick={() => setStatusFilter(status)}
+              onClick={() => handleFilterChange(status)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
                 statusFilter === status
                   ? 'bg-blue-600 text-white'
@@ -490,99 +513,110 @@ const Settlements = () => {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {settlements.map((item) => (
-            <div
-              key={item._id}
-              className="p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl"
-            >
-              <div className="flex flex-wrap justify-between items-start gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-lg text-gray-900 dark:text-white">
-                      {item.employeeName}
+        <div className="space-y-4">
+          <div className="grid gap-4">
+            {settlements.map((item) => (
+              <div
+                key={item._id}
+                className="p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl"
+              >
+                <div className="flex flex-wrap justify-between items-start gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-lg text-gray-900 dark:text-white">
+                        {item.employeeName}
+                      </p>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          STATUS_STYLES[item.status] || STATUS_STYLES.draft
+                        }`}
+                      >
+                        {STATUS_LABELS[item.status] || item.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                      Last working day {formatDate(item.lastWorkingDay)}
                     </p>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                        STATUS_STYLES[item.status] || STATUS_STYLES.draft
-                      }`}
-                    >
-                      {STATUS_LABELS[item.status] || item.status}
-                    </span>
+                    <p className="text-sm text-gray-700 dark:text-slate-300 mt-1">
+                      Gross {formatCurrency(item.grossEarnings)} − deductions{' '}
+                      {formatCurrency(item.totalDeductions)} ={' '}
+                      <strong
+                        className={
+                          item.netSettlement < 0
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-gray-900 dark:text-white'
+                        }
+                      >
+                        {formatCurrency(item.netSettlement)}
+                      </strong>
+                    </p>
+                    {item.rejectionReason && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        Sent back: {item.rejectionReason}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                    Last working day {formatDate(item.lastWorkingDay)}
-                  </p>
-                  <p className="text-sm text-gray-700 dark:text-slate-300 mt-1">
-                    Gross {formatCurrency(item.grossEarnings)} − deductions{' '}
-                    {formatCurrency(item.totalDeductions)} ={' '}
-                    <strong
-                      className={
-                        item.netSettlement < 0
-                          ? 'text-red-600 dark:text-red-400'
-                          : 'text-gray-900 dark:text-white'
-                      }
-                    >
-                      {formatCurrency(item.netSettlement)}
-                    </strong>
-                  </p>
-                  {item.rejectionReason && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      Sent back: {item.rejectionReason}
-                    </p>
-                  )}
-                </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {item.status === 'draft' && (
-                    <button
-                      disabled={busy}
-                      onClick={() => runAction(item._id, 'submit')}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
-                    >
-                      Submit for approval
-                    </button>
-                  )}
-                  {item.status === 'pending_approval' && (
-                    <>
+                  <div className="flex flex-wrap gap-2">
+                    {item.status === 'draft' && (
                       <button
                         disabled={busy}
-                        onClick={() => runAction(item._id, 'approve')}
+                        onClick={() => runAction(item._id, 'submit')}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
+                      >
+                        Submit for approval
+                      </button>
+                    )}
+                    {item.status === 'pending_approval' && (
+                      <>
+                        <button
+                          disabled={busy}
+                          onClick={() => runAction(item._id, 'approve')}
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          disabled={busy}
+                          onClick={() => handleReject(item._id)}
+                          className="px-3 py-1.5 border border-red-500 text-red-600 dark:text-red-400 rounded-lg text-sm font-semibold disabled:opacity-50"
+                        >
+                          Send back
+                        </button>
+                      </>
+                    )}
+                    {item.status === 'approved' && (
+                      <button
+                        disabled={busy}
+                        onClick={() => runAction(item._id, 'mark-paid')}
                         className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
                       >
-                        Approve
+                        Mark paid &amp; offboard
                       </button>
+                    )}
+                    {['draft', 'pending_approval', 'approved'].includes(item.status) && (
                       <button
                         disabled={busy}
-                        onClick={() => handleReject(item._id)}
-                        className="px-3 py-1.5 border border-red-500 text-red-600 dark:text-red-400 rounded-lg text-sm font-semibold disabled:opacity-50"
+                        onClick={() => runAction(item._id, 'cancel')}
+                        className="px-3 py-1.5 border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-400 rounded-lg text-sm font-semibold disabled:opacity-50"
                       >
-                        Send back
+                        Cancel
                       </button>
-                    </>
-                  )}
-                  {item.status === 'approved' && (
-                    <button
-                      disabled={busy}
-                      onClick={() => runAction(item._id, 'mark-paid')}
-                      className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
-                    >
-                      Mark paid &amp; offboard
-                    </button>
-                  )}
-                  {['draft', 'pending_approval', 'approved'].includes(item.status) && (
-                    <button
-                      disabled={busy}
-                      onClick={() => runAction(item._id, 'cancel')}
-                      className="px-3 py-1.5 border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-400 rounded-lg text-sm font-semibold disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+
+          {/* Reusable Standardized Pagination Component */}
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={totalCount}
+            itemsPerPage={limit}
+            onPageChange={(newPage) => setPage(newPage)}
+          />
         </div>
       )}
 
