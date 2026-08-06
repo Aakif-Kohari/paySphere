@@ -1,11 +1,12 @@
-import { useMemo } from 'react';
-import GridViewIcon from '@mui/icons-material/GridView';
-import PeopleIcon from '@mui/icons-material/People';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
-import LogoutIcon from '@mui/icons-material/Logout';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import GridViewIcon from '@mui/icons-material/GridView';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
+import LogoutIcon from '@mui/icons-material/Logout';
+import PeopleIcon from '@mui/icons-material/People';
+import { useMemo } from 'react';
+import ThemeToggle from './ThemeToggle';
 
 const Sidebar = ({
   companyName,
@@ -93,6 +94,7 @@ const Sidebar = ({
         </nav>
 
         <div className="p-3 border-t border-gray-200 dark:border-slate-800 space-y-2">
+          <ThemeToggle showLabel className="w-full" />
           <button
             onClick={() => {
               window.location.href = 'mailto:support@paysphere.com';
