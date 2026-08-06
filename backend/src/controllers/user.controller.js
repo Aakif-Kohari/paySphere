@@ -176,6 +176,7 @@ exports.login = async (req, res, next) => {
     // account has a tenant, which is every account created after this change.
     await ensureTenantForUser(user);
 
+    const { generateTokens } = require('../utils/generateToken');
     const token = generateTokens(user, res);
 
     res.status(200).json({
