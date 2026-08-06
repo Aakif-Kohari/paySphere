@@ -144,8 +144,13 @@ exports.getAuditLogs = async (req, res, next) => {
       AuditLog.countDocuments(built.query),
     ]);
 
+    const processedLogs = logs.map((log) => ({
+      ...log,
+      userId: log.userId || { fullName: "Deleted User", email: "" },
+    }));
+
     res.status(200).json({
-      logs,
+      logs: processedLogs,
       totalPages: Math.ceil(totalLogs / limit) || 1,
       currentPage: page,
       totalLogs,
@@ -193,18 +198,21 @@ exports.exportAuditLogsCSV = async (req, res, next) => {
       return str;
     };
 
-    const rows = logs.map((log) => [
-      escapeCsvField(log.createdAt ? new Date(log.createdAt).toISOString() : ""),
-      escapeCsvField(log.userId?.fullName || ""),
-      escapeCsvField(log.userId?.email || ""),
-      escapeCsvField(log.action || ""),
-      escapeCsvField(log.resourceType || ""),
-      escapeCsvField(Array.isArray(log.resourceIds) ? log.resourceIds.join("; ") : log.resourceIds || ""),
-      escapeCsvField(log.result || "success"),
-      escapeCsvField(log.details || {}),
-      escapeCsvField(log.ipAddress || log.ip || ""),
-      escapeCsvField(log.userAgent || ""),
-    ]);
+    const rows = logs.map((log) => {
+      const actor = log.userId || { fullName: "Deleted User", email: "" };
+      return [
+        escapeCsvField(log.createdAt ? new Date(log.createdAt).toISOString() : ""),
+        escapeCsvField(actor.fullName),
+        escapeCsvField(actor.email),
+        escapeCsvField(log.action || ""),
+        escapeCsvField(log.resourceType || ""),
+        escapeCsvField(Array.isArray(log.resourceIds) ? log.resourceIds.join("; ") : log.resourceIds || ""),
+        escapeCsvField(log.result || "success"),
+        escapeCsvField(log.details || {}),
+        escapeCsvField(log.ipAddress || log.ip || ""),
+        escapeCsvField(log.userAgent || ""),
+      ];
+    });
 
     const csvContent = [header.join(","), ...rows.map((row) => row.join(","))].join("\n");
 
