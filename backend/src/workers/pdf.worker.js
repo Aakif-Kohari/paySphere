@@ -4,7 +4,7 @@ const { formatCurrency } = require("../utils/currency");
 
 async function generatePDF() {
   try {
-    const { type, payload } = data;
+    const { type, payload } = workerData;
 
     if (type === "GENERATE_COMPANY_REPORT") {
       const { payrolls, employeeMap, companyName, companyLogo, monthName, year, totalBase, totalOvertime, totalBonus, totalDeductions, totalPayout, currency = "INR" } = payload;
@@ -23,7 +23,7 @@ async function generatePDF() {
           // companyLogo might be a base64 string
           const logoBuffer = Buffer.from(companyLogo.replace(/^data:image\/\w+;base64,/, ""), 'base64');
           doc.image(logoBuffer, 40, 30, { fit: [50, 50] });
-        } catch (err) {}
+        } catch (error) { console.error(error); }
       }
       doc.fontSize(22).font("Helvetica-Bold").fillColor("#1e3a5f").text(companyName, { align: "center" });
       doc.fontSize(12).font("Helvetica").fillColor("#666666").text(`Payroll Summary Report — ${monthName} ${year}`, { align: "center" });
@@ -169,7 +169,7 @@ async function generatePDF() {
         try {
           const logoBuffer = Buffer.from(companyLogo.replace(/^data:image\/\w+;base64,/, ""), 'base64');
           doc.image(logoBuffer, 50, 40, { fit: [50, 50] });
-        } catch (err) {}
+        } catch (error) { console.error(error); }
       }
       doc.fontSize(20).text("PaySphere", { align: "center" });
       doc.moveDown();
