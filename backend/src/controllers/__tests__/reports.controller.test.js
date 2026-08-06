@@ -211,6 +211,88 @@ describe('Reports Controller - getAnalytics', () => {
 
     expect(next).toHaveBeenCalledWith(error);
   });
+
+  test('should return 400 when startDate is after endDate (#527)', async () => {
+    req.query = { startDate: '2026-06-01', endDate: '2026-01-01' };
+
+    await getAnalytics(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'startDate must be on or before endDate',
+    });
+    expect(PayrollUpdate.find).not.toHaveBeenCalled();
+  });
+
+  test('should return 400 for an invalid startDate format (#527)', async () => {
+    req.query = { startDate: 'not-a-date' };
+
+    await getAnalytics(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Invalid startDate format',
+    });
+    expect(PayrollUpdate.find).not.toHaveBeenCalled();
+  });
+
+  test('should return 400 for an invalid endDate format (#527)', async () => {
+    req.query = { endDate: 'not-a-date' };
+
+    await getAnalytics(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Invalid endDate format',
+    });
+    expect(PayrollUpdate.find).not.toHaveBeenCalled();
+  });
+
+  test('should accept a valid date range and filter payrolls by period (#527)', async () => {
+    req.query = { startDate: '2026-01-01', endDate: '2026-06-30' };
+    PayrollUpdate.find.mockResolvedValue([]);
+    Employee.find.mockResolvedValue([]);
+
+    await getAnalytics(req, res, next);
+
+    const query = PayrollUpdate.find.mock.calls[0][0];
+    // Same-year range collapses to a single { year, month } filter.
+    expect(query.year).toBe(2026);
+    expect(query.month.$gte).toBe(1);
+    expect(query.month.$lte).toBe(6);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  test('should accept a date range spanning multiple years (#527)', async () => {
+    req.query = { startDate: '2025-11-01', endDate: '2026-02-28' };
+    PayrollUpdate.find.mockResolvedValue([]);
+    Employee.find.mockResolvedValue([]);
+
+    await getAnalytics(req, res, next);
+
+    const query = PayrollUpdate.find.mock.calls[0][0];
+    expect(query.$or).toEqual([
+      { year: { $gt: 2025, $lt: 2026 } },
+      { year: 2025, month: { $gte: 11 } },
+      { year: 2026, month: { $lte: 2 } },
+    ]);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  test('should accept a single-sided date range (#527)', async () => {
+    req.query = { startDate: '2026-01-01' };
+    PayrollUpdate.find.mockResolvedValue([]);
+    Employee.find.mockResolvedValue([]);
+
+    await getAnalytics(req, res, next);
+
+    const query = PayrollUpdate.find.mock.calls[0][0];
+    // startDate only: end defaults to "now". Both fall in the current year, so
+    // the range collapses to a single { year, month } filter.
+    expect(query.year).toBe(2026);
+    expect(query.month.$gte).toBe(1);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
 });
 
 describe('Reports Controller - downloadPDFReport', () => {

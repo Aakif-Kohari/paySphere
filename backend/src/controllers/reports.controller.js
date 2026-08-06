@@ -54,6 +54,29 @@ async function getEmployeeIdsByDepartments(userId, departments) {
   return employees.map(emp => emp._id.toString());
 }
 
+/**
+ * Build a { year, month } period filter that covers the calendar range
+ * [start, end]. Payroll rows carry `month` (1-12) and `year` rather than a
+ * single timestamp, so a calendar date range maps onto those two fields.
+ */
+function periodRangeFilter(start, end) {
+  const startYear = start.getFullYear();
+  const startMonth = start.getMonth() + 1;
+  const endYear = end.getFullYear();
+  const endMonth = end.getMonth() + 1;
+
+  if (startYear === endYear) {
+    return { year: startYear, month: { $gte: startMonth, $lte: endMonth } };
+  }
+  return {
+    $or: [
+      { year: { $gt: startYear, $lt: endYear } },
+      { year: startYear, month: { $gte: startMonth } },
+      { year: endYear, month: { $lte: endMonth } },
+    ],
+  };
+}
+
 // GET /api/reports/analytics
 // Returns aggregated financial stats for the authenticated user's company
 exports.getAnalytics = async (req, res, next) => {
@@ -62,13 +85,42 @@ exports.getAnalytics = async (req, res, next) => {
     const tenantId = req.tenantId;
     const monthsBack = Math.min(Math.max(parseInt(req.query.months) || 6, 1), 12);
 
+    // Validate the optional date range (#527). An invalid date, or a startDate
+    // that falls after endDate, used to reach the query and crash with a 500;
+    // now it is a 400 with a meaningful message.
+    let rangeStart = null;
+    let rangeEnd = null;
+    if (req.query.startDate) {
+      rangeStart = new Date(req.query.startDate);
+      if (isNaN(rangeStart.getTime())) {
+        return res.status(400).json({ message: "Invalid startDate format" });
+      }
+    }
+    if (req.query.endDate) {
+      rangeEnd = new Date(req.query.endDate);
+      if (isNaN(rangeEnd.getTime())) {
+        return res.status(400).json({ message: "Invalid endDate format" });
+      }
+    }
+    if (rangeStart && rangeEnd && rangeStart > rangeEnd) {
+      return res.status(400).json({
+        message: "startDate must be on or before endDate",
+      });
+    }
+
     // Parse department filter
     const departments = parseDepartments(req.query.departments);
     const employeeIds = await getEmployeeIdsByDepartments(userId, departments);
 
-    // Include departments in cache key for proper cache invalidation
+    // Include departments in cache key for proper cache invalidation. A date
+    // range is part of the key too: without it, a range-scoped request could
+    // be served the unfiltered response cached under the same months/default
+    // key (or vice-versa) (#527).
     const departmentKey = departments.length > 0 ? departments.sort().join(',') : 'all';
-    const cacheKey = `analytics:${userId}:${monthsBack}:${departmentKey}`;
+    const rangeKey = rangeStart || rangeEnd
+      ? `range:${rangeStart ? rangeStart.toISOString() : '*'}:${rangeEnd ? rangeEnd.toISOString() : '*'}`
+      : `months:${monthsBack}`;
+    const cacheKey = `analytics:${userId}:${rangeKey}:${departmentKey}`;
 
     // 1. Check cache first
     const cachedData = await cacheService.get(cacheKey);
@@ -76,9 +128,21 @@ exports.getAnalytics = async (req, res, next) => {
       return res.status(200).json(cachedData);
     }
 
-    // Calculate date range
+    // Resolve the effective period. An explicit date range overrides the
+    // months-based default.
     const now = new Date();
-    const startDate = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+    const defaultStart = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+    const periodQuery = rangeStart || rangeEnd
+      ? periodRangeFilter(rangeStart || defaultStart, rangeEnd || now)
+      : {
+          $or: [
+            { year: { $gt: defaultStart.getFullYear() } },
+            {
+              year: defaultStart.getFullYear(),
+              month: { $gte: defaultStart.getMonth() + 1 },
+            },
+          ],
+        };
 
     // Fetch all payroll records within the date range
     // Analytics is the owner's view of what payroll actually cost. Rows still
@@ -87,13 +151,7 @@ exports.getAnalytics = async (req, res, next) => {
     const payrolls = await PayrollUpdate.find({
       tenantId,
       ...payableStatusFilter(),
-      $or: [
-        { year: { $gt: startDate.getFullYear() } },
-        {
-          year: startDate.getFullYear(),
-          month: { $gte: startDate.getMonth() + 1 },
-        },
-      ],
+      ...periodQuery,
     });
 
     // Fetch all employees for role breakdown - filter by departments if specified
