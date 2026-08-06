@@ -69,7 +69,7 @@ export default function PaySphereLogin() {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          'Something went wrong. Please try again.',
+        'Something went wrong. Please try again.',
       );
     } finally {
       setLoading(false);
@@ -93,7 +93,7 @@ export default function PaySphereLogin() {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          'Failed to send reset link. Please try again.',
+        'Failed to send reset link. Please try again.',
       );
     } finally {
       setLoading(false);
@@ -210,11 +210,10 @@ export default function PaySphereLogin() {
                   setActiveTab('login');
                   resetFormState();
                 }}
-                className={`flex-1 py-2 cursor-pointer rounded-lg text-sm font-medium transition ${
-                  activeTab === 'login'
+                className={`flex-1 py-2 cursor-pointer rounded-lg text-sm font-medium transition ${activeTab === 'login'
                     ? 'bg-white dark:bg-slate-900 shadow text-gray-900 dark:text-white'
                     : 'text-gray-500 dark:text-slate-450 hover:text-gray-700 dark:hover:text-slate-200'
-                }`}
+                  }`}
               >
                 Login
               </button>
@@ -224,11 +223,10 @@ export default function PaySphereLogin() {
                   setActiveTab('signup');
                   resetFormState();
                 }}
-                className={`flex-1 py-2 cursor-pointer rounded-lg text-sm font-medium transition ${
-                  activeTab === 'signup'
+                className={`flex-1 py-2 cursor-pointer rounded-lg text-sm font-medium transition ${activeTab === 'signup'
                     ? 'bg-white dark:bg-slate-900 shadow text-gray-900 dark:text-white'
                     : 'text-gray-500 dark:text-slate-450 hover:text-gray-700 dark:hover:text-slate-200'
-                }`}
+                  }`}
               >
                 Create Account
               </button>
@@ -268,8 +266,7 @@ export default function PaySphereLogin() {
 
                       <button
                         type="submit"
-                        disabled={loading}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition mb-5 text-center disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                        className="w-full py-3 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold rounded-lg transition shadow-lg shadow-brand-500/30"
                       >
                         {loading ? 'Sending...' : 'Send Reset Link'}
                       </button>
