@@ -1,44 +1,44 @@
 /**
  * @fileoverview Dashboard Routes
- * @description Defines API endpoints for dashboard metrics, summaries, and customizable layouts.
- * Issue: #519 (Summary), Existing (Layouts)
+ * @description API endpoints for dashboard metrics, summaries and per-user
+ * widget layouts.
+ * Issues: #519 (summary), #663 (mounting and auth on the layout endpoints)
  */
 
 const express = require('express');
 const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
 const { getDashboardSummary } = require('../controllers/dashboard.controller');
+const {
+  getLayout,
+  saveLayout,
+} = require('../controllers/dashboardLayout.controller');
 
 const router = express.Router();
 
 // ==========================================
-// DASHBOARD LAYOUT ROUTES (Existing)
+// DASHBOARD LAYOUT ROUTES
 // ==========================================
 
-const dashboardLayouts = new Map();
-
-function getUserId(req) {
-  // Support both req.user.id (common in older setups) and req.userId (from our auth middleware)
-  return req.user?.id || req.userId || 'anonymous';
-}
-
-router.get('/layout', (req, res) => {
-  const userId = getUserId(req);
-  const order = dashboardLayouts.get(userId) || [];
-  res.json({ order });
-});
-
-router.post('/layout', (req, res) => {
-  const userId = getUserId(req);
-  const { order } = req.body;
-
-  if (!Array.isArray(order)) {
-    return res.status(400).json({ error: 'order must be an array' });
-  }
-
-  dashboardLayouts.set(userId, order);
-  res.json({ success: true });
-});
+/**
+ * Both of these used to be unauthenticated (#663).
+ *
+ * `/summary` below has always had `auth` and a permission check. The two layout
+ * routes had neither, and the handler resolved the caller with
+ *
+ *     req.user?.id || req.userId || 'anonymous'
+ *
+ * On a route with no `auth` in front of it neither of the first two is ever
+ * set, so every request in the world — with or without a token — read and wrote
+ * the entry stored under `'anonymous'`.
+ *
+ * `PUT` is the honest verb for "replace my layout with this one" and is what
+ * the client uses now. `POST` is kept as an alias so a bundle cached from
+ * before this change keeps working rather than 404ing mid-session.
+ */
+router.get('/layout', auth, getLayout);
+router.put('/layout', auth, saveLayout);
+router.post('/layout', auth, saveLayout);
 
 // ==========================================
 // DASHBOARD METRICS ROUTES (Issue #519)
@@ -47,7 +47,7 @@ router.post('/layout', (req, res) => {
 /**
  * GET /api/dashboard/summary
  * Retrieves comprehensive dashboard metrics with Redis caching.
- * Requires READ_EMPLOYEE or READ_PAYROLL permissions.
+ * Requires READ_EMPLOYEE permission.
  */
 router.get(
   '/summary',
