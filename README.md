@@ -198,7 +198,54 @@ cd backend && npm run dev
 cd frontend && npm run dev
 ```
 
-### 4. Testing
+### 4. Run with Docker (Recommended)
+
+The entire stack (MongoDB + backend + frontend) can be started with a single command using [Docker Compose](https://docs.docker.com/compose/). Hot-reloading is enabled for both the backend (nodemon) and the frontend (Vite HMR).
+
+Prerequisites: [Docker](https://www.docker.com/products/docker-desktop/) with Docker Compose v2.
+
+```bash
+# From the repo root
+docker compose up --build
+```
+
+This starts:
+- **MongoDB** at `localhost:27017`
+- **Backend API** at `http://localhost:5000`
+- **Frontend** at `http://localhost:5173`
+
+All services work out of the box with sensible defaults. To override secrets and Google/SMTP settings, copy the root `.env.example` to `.env` and edit it:
+
+```bash
+cp .env.example .env
+```
+
+Then restart the stack for changes to take effect:
+
+```bash
+docker compose up -d
+docker compose restart backend
+```
+
+Useful commands:
+
+```bash
+# Build/start all services in the background
+docker compose up --build -d
+
+# Stream logs from all services (or one: docker compose logs backend)
+docker compose logs -f
+
+# Stop the stack (keeps the MongoDB volume)
+docker compose down
+
+# Stop and delete the MongoDB data volume
+docker compose down -v
+```
+
+> **Note:** Redis is optional. Without a `REDIS_URL`, caching falls back to an in-memory store and background payslip email jobs remain available in a degraded mode.
+
+### 5. Testing
 ```bash
 # Run backend test suite (Jest + Supertest)
 cd backend && npm test
