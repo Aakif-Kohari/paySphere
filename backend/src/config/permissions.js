@@ -20,6 +20,14 @@ const PERMISSIONS = {
   // from WRITE_PAYROLL so the two can be held by different people (#458).
   APPROVE_PAYROLL: "APPROVE_PAYROLL",
   READ_REPORT: "READ_REPORT",
+  // Kept apart from READ_REPORT because they are not the same act. Viewing a
+  // report is a read; standing up a recurring job that mails a payroll register
+  // to an address of your choosing is a write, and a fairly serious one. Both
+  // scheduler write routes were gated on READ_REPORT, which every role holds
+  // including Employee — so anyone who could view a report could also schedule
+  // an export of company salary data to an external mailbox, or delete another
+  // admin's schedule (#666).
+  MANAGE_REPORT_SCHEDULE: "MANAGE_REPORT_SCHEDULE",
 };
 
 const PERMISSION_DEFINITIONS = [
@@ -51,6 +59,11 @@ const PERMISSION_DEFINITIONS = [
   {
     name: PERMISSIONS.READ_REPORT,
     description: "View analytics and download generated reports",
+  },
+  {
+    name: PERMISSIONS.MANAGE_REPORT_SCHEDULE,
+    description:
+      "Create and delete recurring report schedules, which mail company data to their recipients",
   },
 ];
 
@@ -84,6 +97,7 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.WRITE_PAYROLL,
       PERMISSIONS.APPROVE_PAYROLL,
       PERMISSIONS.READ_REPORT,
+      PERMISSIONS.MANAGE_REPORT_SCHEDULE,
     ],
   },
   {
