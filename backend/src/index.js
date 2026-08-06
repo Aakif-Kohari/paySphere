@@ -2,7 +2,11 @@ require("dotenv").config();
 const app = require("./app");
 const connectDB = require("./config/db");
 const { startCronJobs } = require("./jobs/cron.jobs");
-require("./jobs/reportCron"); // Load report scheduling cron job
+// Was `require("./jobs/reportCron")` for its side effect: the module called
+// cron.schedule() at require time, so anything importing it — a test wanting
+// one function out of it — started a live timer. It exports a starter now, the
+// same shape cron.jobs.js already uses (#667).
+const { startReportCron } = require("./jobs/reportCron");
 const { seedRbac } = require("./seeds/rbac.seed");
 const { backfillAccountType } = require("./migrations/backfillAccountType");
 const { backfillPayrollStatus } = require("./migrations/backfillPayrollStatus");
@@ -57,6 +61,7 @@ const startServer = async () => {
 
   // Start background jobs
   startCronJobs();
+  startReportCron();
   
   const PORT = process.env.PORT || 5000;
   const server = app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
