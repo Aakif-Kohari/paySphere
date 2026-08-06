@@ -1,11 +1,13 @@
+import { useSelector } from 'react-redux';
 import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Tooltip,
-  Cell,
-  Legend,
+    Cell,
+    Legend,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
 } from "recharts";
+import { createChartTooltip, formatTooltipValue } from './chartTooltip';
 
 
 
@@ -17,6 +19,13 @@ const COLORS = [
 ];
 
 export default function SalaryDistributionChart({ data }) {
+  const themeMode = useSelector((state) => state.ui.themeMode);
+  const isDark = themeMode === 'dark';
+  const tooltipContent = createChartTooltip({
+    isDark,
+    formatValue: formatTooltipValue,
+  });
+
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm p-6">
       <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-5">
@@ -41,7 +50,10 @@ export default function SalaryDistributionChart({ data }) {
               ))}
             </Pie>
 
-            <Tooltip />
+            <Tooltip
+              cursor={{ fill: isDark ? 'rgba(30, 41, 59, 0.12)' : 'rgba(148, 163, 184, 0.16)' }}
+              content={tooltipContent}
+            />
 
             <Legend />
           </PieChart>
