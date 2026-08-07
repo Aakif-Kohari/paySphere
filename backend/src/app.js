@@ -25,21 +25,15 @@ app.use(cookieParser());
 
 const errorHandler = require("./middlewares/error.middleware");
 
-// Security headers
-app.use(helmet({ crossOriginOpenerPolicy: false }));
-
-// Rate limiting trust proxy configuration
-app.set("trust proxy", 1);
-
-// HTTP request logging via morgan + winston
-app.use(morgan("combined", { stream: logger.stream }));
-
-// CORS configuration — restrict to frontend origin
+// CORS configuration — restrict strictly to frontend origin
 const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. server-to-server, curl, mobile apps)
-    if (!origin || origin === allowedOrigin) {
+    // Allow requests with no origin (e.g. server-to-server, unit tests)
+    if (!origin) {
+      return callback(null, true);
+    }
+    if (origin === allowedOrigin) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
@@ -47,6 +41,39 @@ const corsOptions = {
   },
   credentials: true,
 };
+
+// Security headers (HSTS, Content Security Policy, X-Content-Type-Options: nosniff)
+app.use(
+  helmet({
+    crossOriginOpenerPolicy: false,
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: ["'self'", allowedOrigin],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameAncestors: ["'none'"], // blocks clickjacking
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year HSTS
+      includeSubDomains: true,
+      preload: true,
+    },
+    xContentTypeOptions: true, // nosniff
+  })
+);
+
+// Rate limiting trust proxy configuration
+app.set("trust proxy", 1);
+
+// HTTP request logging via morgan + winston
+app.use(morgan("combined", { stream: logger.stream }));
 
 // Middleware
 app.use(express.json({ limit: "10mb" }));
