@@ -5,6 +5,7 @@ const Employee = require("../models/employee.model");
 const PayrollUpdate = require("../models/payroll.model");
 const User = require("../models/user.model");
 const { calculateNetSalary } = require("../utils/salaryCalculator");
+const AnomalyService = require("../services/anomaly.service");
 const { generatePayrollCSV } = require("../utils/csvExport");
 const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
