@@ -33,4 +33,11 @@ export default defineConfig([
       'react-hooks/set-state-in-effect': 'off',
     },
   },
+  {
+    // Playwright specs run in Node, not the browser
+    files: ['e2e/**/*.{js,jsx}'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ]);
