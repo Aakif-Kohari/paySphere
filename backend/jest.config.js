@@ -1,0 +1,1 @@
+module.exports = { transformIgnorePatterns: ['/node_modules/(?!(@scure|otplib)/)'] };
