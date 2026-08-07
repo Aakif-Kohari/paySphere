@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
+import SystemHealthSkeleton from '../components/common/skeleton/SystemHealthSkeleton';
 import api from "../services/api";
 
 export default function SystemHealth() {
@@ -69,7 +70,7 @@ export default function SystemHealth() {
         )}
 
         {/* Metrics Grid */}
-        {health && (
+        {health ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Database Card */}
             <div className="p-6 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-xs">
@@ -98,7 +99,9 @@ export default function SystemHealth() {
               <p className="text-xs text-gray-500 dark:text-slate-500">RSS: {health.memory.rssMB} MB</p>
             </div>
           </div>
-        )}
+        ) : loading ? (
+          <SystemHealthSkeleton />
+        ) : null}
 
         <p className="text-xs text-gray-400 dark:text-slate-500 text-right">
           Last checked at: {lastRefreshed.toLocaleTimeString()} (Auto-refreshes every 15s)
