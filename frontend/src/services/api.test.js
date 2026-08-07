@@ -103,6 +103,28 @@ describe('401 still ends the session', () => {
     expect(localStorage.getItem('token')).toBeNull();
   });
 
+  test('a failed refresh on a background request does not clear token, triggers toast event, and resolves successfully to prevent unhandled rejection', async () => {
+    const axios = (await import('axios')).default;
+    axios.post.mockRejectedValueOnce(new Error('refresh rejected'));
+
+    const onToast = vi.fn();
+    window.addEventListener('toast:show', onToast);
+
+    const bgFailure = {
+      config: { url: '/api/notes/autosave', headers: { 'X-Background-Request': 'true' } },
+      response: { status: 401, data: { message: 'unauthorized' } },
+    };
+
+    const result = await handler(bgFailure);
+
+    window.removeEventListener('toast:show', onToast);
+
+    expect(localStorage.getItem('token')).toBe('a-valid-token');
+    expect(onToast).toHaveBeenCalled();
+    expect(result.data.success).toBe(false);
+    expect(result.data.error).toBe('Session expired');
+  });
+
   test('a 401 on the refresh endpoint itself clears the token', async () => {
     await expect(
       handler(failureWith(401, '/api/auth/refresh')),

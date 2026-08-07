@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSelector, useDispatch } from "react-redux"
-import { ThemeProvider, createTheme, CssBaseline } from "@mui/material"
+import { ThemeProvider, createTheme, CssBaseline, Snackbar, Alert } from "@mui/material"
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import { logout } from "./features/auth/authSlice"
 import Landing from "./pages/Landing"
@@ -21,6 +21,20 @@ import Flashcards from "./pages/Flashcards"
 function App() {
   const dispatch = useDispatch();
   const themeMode = useSelector((state) => state.ui.themeMode);
+  const [toast, setToast] = useState({ open: false, message: "", severity: "info" });
+
+  // Listen to global toast events (e.g. from axios interceptor background saves)
+  useEffect(() => {
+    const handleToastShow = (e) => {
+      setToast({
+        open: true,
+        message: e.detail?.message || "Notification received",
+        severity: e.detail?.severity || "info",
+      });
+    };
+    window.addEventListener("toast:show", handleToastShow);
+    return () => window.removeEventListener("toast:show", handleToastShow);
+  }, []);
 
   // Synchronize Redux auth state when API interceptor detects expired/invalid auth
   useEffect(() => {
@@ -77,6 +91,20 @@ function App() {
         <ScrollToTop />
         <CommandPalette />
       </BrowserRouter>
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={6000}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          severity={toast.severity}
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          sx={{ width: '100%' }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </ThemeProvider>
   )
 }
