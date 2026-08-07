@@ -925,13 +925,15 @@ export default function PaySphereDashboard() {
     }
   };
 
-  const getInitials = (name) =>
-    name
+  const getInitials = (name) => {
+    if (!name) return '';
+    return name
       .split(' ')
       .map((w) => w[0])
       .join('')
       .slice(0, 2)
       .toUpperCase();
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-slate-950 flex font-sans text-slate-800 dark:text-slate-200 transition-colors duration-200">

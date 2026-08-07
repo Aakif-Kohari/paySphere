@@ -31,6 +31,7 @@ const Sidebar = ({
   );
 
   const initials = useMemo(() => {
+    if (!companyName) return '';
     return companyName
       .split(' ')
       .map((w) => w[0])

@@ -289,8 +289,10 @@ export default function Reports() {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
-  const getInitials = (name) =>
-    name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  const getInitials = (name) => {
+    if (!name) return '';
+    return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  };
 
   // Custom styles for react-select to match the app's theme
   const selectStyles = {
