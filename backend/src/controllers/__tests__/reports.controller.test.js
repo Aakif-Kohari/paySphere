@@ -425,6 +425,33 @@ describe('Reports Controller - downloadPDFReport', () => {
     // Should not return 400 (invalid params) — should proceed to 404 (no data)
     expect(res.status).toHaveBeenCalledWith(404);
   });
+
+  test('should filter by departments query param without crashing (#656)', async () => {
+    req.query = { month: '6', year: '2026', departments: 'Engineering,Design' };
+    Employee.find.mockResolvedValue([
+      { _id: 'emp1' },
+      { _id: 'emp2' },
+    ]);
+    PayrollUpdate.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue([]),
+    });
+
+    await downloadPDFReport(req, res, next);
+
+    // Employee lookup was called with the department filter
+    const empQuery = Employee.find.mock.calls[0][0];
+    expect(empQuery.$or).toEqual([
+      { department: { $in: ['Engineering', 'Design'] } },
+      { role: { $in: ['Engineering', 'Design'] } },
+    ]);
+    // Payroll query filtered by the resolved employee IDs
+    const payrollQuery = PayrollUpdate.find.mock.calls[0][0];
+    expect(payrollQuery.employeeId).toEqual({
+      $in: expect.any(Array),
+    });
+    // No crash: reached the 404 (no payrolls for filtered employees)
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
 });
 
 describe('Reports Controller - exportExcelReport', () => {

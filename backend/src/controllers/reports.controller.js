@@ -278,6 +278,11 @@ exports.downloadPDFReport = async (req, res, next) => {
       ...payableStatusFilter(),
     };
 
+    // Parse department filter from query params (#656). These were referenced
+    // before being defined, crashing every report download at runtime.
+    const departments = parseDepartments(req.query.departments);
+    const employeeIds = await getEmployeeIdsByDepartments(userId, departments);
+
     if (employeeIds && employeeIds.length > 0) {
       payrollQuery.employeeId = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
     }
@@ -478,6 +483,11 @@ exports.exportExcelReport = async (req, res, next) => {
       ...payableStatusFilter(),
     };
 
+    // Parse department filter from query params (#656). These were referenced
+    // before being defined, crashing every report download at runtime.
+    const departments = parseDepartments(req.query.departments);
+    const employeeIds = await getEmployeeIdsByDepartments(userId, departments);
+
     if (employeeIds && employeeIds.length > 0) {
       payrollQuery.employeeId = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
     }
@@ -635,6 +645,11 @@ exports.downloadPayslipsZip = async (req, res, next) => {
       year,
       ...payableStatusFilter(),
     };
+
+    // Parse department filter from query params (#656). These were referenced
+    // before being defined, crashing every report download at runtime.
+    const departments = parseDepartments(req.query.departments);
+    const employeeIds = await getEmployeeIdsByDepartments(userId, departments);
 
     if (employeeIds && employeeIds.length > 0) {
       payrollQuery.employeeId = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
