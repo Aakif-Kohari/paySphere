@@ -191,8 +191,6 @@ async function generatePDF() {
       doc.fontSize(14).text(`Net Salary: ${formatCurrency(payroll.netSalary, currency)}`, { underline: true });
       doc.end();
     }
-
-    doc.end();
   } catch (error) {
     parentPort.postMessage({ success: false, error: error.message });
   }
