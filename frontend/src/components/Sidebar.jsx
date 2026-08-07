@@ -5,6 +5,7 @@ import GridViewIcon from '@mui/icons-material/GridView';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PeopleIcon from '@mui/icons-material/People';
+import SchoolIcon from '@mui/icons-material/School';
 import { useMemo } from 'react';
 import ThemeToggle from './ThemeToggle';
 
@@ -24,6 +25,7 @@ const Sidebar = ({
       { id: 'Settlements', label: 'Exits & F&F', icon: <LogoutIcon /> },
       { id: 'Loans', label: 'Advances', icon: <AccountBalanceWalletIcon /> },
       { id: 'Reports', label: 'Reports', icon: <AssessmentIcon /> },
+      { id: 'Flashcards', label: 'AI Study Circle', icon: <SchoolIcon /> },
     ],
     [],
   );
