@@ -19,6 +19,7 @@ import CommandPalette from "./components/common/CommandPalette"
 import SystemHealth from "./pages/SystemHealth"
 import Flashcards from "./pages/Flashcards"
 import PyqDashboard from "./pages/PyqDashboard"
+import QuizBattle from "./pages/QuizBattle"
 function App() {
   const dispatch = useDispatch();
   const themeMode = useSelector((state) => state.ui.themeMode);
@@ -88,6 +89,7 @@ function App() {
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
           <Route path="/pyqs" element={<ProtectedRoute><PyqDashboard /></ProtectedRoute>} />
+          <Route path="/quiz-battle" element={<ProtectedRoute><QuizBattle /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <ScrollToTop />

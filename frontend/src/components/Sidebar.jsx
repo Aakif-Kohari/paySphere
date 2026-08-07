@@ -6,6 +6,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PeopleIcon from '@mui/icons-material/People';
 import SchoolIcon from '@mui/icons-material/School';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import { useMemo } from 'react';
 import ThemeToggle from './ThemeToggle';
 
@@ -27,6 +28,7 @@ const Sidebar = ({
       { id: 'Reports', label: 'Reports', icon: <AssessmentIcon /> },
       { id: 'Flashcards', label: 'AI Study Circle', icon: <SchoolIcon /> },
       { id: 'PYQs', label: 'AI PYQ Trends', icon: <AssessmentIcon /> },
+      { id: 'QuizBattle', label: 'Quiz Battle Arena', icon: <SportsEsportsIcon /> },
     ],
     [],
   );

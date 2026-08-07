@@ -940,6 +940,8 @@ export default function PaySphereDashboard() {
             navigate('/flashcards');
           } else if (page === 'PYQs') {
             navigate('/pyqs');
+          } else if (page === 'QuizBattle') {
+            navigate('/quiz-battle');
           } else {
             setActivePage(page);
           }
