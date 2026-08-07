@@ -938,6 +938,8 @@ export default function PaySphereDashboard() {
             navigate('/reports');
           } else if (page === 'Flashcards') {
             navigate('/flashcards');
+          } else if (page === 'PYQs') {
+            navigate('/pyqs');
           } else {
             setActivePage(page);
           }

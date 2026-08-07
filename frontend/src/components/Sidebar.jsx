@@ -26,6 +26,7 @@ const Sidebar = ({
       { id: 'Loans', label: 'Advances', icon: <AccountBalanceWalletIcon /> },
       { id: 'Reports', label: 'Reports', icon: <AssessmentIcon /> },
       { id: 'Flashcards', label: 'AI Study Circle', icon: <SchoolIcon /> },
+      { id: 'PYQs', label: 'AI PYQ Trends', icon: <AssessmentIcon /> },
     ],
     [],
   );

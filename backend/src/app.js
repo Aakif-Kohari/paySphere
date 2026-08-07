@@ -18,6 +18,7 @@ const workflowRoutes = require("./routes/workflow.routes");
 const salaryHistoryRoutes = require("./routes/salaryHistory.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
 const flashcardRoutes = require("./routes/flashcard.routes");
+const pyqRoutes = require("./routes/pyq.routes");
 const logger = require("./utils/logger");
 
 const app = express();
@@ -109,6 +110,7 @@ app.use("/api/workflows", workflowRoutes);
 
 app.use('/api', salaryHistoryRoutes);
 app.use("/api/flashcards", flashcardRoutes);
+app.use("/api/pyqs", pyqRoutes);
 
 // Mounted here, once (#663).
 //

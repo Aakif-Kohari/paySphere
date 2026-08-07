@@ -18,6 +18,7 @@ import ScrollToTop from "./components/common/ScrollToTop"
 import CommandPalette from "./components/common/CommandPalette"
 import SystemHealth from "./pages/SystemHealth"
 import Flashcards from "./pages/Flashcards"
+import PyqDashboard from "./pages/PyqDashboard"
 function App() {
   const dispatch = useDispatch();
   const themeMode = useSelector((state) => state.ui.themeMode);
@@ -86,6 +87,7 @@ function App() {
           <Route path="/settings/system-health" element={<ProtectedRoute><SystemHealth /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
           <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
+          <Route path="/pyqs" element={<ProtectedRoute><PyqDashboard /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <ScrollToTop />
