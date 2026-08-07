@@ -36,6 +36,8 @@ const employeeSchema = new mongoose.Schema(
       default: '',
       maxlength: [100, 'Role cannot exceed 100 characters'],
     },
+    targetCurrency: { type: String, default: "USD" },
+    baseCurrency: { type: String, default: "USD" },
     department: {
       type: String,
       default: '',

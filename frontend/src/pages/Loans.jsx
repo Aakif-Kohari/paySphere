@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Snackbar } from '@mui/material';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import LoansSkeleton from '../components/common/skeleton/LoansSkeleton';
 import api from '../services/api';
 
 const MONTH_NAMES = [
@@ -464,14 +465,7 @@ const Loans = () => {
       )}
 
       {loading ? (
-        <div className="space-y-3">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-24 rounded-xl bg-gray-100 dark:bg-slate-800/60 animate-pulse"
-            />
-          ))}
-        </div>
+       <LoansSkeleton/>
       ) : loans.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
           <p className="text-gray-500 dark:text-slate-500">
