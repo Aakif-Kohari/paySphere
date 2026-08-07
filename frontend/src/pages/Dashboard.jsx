@@ -936,6 +936,8 @@ export default function PaySphereDashboard() {
         setActivePage={(page) => {
           if (page === 'Reports') {
             navigate('/reports');
+          } else if (page === 'Flashcards') {
+            navigate('/flashcards');
           } else {
             setActivePage(page);
           }
