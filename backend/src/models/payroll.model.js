@@ -102,6 +102,8 @@ const payrollUpdateSchema = new mongoose.Schema({
   // controller that compares against it. `set` folds the legacy "finalized" and
   // the screaming-snake spellings onto the canonical values so documents
   // written by either older revision keep validating.
+  blockchainTxHash: { type: String },
+  merkleRoot: { type: String },
   status: {
     type: String,
     enum: ALL_STATUSES,
