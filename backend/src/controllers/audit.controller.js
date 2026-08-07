@@ -1,6 +1,6 @@
-const AuditLog = require("../models/auditLog.model");
-const { AUDIT_ACTIONS } = require("../models/auditLog.model");
-const { tenantFilter } = require("../utils/tenantScope");
+const AuditLog = require('../models/auditLog.model');
+const { AUDIT_ACTIONS } = require('../models/auditLog.model');
+const { tenantFilter } = require('../utils/tenantScope');
 
 /**
  * Reading the audit trail (#664).
@@ -19,7 +19,7 @@ const { tenantFilter } = require("../utils/tenantScope");
 const MAX_PAGE_SIZE = 100;
 
 /** The default page size, unchanged. */
-const DEFAULT_PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 50;
 
 /**
  * The most rows one CSV export may contain.
@@ -48,7 +48,7 @@ function parseDateRange({ startDate, endDate, days }) {
     if (startDate) {
       const from = new Date(startDate);
       if (isNaN(from.getTime())) {
-        return { ok: false, message: "Invalid startDate format" };
+        return { ok: false, message: 'Invalid startDate format' };
       }
       range.$gte = from;
     }
@@ -56,13 +56,13 @@ function parseDateRange({ startDate, endDate, days }) {
     if (endDate) {
       const to = new Date(endDate);
       if (isNaN(to.getTime())) {
-        return { ok: false, message: "Invalid endDate format" };
+        return { ok: false, message: 'Invalid endDate format' };
       }
       range.$lte = to;
     }
 
     if (range.$gte && range.$lte && range.$gte > range.$lte) {
-      return { ok: false, message: "startDate must be on or before endDate" };
+      return { ok: false, message: 'startDate must be on or before endDate' };
     }
 
     return { ok: true, range };
@@ -72,7 +72,7 @@ function parseDateRange({ startDate, endDate, days }) {
     const daysNum = parseInt(days, 10);
 
     if (isNaN(daysNum) || daysNum <= 0) {
-      return { ok: false, message: "days must be a positive integer" };
+      return { ok: false, message: 'days must be a positive integer' };
     }
 
     const pastDate = new Date();
@@ -102,7 +102,7 @@ function buildQuery(req) {
   // Narrow to one actor. `?actor=me` is the old behaviour, kept because the
   // Settings page's "my recent activity" panel wants exactly that.
   if (req.query.actor) {
-    query.userId = req.query.actor === "me" ? req.userId : req.query.actor;
+    query.userId = req.query.actor === 'me' ? req.userId : req.query.actor;
   }
 
   if (req.query.action) {
@@ -124,20 +124,19 @@ exports.getAuditLogs = async (req, res, next) => {
     if (isNaN(page) || page < 1) page = 1;
 
     let limit = parseInt(req.query.limit, 10);
-    if (isNaN(limit) || limit < 1) limit = DEFAULT_PAGE_SIZE;
-    if (limit > MAX_PAGE_SIZE) limit = MAX_PAGE_SIZE;
+    if (isNaN(limit) || limit < 1) limit = 50;
+
+    if (typeof MAX_PAGE_SIZE !== 'undefined' && limit > MAX_PAGE_SIZE) {
+      limit = MAX_PAGE_SIZE;
+    }
 
     const skip = (page - 1) * limit;
 
-    // The count and the page in parallel: they are independent, and the old
-    // code awaited them one after the other.
+    // The count and the page in parallel: they are independent
     const [logs, totalLogs] = await Promise.all([
       AuditLog.find(built.query)
         .sort({ createdAt: -1 })
-        // Who did it matters as much as what was done, and the trail is no
-        // longer single-actor — without this the UI renders a column of raw
-        // ObjectIds.
-        .populate("userId", "fullName email")
+        .populate('userId', 'fullName email')
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -146,15 +145,18 @@ exports.getAuditLogs = async (req, res, next) => {
 
     const processedLogs = logs.map((log) => ({
       ...log,
-      userId: log.userId || { fullName: "Deleted User", email: "" },
+      userId: log.userId || { fullName: 'Deleted User', email: '' },
     }));
 
+    // Return a metadata object containing totalRecords and totalPages
     res.status(200).json({
       logs: processedLogs,
-      totalPages: Math.ceil(totalLogs / limit) || 1,
-      currentPage: page,
-      totalLogs,
-      pageSize: limit,
+      metadata: {
+        totalRecords: totalLogs,
+        totalPages: Math.ceil(totalLogs / limit) || 1,
+        currentPage: page,
+        pageSize: limit,
+      },
     });
   } catch (error) {
     next(error);
@@ -170,56 +172,66 @@ exports.exportAuditLogsCSV = async (req, res, next) => {
     const logs = await AuditLog.find(built.query)
       .sort({ createdAt: -1 })
       .limit(MAX_EXPORT_ROWS)
-      .populate("userId", "fullName email")
+      .populate('userId', 'fullName email')
       .lean();
 
     const header = [
-      "Timestamp",
-      "Actor",
-      "Actor Email",
-      "Action",
-      "Resource Type",
-      "Resource IDs",
-      "Result",
-      "Details",
-      "IP Address",
-      "User Agent",
+      'Timestamp',
+      'Actor',
+      'Actor Email',
+      'Action',
+      'Resource Type',
+      'Resource IDs',
+      'Result',
+      'Details',
+      'IP Address',
+      'User Agent',
     ];
 
     const escapeCsvField = (value) => {
-      if (value === undefined || value === null) return "";
-      let str = typeof value === "object" ? JSON.stringify(value) : String(value);
+      if (value === undefined || value === null) return '';
+      let str =
+        typeof value === 'object' ? JSON.stringify(value) : String(value);
       if (/^[=+\-@\t\r]/.test(str)) {
         str = "'" + str;
       }
-      if (str.includes(",") || str.includes("\n") || str.includes('"')) {
+      if (str.includes(',') || str.includes('\n') || str.includes('"')) {
         return `"${str.replace(/"/g, '""')}"`;
       }
       return str;
     };
 
     const rows = logs.map((log) => {
-      const actor = log.userId || { fullName: "Deleted User", email: "" };
+      const actor = log.userId || { fullName: 'Deleted User', email: '' };
       return [
-        escapeCsvField(log.createdAt ? new Date(log.createdAt).toISOString() : ""),
+        escapeCsvField(
+          log.createdAt ? new Date(log.createdAt).toISOString() : '',
+        ),
         escapeCsvField(actor.fullName),
         escapeCsvField(actor.email),
-        escapeCsvField(log.action || ""),
-        escapeCsvField(log.resourceType || ""),
-        escapeCsvField(Array.isArray(log.resourceIds) ? log.resourceIds.join("; ") : log.resourceIds || ""),
-        escapeCsvField(log.result || "success"),
+        escapeCsvField(log.action || ''),
+        escapeCsvField(log.resourceType || ''),
+        escapeCsvField(
+          Array.isArray(log.resourceIds)
+            ? log.resourceIds.join('; ')
+            : log.resourceIds || '',
+        ),
+        escapeCsvField(log.result || 'success'),
         escapeCsvField(log.details || {}),
-        escapeCsvField(log.ipAddress || log.ip || ""),
-        escapeCsvField(log.userAgent || ""),
+        escapeCsvField(log.ipAddress || log.ip || ''),
+        escapeCsvField(log.userAgent || ''),
       ];
     });
 
-    const csvContent = [header.join(","), ...rows.map((row) => row.join(","))].join("\n");
+    const csvContent = [
+      header.join(','),
+      ...rows.map((row) => row.join(',')),
+    ].join('\n');
 
-    res.setHeader("Content-Type", "text/csv");
+    res.setHeader('Content-Type', 'text/csv');
     res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=audit_logs_${new Date().toISOString().split("T")[0]}.csv`
+      'Content-Disposition',
+      `attachment; filename=audit_logs_${new Date().toISOString().split('T')[0]}.csv`,
     );
 
     return res.status(200).send(csvContent);
