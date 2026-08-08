@@ -185,7 +185,12 @@ exports.login = async (req, res, next) => {
     // account has a tenant, which is every account created after this change.
     await ensureTenantForUser(user);
 
-    const { generateTokens } = require('../utils/generateToken');
+    // There is no `utils/generateToken` module — `generateTokens` is defined at
+    // the top of this file, and every other call site in it uses that one. This
+    // line shadowed it with a require that throws MODULE_NOT_FOUND, so *login*
+    // answered 500 for every account. It stayed invisible because the suite
+    // covering it cannot even load: `otplib@13` pulls in ESM that jest is not
+    // configured to transform (#792).
     const token = generateTokens(user, res);
 
     res.status(200).json({
