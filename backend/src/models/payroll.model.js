@@ -217,6 +217,17 @@ const payrollUpdateSchema = new mongoose.Schema(
     type: Number,
     default: 0,
   },
+  // Issue #719: Tax-free expense reimbursements bundled into this payroll run
+  reimbursements: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  // Array of expense claim IDs that were paid out in this run (for audit trail)
+  reimbursedExpenseIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ExpenseClaim',
+  }],
   /**
    * The salary component split in force when this row was calculated (#461).
    *

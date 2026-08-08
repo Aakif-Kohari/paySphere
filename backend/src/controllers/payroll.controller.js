@@ -769,6 +769,34 @@ exports.submitPayrollForReview = async (req, res, next) => {
     const preparedItems = [];
     const errors = [];
 
+    // Issue #719: Fetch all approved, unreimbursed expense claims for this month
+    const ExpenseClaim = require('../models/expenseClaim.model');
+    const monthStart = new Date(currentYear, currentMonth - 1, 1);
+    const monthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59);
+
+    const pendingExpenses = await ExpenseClaim.find({
+      tenantId: req.tenantId,
+      status: 'approved',
+      payrollId: null, // Unreimbursed
+      expenseDate: { $gte: monthStart, $lte: monthEnd },
+    }).populate('categoryId', 'isTaxable').lean();
+
+    // Group expenses by employee ID for fast lookup
+    const expensesByEmployee = new Map();
+    for (const exp of pendingExpenses) {
+      const key = String(exp.employeeId);
+      if (!expensesByEmployee.has(key)) {
+        expensesByEmployee.set(key, { taxable: 0, nonTaxable: 0, ids: [] });
+      }
+      const bucket = expensesByEmployee.get(key);
+      if (exp.categoryId.isTaxable) {
+        bucket.taxable += exp.amount;
+      } else {
+        bucket.nonTaxable += exp.amount;
+      }
+      bucket.ids.push(exp._id);
+    }
+
     // Phase 1: Upfront in-memory calculation and validation (no partial writes)
     for (const act of activities) {
       if (!act || typeof act !== "object") {
@@ -935,16 +963,27 @@ exports.submitPayrollForReview = async (req, res, next) => {
         );
       }
 
+      // Issue #719: Inject expense reimbursements
+      const empExpenses = expensesByEmployee.get(String(employee._id)) || { taxable: 0, nonTaxable: 0, ids: [] };
+
+      // Taxable expenses are added to the bonus (subject to tax calculations already done)
+      const totalBonusWithExpenses = bonus + empExpenses.taxable;
+
+      // Non-taxable reimbursements are added directly to net salary AFTER tax/recovery
+      const finalNetSalary = netAfterRecovery + empExpenses.nonTaxable;
+
       preparedItems.push({
         employee,
         baseSalary,
         leaveDays,
         overtimeHours,
-        bonus,
+        bonus: totalBonusWithExpenses,
         deductions,
         leaveDeduction,
         overtimePay,
-        netSalary: netAfterRecovery,
+        reimbursements: empExpenses.nonTaxable,
+        reimbursedExpenseIds: empExpenses.ids,
+        netSalary: finalNetSalary,
         grossNetBeforeRecovery: netSalary,
         loanRecoveries: recovery.recoveries,
         loanRecoveryTotal: recovery.totalRecovered,
@@ -1076,6 +1115,34 @@ exports.submitPayrollForReview = async (req, res, next) => {
 
     const bulkWriteOptions = session ? { session } : {};
     await PayrollUpdate.bulkWrite(bulkOps, bulkWriteOptions);
+
+    // Issue #719: Mark expense claims as reimbursed and link to payroll
+    const allReimbursedIds = preparedItems.flatMap(item => item.reimbursedExpenseIds || []);
+    if (allReimbursedIds.length > 0) {
+      // We need the actual payroll IDs to link them. Fetch them first.
+      const updatedPayrollsForExpenses = await PayrollUpdate.find({
+        tenantId: req.tenantId,
+        month: currentMonth,
+        year: currentYear,
+        employeeId: { $in: preparedItems.map(i => i.employee._id) }
+      }).select('_id employeeId').lean();
+
+      const payrollMap = new Map(updatedPayrollsForExpenses.map(p => [String(p.employeeId), p._id]));
+
+      const expenseUpdates = preparedItems.flatMap(item => {
+        const payrollId = payrollMap.get(String(item.employee._id));
+        return (item.reimbursedExpenseIds || []).map(expId => ({
+          updateOne: {
+            filter: { _id: expId, tenantId: req.tenantId },
+            update: { $set: { status: 'reimbursed', payrollId } }
+          }
+        }));
+      });
+
+      if (expenseUpdates.length > 0) {
+        await ExpenseClaim.bulkWrite(expenseUpdates, bulkWriteOptions);
+      }
+    }
 
     // Phase 3: Fetch updated payrolls to construct response
     const fetchOptions = session ? { session } : {};

@@ -8,7 +8,7 @@ async function generatePDF() {
 
     if (type === "GENERATE_COMPANY_REPORT") {
       const { payrolls, employeeMap, companyName, companyLogo, monthName, year, totalBase, totalOvertime, totalBonus, totalDeductions, totalPayout, currency = "INR" } = payload;
-      
+
       const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
       const buffers = [];
       doc.on("data", buffers.push.bind(buffers));
@@ -47,97 +47,97 @@ async function generatePDF() {
       ];
 
 
-    summaryData.forEach(([label, value]) => {
+      summaryData.forEach(([label, value]) => {
+        doc
+          .fontSize(10)
+          .font("Helvetica")
+          .fillColor("#555555")
+          .text(label, 60, doc.y, { continued: true, width: 200 });
+        doc
+          .font("Helvetica-Bold")
+          .fillColor("#1e3a5f")
+          .text(`  ${value}`, { align: "right" });
+        doc.moveDown(0.2);
+      });
+
+      doc.moveDown(1);
+
+      // --- Employee Payroll Table ---
       doc
-        .fontSize(10)
-        .font("Helvetica")
-        .fillColor("#555555")
-        .text(label, 60, doc.y, { continued: true, width: 200 });
-      doc
-        .font("Helvetica-Bold")
-        .fillColor("#1e3a5f")
-        .text(`  ${value}`, { align: "right" });
-      doc.moveDown(0.2);
-    });
-
-    doc.moveDown(1);
-
-    // --- Employee Payroll Table ---
-    doc
-      .fontSize(14)
-      .font("Helvetica-Bold")
-      .fillColor("#333333")
-      .text("Employee Payroll Details");
-
-    doc.moveDown(0.5);
-
-    // Table header
-    const tableTop = doc.y;
-    const colWidths = [110, 65, 55, 60, 55, 55, 65];
-    const colLabels = [
-      "Employee",
-      "Base",
-      "Leave",
-      "Overtime",
-      "Bonus",
-      "Deduct",
-      "Net Pay",
-    ];
-    const startX = 40;
-
-    // Header background
-    doc
-      .rect(startX, tableTop - 4, 515, 18)
-      .fill("#e8edf3");
-
-    let xPos = startX + 5;
-    colLabels.forEach((label, i) => {
-      doc
-        .fontSize(8)
+        .fontSize(14)
         .font("Helvetica-Bold")
         .fillColor("#333333")
-        .text(label, xPos, tableTop, { width: colWidths[i] });
-      xPos += colWidths[i];
-    });
+        .text("Employee Payroll Details");
 
-    doc.y = tableTop + 18;
+      doc.moveDown(0.5);
 
-    // Table rows
-    payrolls.forEach((p, idx) => {
-      if (doc.y > 750) {
-        doc.addPage();
-      }
-
-      const rowY = doc.y;
-      const emp = employeeMap[String(p.employeeId)];
-      const role = emp?.role ? ` (${emp.role})` : "";
-
-      // Alternating row background
-      if (idx % 2 === 0) {
-        doc.rect(startX, rowY - 2, 515, 14).fill("#f9fafb");
-      }
-
-      const rowData = [
-        `${p.employeeName}${role}`,
-        formatCurrency(p.baseSalary, currency),
-        String(p.leaveDays),
-        formatCurrency(p.overtimePay, currency),
-        formatCurrency(p.bonus, currency),
-        formatCurrency(p.deductions + p.leaveDeduction, currency),
-        formatCurrency(p.netSalary, currency),
+      // Table header
+      const tableTop = doc.y;
+      const colWidths = [110, 65, 55, 60, 55, 55, 65];
+      const colLabels = [
+        "Employee",
+        "Base",
+        "Leave",
+        "Overtime",
+        "Bonus",
+        "Deduct",
+        "Net Pay",
       ];
+      const startX = 40;
 
-      xPos = startX + 5;
-      rowData.forEach((cell, i) => {
+      // Header background
+      doc
+        .rect(startX, tableTop - 4, 515, 18)
+        .fill("#e8edf3");
+
+      let xPos = startX + 5;
+      colLabels.forEach((label, i) => {
         doc
           .fontSize(8)
-          .font("Helvetica")
-          .fillColor("#444444")
-          .text(cell, xPos, rowY, { width: colWidths[i] });
+          .font("Helvetica-Bold")
+          .fillColor("#333333")
+          .text(label, xPos, tableTop, { width: colWidths[i] });
         xPos += colWidths[i];
       });
 
-      doc.y = rowY + 14;
+      doc.y = tableTop + 18;
+
+      // Table rows
+      payrolls.forEach((p, idx) => {
+        if (doc.y > 750) {
+          doc.addPage();
+        }
+
+        const rowY = doc.y;
+        const emp = employeeMap[String(p.employeeId)];
+        const role = emp?.role ? ` (${emp.role})` : "";
+
+        // Alternating row background
+        if (idx % 2 === 0) {
+          doc.rect(startX, rowY - 2, 515, 14).fill("#f9fafb");
+        }
+
+        const rowData = [
+          `${p.employeeName}${role}`,
+          formatCurrency(p.baseSalary, currency),
+          String(p.leaveDays),
+          formatCurrency(p.overtimePay, currency),
+          formatCurrency(p.bonus, currency),
+          formatCurrency(p.deductions + p.leaveDeduction, currency),
+          formatCurrency(p.netSalary, currency),
+        ];
+
+        xPos = startX + 5;
+        rowData.forEach((cell, i) => {
+          doc
+            .fontSize(8)
+            .font("Helvetica")
+            .fillColor("#444444")
+            .text(cell, xPos, rowY, { width: colWidths[i] });
+          xPos += colWidths[i];
+        });
+
+        doc.y = rowY + 14;
       });
 
       doc.moveDown(0.5);
@@ -155,7 +155,7 @@ async function generatePDF() {
 
     } else if (type === "GENERATE_PAYSLIP") {
       const { employee, payroll, companyLogo, currency = "INR" } = payload;
-      
+
       const doc = new PDFDocument({ margin: 50 });
       const buffers = [];
       doc.on("data", buffers.push.bind(buffers));
@@ -184,9 +184,18 @@ async function generatePDF() {
       doc.text(`Base Salary: ${formatCurrency(payroll.baseSalary, currency)}`);
       doc.text(`Leave Days: ${payroll.leaveDays} (-${formatCurrency(payroll.leaveDeduction, currency)})`);
       doc.text(`Overtime Hours: ${payroll.overtimeHours} (+${formatCurrency(payroll.overtimePay, currency)})`);
-      doc.text(`Bonus: +${formatCurrency(payroll.bonus, currency)}`);
-      doc.text(`Deductions: -${formatCurrency(payroll.deductions, currency)}`);
-      doc.moveDown();
+      doc.text(`Bonus: +${formatCurrency(payroll.bonus || 0, currency)}`);
+      doc.text(`Deductions: -${formatCurrency(payroll.deductions || 0, currency)}`);
+
+      // Issue #719: Render tax-free reimbursements distinctly
+      if (payroll.reimbursements && payroll.reimbursements > 0) {
+        doc.moveDown(0.5);
+        doc.fontSize(11).font("Helvetica-Bold").fillColor("#2563EB").text("Reimbursements (Tax-Free)");
+        doc.fontSize(10).font("Helvetica").fillColor("#555555");
+        doc.text(`Expense Reimbursements: +${formatCurrency(payroll.reimbursements, currency)}`);
+      }
+
+      doc.moveDown(1);
 
       doc.fontSize(14).text(`Net Salary: ${formatCurrency(payroll.netSalary, currency)}`, { underline: true });
       doc.end();
