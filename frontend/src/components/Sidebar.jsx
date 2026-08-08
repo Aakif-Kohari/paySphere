@@ -131,6 +131,13 @@ const Sidebar = ({
 
         <div className="p-3 border-t border-gray-200 dark:border-slate-800 space-y-2">
           <ThemeToggle showLabel className="w-full" />
+          <a
+            href="/profile"
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
+          >
+            <PeopleIcon />
+            Profile Settings
+          </a>
           <button
             onClick={() => {
               window.location.href = 'mailto:support@paysphere.com';

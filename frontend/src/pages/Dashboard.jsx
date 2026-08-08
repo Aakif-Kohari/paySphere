@@ -1039,9 +1039,12 @@ export default function PaySphereDashboard() {
 
           <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
             <ThemeToggle />
-            <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+            <button
+              onClick={() => navigate('/profile')}
+              className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+            >
               {getInitials(companyName)}
-            </div>
+            </button>
             <button
               onClick={() => {
                 dispatch(logout());
