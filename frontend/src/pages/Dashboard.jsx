@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useDashboardSummary, useRecentActivity, usePayrollTrend } from '../hooks/useDashboardData';
 import EmployeeCard from '../components/EmployeeCard';
 import EmployeeExportActions from '../components/EmployeeExportActions';
 import SettingsModal from '../components/SettingsModal';
@@ -760,13 +761,27 @@ const PayrollTable = ({
 export default function PaySphereDashboard() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  
+  // Replaced useState/useEffect with TanStack Query hooks (Issue #684)
+  const { 
+    data: summary, 
+    isLoading: loading, 
+    error: queryError, 
+    refetch: refetchSummary 
+  } = useDashboardSummary();
+
+  const { data: recentActivity, isLoading: activityLoading } = useRecentActivity(5);
+  const { data: trendData, isLoading: trendLoading } = usePayrollTrend(6);
+
+  // Derived error state for backward compatibility with existing JSX
+  const error = queryError ? queryError.message : null;
+
   const [activePage, setActivePage] = useState('Dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
@@ -843,12 +858,9 @@ export default function PaySphereDashboard() {
         setPayrolls(payRes.data.payrolls || []);
       } catch (err) {
         console.error('Failed to fetch data:', err);
-      } finally {
-        setLoading(false);
       }
     };
     if (token) fetchData();
-    else setTimeout(() => setLoading(false), 0);
   }, [token, currentPage, debouncedSearch]);
 
   // Fetch paginated payroll records when viewing the Payroll tab
