@@ -21,6 +21,32 @@ const flashcardRoutes = require('./routes/flashcard.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const archiveRoutes = require('./routes/archive.routes');
 const logger = require('./utils/logger');
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const multer = require("multer");
+const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
+const userRoutes = require("./routes/user.routes");
+const employeeRoutes = require("./routes/employee.routes");
+const payrollRoutes = require("./routes/payroll.routes");
+const reportsRoutes = require("./routes/reports.routes");
+const auditRoutes = require("./routes/audit.routes");
+const attendanceRoutes = require("./routes/attendance.routes");
+const settlementRoutes = require("./routes/settlement.routes");
+const loanRoutes = require("./routes/loan.routes");
+const schedulerRoutes = require("./routes/scheduler.routes");
+const employeePortalRoutes = require("./routes/employeePortal.routes");
+const workflowRoutes = require("./routes/workflow.routes");
+const salaryHistoryRoutes = require("./routes/salaryHistory.routes");
+const dashboardRoutes = require("./routes/dashboard.routes");
+const flashcardRoutes = require("./routes/flashcard.routes");
+const webhookRoutes = require("./routes/webhook.routes");
+const notificationRoutes = require("./routes/notification.routes");
+const logger = require("./utils/logger");
+const { ApolloServer } = require("@apollo/server");
+const { expressMiddleware } = require("@as-integrations/express");
+const { typeDefs, resolvers } = require("./graphql/schema");
 
 const app = express();
 app.use(cookieParser());
@@ -58,6 +84,16 @@ app.use(cors(corsOptions));
 const { generalRateLimiter } = require('./middlewares/rateLimiter.middleware');
 const requireBody = require('./middlewares/requireBody.middleware');
 const { MAX_FILE_SIZE } = require('./middlewares/upload.middleware');
+const { generalRateLimiter } = require("./middlewares/rateLimiter.middleware");
+const requireBody = require("./middlewares/requireBody.middleware");
+const { MAX_FILE_SIZE } = require("./middlewares/upload.middleware");
+const { ApolloServer } = require("@apollo/server");
+const { expressMiddleware } = require("@as-integrations/express");
+const { typeDefs, resolvers } = require("./graphql/schema");
+
+const apolloServer = new ApolloServer({ typeDefs, resolvers });
+await apolloServer.start();
+app.use("/graphql", cors(), express.json(), expressMiddleware(apolloServer));
 
 // Require request body for state-changing methods
 app.use('/api', requireBody);
@@ -102,6 +138,24 @@ app.use('/api/webhooks', webhookRoutes);
 // `POST /api/dashboard/layout` threw a TypeError destructuring an unparsed
 // `req.body` on every call.
 app.use('/api/dashboard', dashboardRoutes);
+app.get("/", (req, res) => res.send("PaySphere API is running..."));
+app.use("/api", generalRateLimiter);
+app.use("/api/auth", userRoutes);
+app.use("/api/employees", employeeRoutes);
+app.use("/api/payroll", payrollRoutes);
+app.use("/api/reports", reportsRoutes);
+app.use("/api/employee-portal", employeePortalRoutes);
+app.use("/api/schedules", schedulerRoutes);
+app.use("/api/audit-logs", auditRoutes);
+app.use("/api/attendance", attendanceRoutes);
+app.use("/api/settlements", settlementRoutes);
+app.use("/api/loans", loanRoutes);
+app.use("/api/workflows", workflowRoutes);
+app.use('/api', salaryHistoryRoutes);
+app.use("/api/flashcards", flashcardRoutes);
+app.use("/api/webhooks", webhookRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // CORS error handler — return 403 for blocked origins
 app.use((err, req, res, next) => {
