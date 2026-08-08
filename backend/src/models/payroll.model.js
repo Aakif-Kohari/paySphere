@@ -109,6 +109,7 @@ const payrollUpdateSchema = new mongoose.Schema({
     enum: ALL_STATUSES,
     default: PAYROLL_STATUS.PENDING_APPROVAL,
     set: (value) => normalizeStatus(value) || value,
+    index: true,
   },
   /**
    * The maker–checker trail (#559).
