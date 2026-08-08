@@ -1,6 +1,6 @@
 import { Alert, Snackbar } from '@mui/material';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Pagination from '../components/Pagination';
+import Pagination from '../components/common/Pagination';
 import SettlementsSkeleton from '../components/common/skeleton/SettlementsSkeleton';
 import api from '../services/api';
 
@@ -14,7 +14,8 @@ const STATUS_LABELS = {
 
 const STATUS_STYLES = {
   draft: 'bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-300',
-  pending_approval: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  pending_approval:
+    'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
   approved: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
   paid: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
   cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
@@ -97,7 +98,11 @@ const Settlements = () => {
 
   const [preview, setPreview] = useState(null);
   const [formError, setFormError] = useState('');
-  const [toast, setToast] = useState({ open: false, severity: 'success', message: '' });
+  const [toast, setToast] = useState({
+    open: false,
+    severity: 'success',
+    message: '',
+  });
 
   const notify = useCallback((severity, message) => {
     setToast({ open: true, severity, message });
@@ -115,7 +120,7 @@ const Settlements = () => {
       };
 
       const res = await api.get('/api/settlements', { params });
-      
+
       setSettlements(res.data?.settlements || []);
       setTotalPages(res.data?.totalPages || 1);
       setTotalCount(res.data?.totalCount || 0);
@@ -148,7 +153,9 @@ const Settlements = () => {
 
   const setField = (field) => (event) => {
     const value =
-      event.target.type === 'checkbox' ? event.target.checked : event.target.value;
+      event.target.type === 'checkbox'
+        ? event.target.checked
+        : event.target.value;
     setForm((prev) => ({ ...prev, [field]: value }));
     setPreview(null);
     setFormError('');
@@ -210,8 +217,12 @@ const Settlements = () => {
         employeeId: form.employeeId,
         lastWorkingDay: lastWorkingDayDate,
         unusedLeaveDays: Number(form.unusedLeaveDays) || 0,
-        noticePeriodDays: form.noticePeriodDays ? Number(form.noticePeriodDays) : undefined,
-        noticeServedDays: form.noticeServedDays ? Number(form.noticeServedDays) : undefined,
+        noticePeriodDays: form.noticePeriodDays
+          ? Number(form.noticePeriodDays)
+          : undefined,
+        noticeServedDays: form.noticeServedDays
+          ? Number(form.noticeServedDays)
+          : undefined,
         assetRecovery: Number(form.assetRecovery) || 0,
         advanceRecovery: Number(form.advanceRecovery) || 0,
         bonus: Number(form.bonus) || 0,
@@ -240,7 +251,10 @@ const Settlements = () => {
       notify('success', `Settlement ${action.replace('-', ' ')}.`);
       await fetchSettlements();
     } catch (error) {
-      notify('error', describeError(error, `Could not ${action} the settlement.`));
+      notify(
+        'error',
+        describeError(error, `Could not ${action} the settlement.`),
+      );
     } finally {
       setBusy(false);
     }
@@ -262,7 +276,8 @@ const Settlements = () => {
             Full &amp; Final Settlements
           </h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-            Offboard an employee with a final statement — their payroll history is preserved.
+            Offboard an employee with a final statement — their payroll history
+            is preserved.
           </p>
         </div>
 
@@ -331,7 +346,10 @@ const Settlements = () => {
               ['advanceRecovery', 'Advance recovery'],
               ['assetRecovery', 'Asset recovery'],
             ].map(([field, label]) => (
-              <label key={field} className="text-sm text-gray-700 dark:text-slate-300">
+              <label
+                key={field}
+                className="text-sm text-gray-700 dark:text-slate-300"
+              >
                 {label}
                 <input
                   type="number"
@@ -366,8 +384,16 @@ const Settlements = () => {
                     Earnings
                   </p>
                   {[
-                    ['Prorated salary', s.earnings.proratedSalary, s.explanations.proratedSalary],
-                    ['Leave encashment', s.earnings.leaveEncashment, s.explanations.leaveEncashment],
+                    [
+                      'Prorated salary',
+                      s.earnings.proratedSalary,
+                      s.explanations.proratedSalary,
+                    ],
+                    [
+                      'Leave encashment',
+                      s.earnings.leaveEncashment,
+                      s.explanations.leaveEncashment,
+                    ],
                     ['Gratuity', s.earnings.gratuity, s.explanations.gratuity],
                     ['Bonus / ex-gratia', s.earnings.bonus, null],
                   ].map(([label, amount, explanation]) => (
@@ -390,7 +416,11 @@ const Settlements = () => {
                     Deductions
                   </p>
                   {[
-                    ['Notice shortfall', s.deductions.noticeShortfall, s.explanations.noticeShortfall],
+                    [
+                      'Notice shortfall',
+                      s.deductions.noticeShortfall,
+                      s.explanations.noticeShortfall,
+                    ],
                     ['Advance recovery', s.deductions.advanceRecovery, null],
                     ['Asset recovery', s.deductions.assetRecovery, null],
                   ].map(([label, amount, explanation]) => (
@@ -499,7 +529,7 @@ const Settlements = () => {
       )}
 
       {loading ? (
-         <SettlementsSkeleton/>
+        <SettlementsSkeleton />
       ) : settlements.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
           <p className="text-gray-500 dark:text-slate-400">
@@ -588,7 +618,9 @@ const Settlements = () => {
                         Mark paid &amp; offboard
                       </button>
                     )}
-                    {['draft', 'pending_approval', 'approved'].includes(item.status) && (
+                    {['draft', 'pending_approval', 'approved'].includes(
+                      item.status,
+                    ) && (
                       <button
                         disabled={busy}
                         onClick={() => runAction(item._id, 'cancel')}

@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 
 const cronLockSchema = new mongoose.Schema({
   _id: { type: String, required: true }, // e.g., 'monthly_payslip'
@@ -9,4 +10,5 @@ const cronLockSchema = new mongoose.Schema({
 // Automatically delete locks after they expire
 cronLockSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-module.exports = mongoose.model("CronLock", cronLockSchema);
+cronLockSchema.plugin(softDeletePlugin);
+module.exports = mongoose.model('CronLock', cronLockSchema);
