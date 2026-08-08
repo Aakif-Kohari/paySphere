@@ -19,6 +19,7 @@ const salaryHistoryRoutes = require("./routes/salaryHistory.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
 const flashcardRoutes = require("./routes/flashcard.routes");
 const webhookRoutes = require("./routes/webhook.routes");
+const roleRoutes = require("./routes/role.routes");
 const logger = require("./utils/logger");
 
 const app = express();
@@ -88,6 +89,11 @@ app.use("/api/flashcards", flashcardRoutes);
 // payroll and employee events. The controller and models were written in #645
 // but never mounted here, so the whole feature was a 404.
 app.use("/api/webhooks", webhookRoutes);
+
+// Custom role management (#475) — the owner role manages the permission sets
+// that decide what every other account can do. Mounted once, after the security
+// middleware, like the rest of the API.
+app.use("/api/roles", roleRoutes);
 
 // Mounted here, once (#663).
 //

@@ -73,6 +73,12 @@ const AUDIT_ACTIONS = [
   "WEBHOOK_UPDATE",
   "WEBHOOK_DELETE",
   "WEBHOOK_SECRET_REGENERATED",
+  // Custom role management (#475) — creating a role grants capabilities,
+  // deleting one revokes them from whoever holds it, and editing one reassigns
+  // them, so all three are security mutations and are audited like the others.
+  "ROLE_CREATE",
+  "ROLE_UPDATE",
+  "ROLE_DELETE",
   // The monthly-updates endpoints emit their own two. Monthly revisions are
   // financial mutations (they move allowances and deductions into the next
   // payroll run), so they are audited like SALARY_HISTORY_* above.
@@ -94,6 +100,7 @@ const AUDIT_RESOURCE_TYPES = [
   "WorkflowInstance",
   "Webhook",
   "MonthlyUpdate",
+  "Role",
 ];
 
 const auditLogSchema = new mongoose.Schema({

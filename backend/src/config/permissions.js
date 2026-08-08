@@ -35,6 +35,13 @@ const PERMISSIONS = {
   // owner role — deliberately not something every admin of the workspace can do
   // (#474).
   MANAGE_WEBHOOKS: "MANAGE_WEBHOOKS",
+  // Roles decide what everyone in the company may do, and the API that edits
+  // them (role.controller.js, #475) is a security mutation of the same kind as
+  // the webhooks one: creating a role grants real capabilities, deleting one
+  // revokes them from whoever holds it. It is its own permission so the owner
+  // role is the only one that can hand itself and the rest of the workspace
+  // different powers (#475).
+  MANAGE_ROLES: "MANAGE_ROLES",
 };
 
 const PERMISSION_DEFINITIONS = [
@@ -77,6 +84,11 @@ const PERMISSION_DEFINITIONS = [
     description:
       "Create, update and delete webhook endpoints, which receive company data when payroll or employee events fire",
   },
+  {
+    name: PERMISSIONS.MANAGE_ROLES,
+    description:
+      "Create, update and delete custom roles and their permission sets",
+  },
 ];
 
 // --- Roles -----------------------------------------------------------------
@@ -111,6 +123,7 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_REPORT,
       PERMISSIONS.MANAGE_REPORT_SCHEDULE,
       PERMISSIONS.MANAGE_WEBHOOKS,
+      PERMISSIONS.MANAGE_ROLES,
     ],
   },
   {

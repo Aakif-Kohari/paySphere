@@ -463,6 +463,8 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
   useCtrlEnterSubmit(formRef);
   const { phoneCountryCode: initialPhoneCountryCode, phone: initialPhone } = getPhoneParts(employee?.phone);
   const currency = localStorage.getItem('currency') || 'INR';
+  // Custom role names from GET /api/roles for the Role datalist (#475)
+  const [roleSuggestions, setRoleSuggestions] = useState([]);
   const [formData, setFormData] = useState({
     fullName: employee?.fullName || '',
     role: employee?.role || '',
@@ -474,6 +476,15 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    api
+      .get('/api/roles')
+      .then((res) =>
+        setRoleSuggestions((res.data?.roles || []).map((r) => r.name)),
+      )
+      .catch(() => setRoleSuggestions([]));
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -561,10 +572,16 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
               required
               type="text"
               name="role"
+              list="role-suggestions"
               value={formData.role}
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
             />
+            <datalist id="role-suggestions">
+              {roleSuggestions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
           </div>
 
           <div>
