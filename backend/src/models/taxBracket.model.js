@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 const { validateSlabs } = require('../utils/taxCalculator');
 
 /**
@@ -99,4 +100,5 @@ const taxBracketSchema = new mongoose.Schema(
 // hands back first — so the tax an employee pays depends on insertion order.
 taxBracketSchema.index({ tenantId: 1, region: 1 }, { unique: true });
 
+taxBracketSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('TaxBracket', taxBracketSchema);

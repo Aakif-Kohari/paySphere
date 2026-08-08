@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 const {
   INTEREST_METHOD,
   LOAN_TYPE,
@@ -121,7 +122,10 @@ const loanSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: [1, 'Tenure must be at least one month'],
-      max: [MAX_TENURE_MONTHS, `Tenure cannot exceed ${MAX_TENURE_MONTHS} months`],
+      max: [
+        MAX_TENURE_MONTHS,
+        `Tenure cannot exceed ${MAX_TENURE_MONTHS} months`,
+      ],
     },
     installmentAmount: { type: Number, required: true, min: 0 },
     totalPayable: { type: Number, required: true, min: 0 },
@@ -177,4 +181,5 @@ loanSchema.methods.isCollectible = function isCollectible() {
   return this.status === LOAN_STATUS.ACTIVE && this.outstanding > 0;
 };
 
+loanSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('Loan', loanSchema);

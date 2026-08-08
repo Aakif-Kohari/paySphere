@@ -5,6 +5,8 @@ import GridViewIcon from '@mui/icons-material/GridView';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PeopleIcon from '@mui/icons-material/People';
+import SchoolIcon from '@mui/icons-material/School';
+import ArchiveIcon from '@mui/icons-material/Archive';
 import { useEffect, useMemo, useRef } from 'react';
 import ThemeToggle from './ThemeToggle';
 
@@ -48,6 +50,7 @@ const Sidebar = ({
       { id: 'Loans', label: 'Advances', icon: <AccountBalanceWalletIcon /> },
       { id: 'Reports', label: 'Reports', icon: <AssessmentIcon /> },
       { id: 'Flashcards', label: 'AI Study Circle', icon: <SchoolIcon /> },
+      { id: 'Archive', label: 'Archive', icon: <ArchiveIcon /> },
     ],
     [],
   );
@@ -104,25 +107,37 @@ const Sidebar = ({
 
         <nav className="flex-1 p-3 space-y-1">
           {sidebarItems.map((item) => (
-            <button
+            /* Fixed: Added href and role for screen readers (Issue #660) */
+            <a
               key={item.id}
-              onClick={() => {
+              href={`/${item.id.toLowerCase()}`}
+              onClick={(e) => {
+                e.preventDefault();
                 setActivePage(item.id);
                 onClose();
               }}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activePage === item.id
+              aria-current={activePage === item.id ? 'page' : undefined}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500 ${
+                activePage === item.id
                   ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20 dark:shadow-none' /* Issue #521: Replaced hardcoded hex */
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-                }`}
+              }`}
             >
               {item.icon}
               {item.label}
-            </button>
+            </a>
           ))}
         </nav>
 
         <div className="p-3 border-t border-gray-200 dark:border-slate-800 space-y-2">
           <ThemeToggle showLabel className="w-full" />
+          <a
+            href="/profile"
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
+          >
+            <PeopleIcon />
+            Profile Settings
+          </a>
           <button
             onClick={() => {
               window.location.href = 'mailto:support@paysphere.com';

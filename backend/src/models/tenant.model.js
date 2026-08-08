@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 
 /**
  * A tenant — one customer company, and the unit every scoped query filters on.
@@ -62,4 +63,5 @@ const tenantSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+tenantSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('Tenant', tenantSchema);

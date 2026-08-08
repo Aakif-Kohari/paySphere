@@ -59,17 +59,24 @@ export const createChartTooltip = ({
 
     return (
       <div className={containerClasses}>
-        <p className={`text-xs font-semibold uppercase tracking-wide ${titleClasses}`}>
+        <p
+          className={`text-xs font-semibold uppercase tracking-wide ${titleClasses}`}
+        >
           {title ?? formatLabel(label)}
         </p>
         {description ? (
           <p className={`mt-1 text-xs ${descriptionClasses}`}>
-            {typeof description === 'function' ? description(label, payload) : description}
+            {typeof description === 'function'
+              ? description(label, payload)
+              : description}
           </p>
         ) : null}
         <div className="mt-2 space-y-1">
           {payload.map((entry) => (
-            <div key={entry.dataKey} className="flex items-center justify-between gap-4 text-sm">
+            <div
+              key={entry.dataKey}
+              className="flex items-center justify-between gap-4 text-sm"
+            >
               <span className="flex items-center gap-2">
                 {entry.color ? (
                   <span
