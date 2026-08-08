@@ -1,11 +1,12 @@
-const mongoose = require("mongoose");
-const { isValidEmail } = require("../utils/validators");
+const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
+const { isValidEmail } = require('../utils/validators');
 
 /** The report kinds a schedule can ask for. */
-const REPORT_TYPES = ["analytics", "payroll", "turnover", "custom"];
+const REPORT_TYPES = ['analytics', 'payroll', 'turnover', 'custom'];
 
 /** How often a schedule can fire. */
-const FREQUENCIES = ["daily", "weekly", "monthly"];
+const FREQUENCIES = ['daily', 'weekly', 'monthly'];
 
 /**
  * The most addresses one schedule may mail.
@@ -53,7 +54,7 @@ const reportScheduleSchema = new mongoose.Schema(
       validate: [
         {
           validator: (v) => Array.isArray(v) && v.length > 0,
-          message: "Must provide at least one recipient email address.",
+          message: 'Must provide at least one recipient email address.',
         },
         {
           validator: (v) => v.length <= MAX_RECIPIENTS,
@@ -63,7 +64,7 @@ const reportScheduleSchema = new mongoose.Schema(
           validator: (v) => v.every((email) => isValidEmail(email)),
           message: (props) => {
             const bad = (props.value || []).filter((e) => !isValidEmail(e));
-            return `Invalid recipient email address: ${bad.join(", ")}`;
+            return `Invalid recipient email address: ${bad.join(', ')}`;
           },
         },
       ],
@@ -104,18 +105,18 @@ const reportScheduleSchema = new mongoose.Schema(
     },
     // Optional configuration for custom reports
     config: {
-      dataset: { type: String, enum: ["employees", "payroll"] },
+      dataset: { type: String, enum: ['employees', 'payroll'] },
       columns: [String],
       filters: [
         {
           field: String,
           operator: String,
           value: mongoose.Schema.Types.Mixed,
-        }
-      ]
-    }
+        },
+      ],
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // The cron walks "every active schedule", and the read endpoint walks "this
@@ -123,7 +124,8 @@ const reportScheduleSchema = new mongoose.Schema(
 reportScheduleSchema.index({ tenantId: 1, createdAt: -1 });
 reportScheduleSchema.index({ isActive: 1, frequency: 1 });
 
-module.exports = mongoose.model("ReportSchedule", reportScheduleSchema);
+reportScheduleSchema.plugin(softDeletePlugin);
+module.exports = mongoose.model('ReportSchedule', reportScheduleSchema);
 module.exports.REPORT_TYPES = REPORT_TYPES;
 module.exports.FREQUENCIES = FREQUENCIES;
 module.exports.MAX_RECIPIENTS = MAX_RECIPIENTS;

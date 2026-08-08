@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 const {
   ALL_SETTLEMENT_STATUSES,
   SETTLEMENT_STATUS,
@@ -148,4 +149,5 @@ settlementSchema.index(
 // Leads with `tenantId` to match what the settlements list filters on (#613).
 settlementSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
 
+settlementSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('Settlement', settlementSchema);
