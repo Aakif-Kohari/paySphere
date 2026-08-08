@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 const {
   ALL_INSTANCE_STATUSES,
   ALL_WORKFLOW_ACTIONS,
@@ -74,6 +75,11 @@ const workflowInstanceSchema = new mongoose.Schema(
 workflowInstanceSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
 
 // "Is there already a request open against this payroll run?"
-workflowInstanceSchema.index({ tenantId: 1, targetEntityType: 1, targetEntityId: 1 });
+workflowInstanceSchema.index({
+  tenantId: 1,
+  targetEntityType: 1,
+  targetEntityId: 1,
+});
 
+workflowInstanceSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('WorkflowInstance', workflowInstanceSchema);

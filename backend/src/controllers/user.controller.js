@@ -8,8 +8,8 @@ const User = require('../models/user.model');
 const Employee = require('../models/employee.model');
 const PayrollUpdate = require('../models/payroll.model');
 const { sendEmail } = require('../utils/email');
-const { authenticator } = require("otplib");
-const QRCode = require("qrcode");
+const { authenticator } = require('otplib');
+const QRCode = require('qrcode');
 const {
   isNonEmptyString,
   isValidEmail,
@@ -31,17 +31,23 @@ const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
 
 const generateTokens = (user, res) => {
   const accessToken = jwt.sign(
-    { id: user._id,
+    {
+      id: user._id,
       role: user.role,
-      tenantId: user.tenantId, tokenVersion: user.tokenVersion || 0 },
+      tenantId: user.tenantId,
+      tokenVersion: user.tokenVersion || 0,
+    },
     process.env.JWT_SECRET,
     { expiresIn: '15m' },
   );
 
   const refreshToken = jwt.sign(
-    { id: user._id,
+    {
+      id: user._id,
       role: user.role,
-      tenantId: user.tenantId, tokenVersion: user.tokenVersion || 0 },
+      tenantId: user.tenantId,
+      tokenVersion: user.tokenVersion || 0,
+    },
     process.env.JWT_SECRET,
     { expiresIn: '7d' },
   );
@@ -109,9 +115,12 @@ exports.signup = async (req, res, next) => {
     await newUser.save();
 
     if (!defaultRole) {
-      logger.warn('Signed up a user without a role: RBAC roles are not seeded', {
-        userId: newUser._id,
-      });
+      logger.warn(
+        'Signed up a user without a role: RBAC roles are not seeded',
+        {
+          userId: newUser._id,
+        },
+      );
     }
 
     // Create the company this account is registering, and bind the account to
@@ -133,7 +142,7 @@ exports.signup = async (req, res, next) => {
       companyName: newUser.companyName,
       role: resolveAccountType(newUser),
       employeeId: newUser.employeeId,
-      currency: newUser.settings?.payrollConfig?.currency || 'INR'
+      currency: newUser.settings?.payrollConfig?.currency || 'INR',
     });
   } catch (error) {
     next(error);
@@ -167,7 +176,7 @@ exports.login = async (req, res, next) => {
       return res.status(200).json({
         requires2FA: true,
         userId: user._id,
-        message: "Two-Factor Authentication code required",
+        message: 'Two-Factor Authentication code required',
       });
     }
 
@@ -184,7 +193,7 @@ exports.login = async (req, res, next) => {
       companyName: user.companyName,
       role: resolveAccountType(user),
       employeeId: user.employeeId,
-      currency: user.settings?.payrollConfig?.currency || 'INR'
+      currency: user.settings?.payrollConfig?.currency || 'INR',
     });
   } catch (error) {
     next(error);
@@ -227,17 +236,20 @@ exports.getSettings = async (req, res, next) => {
 
 exports.uploadLogo = async (req, res, next) => {
   try {
-    if (!req.file) return res.status(400).json({ message: "No image provided" });
+    if (!req.file)
+      return res.status(400).json({ message: 'No image provided' });
 
     // Store as base64 string
-    const base64Data = req.file.buffer.toString("base64");
+    const base64Data = req.file.buffer.toString('base64');
     const mimeType = req.file.mimetype;
     const logoDataUrl = `data:${mimeType};base64,${base64Data}`;
 
     await User.findByIdAndUpdate(req.userId, { companyLogoData: logoDataUrl });
 
     // Also invalidate settings cache if we had one
-    res.status(200).json({ message: "Logo updated successfully", logo: logoDataUrl });
+    res
+      .status(200)
+      .json({ message: 'Logo updated successfully', logo: logoDataUrl });
   } catch (error) {
     next(error);
   }
@@ -259,11 +271,19 @@ exports.updateSettings = async (req, res, next) => {
     } = req.body;
 
     if (settings && settings.payrollConfig) {
-      if (defaultDailyRate === undefined && settings.payrollConfig.defaultDailyRate !== undefined) {
+      if (
+        defaultDailyRate === undefined &&
+        settings.payrollConfig.defaultDailyRate !== undefined
+      ) {
         defaultDailyRate = Number(settings.payrollConfig.defaultDailyRate);
       }
-      if (defaultOvertimeRate === undefined && settings.payrollConfig.defaultOvertimeRate !== undefined) {
-        defaultOvertimeRate = Number(settings.payrollConfig.defaultOvertimeRate);
+      if (
+        defaultOvertimeRate === undefined &&
+        settings.payrollConfig.defaultOvertimeRate !== undefined
+      ) {
+        defaultOvertimeRate = Number(
+          settings.payrollConfig.defaultOvertimeRate,
+        );
       }
     }
 
@@ -535,6 +555,111 @@ exports.googleAuth = async (req, res, next) => {
   }
 };
 
+// GITHUB AUTH
+exports.githubAuth = async (req, res, next) => {
+  try {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ message: 'Request body is required' });
+    }
+    const { code, companyName } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ message: 'No GitHub code provided' });
+    }
+
+    // Exchange code for access token
+    const tokenResponse = await axios.post(
+      'https://github.com/login/oauth/access_token',
+      {
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        code,
+      },
+      {
+        headers: { Accept: 'application/json' },
+      },
+    );
+
+    const accessToken = tokenResponse.data.access_token;
+    if (!accessToken) {
+      return res.status(401).json({ message: 'Invalid GitHub code' });
+    }
+
+    // Fetch user profile
+    const userResponse = await axios.get('https://api.github.com/user', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const githubData = userResponse.data;
+
+    // Fetch user emails (GitHub doesn't always return email in profile if private)
+    const emailResponse = await axios.get(
+      'https://api.github.com/user/emails',
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
+    const primaryEmailObj =
+      emailResponse.data.find((e) => e.primary) || emailResponse.data[0];
+    if (!primaryEmailObj || !primaryEmailObj.email) {
+      return res
+        .status(400)
+        .json({ message: 'No email found in GitHub account' });
+    }
+
+    const email = primaryEmailObj.email;
+    const { id: githubId, name, login, avatar_url } = githubData;
+    const fullName = name || login;
+
+    let user = await User.findOne({ email });
+    const isNewUser = !user;
+
+    if (!user) {
+      if (!companyName) {
+        return res.status(202).json({
+          message:
+            "Account doesn't exist. Please provide a company name to sign up.",
+          needsCompanyName: true,
+        });
+      }
+
+      const defaultRole = await getDefaultRole();
+
+      user = new User({
+        fullName: sanitizeText(fullName),
+        email,
+        companyName: sanitizeText(companyName),
+        githubId: String(githubId),
+        avatar: avatar_url,
+        ...(defaultRole ? { role: defaultRole._id } : {}),
+      });
+
+      await user.save();
+    } else if (!user.githubId) {
+      user.githubId = String(githubId);
+      if (!user.avatar) user.avatar = avatar_url;
+      await user.save();
+    }
+
+    await ensureTenantForUser(user);
+
+    const token = generateTokens(user, res);
+
+    const statusCode = isNewUser ? 201 : 200;
+    res.status(statusCode).json({
+      token,
+      companyName: user.companyName,
+      role: resolveAccountType(user),
+      employeeId: user.employeeId,
+      currency: user.settings?.payrollConfig?.currency || 'INR',
+      message: isNewUser
+        ? 'Account created successfully'
+        : 'Logged in successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Local Map to store cooldowns for password reset requests (5 minutes per email)
 const resetCooldowns = new Map();
 const COOLDOWN_MS = 5 * 60 * 1000;
@@ -711,7 +836,9 @@ exports.deleteAccount = async (req, res, next) => {
       return res.status(400).json({ message: 'Current password is required' });
     }
     if (!user.password) {
-      return res.status(400).json({ message: 'No password set on this account' });
+      return res
+        .status(400)
+        .json({ message: 'No password set on this account' });
     }
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
@@ -849,13 +976,13 @@ exports.logout = async (req, res, next) => {
 exports.generate2FA = async (req, res, next) => {
   try {
     const user = await User.findById(req.userId);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
     const secret = authenticator.generateSecret();
     const otpauthUrl = authenticator.keyuri(
       user.email,
-      `PaySphere (${user.companyName || "Admin"})`,
-      secret
+      `PaySphere (${user.companyName || 'Admin'})`,
+      secret,
     );
 
     user.twoFactorSecret = secret;
@@ -877,12 +1004,12 @@ exports.verifyAndEnable2FA = async (req, res, next) => {
   try {
     const { token } = req.body;
     if (!token) {
-      return res.status(400).json({ message: "2FA token code is required" });
+      return res.status(400).json({ message: '2FA token code is required' });
     }
 
     const user = await User.findById(req.userId);
     if (!user || !user.twoFactorSecret) {
-      return res.status(400).json({ message: "2FA is not initialized" });
+      return res.status(400).json({ message: '2FA is not initialized' });
     }
 
     const isValid = authenticator.verify({
@@ -891,14 +1018,14 @@ exports.verifyAndEnable2FA = async (req, res, next) => {
     });
 
     if (!isValid) {
-      return res.status(400).json({ message: "Invalid 2FA verification code" });
+      return res.status(400).json({ message: 'Invalid 2FA verification code' });
     }
 
     user.isTwoFactorEnabled = true;
     await user.save();
 
     return res.status(200).json({
-      message: "Two-Factor Authentication successfully enabled",
+      message: 'Two-Factor Authentication successfully enabled',
       isTwoFactorEnabled: true,
     });
   } catch (error) {
@@ -913,7 +1040,7 @@ exports.disable2FA = async (req, res, next) => {
     const user = await User.findById(req.userId);
 
     if (!user || !user.isTwoFactorEnabled) {
-      return res.status(400).json({ message: "2FA is not currently enabled" });
+      return res.status(400).json({ message: '2FA is not currently enabled' });
     }
 
     const isValid = authenticator.verify({
@@ -922,15 +1049,15 @@ exports.disable2FA = async (req, res, next) => {
     });
 
     if (!isValid) {
-      return res.status(400).json({ message: "Invalid 2FA verification code" });
+      return res.status(400).json({ message: 'Invalid 2FA verification code' });
     }
 
     user.isTwoFactorEnabled = false;
-    user.twoFactorSecret = "";
+    user.twoFactorSecret = '';
     await user.save();
 
     return res.status(200).json({
-      message: "Two-Factor Authentication disabled",
+      message: 'Two-Factor Authentication disabled',
       isTwoFactorEnabled: false,
     });
   } catch (error) {
@@ -943,12 +1070,16 @@ exports.validate2FALogin = async (req, res, next) => {
   try {
     const { userId, token } = req.body;
     if (!userId || !token) {
-      return res.status(400).json({ message: "User ID and 2FA token are required" });
+      return res
+        .status(400)
+        .json({ message: 'User ID and 2FA token are required' });
     }
 
     const user = await User.findById(userId);
     if (!user || !user.isTwoFactorEnabled) {
-      return res.status(400).json({ message: "2FA is not enabled for this user" });
+      return res
+        .status(400)
+        .json({ message: '2FA is not enabled for this user' });
     }
 
     const isValid = authenticator.verify({
@@ -957,19 +1088,19 @@ exports.validate2FALogin = async (req, res, next) => {
     });
 
     if (!isValid) {
-      return res.status(400).json({ message: "Invalid 2FA code" });
+      return res.status(400).json({ message: 'Invalid 2FA code' });
     }
 
     // Generate full JWT access token after successful 2FA
     const accessToken = generateTokens(user, res);
 
     return res.status(200).json({
-      message: "2FA verification successful",
+      message: '2FA verification successful',
       token: accessToken,
       user: {
         id: user._id,
-      role: user.role,
-      tenantId: user.tenantId,
+        role: user.role,
+        tenantId: user.tenantId,
         email: user.email,
         fullName: user.fullName,
         companyName: user.companyName,

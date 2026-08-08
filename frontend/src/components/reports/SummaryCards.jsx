@@ -1,9 +1,9 @@
 import {
-  People,
-  AccountBalanceWallet,
-  TrendingUp,
   AccessTime,
+  AccountBalanceWallet,
   MoneyOff,
+  People,
+  TrendingUp,
 } from "@mui/icons-material";
 
 export default function SummaryCards({ data }) {
@@ -55,19 +55,19 @@ export default function SummaryCards({ data }) {
             key={card.title}
             className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm p-5"
           >
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-gray-500 dark:text-gray-500">
                   {card.title}
                 </p>
 
-                <h2 className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                <h2 className="mt-2 break-words text-2xl font-bold text-gray-900 dark:text-white">
                   {card.value}
                 </h2>
               </div>
 
               <div
-                className={`w-12 h-12 rounded-full flex items-center justify-center ${card.bg}`}
+                className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center ${card.bg}`}
               >
                 <Icon className={card.color} />
               </div>
