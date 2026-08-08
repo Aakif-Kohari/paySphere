@@ -1,6 +1,7 @@
 import { Alert, Snackbar } from '@mui/material';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Pagination from '../components/common/Pagination';
+import SettlementSkeleton from '../components/common/skeleton/SettlementSkeleton';
 import SettlementsSkeleton from '../components/common/skeleton/SettlementsSkeleton';
 import api from '../services/api';
 
@@ -529,6 +530,7 @@ const Settlements = () => {
       )}
 
       {loading ? (
+        <SettlementSkeleton />
         <SettlementsSkeleton />
       ) : settlements.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
