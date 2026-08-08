@@ -9,8 +9,8 @@ import {
   XAxis, YAxis,
 } from 'recharts';
 import api from '../../services/api';
+import TurnoverMetricsSkeleton from '../common/skeleton/TurnoverMetricsSkeleton';
 import { createChartTooltip } from './chartTooltip';
-
 const TurnoverMetrics = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -33,8 +33,8 @@ const TurnoverMetrics = () => {
     fetchData();
   }, []);
 
-  if (loading) {
-    return <div className="h-40 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 animate-pulse"></div>;
+ if (loading) {
+    return <TurnoverMetricsSkeleton />;
   }
 
   if (error || !data) {

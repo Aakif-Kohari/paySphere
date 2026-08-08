@@ -1,26 +1,26 @@
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { Alert, Snackbar } from '@mui/material';
 import { useEffect, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { Snackbar, Alert } from '@mui/material';
 import Select from 'react-select';
-
+import ReportsSkeleton from '../components/common/skeleton/ReportsSkeleton';
 import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import api from '../services/api';
 
 // --- Recharts Components ---
-import SummaryCards from '../components/reports/SummaryCards';
-import PayrollTrendChart from '../components/reports/PayrollTrendChart';
+import CustomReportBuilder from '../components/reports/CustomReportBuilder';
 import DepartmentChart from '../components/reports/DepartmentChart';
-import { formatCurrency } from "../utils/currency";
-import SalaryDistributionChart from '../components/reports/SalaryDistributionChart';
 import OvertimeChart from '../components/reports/OvertimeChart';
 import PayrollTable from '../components/reports/PayrollTable';
+import PayrollTrendChart from '../components/reports/PayrollTrendChart';
+import SalaryDistributionChart from '../components/reports/SalaryDistributionChart';
 import ScheduleReportModal from '../components/reports/ScheduleReportModal';
-import CustomReportBuilder from '../components/reports/CustomReportBuilder';
+import SummaryCards from '../components/reports/SummaryCards';
 import TurnoverMetrics from '../components/reports/TurnoverMetrics';
+import { formatCurrency } from "../utils/currency";
 
 // --- Month-Year Selector ---
 const MONTH_NAMES = [
@@ -289,8 +289,10 @@ export default function Reports() {
     setSnackbar(prev => ({ ...prev, open: false }));
   };
 
-  const getInitials = (name) =>
-    name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  const getInitials = (name) => {
+    if (!name) return '';
+    return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  };
 
   // Custom styles for react-select to match the app's theme
   const selectStyles = {
@@ -541,11 +543,7 @@ export default function Reports() {
             ) : activeTab === 'custom' ? (
               <CustomReportBuilder />
             ) : loading ? (
-              <div className="space-y-4">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="h-32 bg-gray-200 dark:bg-slate-800 rounded-xl animate-pulse"></div>
-                ))}
-              </div>
+              <ReportsSkeleton />
             ) : !reportData || reportData.table.length === 0 ? (
               <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 p-12 text-center">
                 <svg className="mx-auto h-16 w-16 text-gray-400 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

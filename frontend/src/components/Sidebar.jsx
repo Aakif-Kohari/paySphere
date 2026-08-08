@@ -47,11 +47,13 @@ const Sidebar = ({
       { id: 'Settlements', label: 'Exits & F&F', icon: <LogoutIcon /> },
       { id: 'Loans', label: 'Advances', icon: <AccountBalanceWalletIcon /> },
       { id: 'Reports', label: 'Reports', icon: <AssessmentIcon /> },
+      { id: 'Flashcards', label: 'AI Study Circle', icon: <SchoolIcon /> },
     ],
     [],
   );
 
   const initials = useMemo(() => {
+    if (!companyName) return '';
     return companyName
       .split(' ')
       .map((w) => w[0])
@@ -108,11 +110,10 @@ const Sidebar = ({
                 setActivePage(item.id);
                 onClose();
               }}
-              className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${
-                activePage === item.id
-                  ? 'bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold'
-                  : 'text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
-              }`}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activePage === item.id
+                  ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20 dark:shadow-none' /* Issue #521: Replaced hardcoded hex */
+                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                }`}
             >
               {item.icon}
               {item.label}

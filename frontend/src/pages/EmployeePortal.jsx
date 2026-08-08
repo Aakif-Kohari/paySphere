@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
+import EmployeePortalSkeleton from '../components/common/skeleton/EmployeePortalSkeleton';
 import api from '../services/api';
 
 export default function EmployeePortal() {
@@ -74,10 +75,7 @@ export default function EmployeePortal() {
       {/* Main Content */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-8">
         {loading ? (
-          <div className="animate-pulse space-y-6">
-            <div className="h-32 bg-gray-200 dark:bg-slate-800 rounded-2xl"></div>
-            <div className="h-64 bg-gray-200 dark:bg-slate-800 rounded-2xl"></div>
-          </div>
+            <EmployeePortalSkeleton />
         ) : (
           <>
             {/* Header Card */}
