@@ -74,10 +74,10 @@
     "globals": "^16.5.0",
     "jsdom": "^29.1.1",
     "lightningcss": "^1.33.0",
+    "lightningcss-darwin-arm64": "^1.33.0",
     "playwright": "latest",
     "prop-types": "latest",
     "storybook": "^10.5.7",
-    "lightningcss-darwin-arm64": "^1.33.0",
     "vite": "^7.2.4",
     "vite-plugin-pwa": "^1.3.0",
     "vitest": "^3.2.7"

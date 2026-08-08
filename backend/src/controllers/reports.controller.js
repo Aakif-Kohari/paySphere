@@ -160,7 +160,7 @@ exports.getAnalytics = async (req, res, next) => {
       isDeleted: { $ne: true } // Filter soft-deleted
     };
     if (employeeIds && employeeIds.length > 0) {
-      employeeQuery._id = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
+      employeeQuery._id = { $in: employeeIds };
     }
     
     const employees = await Employee.find(employeeQuery);
@@ -284,7 +284,7 @@ exports.downloadPDFReport = async (req, res, next) => {
     const employeeIds = await getEmployeeIdsByDepartments(userId, departments);
 
     if (employeeIds && employeeIds.length > 0) {
-      payrollQuery.employeeId = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
+      payrollQuery.employeeId = { $in: employeeIds };
     }
 
     // Fetch payroll records for the selected month
