@@ -10,6 +10,7 @@ const { generatePayrollCSV } = require("../utils/csvExport");
 const logger = require("../utils/logger");
 const eventBus = require("../services/event.service");
 const cacheService = require("../services/cache.service");
+const webhookService = require("../services/webhook.service");
 // Restored: this import was dropped when #464 was merged into main via the
 // GitHub conflict editor, leaving PAYROLL_STATUS, payableStatusFilter and
 // friends undefined — every summary, export, payslip email and approval call
@@ -562,7 +563,7 @@ exports.parsePayrollCSV = async (req, res, next) => {
     if (!req.file) {
       return res.status(400).json({ message: "No CSV file uploaded." });
     }
-    
+
     const csvData = req.file.buffer.toString("utf8");
     const lines = csvData.split("\n");
     if (lines.length < 2) {
@@ -570,14 +571,14 @@ exports.parsePayrollCSV = async (req, res, next) => {
     }
 
     const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
-    
+
     const empIdIdx = headers.findIndex(h => h.includes("employee id") || h === "id");
     const nameIdx = headers.findIndex(h => h.includes("name") || h === "employee name");
     const otIdx = headers.findIndex(h => h.includes("overtime"));
     const bonusIdx = headers.findIndex(h => h.includes("bonus"));
     const leaveIdx = headers.findIndex(h => h.includes("leave"));
 
-    const employees = await Employee.find({ 
+    const employees = await Employee.find({
       tenantId: req.tenantId,
       isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
     });
@@ -592,13 +593,13 @@ exports.parsePayrollCSV = async (req, res, next) => {
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
-      
+
       // Basic CSV split, ignores quotes (assuming simple format for ECSoC)
       const cols = line.split(",").map(c => c.trim());
-      
+
       const empIdStr = empIdIdx >= 0 ? cols[empIdIdx] : null;
       const nameStr = nameIdx >= 0 ? cols[nameIdx] : null;
-      
+
       let matchedEmp = null;
       if (empIdStr) {
         matchedEmp = employees.find(e => String(e._id) === empIdStr);
@@ -606,7 +607,7 @@ exports.parsePayrollCSV = async (req, res, next) => {
       if (!matchedEmp && nameStr) {
         matchedEmp = employees.find(e => e.fullName.toLowerCase() === nameStr.toLowerCase());
       }
-      
+
       if (!matchedEmp) continue; // Skip unmatchable employees
 
       const tags = [];
@@ -634,9 +635,9 @@ exports.parsePayrollCSV = async (req, res, next) => {
       }
     }
 
-    res.status(200).json({ 
-      message: "CSV parsed successfully", 
-      activities 
+    res.status(200).json({
+      message: "CSV parsed successfully",
+      activities
     });
   } catch (error) {
     next(error);
@@ -667,7 +668,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
     }
 
     // Fetch all employees for this user
-    const employees = await Employee.find({ 
+    const employees = await Employee.find({
       tenantId: req.tenantId,
       isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
     });
@@ -977,6 +978,17 @@ exports.submitPayrollForReview = async (req, res, next) => {
       status: { $in: [PAYROLL_STATUS.PAID, PAYROLL_STATUS.APPROVED, "finalized"] },
     });
 
+    if (status === "PAID") {
+      await webhookService.triggerEvent("payroll.paid", {
+        payrollId: payroll._id,
+        employeeId: payroll.employeeId,
+        netPay: payroll.netPay,
+        payPeriod: payroll.payPeriod,
+        status: "PAID",
+        updatedAt: new Date(),
+      });
+    }
+
     if (lockedRecords.length > 0) {
       const paidEmployees = lockedRecords
         .filter((p) => normalizeStatus(p.status) === PAYROLL_STATUS.PAID)
@@ -1007,7 +1019,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
     try {
       session = await mongoose.startSession();
       session.startTransaction();
-      } catch {
+    } catch {
       session = null;
     }
 
@@ -1212,7 +1224,7 @@ exports.submitPayrollForReview = async (req, res, next) => {
       try {
         await session.abortTransaction();
         session.endSession();
-    } catch {
+      } catch {
         // ignore session cleanup error
       }
     }
@@ -1429,7 +1441,7 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
     const payroll = await PayrollUpdate.findOne({ _id: payrollId, tenantId: req.tenantId });
-    
+
     if (!payroll) {
       return res.status(404).json({ message: "Payroll record not found" });
     }
@@ -1438,7 +1450,7 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
     if (!employee) {
       return res.status(404).json({ message: "Employee not found" });
     }
-    
+
     // Optional: Warn if employee is soft-deleted but still allow sending
     // since this might be for historical payroll records
     if (employee.isDeleted) {
@@ -1448,7 +1460,7 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
         employeeName: employee.fullName,
       });
     }
-    
+
     if (!employee.email) {
       return res.status(400).json({ message: "Employee does not have an email address set" });
     }
@@ -1515,7 +1527,7 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
     }
 
     const employeeIds = [...new Set(payrolls.map(p => p.employeeId))];
-    const employees = await Employee.find({ 
+    const employees = await Employee.find({
       _id: { $in: employeeIds },
       isDeleted: { $ne: true } // Filter soft-deleted - Issue #526
     });
