@@ -49,13 +49,18 @@ export default function EmployeePortal() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       <Helmet>
         <title>Employee Self-Service Portal | PaySphere</title>
-        <meta name="description" content="View your profile, payslips, and attendance history." />
+        <meta
+          name="description"
+          content="View your profile, payslips, and attendance history."
+        />
       </Helmet>
 
       {/* Top Bar */}
       <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 flex items-center justify-between sticky top-0 z-30 transition-colors">
         <div className="flex items-center gap-3">
-          <span className="font-bold text-xl text-blue-600 dark:text-blue-400">PaySphere</span>
+          <span className="font-bold text-xl text-blue-600 dark:text-blue-400">
+            PaySphere
+          </span>
           <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-semibold uppercase tracking-wider">
             Employee Portal
           </span>
@@ -63,6 +68,12 @@ export default function EmployeePortal() {
 
         <div className="flex items-center gap-4">
           <ThemeToggle />
+          <button
+            onClick={() => navigate('/profile')}
+            className="px-3.5 py-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition"
+          >
+            Profile Settings
+          </button>
           <button
             onClick={handleSignOut}
             className="px-3.5 py-1.5 text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"
@@ -75,7 +86,7 @@ export default function EmployeePortal() {
       {/* Main Content */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-8">
         {loading ? (
-            <EmployeePortalSkeleton />
+          <EmployeePortalSkeleton />
         ) : (
           <>
             {/* Header Card */}
@@ -88,20 +99,25 @@ export default function EmployeePortal() {
                   {profile?.fullName || 'Employee'}
                 </h1>
                 <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                  {employee?.role ? `${employee.role} • ` : ''}{profile?.companyName || 'PaySphere'}
+                  {employee?.role ? `${employee.role} • ` : ''}
+                  {profile?.companyName || 'PaySphere'}
                 </p>
               </div>
 
               {employee && (
                 <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-gray-100 dark:border-slate-800 flex gap-6">
                   <div>
-                    <p className="text-xs uppercase text-gray-400 font-bold">Base Monthly Salary</p>
+                    <p className="text-xs uppercase text-gray-400 font-bold">
+                      Base Monthly Salary
+                    </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
                       ₹{employee.monthlySalary?.toLocaleString('en-IN') || 0}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase text-gray-400 font-bold">Overtime Rate</p>
+                    <p className="text-xs uppercase text-gray-400 font-bold">
+                      Overtime Rate
+                    </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
                       ₹{employee.overtimeRate || 0}/hr
                     </p>
@@ -129,13 +145,18 @@ export default function EmployeePortal() {
                         <th className="py-3 px-4">Base Salary</th>
                         <th className="py-3 px-4">Overtime Pay</th>
                         <th className="py-3 px-4">Leave Deductions</th>
-                        <th className="py-3 px-4 font-bold text-slate-900 dark:text-white">Net Payout</th>
+                        <th className="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                          Net Payout
+                        </th>
                         <th className="py-3 px-4">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-slate-800/60">
                       {payslips.map((pay) => (
-                        <tr key={pay._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                        <tr
+                          key={pay._id}
+                          className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition"
+                        >
                           <td className="py-4 px-4 font-semibold text-slate-900 dark:text-white">
                             {getMonthName(pay.month)} {pay.year}
                           </td>

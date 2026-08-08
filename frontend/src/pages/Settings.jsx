@@ -225,7 +225,7 @@ export default function Settings() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const localCompanyName = localStorage.getItem('companyName') || 'Acme Corp';
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState('preferences');
 
   const [loading, setLoading] = useState(true);
 
@@ -508,12 +508,9 @@ export default function Settings() {
   ];
 
   const settingsTabs = [
-    { id: 'profile', label: 'Profile', icon: <UserIcon /> },
-    { id: 'account', label: 'Account Security', icon: <LockIcon /> },
     { id: 'preferences', label: 'Preferences', icon: <PaletteIcon /> },
     { id: 'company', label: 'Company Info', icon: <BuildingIcon /> },
     { id: 'payroll', label: 'Payroll Config', icon: <WalletIcon /> },
-    { id: 'notifications', label: 'Notifications', icon: <BellIcon /> },
     { id: 'webhooks', label: 'Webhooks', icon: <WebhookIcon /> },
     { id: 'about', label: 'About PaySphere', icon: <InfoIcon /> },
   ];
@@ -712,7 +709,8 @@ export default function Settings() {
                     Two-Factor Authentication (2FA)
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                    Protect your admin account with TOTP apps like Google Authenticator or Authy.
+                    Protect your admin account with TOTP apps like Google
+                    Authenticator or Authy.
                   </p>
                 </div>
                 <span
