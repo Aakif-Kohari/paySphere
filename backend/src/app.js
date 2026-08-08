@@ -21,6 +21,9 @@ const flashcardRoutes = require("./routes/flashcard.routes");
 const webhookRoutes = require("./routes/webhook.routes");
 const notificationRoutes = require("./routes/notification.routes");
 const logger = require("./utils/logger");
+const { ApolloServer } = require("@apollo/server");
+const { expressMiddleware } = require("@as-integrations/express");
+const { typeDefs, resolvers } = require("./graphql/schema");
 
 const app = express();
 app.use(cookieParser());
@@ -58,6 +61,13 @@ app.use(cors(corsOptions));
 const { generalRateLimiter } = require("./middlewares/rateLimiter.middleware");
 const requireBody = require("./middlewares/requireBody.middleware");
 const { MAX_FILE_SIZE } = require("./middlewares/upload.middleware");
+const { ApolloServer } = require("@apollo/server");
+const { expressMiddleware } = require("@as-integrations/express");
+const { typeDefs, resolvers } = require("./graphql/schema");
+
+const apolloServer = new ApolloServer({ typeDefs, resolvers });
+await apolloServer.start();
+app.use("/graphql", cors(), express.json(), expressMiddleware(apolloServer));
 
 // Require request body for state-changing methods
 app.use("/api", requireBody);
