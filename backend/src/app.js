@@ -18,6 +18,7 @@ const workflowRoutes = require("./routes/workflow.routes");
 const salaryHistoryRoutes = require("./routes/salaryHistory.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
 const flashcardRoutes = require("./routes/flashcard.routes");
+const webhookRoutes = require("./routes/webhook.routes");
 const logger = require("./utils/logger");
 
 const app = express();
@@ -82,6 +83,11 @@ app.use("/api/workflows", workflowRoutes);
 
 app.use('/api', salaryHistoryRoutes);
 app.use("/api/flashcards", flashcardRoutes);
+
+// Webhook endpoints (#474) — an admin lets an external system subscribe to
+// payroll and employee events. The controller and models were written in #645
+// but never mounted here, so the whole feature was a 404.
+app.use("/api/webhooks", webhookRoutes);
 
 // Mounted here, once (#663).
 //

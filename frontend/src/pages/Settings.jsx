@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
+import WebhooksSection from '../components/WebhooksSection';
 import { logout } from '../features/auth/authSlice';
 import { setThemeMode } from '../features/ui/uiSlice';
 import api from '../services/api';
@@ -179,6 +180,26 @@ const WalletIcon = () => (
     <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"></path>
     <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"></path>
     <path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path>
+  </svg>
+);
+const WebhookIcon = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="4" cy="4" r="2"></circle>
+    <circle cx="20" cy="4" r="2"></circle>
+    <circle cx="12" cy="20" r="2"></circle>
+    <path d="M6 5.4a4 4 0 0 1 12 0"></path>
+    <path d="M4 6v6a4 4 0 0 0 2 3.46"></path>
+    <path d="M20 6v6a4 4 0 0 1-2 3.46"></path>
+    <path d="M12 8v8"></path>
   </svg>
 );
 const InfoIcon = () => (
@@ -493,6 +514,7 @@ export default function Settings() {
     { id: 'company', label: 'Company Info', icon: <BuildingIcon /> },
     { id: 'payroll', label: 'Payroll Config', icon: <WalletIcon /> },
     { id: 'notifications', label: 'Notifications', icon: <BellIcon /> },
+    { id: 'webhooks', label: 'Webhooks', icon: <WebhookIcon /> },
     { id: 'about', label: 'About PaySphere', icon: <InfoIcon /> },
   ];
 
@@ -1289,6 +1311,9 @@ export default function Settings() {
             </div>
           </div>
         );
+
+      case 'webhooks':
+        return <WebhooksSection />;
 
       case 'about':
         return (

@@ -15,6 +15,9 @@ const {
 } = require("./migrations/backfillSalaryStructures");
 const { backfillTenants } = require("./migrations/backfillTenants");
 const { registerAuditListener } = require("./listeners/audit.listener");
+const { initializeWebhookService } = require("./services/webhook.service");
+const { startWebhookWorker } = require("./workers/webhook.worker");
+const { isRedisAvailable } = require("./config/redis");
 const logger = require("./utils/logger");
 
 const startServer = async () => {
@@ -59,9 +62,26 @@ const startServer = async () => {
   // side-effect import is what got deleted the first time.
   registerAuditListener();
 
+  // Subscribe to AUDIT_LOG for webhook dispatch (#645/#474). Same shape as
+  // `registerAuditListener` above — an exported call in the boot sequence, not
+  // a side-effect import, so it cannot silently go unrequired.
+  initializeWebhookService();
+
   // Start background jobs
   startCronJobs();
   startReportCron();
+
+  // Start the BullMQ worker that delivers webhooks. Redis is optional in
+  // PaySphere (cache.service.js falls back to in-memory), so without REDIS_URL
+  // the worker is not started at all — the dispatch service logs a warning on
+  // each event instead of enqueueing into a queue nothing is draining.
+  if (process.env.REDIS_URL) {
+    startWebhookWorker();
+  } else if (!isRedisAvailable()) {
+    logger.warn(
+      "Webhook worker not started: REDIS_URL is not set. Webhook deliveries require Redis.",
+    );
+  }
   
   const PORT = process.env.PORT || 5000;
   const server = app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
