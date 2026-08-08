@@ -1,24 +1,25 @@
-require("dotenv").config();
-const app = require("./app");
-const connectDB = require("./config/db");
-const { startCronJobs } = require("./jobs/cron.jobs");
+require('dotenv').config();
+const app = require('./app');
+const connectDB = require('./config/db');
+const { startCronJobs } = require('./jobs/cron.jobs');
 // Was `require("./jobs/reportCron")` for its side effect: the module called
 // cron.schedule() at require time, so anything importing it — a test wanting
 // one function out of it — started a live timer. It exports a starter now, the
 // same shape cron.jobs.js already uses (#667).
-const { startReportCron } = require("./jobs/reportCron");
-const { seedRbac } = require("./seeds/rbac.seed");
-const { backfillAccountType } = require("./migrations/backfillAccountType");
-const { backfillPayrollStatus } = require("./migrations/backfillPayrollStatus");
+const { startReportCron } = require('./jobs/reportCron');
+const { seedRbac } = require('./seeds/rbac.seed');
+const { backfillAccountType } = require('./migrations/backfillAccountType');
+const { backfillPayrollStatus } = require('./migrations/backfillPayrollStatus');
 const {
   backfillSalaryStructures,
-} = require("./migrations/backfillSalaryStructures");
-const { backfillTenants } = require("./migrations/backfillTenants");
-const { registerAuditListener } = require("./listeners/audit.listener");
-const { initializeWebhookService } = require("./services/webhook.service");
-const { startWebhookWorker } = require("./workers/webhook.worker");
-const { isRedisAvailable } = require("./config/redis");
-const logger = require("./utils/logger");
+} = require('./migrations/backfillSalaryStructures');
+const { backfillTenants } = require('./migrations/backfillTenants');
+const { registerAuditListener } = require('./listeners/audit.listener');
+const { initializeWebhookService } = require('./services/webhook.service');
+const { startWebhookWorker } = require('./workers/webhook.worker');
+const { isRedisAvailable } = require('./config/redis');
+const { attachGraphQL } = require('./graphql');
+const logger = require('./utils/logger');
 
 const startServer = async () => {
   await connectDB();
@@ -79,13 +80,22 @@ const startServer = async () => {
     startWebhookWorker();
   } else if (!isRedisAvailable()) {
     logger.warn(
-      "Webhook worker not started: REDIS_URL is not set. Webhook deliveries require Redis.",
+      'Webhook worker not started: REDIS_URL is not set. Webhook deliveries require Redis.',
     );
   }
-  
+  // Mount /graphql, if the packages for it are installed.
+  //
+  // This used to live in app.js as a top-level `await`, which is a syntax error
+  // in CommonJS and left the whole file unparseable (#792). `ApolloServer.start()`
+  // really is asynchronous, so it belongs here in the startup sequence rather
+  // than in the middle of a module body. Never throws — see graphql/index.js.
+  await attachGraphQL(app);
+
   const PORT = process.env.PORT || 5000;
-  const server = app.listen(PORT, () => logger.info(`Server running on port ${PORT}`));
-  require("./sockets/payroll.socket").init(server);
+  const server = app.listen(PORT, () =>
+    logger.info(`Server running on port ${PORT}`),
+  );
+  require('./sockets/payroll.socket').init(server);
 };
 
 startServer();
