@@ -19,6 +19,7 @@ const salaryHistoryRoutes = require("./routes/salaryHistory.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
 const flashcardRoutes = require("./routes/flashcard.routes");
 const webhookRoutes = require("./routes/webhook.routes");
+const notificationRoutes = require("./routes/notification.routes");
 const logger = require("./utils/logger");
 
 const app = express();
@@ -74,32 +75,12 @@ app.use("/api/audit-logs", auditRoutes);
 app.use("/api/attendance", attendanceRoutes);
 app.use("/api/settlements", settlementRoutes);
 app.use("/api/loans", loanRoutes);
-// #590 shipped the controller, the models, the router and a WorkflowBuilder
-// page, and never registered the router — so the whole engine was a 404 and the
-// builder had nothing to talk to. It could not simply be added either: the
-// router destructured a `verifyToken` export that does not exist, so mounting
-// it threw at require time and took the process down at boot (#614).
 app.use("/api/workflows", workflowRoutes);
-
 app.use('/api', salaryHistoryRoutes);
 app.use("/api/flashcards", flashcardRoutes);
-
-// Webhook endpoints (#474) — an admin lets an external system subscribe to
-// payroll and employee events. The controller and models were written in #645
-// but never mounted here, so the whole feature was a 404.
 app.use("/api/webhooks", webhookRoutes);
-
-// Mounted here, once (#663).
-//
-// This router used to be mounted twice: on line 23, immediately after
-// `express()` and therefore *above* the cookie parser, Helmet, morgan, CORS,
-// the JSON body parser, the rate limiter and `requireBody` — and again down
-// here. Express serves the first mount that matches, so the copy that won was
-// the one with no middleware in front of it. Dashboard traffic got no security
-// headers, no origin check, no rate limit and no access log, and
-// `POST /api/dashboard/layout` threw a TypeError destructuring an unparsed
-// `req.body` on every call.
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // CORS error handler — return 403 for blocked origins
 app.use((err, req, res, next) => {
@@ -123,6 +104,5 @@ app.use((err, req, res, next) => {
 
 // Centralized error handler
 app.use(errorHandler);
-
 
 module.exports = app;
