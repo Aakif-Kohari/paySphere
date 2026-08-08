@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 const {
   MONTHLY_SALARY_MAX,
   OVERTIME_RATE_MAX,
@@ -36,8 +37,8 @@ const employeeSchema = new mongoose.Schema(
       default: '',
       maxlength: [100, 'Role cannot exceed 100 characters'],
     },
-    targetCurrency: { type: String, default: "USD" },
-    baseCurrency: { type: String, default: "USD" },
+    targetCurrency: { type: String, default: 'USD' },
+    baseCurrency: { type: String, default: 'USD' },
     department: {
       type: String,
       default: '',
@@ -108,17 +109,9 @@ const employeeSchema = new mongoose.Schema(
     },
     currency: {
       type: String,
-      default: "INR",
+      default: 'INR',
     },
-    deletedAt: {
-      type: Date,
-      default: null,
-    },
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
+
     /**
      * Who created this row. An audit fact, not a scoping key.
      *
@@ -172,7 +165,10 @@ employeeSchema.index({ tenantId: 1, fullName: 1, role: 1 }, { unique: true });
 // shorter index already enforces — two people with the same name and role in
 // different departments are still rejected. Left as-is because relaxing it
 // changes who can be hired, which is a product decision, not a scoping fix.
-employeeSchema.index({ tenantId: 1, fullName: 1, role: 1, department: 1 }, { unique: true });
+employeeSchema.index(
+  { tenantId: 1, fullName: 1, role: 1, department: 1 },
+  { unique: true },
+);
 
 /**
  * Email is unique within a company, for the employees that have one.
@@ -202,4 +198,5 @@ employeeSchema.index(
 // Index for efficient soft delete filtering
 employeeSchema.index({ tenantId: 1, isDeleted: 1, isActive: 1 });
 
+employeeSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('Employee', employeeSchema);

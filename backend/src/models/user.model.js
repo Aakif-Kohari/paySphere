@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 const {
   ALL_ACCOUNT_TYPES,
   DEFAULT_ACCOUNT_TYPE,
@@ -185,4 +186,5 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+userSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('User', userSchema);
