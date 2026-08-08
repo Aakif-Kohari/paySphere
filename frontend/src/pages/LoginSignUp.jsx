@@ -211,8 +211,8 @@ export default function PaySphereLogin() {
                   resetFormState();
                 }}
                 className={`flex-1 py-2 cursor-pointer rounded-lg text-sm font-medium transition ${activeTab === 'login'
-                    ? 'bg-white dark:bg-slate-900 shadow text-gray-900 dark:text-white'
-                    : 'text-gray-500 dark:text-slate-450 hover:text-gray-700 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-slate-900 shadow text-gray-900 dark:text-white'
+                  : 'text-gray-500 dark:text-slate-450 hover:text-gray-700 dark:hover:text-slate-200'
                   }`}
               >
                 Login
@@ -224,8 +224,8 @@ export default function PaySphereLogin() {
                   resetFormState();
                 }}
                 className={`flex-1 py-2 cursor-pointer rounded-lg text-sm font-medium transition ${activeTab === 'signup'
-                    ? 'bg-white dark:bg-slate-900 shadow text-gray-900 dark:text-white'
-                    : 'text-gray-500 dark:text-slate-450 hover:text-gray-700 dark:hover:text-slate-200'
+                  ? 'bg-white dark:bg-slate-900 shadow text-gray-900 dark:text-white'
+                  : 'text-gray-500 dark:text-slate-450 hover:text-gray-700 dark:hover:text-slate-200'
                   }`}
               >
                 Create Account
@@ -248,6 +248,9 @@ export default function PaySphereLogin() {
                     <form onSubmit={handleForgotPassword}>
                       <input
                         type="email"
+                        id="forgot-email"
+                        name="forgotEmail"
+                        aria-label="Email address for password reset"
                         placeholder="name@company.com"
                         value={forgotEmail}
                         onChange={(e) => setForgotEmail(e.target.value)}
@@ -298,6 +301,9 @@ export default function PaySphereLogin() {
                     <form onSubmit={handleAuth}>
                       <input
                         type="email"
+                        id="login-email"
+                        name="email"
+                        aria-label="Email address"
                         placeholder="name@company.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -307,6 +313,9 @@ export default function PaySphereLogin() {
 
                       <input
                         type="password"
+                        id="login-password"
+                        name="password"
+                        aria-label="Password"
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -359,6 +368,21 @@ export default function PaySphereLogin() {
                   <GoogleIcon />
                   Sign in with Google
                 </button>
+
+                <p className="text-center text-sm text-gray-600 dark:text-slate-400 mt-6">
+                  {activeTab === 'login' ? "Don't have an account?" : "Already have an account?"}
+                  {/* Fixed: Replaced anchor with button for valid semantics (Issue #660) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(activeTab === 'login' ? 'signup' : 'login');
+                      resetFormState();
+                    }}
+                    className="ml-1 font-bold text-brand-600 dark:text-brand-400 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500 rounded"
+                  >
+                    {activeTab === 'login' ? "Sign Up" : "Login"}
+                  </button>
+                </p>
               </>
             ) : (
               <>
@@ -372,6 +396,9 @@ export default function PaySphereLogin() {
                 <form onSubmit={handleAuth}>
                   <input
                     type="text"
+                    id="signup-fullname"
+                    name="fullName"
+                    aria-label="Full name"
                     placeholder="Full Name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
@@ -381,6 +408,9 @@ export default function PaySphereLogin() {
 
                   <input
                     type="email"
+                    id="signup-email"
+                    name="email"
+                    aria-label="Email address"
                     placeholder="Email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -390,6 +420,9 @@ export default function PaySphereLogin() {
 
                   <input
                     type="text"
+                    id="signup-company"
+                    name="companyName"
+                    aria-label="Company name"
                     placeholder="Company Name"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
@@ -399,6 +432,9 @@ export default function PaySphereLogin() {
 
                   <input
                     type="password"
+                    id="signup-password"
+                    name="password"
+                    aria-label="Password"
                     placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -435,6 +471,21 @@ export default function PaySphereLogin() {
                   <GoogleIcon />
                   Sign Up with Google
                 </button>
+
+                <p className="text-center text-sm text-gray-600 dark:text-slate-400 mt-6">
+                  {activeTab === 'login' ? "Don't have an account?" : "Already have an account?"}
+                  {/* Fixed: Replaced anchor with button for valid semantics (Issue #660) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(activeTab === 'login' ? 'signup' : 'login');
+                      resetFormState();
+                    }}
+                    className="ml-1 font-bold text-brand-600 dark:text-brand-400 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500 rounded"
+                  >
+                    {activeTab === 'login' ? "Sign Up" : "Login"}
+                  </button>
+                </p>
               </>
             )}
           </div>

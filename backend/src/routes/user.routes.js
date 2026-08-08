@@ -15,10 +15,10 @@ router.post("/forgot-password", authRateLimiter, forgotPassword);
 router.post("/reset-password/:token", authRateLimiter, resetPassword);
 router.post("/refresh", authRateLimiter, require("../controllers/user.controller").refresh);
 router.post("/logout", authRateLimiter, require("../controllers/user.controller").logout);
-router.post("/2fa/generate", auth, generate2FA);
-router.post("/2fa/verify-and-enable", auth, verifyAndEnable2FA);
+router.post("/2fa/generate", authRateLimiter, auth, generate2FA);
+router.post("/2fa/verify-and-enable", authRateLimiter, auth, verifyAndEnable2FA);
 router.post("/2fa/disable", auth, disable2FA);
-router.post("/2fa/validate-login", auth, validate2FALogin);
+router.post("/2fa/validate-login", authRateLimiter, auth, validate2FALogin);
 
 // Settings & Health
 router.get("/settings", auth, getSettings);
