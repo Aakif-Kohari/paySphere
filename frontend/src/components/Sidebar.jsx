@@ -5,7 +5,7 @@ import GridViewIcon from '@mui/icons-material/GridView';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PeopleIcon from '@mui/icons-material/People';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import ThemeToggle from './ThemeToggle';
 
 const Sidebar = ({
@@ -15,11 +15,34 @@ const Sidebar = ({
   isSidebarOpen,
   onClose,
 }) => {
+  const sidebarRef = useRef(null);
+
+  useEffect(() => {
+    if (!isSidebarOpen) return undefined;
+
+    const handleOutsideClick = (event) => {
+      if (sidebarRef.current && !sidebarRef.current.contains(event.target)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [isSidebarOpen, onClose]);
   const sidebarItems = useMemo(
     () => [
       { id: 'Dashboard', label: 'Dashboard', icon: <GridViewIcon /> },
       { id: 'Employees', label: 'Employees', icon: <PeopleIcon /> },
-      { id: 'Payroll', label: 'Payroll History', icon: <AccountBalanceWalletIcon /> },
+      {
+        id: 'Payroll',
+        label: 'Payroll History',
+        icon: <AccountBalanceWalletIcon />,
+      },
       { id: 'Approvals', label: 'Approvals', icon: <FactCheckIcon /> },
       { id: 'Settlements', label: 'Exits & F&F', icon: <LogoutIcon /> },
       { id: 'Loans', label: 'Advances', icon: <AccountBalanceWalletIcon /> },
@@ -40,7 +63,10 @@ const Sidebar = ({
   return (
     <>
       {isSidebarOpen && (
-        <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
+        <div
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={onClose}
         />
@@ -50,6 +76,7 @@ const Sidebar = ({
         className={`w-56 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 fixed inset-y-0 left-0 flex flex-col z-50 transition-transform duration-300 transform ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0`}
+        ref={sidebarRef}
       >
         <div className="p-5 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
