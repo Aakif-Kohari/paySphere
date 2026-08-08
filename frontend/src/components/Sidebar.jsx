@@ -6,6 +6,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PeopleIcon from '@mui/icons-material/People';
 import SchoolIcon from '@mui/icons-material/School';
+import ArchiveIcon from '@mui/icons-material/Archive';
 import { useEffect, useMemo, useRef } from 'react';
 import ThemeToggle from './ThemeToggle';
 
@@ -49,6 +50,7 @@ const Sidebar = ({
       { id: 'Loans', label: 'Advances', icon: <AccountBalanceWalletIcon /> },
       { id: 'Reports', label: 'Reports', icon: <AssessmentIcon /> },
       { id: 'Flashcards', label: 'AI Study Circle', icon: <SchoolIcon /> },
+      { id: 'Archive', label: 'Archive', icon: <ArchiveIcon /> },
     ],
     [],
   );
@@ -76,8 +78,9 @@ const Sidebar = ({
       )}
 
       <aside
-        className={`w-56 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 fixed inset-y-0 left-0 flex flex-col z-50 transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          } md:translate-x-0`}
+        className={`w-56 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 fixed inset-y-0 left-0 flex flex-col z-50 transition-transform duration-300 transform ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } md:translate-x-0`}
         ref={sidebarRef}
       >
         <div className="p-5 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
@@ -114,10 +117,11 @@ const Sidebar = ({
                 onClose();
               }}
               aria-current={activePage === item.id ? 'page' : undefined}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500 ${activePage === item.id
-                ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20 dark:shadow-none' /* Issue #521: Replaced hardcoded hex */
-                : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-                }`}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500 ${
+                activePage === item.id
+                  ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20 dark:shadow-none' /* Issue #521: Replaced hardcoded hex */
+                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+              }`}
             >
               {item.icon}
               {item.label}
