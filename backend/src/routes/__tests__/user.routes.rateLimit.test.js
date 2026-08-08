@@ -9,15 +9,20 @@
  * including the 2FA endpoints, which were previously unguarded.
  */
 
-const express = require("express");
-const request = require("supertest");
+const express = require('express');
+const request = require('supertest');
 
 // Every handler is stubbed: this suite is about which middleware runs and in
 // what order, not about what the controllers do.
-jest.mock("../../controllers/user.controller", () => ({
+jest.mock('../../controllers/user.controller', () => ({
   signup: (req, res) => res.status(200).json({ ok: true }),
   login: (req, res) => res.status(200).json({ ok: true }),
   googleAuth: (req, res) => res.status(200).json({ ok: true }),
+  // Added by the OAuth2 work in #753, which wired `/github` into the router
+  // without extending this mock — so the router got `undefined` for a handler
+  // and threw "argument handler must be a function" at require time, taking the
+  // suite down before a single assertion ran (#793).
+  githubAuth: (req, res) => res.status(200).json({ ok: true }),
   forgotPassword: (req, res) => res.status(200).json({ ok: true }),
   resetPassword: (req, res) => res.status(200).json({ ok: true }),
   refresh: (req, res) => res.status(200).json({ ok: true }),
@@ -33,8 +38,8 @@ jest.mock("../../controllers/user.controller", () => ({
   validate2FALogin: (req, res) => res.status(200).json({ ok: true }),
 }));
 
-jest.mock("../../middlewares/auth.middleware", () => (req, res, next) => {
-  req.userId = "507f1f77bcf86cd799439011";
+jest.mock('../../middlewares/auth.middleware', () => (req, res, next) => {
+  req.userId = '507f1f77bcf86cd799439011';
   next();
 });
 
@@ -42,15 +47,15 @@ jest.mock("../../middlewares/auth.middleware", () => (req, res, next) => {
 // regardless of any AUTH_RATE_LIMIT in the host environment.
 delete process.env.AUTH_RATE_LIMIT;
 
-const userRoutes = require("../user.routes");
+const userRoutes = require('../user.routes');
 
 const buildApp = () => {
   const app = express();
   // `trust proxy` is set on the real app (app.js) so client IPs come from
   // X-Forwarded-For; mirror that here so each test gets an isolated key.
-  app.set("trust proxy", 1);
+  app.set('trust proxy', 1);
   app.use(express.json());
-  app.use("/api/auth", userRoutes);
+  app.use('/api/auth', userRoutes);
   return app;
 };
 
@@ -63,67 +68,83 @@ const hammerUntilBlocked = async (app, path, payload) => {
   for (let i = 0; i < 40; i += 1) {
     response = await request(app)
       .post(path)
-      .set("X-Forwarded-For", ip)
+      .set('X-Forwarded-For', ip)
       .send(payload);
     if (response.status === 429) break;
   }
   return response;
 };
 
-describe("auth routes are rate limited (#470)", () => {
-  it("blocks /api/auth/login with 429 after the auth limit", async () => {
+describe('auth routes are rate limited (#470)', () => {
+  it('blocks /api/auth/login with 429 after the auth limit', async () => {
     const app = buildApp();
-    const response = await hammerUntilBlocked(app, "/api/auth/login", {
-      email: "user@example.com",
-      password: "wrong-password",
+    const response = await hammerUntilBlocked(app, '/api/auth/login', {
+      email: 'user@example.com',
+      password: 'wrong-password',
     });
     expect(response.status).toBe(429);
   });
 
-  it("blocks /api/auth/reset-password/:token with 429 after the auth limit", async () => {
+  it('blocks /api/auth/reset-password/:token with 429 after the auth limit', async () => {
     const app = buildApp();
-    const response = await hammerUntilBlocked(app, "/api/auth/reset-password/abc123", {
-      newPassword: "NewPass123!",
-    });
+    const response = await hammerUntilBlocked(
+      app,
+      '/api/auth/reset-password/abc123',
+      {
+        newPassword: 'NewPass123!',
+      },
+    );
     expect(response.status).toBe(429);
   });
 
-  it("blocks /api/auth/2fa/validate-login with 429 after the auth limit", async () => {
+  it('blocks /api/auth/2fa/validate-login with 429 after the auth limit', async () => {
     const app = buildApp();
-    const response = await hammerUntilBlocked(app, "/api/auth/2fa/validate-login", {
-      code: "123456",
-    });
+    const response = await hammerUntilBlocked(
+      app,
+      '/api/auth/2fa/validate-login',
+      {
+        code: '123456',
+      },
+    );
     expect(response.status).toBe(429);
   });
 
-  it("blocks /api/auth/2fa/generate and /2fa/verify-and-enable with 429 after the auth limit", async () => {
+  it('blocks /api/auth/2fa/generate and /2fa/verify-and-enable with 429 after the auth limit', async () => {
     const app = buildApp();
-    const generate = await hammerUntilBlocked(app, "/api/auth/2fa/generate", {});
-    const verify = await hammerUntilBlocked(app, "/api/auth/2fa/verify-and-enable", {
-      code: "123456",
-    });
+    const generate = await hammerUntilBlocked(
+      app,
+      '/api/auth/2fa/generate',
+      {},
+    );
+    const verify = await hammerUntilBlocked(
+      app,
+      '/api/auth/2fa/verify-and-enable',
+      {
+        code: '123456',
+      },
+    );
     expect(generate.status).toBe(429);
     expect(verify.status).toBe(429);
   });
 
-  it("returns the documented message body on a 429", async () => {
+  it('returns the documented message body on a 429', async () => {
     const app = buildApp();
-    const response = await hammerUntilBlocked(app, "/api/auth/login", {
-      email: "user@example.com",
-      password: "wrong-password",
+    const response = await hammerUntilBlocked(app, '/api/auth/login', {
+      email: 'user@example.com',
+      password: 'wrong-password',
     });
     expect(response.status).toBe(429);
     expect(response.body.message).toMatch(/Too many authentication attempts/i);
   });
 
-  it("does not block legitimate users below the limit", async () => {
+  it('does not block legitimate users below the limit', async () => {
     const app = buildApp();
     const ip = `198.51.100.${Math.floor(Math.random() * 200) + 1}`;
     for (let i = 0; i < 3; i += 1) {
       const response = await request(app)
-        .post("/api/auth/login")
-        .set("X-Forwarded-For", ip)
-        .send({ email: "user@example.com", password: "wrong-password" });
+        .post('/api/auth/login')
+        .set('X-Forwarded-For', ip)
+        .send({ email: 'user@example.com', password: 'wrong-password' });
       expect(response.status).toBe(200);
     }
   });
