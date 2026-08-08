@@ -64,6 +64,20 @@ const AUDIT_ACTIONS = [
   "ACCOUNT_DELETE",
   "SETTINGS_UPDATE",
   "PASSWORD_UPDATE",
+  // #474 — a webhook endpoint is the company's instruction to POST payroll and
+  // employee data to an external URL, and the secret signs every one of those
+  // requests. Creating one, changing what it receives, rotating its secret or
+  // deleting it all alter what leaves the org, so they are audited like the
+  // other security mutations above.
+  "WEBHOOK_CREATE",
+  "WEBHOOK_UPDATE",
+  "WEBHOOK_DELETE",
+  "WEBHOOK_SECRET_REGENERATED",
+  // The monthly-updates endpoints emit their own two. Monthly revisions are
+  // financial mutations (they move allowances and deductions into the next
+  // payroll run), so they are audited like SALARY_HISTORY_* above.
+  "MONTHLY_UPDATE_UPSERT",
+  "MONTHLY_UPDATE_DELETE",
 ];
 
 /** Every resource type a controller emits. Same story as the actions above. */
@@ -78,6 +92,8 @@ const AUDIT_RESOURCE_TYPES = [
   "SalaryHistory",
   "Workflow",
   "WorkflowInstance",
+  "Webhook",
+  "MonthlyUpdate",
 ];
 
 const auditLogSchema = new mongoose.Schema({

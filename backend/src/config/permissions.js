@@ -28,6 +28,13 @@ const PERMISSIONS = {
   // an export of company salary data to an external mailbox, or delete another
   // admin's schedule (#666).
   MANAGE_REPORT_SCHEDULE: "MANAGE_REPORT_SCHEDULE",
+  // A webhook endpoint is a standing instruction to POST company payroll and
+  // employee data to an external URL, signed with a secret this account owns.
+  // Creating, editing, rotating the secret for or deleting one is a write that
+  // can point data anywhere, so it is its own permission and it stays with the
+  // owner role — deliberately not something every admin of the workspace can do
+  // (#474).
+  MANAGE_WEBHOOKS: "MANAGE_WEBHOOKS",
 };
 
 const PERMISSION_DEFINITIONS = [
@@ -65,6 +72,11 @@ const PERMISSION_DEFINITIONS = [
     description:
       "Create and delete recurring report schedules, which mail company data to their recipients",
   },
+  {
+    name: PERMISSIONS.MANAGE_WEBHOOKS,
+    description:
+      "Create, update and delete webhook endpoints, which receive company data when payroll or employee events fire",
+  },
 ];
 
 // --- Roles -----------------------------------------------------------------
@@ -98,6 +110,7 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.APPROVE_PAYROLL,
       PERMISSIONS.READ_REPORT,
       PERMISSIONS.MANAGE_REPORT_SCHEDULE,
+      PERMISSIONS.MANAGE_WEBHOOKS,
     ],
   },
   {
