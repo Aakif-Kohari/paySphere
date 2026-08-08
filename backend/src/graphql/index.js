@@ -15,16 +15,12 @@
  * `app.js` is being required. It belongs in the startup sequence next to
  * `connectDB()` and the migrations, which is where `index.js` calls this from.
  *
- * The require is deliberately *inside* the function and guarded. Neither
- * `@apollo/server`, `@as-integrations/express` nor `graphql` is declared in
- * `backend/package.json` — #539 never added them — so on a checkout of `main`
- * the require throws `MODULE_NOT_FOUND`. Booting the whole API is not something
- * an optional reporting endpoint gets to veto, so a missing package downgrades
- * to a warning and the rest of the server comes up without `/graphql`.
- *
- * Note that the schema itself is unauthenticated and unscoped by tenant
- * (#795). Until that is fixed, this stays behind the missing-dependency guard
- * rather than being wired up eagerly.
+ * The require is deliberately *inside* the function and guarded. #539 never
+ * added the three packages to `backend/package.json`, so until #795 the require
+ * threw `MODULE_NOT_FOUND` on a clean checkout. They are declared now, and the
+ * guard stays: booting the whole API is not something an optional reporting
+ * endpoint gets to veto, so a missing or broken package downgrades to a warning
+ * and the rest of the server comes up without `/graphql`.
  */
 
 const logger = require('../utils/logger');
@@ -40,7 +36,7 @@ const logger = require('../utils/logger');
 function isGraphQLAvailable() {
   try {
     require.resolve('@apollo/server');
-    require.resolve('@as-integrations/express');
+    require.resolve('@as-integrations/express5');
     require.resolve('graphql');
     return true;
   } catch {
@@ -62,7 +58,7 @@ function isGraphQLAvailable() {
 async function attachGraphQL(app) {
   if (!isGraphQLAvailable()) {
     logger.warn(
-      'GraphQL not mounted: @apollo/server, @as-integrations/express and graphql are not installed. Add them to backend/package.json to enable /graphql.',
+      'GraphQL not mounted: @apollo/server, @as-integrations/express5 and graphql are not installed.',
     );
     return false;
   }
@@ -70,13 +66,31 @@ async function attachGraphQL(app) {
   try {
     const express = require('express');
     const { ApolloServer } = require('@apollo/server');
-    const { expressMiddleware } = require('@as-integrations/express');
+    // `@as-integrations/express5`, not `@as-integrations/express` — the latter
+    // does not exist on the registry at all, so #539's import could never have
+    // resolved even with the package installed. This project is on express@5,
+    // which is what the `5` in the name refers to.
+    const { expressMiddleware } = require('@as-integrations/express5');
     const { typeDefs, resolvers } = require('./schema');
+    const { buildContext } = require('./context');
 
-    const apolloServer = new ApolloServer({ typeDefs, resolvers });
+    const apolloServer = new ApolloServer({
+      typeDefs,
+      resolvers,
+      // Introspection lets anyone enumerate the whole schema. Useful while
+      // developing, not something to publish (#795).
+      introspection: process.env.NODE_ENV !== 'production',
+    });
     await apolloServer.start();
 
-    app.use('/graphql', express.json(), expressMiddleware(apolloServer));
+    // `context` is where authentication happens: it runs before any resolver,
+    // and what it throws the caller gets instead of data. Every resolver then
+    // scopes on `context.tenantId`, which no query argument can influence.
+    app.use(
+      '/graphql',
+      express.json(),
+      expressMiddleware(apolloServer, { context: buildContext }),
+    );
 
     logger.info('GraphQL mounted at /graphql');
     return true;
