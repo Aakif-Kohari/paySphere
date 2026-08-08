@@ -110,6 +110,11 @@ const PERMISSION_DEFINITIONS = [
     description:
       'Create and edit expense categories, including whether a category is taxable',
   },
+  {
+    name: PERMISSIONS.MANAGE_ROLES,
+    description:
+      "Create, update and delete custom roles and their permission sets",
+  },
 ];
 
 // --- Roles -----------------------------------------------------------------

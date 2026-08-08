@@ -130,6 +130,11 @@ app.use('/api/flashcards', flashcardRoutes);
 // but never mounted here, so the whole feature was a 404.
 app.use('/api/webhooks', webhookRoutes);
 
+// Custom role management (#475) — the owner role manages the permission sets
+// that decide what every other account can do. Mounted once, after the security
+// middleware, like the rest of the API.
+app.use("/api/roles", roleRoutes);
+
 // Mounted here, once (#663).
 //
 // This router used to be mounted twice: on line 23, immediately after
