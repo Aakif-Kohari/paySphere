@@ -1,6 +1,7 @@
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const zxcvbn = require('../utils/zxcvbn');
 const mongoose = require('mongoose');
 const { OAuth2Client } = require('google-auth-library');
 const crypto = require('crypto');
@@ -112,6 +113,13 @@ exports.signup = async (req, res, next) => {
       });
     }
 
+    const strength = zxcvbn(password);
+    if (strength.score < 3) {
+      return res.status(400).json({
+        message: `Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`,
+      });
+    }
+
     const cleanEmail = email.trim().toLowerCase();
     const existingUser = await User.findOne({ email: cleanEmail });
     if (existingUser)
@@ -128,6 +136,7 @@ exports.signup = async (req, res, next) => {
       email: cleanEmail,
       companyName: sanitizeText(companyName),
       password: hashedPassword,
+      passwordHistory: [hashedPassword],
       ...(defaultRole ? { role: defaultRole._id } : {}),
     });
 
@@ -452,6 +461,13 @@ exports.updatePassword = async (req, res, next) => {
       });
     }
 
+    const strength = zxcvbn(newPassword);
+    if (strength.score < 3) {
+      return res.status(400).json({
+        message: `Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`,
+      });
+    }
+
     if (!user.password) {
       return res
         .status(400)
@@ -462,8 +478,26 @@ exports.updatePassword = async (req, res, next) => {
     if (!isMatch)
       return res.status(400).json({ message: 'Incorrect current password' });
 
+    if (user.passwordHistory && user.passwordHistory.length > 0) {
+      for (const oldHash of user.passwordHistory) {
+        const isReused = await bcrypt.compare(newPassword, oldHash);
+        if (isReused) {
+          return res.status(400).json({
+            message: 'You cannot reuse any of your last 5 passwords',
+          });
+        }
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     user.password = hashedPassword;
+    if (!user.passwordHistory) {
+      user.passwordHistory = [];
+    }
+    user.passwordHistory.push(hashedPassword);
+    if (user.passwordHistory.length > 5) {
+      user.passwordHistory.shift();
+    }
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
 
@@ -795,6 +829,13 @@ exports.resetPassword = async (req, res, next) => {
       });
     }
 
+    const strength = zxcvbn(password);
+    if (strength.score < 3) {
+      return res.status(400).json({
+        message: `Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`,
+      });
+    }
+
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
     const user = await User.findOne({
@@ -808,11 +849,29 @@ exports.resetPassword = async (req, res, next) => {
         .json({ message: 'Password reset token is invalid or has expired' });
     }
 
+    if (user.passwordHistory && user.passwordHistory.length > 0) {
+      for (const oldHash of user.passwordHistory) {
+        const isReused = await bcrypt.compare(password, oldHash);
+        if (isReused) {
+          return res.status(400).json({
+            message: 'You cannot reuse any of your last 5 passwords',
+          });
+        }
+      }
+    }
+
     // Hash the new password
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Save user new password, clear token fields, and increment tokenVersion
     user.password = hashedPassword;
+    if (!user.passwordHistory) {
+      user.passwordHistory = [];
+    }
+    user.passwordHistory.push(hashedPassword);
+    if (user.passwordHistory.length > 5) {
+      user.passwordHistory.shift();
+    }
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     user.tokenVersion = (user.tokenVersion || 0) + 1;
