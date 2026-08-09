@@ -1,8 +1,14 @@
 const winston = require("winston");
 const path = require("path");
+const { redact } = require("./redaction");
 require("winston-daily-rotate-file");
 
 const logDir = path.join(__dirname, "../../logs");
+
+const redactFormat = winston.format((info) => {
+  const redacted = redact(info);
+  return Object.assign(info, redacted);
+})();
 
 const fileRotateTransport = new winston.transports.DailyRotateFile({
   filename: path.join(logDir, "paysphere-%DATE%.log"),
@@ -10,6 +16,7 @@ const fileRotateTransport = new winston.transports.DailyRotateFile({
   maxSize: "20m",
   maxFiles: "30d",
   format: winston.format.combine(
+    redactFormat,
     winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
     winston.format.json()
   ),
@@ -22,6 +29,7 @@ const errorFileRotateTransport = new winston.transports.DailyRotateFile({
   maxFiles: "30d",
   level: "error",
   format: winston.format.combine(
+    redactFormat,
     winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
     winston.format.json()
   ),
@@ -29,6 +37,7 @@ const errorFileRotateTransport = new winston.transports.DailyRotateFile({
 
 const consoleTransport = new winston.transports.Console({
   format: winston.format.combine(
+    redactFormat,
     winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
     winston.format.colorize(),
     winston.format.printf(({ timestamp, level, message, ...meta }) => {

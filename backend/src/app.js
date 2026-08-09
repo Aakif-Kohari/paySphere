@@ -81,6 +81,9 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use(cors(corsOptions));
 
+const redactionMiddleware = require("./middlewares/redaction.middleware");
+app.use(redactionMiddleware);
+
 const { generalRateLimiter } = require("./middlewares/rateLimiter.middleware");
 const requireBody = require("./middlewares/requireBody.middleware");
 const { MAX_FILE_SIZE } = require("./middlewares/upload.middleware");
