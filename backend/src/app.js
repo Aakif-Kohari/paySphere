@@ -48,6 +48,7 @@ const archiveRoutes = require('./routes/archive.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
+const searchRoutes  = require('./routes/search.routes');
 
 const errorHandler = require('./middlewares/error.middleware');
 const { generalRateLimiter } = require('./middlewares/rateLimiter.middleware');
@@ -159,6 +160,10 @@ app.use('/api/monthly-updates', monthlyUpdatesRoutes);
 // answer 403 until the EXPENSE permissions exist (#794); mounting them is the
 // part that belongs to this file.
 app.use('/api/expenses', expenseRoutes);
+
+// Full-text search via Elasticsearch (#771). Returns ranked results across
+// employees, payroll, and audit-log indices without exposing raw Mongo regex.
+app.use('/api/search', searchRoutes);
 
 // ─── Error handlers ────────────────────────────────────────────────────────
 
