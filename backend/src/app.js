@@ -1,60 +1,25 @@
-/**
- * The Express application.
- *
- * This file was unparseable on `main` between #539 and #792. Two separate
- * events put it there, and the second is the reason it is worth a comment:
- *
- *   - #539 added the Apollo requires twice — once at the top of the file and
- *     once in the middle of the middleware stack — and then called
- *     `await apolloServer.start()` at module scope. `backend` is CommonJS, so
- *     top-level `await` is a syntax error whatever else is going on.
- *
- *   - #785's "Merge branch 'main' into feature/soft-delete-759" resolved a
- *     whitespace-only conflict by keeping *both* sides, so the file ended up
- *     with two complete copies of the require block, the middleware stack and
- *     the route table.
- *
- * The two copies of the route table were not identical, which is the part that
- * bites quietly: the first mounted `/api/archive` and not `/api/notifications`,
- * the second the other way round, and Express serves whichever match it reaches
- * first. Neither mounted `/api/expenses`. The mount list below is the union, and
- * `__tests__/app.routeMounting.test.js` now asserts it so a future merge cannot
- * drop a router without a test going red.
- */
-
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const multer = require('multer');
-const morgan = require('morgan');
-const cookieParser = require('cookie-parser');
-
-const userRoutes = require('./routes/user.routes');
-const employeeRoutes = require('./routes/employee.routes');
-const payrollRoutes = require('./routes/payroll.routes');
-const reportsRoutes = require('./routes/reports.routes');
-const auditRoutes = require('./routes/audit.routes');
-const attendanceRoutes = require('./routes/attendance.routes');
-const settlementRoutes = require('./routes/settlement.routes');
-const loanRoutes = require('./routes/loan.routes');
-const schedulerRoutes = require('./routes/scheduler.routes');
-const employeePortalRoutes = require('./routes/employeePortal.routes');
-const workflowRoutes = require('./routes/workflow.routes');
-const salaryHistoryRoutes = require('./routes/salaryHistory.routes');
-const dashboardRoutes = require('./routes/dashboard.routes');
-const flashcardRoutes = require('./routes/flashcard.routes');
-const webhookRoutes = require('./routes/webhook.routes');
-const archiveRoutes = require('./routes/archive.routes');
-const notificationRoutes = require('./routes/notification.routes');
-const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
-const expenseRoutes = require('./routes/expense.routes');
-const searchRoutes  = require('./routes/search.routes');
-
-const errorHandler = require('./middlewares/error.middleware');
-const { generalRateLimiter } = require('./middlewares/rateLimiter.middleware');
-const requireBody = require('./middlewares/requireBody.middleware');
-const { MAX_FILE_SIZE } = require('./middlewares/upload.middleware');
-const logger = require('./utils/logger');
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const multer = require("multer");
+const morgan = require("morgan");
+const cookieParser = require("cookie-parser");
+const userRoutes = require("./routes/user.routes");
+const employeeRoutes = require("./routes/employee.routes");
+const payrollRoutes = require("./routes/payroll.routes");
+const reportsRoutes = require("./routes/reports.routes");
+const auditRoutes = require("./routes/audit.routes");
+const attendanceRoutes = require("./routes/attendance.routes");
+const settlementRoutes = require("./routes/settlement.routes");
+const loanRoutes = require("./routes/loan.routes");
+const schedulerRoutes = require("./routes/scheduler.routes");
+const employeePortalRoutes = require("./routes/employeePortal.routes");
+const workflowRoutes = require("./routes/workflow.routes");
+const salaryHistoryRoutes = require("./routes/salaryHistory.routes");
+const dashboardRoutes = require("./routes/dashboard.routes");
+const flashcardRoutes = require("./routes/flashcard.routes");
+const pyqRoutes = require("./routes/pyq.routes");
+const logger = require("./utils/logger");
 
 const app = express();
 
@@ -66,21 +31,15 @@ const app = express();
 
 app.use(cookieParser());
 
-// Security headers
-app.use(helmet({ crossOriginOpenerPolicy: false }));
-
-// Rate limiting trust proxy configuration
-app.set('trust proxy', 1);
-
-// HTTP request logging via morgan + winston
-app.use(morgan('combined', { stream: logger.stream }));
-
-// CORS configuration — restrict to frontend origin
-const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
+// CORS configuration — restrict strictly to frontend origin
+const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. server-to-server, curl, mobile apps)
-    if (!origin || origin === allowedOrigin) {
+    // Allow requests with no origin (e.g. server-to-server, unit tests)
+    if (!origin) {
+      return callback(null, true);
+    }
+    if (origin === allowedOrigin) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -89,8 +48,42 @@ const corsOptions = {
   credentials: true,
 };
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+// Security headers (HSTS, Content Security Policy, X-Content-Type-Options: nosniff)
+app.use(
+  helmet({
+    crossOriginOpenerPolicy: false,
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: ["'self'", allowedOrigin],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameAncestors: ["'none'"], // blocks clickjacking
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year HSTS
+      includeSubDomains: true,
+      preload: true,
+    },
+    xContentTypeOptions: true, // nosniff
+  })
+);
+
+// Rate limiting trust proxy configuration
+app.set("trust proxy", 1);
+
+// HTTP request logging via morgan + winston
+app.use(morgan("combined", { stream: logger.stream }));
+
+// Middleware
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use(cors(corsOptions));
 
 // Require request body for state-changing methods
@@ -124,17 +117,8 @@ app.use('/api/archive', archiveRoutes);
 app.use('/api/workflows', workflowRoutes);
 
 app.use('/api', salaryHistoryRoutes);
-app.use('/api/flashcards', flashcardRoutes);
-
-// Webhook endpoints (#474) — an admin lets an external system subscribe to
-// payroll and employee events. The controller and models were written in #645
-// but never mounted here, so the whole feature was a 404.
-app.use('/api/webhooks', webhookRoutes);
-
-// Custom role management (#475) — the owner role manages the permission sets
-// that decide what every other account can do. Mounted once, after the security
-// middleware, like the rest of the API.
-app.use("/api/roles", roleRoutes);
+app.use("/api/flashcards", flashcardRoutes);
+app.use("/api/pyqs", pyqRoutes);
 
 // Mounted here, once (#663).
 //
