@@ -91,6 +91,11 @@ const corsOptions = {
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Global Input Sanitization (Issue #727)
+// Must be placed AFTER body parsers but BEFORE route handlers
+const sanitizeMiddleware = require('./middlewares/sanitize.middleware');
+app.use(sanitizeMiddleware);
 app.use(cors(corsOptions));
 
 // Require request body for state-changing methods
