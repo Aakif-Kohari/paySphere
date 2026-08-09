@@ -56,11 +56,11 @@ app.use(
       useDefaults: true,
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "https://fonts.googleapis.com"],
         imgSrc: ["'self'", "data:", "blob:"],
         connectSrc: ["'self'", allowedOrigin],
-        fontSrc: ["'self'"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'"],
         frameAncestors: ["'none'"], // blocks clickjacking
@@ -85,6 +85,13 @@ app.use(morgan("combined", { stream: logger.stream }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use(cors(corsOptions));
+
+const redactionMiddleware = require("./middlewares/redaction.middleware");
+app.use(redactionMiddleware);
+
+const { generalRateLimiter } = require("./middlewares/rateLimiter.middleware");
+const requireBody = require("./middlewares/requireBody.middleware");
+const { MAX_FILE_SIZE } = require("./middlewares/upload.middleware");
 
 // Require request body for state-changing methods
 app.use('/api', requireBody);

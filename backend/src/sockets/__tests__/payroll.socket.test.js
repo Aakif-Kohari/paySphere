@@ -341,6 +341,105 @@ describe('payroll_adjustment_change (#615)', () => {
   });
 });
 
+describe('payroll row locks (#813)', () => {
+  const customConnectAndJoin = async (socketId = 's1', userId = USER_A, userName = 'Ada') => {
+    const { io } = boot();
+    const socket = makeSocket(socketId);
+    socket.identity = { userId, tenantId: TENANT_A, name: userName };
+    io.connection(socket);
+    socket.fire('join_payroll_session', { month: 8, year: 2026 });
+    mockEmissions.length = 0;
+    return socket;
+  };
+
+  let employeeId;
+
+  beforeEach(() => {
+    employeeId = oid();
+    const { getLocksRegistry } = require('../payroll.socket');
+    if (getLocksRegistry()) {
+      getLocksRegistry().clear();
+    }
+  });
+
+  test('should emit active_locks_update when user joins the session', async () => {
+    const { io } = boot();
+    const socket = makeSocket('s1');
+    socket.identity = { userId: USER_A, tenantId: TENANT_A, name: 'Ada' };
+    io.connection(socket);
+    socket.fire('join_payroll_session', { month: 8, year: 2026 });
+
+    const activeLocksUpdate = mockEmissions.find((e) => e.event === 'active_locks_update');
+    expect(activeLocksUpdate).toBeDefined();
+    expect(activeLocksUpdate.payload).toEqual([]);
+  });
+
+  test('should broadcast payroll_row_locked when a user successfully locks a row', async () => {
+    const socket = await customConnectAndJoin();
+    socket.fire('payroll_row_lock', { empId: employeeId });
+
+    const lockedEvent = mockEmissions.find((e) => e.event === 'payroll_row_locked');
+    expect(lockedEvent).toBeDefined();
+    expect(lockedEvent.payload).toMatchObject({
+      userId: USER_A,
+      userName: 'Ada',
+      empId: employeeId,
+    });
+  });
+
+  test('should broadcast payroll_row_unlocked when a user unlocks a row', async () => {
+    const socket = await customConnectAndJoin();
+    socket.fire('payroll_row_lock', { empId: employeeId });
+    socket.fire('payroll_row_unlock', { empId: employeeId });
+
+    const unlockedEvent = mockEmissions.find((e) => e.event === 'payroll_row_unlocked');
+    expect(unlockedEvent).toBeDefined();
+    expect(unlockedEvent.payload).toMatchObject({
+      userId: USER_A,
+      userName: 'Ada',
+      empId: employeeId,
+    });
+  });
+
+  test('should fail to lock if the row is already locked by someone else', async () => {
+    const { io } = boot();
+    
+    // First client socket
+    const socket1 = makeSocket('s1');
+    socket1.identity = { userId: USER_A, tenantId: TENANT_A, name: 'Ada' };
+    io.connection(socket1);
+    socket1.fire('join_payroll_session', { month: 8, year: 2026 });
+
+    // Second client socket
+    const socket2 = makeSocket('s2');
+    const USER_B = oid();
+    socket2.identity = { userId: USER_B, tenantId: TENANT_A, name: 'Bob' };
+    io.connection(socket2);
+    socket2.fire('join_payroll_session', { month: 8, year: 2026 });
+
+    mockEmissions.length = 0;
+
+    // Socket 1 acquires lock
+    socket1.fire('payroll_row_lock', { empId: employeeId });
+    // Socket 2 tries to acquire the same lock
+    socket2.fire('payroll_row_lock', { empId: employeeId });
+
+    const errorEvent = mockEmissions.find((e) => e.to === 's2' && e.event === 'payroll_session_error');
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent.payload.message).toContain('Failed to acquire row lock');
+  });
+
+  test('should automatically unlock rows when the user disconnects', async () => {
+    const socket = await customConnectAndJoin();
+    socket.fire('payroll_row_lock', { empId: employeeId });
+
+    socket.fire('disconnect');
+    const unlockedEvent = mockEmissions.find((e) => e.event === 'payroll_row_unlocked');
+    expect(unlockedEvent).toBeDefined();
+    expect(unlockedEvent.payload.empId).toBe(employeeId);
+  });
+});
+
 describe('logging (#615)', () => {
   test('connections are not written to stdout with console.log', () => {
     const source = require('fs').readFileSync(
