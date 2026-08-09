@@ -1,25 +1,60 @@
-const express = require("express");
-const cors = require("cors");
-const helmet = require("helmet");
-const multer = require("multer");
-const morgan = require("morgan");
-const cookieParser = require("cookie-parser");
-const userRoutes = require("./routes/user.routes");
-const employeeRoutes = require("./routes/employee.routes");
-const payrollRoutes = require("./routes/payroll.routes");
-const reportsRoutes = require("./routes/reports.routes");
-const auditRoutes = require("./routes/audit.routes");
-const attendanceRoutes = require("./routes/attendance.routes");
-const settlementRoutes = require("./routes/settlement.routes");
-const loanRoutes = require("./routes/loan.routes");
-const schedulerRoutes = require("./routes/scheduler.routes");
-const employeePortalRoutes = require("./routes/employeePortal.routes");
-const workflowRoutes = require("./routes/workflow.routes");
-const salaryHistoryRoutes = require("./routes/salaryHistory.routes");
-const dashboardRoutes = require("./routes/dashboard.routes");
-const flashcardRoutes = require("./routes/flashcard.routes");
-const pyqRoutes = require("./routes/pyq.routes");
-const logger = require("./utils/logger");
+/**
+ * The Express application.
+ *
+ * This file was unparseable on `main` between #539 and #792. Two separate
+ * events put it there, and the second is the reason it is worth a comment:
+ *
+ *   - #539 added the Apollo requires twice — once at the top of the file and
+ *     once in the middle of the middleware stack — and then called
+ *     `await apolloServer.start()` at module scope. `backend` is CommonJS, so
+ *     top-level `await` is a syntax error whatever else is going on.
+ *
+ *   - #785's "Merge branch 'main' into feature/soft-delete-759" resolved a
+ *     whitespace-only conflict by keeping *both* sides, so the file ended up
+ *     with two complete copies of the require block, the middleware stack and
+ *     the route table.
+ *
+ * The two copies of the route table were not identical, which is the part that
+ * bites quietly: the first mounted `/api/archive` and not `/api/notifications`,
+ * the second the other way round, and Express serves whichever match it reaches
+ * first. Neither mounted `/api/expenses`. The mount list below is the union, and
+ * `__tests__/app.routeMounting.test.js` now asserts it so a future merge cannot
+ * drop a router without a test going red.
+ */
+
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const multer = require('multer');
+const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
+
+const userRoutes = require('./routes/user.routes');
+const employeeRoutes = require('./routes/employee.routes');
+const payrollRoutes = require('./routes/payroll.routes');
+const reportsRoutes = require('./routes/reports.routes');
+const auditRoutes = require('./routes/audit.routes');
+const attendanceRoutes = require('./routes/attendance.routes');
+const settlementRoutes = require('./routes/settlement.routes');
+const loanRoutes = require('./routes/loan.routes');
+const schedulerRoutes = require('./routes/scheduler.routes');
+const employeePortalRoutes = require('./routes/employeePortal.routes');
+const workflowRoutes = require('./routes/workflow.routes');
+const salaryHistoryRoutes = require('./routes/salaryHistory.routes');
+const dashboardRoutes = require('./routes/dashboard.routes');
+const flashcardRoutes = require('./routes/flashcard.routes');
+const webhookRoutes = require('./routes/webhook.routes');
+const archiveRoutes = require('./routes/archive.routes');
+const notificationRoutes = require('./routes/notification.routes');
+const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
+const expenseRoutes = require('./routes/expense.routes');
+const searchRoutes = require('./routes/search.routes');
+
+const errorHandler = require('./middlewares/error.middleware');
+const { generalRateLimiter } = require('./middlewares/rateLimiter.middleware');
+const requireBody = require('./middlewares/requireBody.middleware');
+const { MAX_FILE_SIZE } = require('./middlewares/upload.middleware');
+const logger = require('./utils/logger');
 
 const app = express();
 
@@ -95,8 +130,17 @@ app.use('/api/archive', archiveRoutes);
 app.use('/api/workflows', workflowRoutes);
 
 app.use('/api', salaryHistoryRoutes);
-app.use("/api/flashcards", flashcardRoutes);
-app.use("/api/pyqs", pyqRoutes);
+app.use('/api/flashcards', flashcardRoutes);
+
+// Webhook endpoints (#474) — an admin lets an external system subscribe to
+// payroll and employee events. The controller and models were written in #645
+// but never mounted here, so the whole feature was a 404.
+app.use('/api/webhooks', webhookRoutes);
+
+// Custom role management (#475) — the owner role manages the permission sets
+// that decide what every other account can do. Mounted once, after the security
+// middleware, like the rest of the API.
+app.use('/api/roles', roleRoutes);
 
 // Mounted here, once (#663).
 //
@@ -126,6 +170,23 @@ app.use('/api/expenses', expenseRoutes);
 // Full-text search via Elasticsearch (#771). Returns ranked results across
 // employees, payroll, and audit-log indices without exposing raw Mongo regex.
 app.use('/api/search', searchRoutes);
+
+// ─── 404 Handler ──────────────────────────────────────────────────────────
+// Must be registered AFTER all valid routes but BEFORE error handlers.
+// Uses NotFoundError if available, otherwise falls back to a standard Error
+// so the centralized error handler can format the response consistently.
+app.all('*', (req, res, next) => {
+  let err;
+  try {
+    const { NotFoundError } = require('./utils/apiError');
+    err = new NotFoundError(`Cannot find ${req.originalUrl} on this server!`);
+  } catch {
+    // Fallback if apiError module doesn't exist yet
+    err = new Error(`Cannot find ${req.originalUrl} on this server!`);
+    err.statusCode = 404;
+  }
+  next(err);
+});
 
 // ─── Error handlers ────────────────────────────────────────────────────────
 
