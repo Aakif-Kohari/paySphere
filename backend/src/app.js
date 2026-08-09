@@ -48,42 +48,13 @@ const corsOptions = {
   credentials: true,
 };
 
-// Security headers (HSTS, Content Security Policy, X-Content-Type-Options: nosniff)
-app.use(
-  helmet({
-    crossOriginOpenerPolicy: false,
-    contentSecurityPolicy: {
-      useDefaults: true,
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "https://fonts.googleapis.com"],
-        imgSrc: ["'self'", "data:", "blob:"],
-        connectSrc: ["'self'", allowedOrigin],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        objectSrc: ["'none'"],
-        mediaSrc: ["'self'"],
-        frameAncestors: ["'none'"], // blocks clickjacking
-      },
-    },
-    hsts: {
-      maxAge: 31536000, // 1 year HSTS
-      includeSubDomains: true,
-      preload: true,
-    },
-    xContentTypeOptions: true, // nosniff
-  })
-);
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// Rate limiting trust proxy configuration
-app.set("trust proxy", 1);
-
-// HTTP request logging via morgan + winston
-app.use(morgan("combined", { stream: logger.stream }));
-
-// Middleware
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
+// Global Input Sanitization (Issue #727)
+// Must be placed AFTER body parsers but BEFORE route handlers
+const sanitizeMiddleware = require('./middlewares/sanitize.middleware');
+app.use(sanitizeMiddleware);
 app.use(cors(corsOptions));
 
 const redactionMiddleware = require("./middlewares/redaction.middleware");
