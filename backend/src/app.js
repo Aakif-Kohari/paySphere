@@ -66,21 +66,15 @@ const app = express();
 
 app.use(cookieParser());
 
-// Security headers
-app.use(helmet({ crossOriginOpenerPolicy: false }));
-
-// Rate limiting trust proxy configuration
-app.set('trust proxy', 1);
-
-// HTTP request logging via morgan + winston
-app.use(morgan('combined', { stream: logger.stream }));
-
-// CORS configuration — restrict to frontend origin
-const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
+// CORS configuration — restrict strictly to frontend origin
+const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. server-to-server, curl, mobile apps)
-    if (!origin || origin === allowedOrigin) {
+    // Allow requests with no origin (e.g. server-to-server, unit tests)
+    if (!origin) {
+      return callback(null, true);
+    }
+    if (origin === allowedOrigin) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -91,7 +85,19 @@ const corsOptions = {
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Global Input Sanitization (Issue #727)
+// Must be placed AFTER body parsers but BEFORE route handlers
+const sanitizeMiddleware = require('./middlewares/sanitize.middleware');
+app.use(sanitizeMiddleware);
 app.use(cors(corsOptions));
+
+const redactionMiddleware = require("./middlewares/redaction.middleware");
+app.use(redactionMiddleware);
+
+const { generalRateLimiter } = require("./middlewares/rateLimiter.middleware");
+const requireBody = require("./middlewares/requireBody.middleware");
+const { MAX_FILE_SIZE } = require("./middlewares/upload.middleware");
 
 // Require request body for state-changing methods
 app.use('/api', requireBody);

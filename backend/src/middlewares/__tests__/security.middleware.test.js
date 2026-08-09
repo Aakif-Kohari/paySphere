@@ -34,6 +34,13 @@ describe("Security Middleware - Helmet & CORS (#80)", () => {
       const res = await request(app).get("/");
       expect(res.headers["content-security-policy"]).toBeDefined();
     });
+
+    test("should set strict Content-Security-Policy rules without unsafe-inline", async () => {
+      const res = await request(app).get("/");
+      const csp = res.headers["content-security-policy"];
+      expect(csp).toBeDefined();
+      expect(csp).not.toContain("'unsafe-inline'");
+    });
   });
 
   // ─── CORS Configuration ────────────────────────────────────────
