@@ -51,11 +51,11 @@ app.use(
       useDefaults: true,
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "https://fonts.googleapis.com"],
         imgSrc: ["'self'", "data:", "blob:"],
         connectSrc: ["'self'", allowedOrigin],
-        fontSrc: ["'self'"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'"],
         frameAncestors: ["'none'"], // blocks clickjacking
