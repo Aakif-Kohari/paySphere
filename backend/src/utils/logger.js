@@ -35,6 +35,9 @@ const errorFileRotateTransport = new winston.transports.DailyRotateFile({
   ),
 });
 
+/**
+ * Transport: Console (Colorized for Dev only, disabled in production)
+ */
 const consoleTransport = new winston.transports.Console({
   format: winston.format.combine(
     redactFormat,
@@ -47,17 +50,59 @@ const consoleTransport = new winston.transports.Console({
   ),
 });
 
+/**
+ * Winston Logger Instance
+ */
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || "info",
-  transports: [fileRotateTransport, errorFileRotateTransport],
+  level: process.env.LOG_LEVEL || 'info',
+  defaultMeta: {
+    service: 'paysphere-api',
+    env: process.env.NODE_ENV || 'development',
+  },
+  transports: [
+    errorRotateTransport,
+    combinedRotateTransport,
+  ],
+  // Handle uncaught exceptions and unhandled rejections
+  exceptionHandlers: [
+    new DailyRotateFile({
+      filename: path.join(logDir, 'exceptions-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '20m',
+      maxFiles: '30d',
+    }),
+  ],
+  rejectionHandlers: [
+    new DailyRotateFile({
+      filename: path.join(logDir, 'rejections-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '20m',
+      maxFiles: '30d',
+    }),
+  ],
 });
 
-if (process.env.NODE_ENV !== "production") {
+// Only enable console transport outside of production
+// Prevents double-logging in containerized/cloud environments
+if (process.env.NODE_ENV !== 'production') {
   logger.add(consoleTransport);
 }
 
+/**
+ * Morgan-compatible stream for HTTP access logging
+ * Usage: app.use(morgan('combined', { stream: logger.stream }))
+ */
 logger.stream = {
   write: (message) => logger.http(message.trim()),
+};
+
+/**
+ * Creates a child logger with specific context (e.g., for a specific module or request)
+ * @param {Object} context - Metadata to inject into all logs from this child
+ * @returns {winston.Logger} Child logger instance
+ */
+logger.createChild = (context) => {
+  return logger.child(context);
 };
 
 module.exports = logger;

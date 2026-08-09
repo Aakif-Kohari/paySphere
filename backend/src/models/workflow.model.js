@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 const { ALL_NODE_TYPES } = require('../config/workflow');
 
 /**
@@ -56,4 +57,5 @@ const workflowSchema = new mongoose.Schema(
 // the controller runs against this collection.
 workflowSchema.index({ tenantId: 1, createdAt: -1 });
 
+workflowSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('Workflow', workflowSchema);

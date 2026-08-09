@@ -101,6 +101,8 @@ export default function AddEmployee() {
   // Form state
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("");
+  // Custom role names from GET /api/roles for the role datalist (#475)
+  const [roleSuggestions, setRoleSuggestions] = useState([]);
   const [monthlySalary, setMonthlySalary] = useState("");
   const [department, setDepartment] = useState("");
   const [overtimeRate, setOvertimeRate] = useState("");
@@ -145,6 +147,14 @@ export default function AddEmployee() {
       setTimeout(() => setLoadingRecent(false), 0);
     }
   }, [token]);
+
+  // Load custom role names so the Role field offers them as suggestions (#475)
+  useEffect(() => {
+    api
+      .get("/api/roles")
+      .then((res) => setRoleSuggestions((res.data?.roles || []).map((r) => r.name)))
+      .catch(() => setRoleSuggestions([]));
+  }, []);
 
   const handleCsvUpload = async () => {
     if (!csvFile) {
@@ -512,12 +522,18 @@ export default function AddEmployee() {
                   <input
                     id="employee-role"
                     type="text"
+                    list="role-suggestions"
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
                     placeholder="e.g. Software Engineer"
                     required
                     className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
                   />
+                  <datalist id="role-suggestions">
+                    {roleSuggestions.map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
                 </label>
 
                 {/* Department Field */}

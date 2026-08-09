@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 
 /**
  * The widget order a user has dragged their dashboard into.
@@ -54,4 +55,5 @@ const dashboardLayoutSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+dashboardLayoutSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('DashboardLayout', dashboardLayoutSchema);
