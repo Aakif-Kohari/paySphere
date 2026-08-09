@@ -79,6 +79,8 @@ function periodRangeFilter(start, end) {
 
 // GET /api/reports/analytics
 // Returns aggregated financial stats for the authenticated user's company
+// NOTE: Caching is now handled by cacheMiddleware in routes (#722).
+// Manual cache.get/setEx calls have been removed to prevent double-caching.
 exports.getAnalytics = async (req, res, next) => {
   try {
     const userId = req.userId;
@@ -112,24 +114,7 @@ exports.getAnalytics = async (req, res, next) => {
     const departments = parseDepartments(req.query.departments);
     const employeeIds = await getEmployeeIdsByDepartments(userId, departments);
 
-    // Include departments in cache key for proper cache invalidation. A date
-    // range is part of the key too: without it, a range-scoped request could
-    // be served the unfiltered response cached under the same months/default
-    // key (or vice-versa) (#527).
-    const departmentKey = departments.length > 0 ? departments.sort().join(',') : 'all';
-    const rangeKey = rangeStart || rangeEnd
-      ? `range:${rangeStart ? rangeStart.toISOString() : '*'}:${rangeEnd ? rangeEnd.toISOString() : '*'}`
-      : `months:${monthsBack}`;
-    const cacheKey = `analytics:${userId}:${rangeKey}:${departmentKey}`;
-
-    // 1. Check cache first
-    const cachedData = await cacheService.get(cacheKey);
-    if (cachedData) {
-      return res.status(200).json(cachedData);
-    }
-
-    // Resolve the effective period. An explicit date range overrides the
-    // months-based default.
+    // Resolve the effective period
     const now = new Date();
     const defaultStart = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
     const periodQuery = rangeStart || rangeEnd
@@ -246,9 +231,7 @@ exports.getAnalytics = async (req, res, next) => {
       roleBreakdown,
     };
 
-    // 2. Store in cache for 1 hour (3600 seconds)
-    await cacheService.setEx(cacheKey, 3600, responseData);
-
+    // Cache is now handled by middleware — no manual setEx needed
     res.status(200).json(responseData);
   } catch (error) {
     next(error);
