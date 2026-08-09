@@ -8,6 +8,7 @@ import { logout } from '../features/auth/authSlice';
 import { setThemeMode } from '../features/ui/uiSlice';
 import api from '../services/api';
 import { getCurrencySymbol } from '../utils/currency';
+import zxcvbn from '../utils/zxcvbn';
 
 // ── Icons for Sidebar (Copied from AddEmployee for consistency) ──
 const GridIcon = () => (
@@ -384,6 +385,10 @@ export default function Settings() {
       return alert(
         'New password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character.',
       );
+    }
+    const strength = zxcvbn(newPassword);
+    if (strength.score < 3) {
+      return alert(`Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`);
     }
     try {
       await api.patch('/api/auth/security/password', {

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
+import zxcvbn from "../utils/zxcvbn";
 
 export default function ResetPassword() {
   const { token } = useParams();
@@ -28,6 +29,11 @@ export default function ResetPassword() {
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
     if (!passwordRegex.test(password)) {
       return setError("Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character.");
+    }
+
+    const strength = zxcvbn(password);
+    if (strength.score < 3) {
+      return setError(`Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`);
     }
 
     setLoading(true);

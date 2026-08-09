@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import zxcvbn from '../utils/zxcvbn';
 
 import { Helmet } from 'react-helmet-async';
 import { useGoogleLogin } from '@react-oauth/google';
@@ -45,6 +46,15 @@ export default function PaySphereLogin() {
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    if (activeTab === 'signup') {
+      const strength = zxcvbn(password);
+      if (strength.score < 3) {
+        setError(`Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`);
+        setLoading(false);
+        return;
+      }
+    }
 
     const endpoint = activeTab === 'signup' ? '/signup' : '/login';
     const payload =
@@ -405,6 +415,40 @@ export default function PaySphereLogin() {
                     required
                     className="w-full mb-4 px-4 py-3 rounded-lg bg-gray-100 dark:bg-slate-950 text-gray-950 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 border border-transparent dark:border-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:border-blue-500 dark:focus:border-blue-500 outline-none transition-colors"
                   />
+
+                  {password && (
+                    <div className="mb-4 text-left">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-gray-500 dark:text-slate-450">Password Strength:</span>
+                        <span className={`text-xs font-bold ${
+                          zxcvbn(password).score < 2 ? 'text-red-500' :
+                          zxcvbn(password).score === 2 ? 'text-yellow-500' :
+                          zxcvbn(password).score === 3 ? 'text-blue-500' : 'text-green-500'
+                        }`}>
+                          {zxcvbn(password).score === 0 && 'Very Weak'}
+                          {zxcvbn(password).score === 1 && 'Weak'}
+                          {zxcvbn(password).score === 2 && 'Fair'}
+                          {zxcvbn(password).score === 3 && 'Good'}
+                          {zxcvbn(password).score === 4 && 'Strong'}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            zxcvbn(password).score < 2 ? 'bg-red-500' :
+                            zxcvbn(password).score === 2 ? 'bg-yellow-500' :
+                            zxcvbn(password).score === 3 ? 'bg-blue-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${(zxcvbn(password).score + 1) * 20}%` }}
+                        />
+                      </div>
+                      {zxcvbn(password).feedback.suggestions.length > 0 && (
+                        <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1 leading-normal">
+                          💡 {zxcvbn(password).feedback.suggestions[0]}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {error && (
                     <p className="text-red-500 text-xs mb-4">{error}</p>
