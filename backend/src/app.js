@@ -48,6 +48,7 @@ const archiveRoutes = require('./routes/archive.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
+const searchRoutes  = require('./routes/search.routes');
 
 const errorHandler = require('./middlewares/error.middleware');
 const { generalRateLimiter } = require('./middlewares/rateLimiter.middleware');
@@ -130,6 +131,11 @@ app.use('/api/flashcards', flashcardRoutes);
 // but never mounted here, so the whole feature was a 404.
 app.use('/api/webhooks', webhookRoutes);
 
+// Custom role management (#475) — the owner role manages the permission sets
+// that decide what every other account can do. Mounted once, after the security
+// middleware, like the rest of the API.
+app.use("/api/roles", roleRoutes);
+
 // Mounted here, once (#663).
 //
 // This router used to be mounted twice: on line 23, immediately after
@@ -154,6 +160,10 @@ app.use('/api/monthly-updates', monthlyUpdatesRoutes);
 // answer 403 until the EXPENSE permissions exist (#794); mounting them is the
 // part that belongs to this file.
 app.use('/api/expenses', expenseRoutes);
+
+// Full-text search via Elasticsearch (#771). Returns ranked results across
+// employees, payroll, and audit-log indices without exposing raw Mongo regex.
+app.use('/api/search', searchRoutes);
 
 // ─── Error handlers ────────────────────────────────────────────────────────
 
