@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 const {
   COMPONENT_TYPE,
   CALCULATION,
@@ -135,4 +136,5 @@ salaryStructureSchema.index(
 // The timeline read: "this employee's revisions, newest first".
 salaryStructureSchema.index({ tenantId: 1, employeeId: 1, effectiveFrom: -1 });
 
+salaryStructureSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('SalaryStructure', salaryStructureSchema);

@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useDashboardSummary, useRecentActivity, usePayrollTrend } from '../hooks/useDashboardData';
 import EmployeeCard from '../components/EmployeeCard';
 import EmployeeExportActions from '../components/EmployeeExportActions';
 import SettingsModal from '../components/SettingsModal';
@@ -19,12 +20,13 @@ import { formatCurrency, getCurrencySymbol } from '../utils/currency';
 import Approvals from './Approvals';
 import Loans from './Loans';
 import Settlements from './Settlements';
+import Archive from './Archive';
 
 // Accept international phone numbers with an optional leading "+" and
 // a national number of 7-15 digits. Mirrors backend validation behavior.
 const PHONE_REGEX = /^\+?[1-9]\d{6,14}$/;
 
-const normalizePhoneValue = (value) => value.trim().replace(/[()\s-]/g, "");
+const normalizePhoneValue = (value) => value.trim().replace(/[()\s-]/g, '');
 
 // Country codes offered in the Edit Employee phone field. Extend this list
 // as needed — longer codes are checked first in getPhoneParts so a code like
@@ -461,7 +463,8 @@ const EmployeeManagement = ({
 const EditEmployeeModal = ({ employee, onClose, onSave }) => {
   const formRef = useRef(null);
   useCtrlEnterSubmit(formRef);
-  const { phoneCountryCode: initialPhoneCountryCode, phone: initialPhone } = getPhoneParts(employee?.phone);
+  const { phoneCountryCode: initialPhoneCountryCode, phone: initialPhone } =
+    getPhoneParts(employee?.phone);
   const currency = localStorage.getItem('currency') || 'INR';
   // Custom role names from GET /api/roles for the Role datalist (#475)
   const [roleSuggestions, setRoleSuggestions] = useState([]);
@@ -513,7 +516,9 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
     // phone-number format.
     const trimmedPhone = formData.phone.trim();
     const trimmedCountryCode = formData.phoneCountryCode?.trim() || '+91';
-    const normalizedPhone = normalizePhoneValue(`${trimmedCountryCode}${trimmedPhone}`);
+    const normalizedPhone = normalizePhoneValue(
+      `${trimmedCountryCode}${trimmedPhone}`,
+    );
     if (trimmedPhone && !PHONE_REGEX.test(normalizedPhone)) {
       return setError('Enter a valid international phone number.');
     }
@@ -679,18 +684,35 @@ const PayrollTable = ({
   const endIdx = Math.min(currentPage * PAYROLL_LIMIT, totalCount);
 
   const STATUS_STYLE = {
-    pending_approval: 'bg-yellow-50 text-yellow-700 border border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800/40',
-    approved: 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800/40',
+    pending_approval:
+      'bg-yellow-50 text-yellow-700 border border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800/40',
+    approved:
+      'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800/40',
     paid: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800/40',
-    rejected: 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/40',
-    finalized: 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800/40',
+    rejected:
+      'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/40',
+    finalized:
+      'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800/40',
   };
 
-  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MONTH_NAMES = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
 
   const formatStatus = (s) => {
     if (!s) return 'Unknown';
-    return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
   if (loading) {
@@ -701,10 +723,13 @@ const PayrollTable = ({
     <main className="p-4 sm:p-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-2">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Payroll History</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+            Payroll History
+          </h1>
           {totalCount > 0 && (
             <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">
-              Showing {startIdx}–{endIdx} of {totalCount} record{totalCount !== 1 ? 's' : ''}
+              Showing {startIdx}–{endIdx} of {totalCount} record
+              {totalCount !== 1 ? 's' : ''}
             </p>
           )}
         </div>
@@ -721,14 +746,23 @@ const PayrollTable = ({
 
         {payrolls.length === 0 ? (
           <div className="px-6 py-16 text-center">
-            <p className="text-gray-500 dark:text-slate-500 text-sm">No payroll records found for this month.</p>
-            <p className="text-gray-400 dark:text-slate-600 text-xs mt-1">Run payroll from Monthly Updates to see records here.</p>
+            <p className="text-gray-500 dark:text-slate-500 text-sm">
+              No payroll records found for this month.
+            </p>
+            <p className="text-gray-400 dark:text-slate-600 text-xs mt-1">
+              Run payroll from Monthly Updates to see records here.
+            </p>
           </div>
         ) : (
           payrolls.map((p) => (
-            <div key={p._id} className="grid grid-cols-1 sm:grid-cols-5 px-6 py-4 border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors items-center gap-2">
+            <div
+              key={p._id}
+              className="grid grid-cols-1 sm:grid-cols-5 px-6 py-4 border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors items-center gap-2"
+            >
               <div>
-                <p className="font-semibold text-gray-900 dark:text-white text-sm">{p.employeeName}</p>
+                <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                  {p.employeeName}
+                </p>
               </div>
               <div className="text-center text-sm text-gray-600 dark:text-slate-400">
                 {MONTH_NAMES[(p.month || 1) - 1]} {p.year}
@@ -740,7 +774,9 @@ const PayrollTable = ({
                 ₹{(p.netSalary || 0).toLocaleString('en-IN')}
               </div>
               <div className="flex sm:justify-center">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[p.status] || STATUS_STYLE['finalized']}`}>
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[p.status] || STATUS_STYLE['finalized']}`}
+                >
                   {formatStatus(p.status)}
                 </span>
               </div>
@@ -777,13 +813,27 @@ const PayrollTable = ({
 export default function PaySphereDashboard() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  
+  // Replaced useState/useEffect with TanStack Query hooks (Issue #684)
+  const { 
+    data: summary, 
+    isLoading: loading, 
+    error: queryError, 
+    refetch: refetchSummary 
+  } = useDashboardSummary();
+
+  const { data: recentActivity, isLoading: activityLoading } = useRecentActivity(5);
+  const { data: trendData, isLoading: trendLoading } = usePayrollTrend(6);
+
+  // Derived error state for backward compatibility with existing JSX
+  const error = queryError ? queryError.message : null;
+
   const [activePage, setActivePage] = useState('Dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
@@ -860,12 +910,9 @@ export default function PaySphereDashboard() {
         setPayrolls(payRes.data.payrolls || []);
       } catch (err) {
         console.error('Failed to fetch data:', err);
-      } finally {
-        setLoading(false);
       }
     };
     if (token) fetchData();
-    else setTimeout(() => setLoading(false), 0);
   }, [token, currentPage, debouncedSearch]);
 
   // Fetch paginated payroll records when viewing the Payroll tab
@@ -874,7 +921,9 @@ export default function PaySphereDashboard() {
     const fetchPayrollPage = async () => {
       setPayrollLoading(true);
       try {
-        const res = await api.get(`/api/payroll/summary?page=${payrollPage}&limit=10`);
+        const res = await api.get(
+          `/api/payroll/summary?page=${payrollPage}&limit=10`,
+        );
         setPaginatedPayrolls(res.data.payrolls || []);
         setPayrollTotalPages(res.data.totalPages || 1);
         setPayrollTotalCount(res.data.totalCount || 0);
@@ -975,6 +1024,10 @@ export default function PaySphereDashboard() {
             navigate('/reports');
           } else if (page === 'Flashcards') {
             navigate('/flashcards');
+          } else if (page === 'PYQs') {
+            navigate('/pyqs');
+          } else if (page === 'QuizBattle') {
+            navigate('/quiz-battle');
           } else {
             setActivePage(page);
           }
@@ -1007,9 +1060,12 @@ export default function PaySphereDashboard() {
 
           <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
             <ThemeToggle />
-            <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+            <button
+              onClick={() => navigate('/profile')}
+              className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+            >
               {getInitials(companyName)}
-            </div>
+            </button>
             <button
               onClick={() => {
                 dispatch(logout());
@@ -1053,6 +1109,8 @@ export default function PaySphereDashboard() {
             payrolls={payrolls}
             onEditEmployee={(emp) => setEmployeeToEdit(emp)}
           />
+        ) : activePage === 'Archive' ? (
+          <Archive />
         ) : (
           <EmployeeManagement
             search={search}

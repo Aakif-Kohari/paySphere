@@ -10,6 +10,7 @@ import { logout } from '../features/auth/authSlice';
 import { setThemeMode } from '../features/ui/uiSlice';
 import api from '../services/api';
 import { getCurrencySymbol } from '../utils/currency';
+import zxcvbn from '../utils/zxcvbn';
 
 // ── Icons for Sidebar (Copied from AddEmployee for consistency) ──
 const GridIcon = () => (
@@ -240,7 +241,7 @@ export default function Settings() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const localCompanyName = localStorage.getItem('companyName') || 'Acme Corp';
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState('preferences');
 
   const [loading, setLoading] = useState(true);
 
@@ -421,6 +422,10 @@ export default function Settings() {
         'New password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character.',
       );
     }
+    const strength = zxcvbn(newPassword);
+    if (strength.score < 3) {
+      return alert(`Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`);
+    }
     try {
       await api.patch('/api/auth/security/password', {
         currentPassword,
@@ -523,13 +528,9 @@ export default function Settings() {
   ];
 
   const settingsTabs = [
-    { id: 'profile', label: 'Profile', icon: <UserIcon /> },
-    { id: 'account', label: 'Account Security', icon: <LockIcon /> },
     { id: 'preferences', label: 'Preferences', icon: <PaletteIcon /> },
     { id: 'company', label: 'Company Info', icon: <BuildingIcon /> },
     { id: 'payroll', label: 'Payroll Config', icon: <WalletIcon /> },
-    { id: 'notifications', label: 'Notifications', icon: <BellIcon /> },
-    { id: 'roles', label: 'Roles & Permissions', icon: <ShieldIcon /> },
     { id: 'webhooks', label: 'Webhooks', icon: <WebhookIcon /> },
     { id: 'about', label: 'About PaySphere', icon: <InfoIcon /> },
   ];
@@ -612,11 +613,10 @@ export default function Settings() {
                   onChange={(e) =>
                     setUserProfile({ ...userProfile, fullName: e.target.value })
                   }
-                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
-                    profileErrors.fullName
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.fullName
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
                       : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
-                  }`}
+                    }`}
                 />
                 {profileErrors.fullName && (
                   <p className="text-xs text-red-500 mt-1.5 font-medium">
@@ -634,11 +634,10 @@ export default function Settings() {
                   onChange={(e) =>
                     setUserProfile({ ...userProfile, email: e.target.value })
                   }
-                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
-                    profileErrors.email
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.email
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
                       : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
-                  }`}
+                    }`}
                 />
                 {profileErrors.email && (
                   <p className="text-xs text-red-500 mt-1.5 font-medium">
@@ -728,15 +727,15 @@ export default function Settings() {
                     Two-Factor Authentication (2FA)
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                    Protect your admin account with TOTP apps like Google Authenticator or Authy.
+                    Protect your admin account with TOTP apps like Google
+                    Authenticator or Authy.
                   </p>
                 </div>
                 <span
-                  className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                    userProfile.isTwoFactorEnabled
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold ${userProfile.isTwoFactorEnabled
                       ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400'
                       : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
-                  }`}
+                    }`}
                 >
                   {userProfile.isTwoFactorEnabled ? 'Enabled' : 'Disabled'}
                 </span>
@@ -897,8 +896,8 @@ export default function Settings() {
                           const newMode =
                             t === 'system'
                               ? window.matchMedia(
-                                  '(prefers-color-scheme: dark)',
-                                ).matches
+                                '(prefers-color-scheme: dark)',
+                              ).matches
                                 ? 'dark'
                                 : 'light'
                               : t;
@@ -1499,11 +1498,10 @@ export default function Settings() {
                 navigate(item.path);
                 setIsSidebarOpen(false);
               }}
-              className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${
-                item.id === 'settings'
+              className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${item.id === 'settings'
                   ? 'bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold'
                   : 'text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
-              }`}
+                }`}
             >
               {item.icon}
               {item.label}
@@ -1571,18 +1569,28 @@ export default function Settings() {
           <div className="w-full max-w-5xl flex flex-col md:flex-row gap-8">
             {/* ── Left Settings Menu ── */}
             <div className="w-full md:w-64 flex-shrink-0">
-              <div className="sticky top-24 space-y-1">
+              {/* Added role="tablist" and aria-label for screen readers (Issue #686) */}
+              <div
+                className="sticky top-24 space-y-1"
+                role="tablist"
+                aria-label="Settings Navigation"
+                aria-orientation="vertical"
+              >
                 {settingsTabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-200 ${
-                      activeTab === tab.id
+                    role="tab"
+                    aria-selected={activeTab === tab.id}
+                    aria-controls={`panel-${tab.id}`}
+                    id={`tab-${tab.id}`}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === tab.id
                         ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-100 dark:border-slate-800'
                         : 'text-gray-500 dark:text-slate-500 hover:bg-white/60 dark:hover:bg-slate-900/50 hover:text-gray-900 dark:hover:text-white border border-transparent'
-                    }`}
+                      }`}
                   >
                     <span
+                      aria-hidden="true"
                       className={
                         activeTab === tab.id
                           ? 'text-blue-600 dark:text-blue-400'
@@ -1598,7 +1606,16 @@ export default function Settings() {
             </div>
 
             {/* ── Right Content Area ── */}
-            <div className="flex-1 pb-20">{renderContent()}</div>
+            {/* Added role="tabpanel" and aria-labelledby to associate with the active tab (Issue #686) */}
+            <div
+              className="flex-1 pb-20 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6 md:p-8 shadow-sm min-h-[500px]"
+              role="tabpanel"
+              id={`panel-${activeTab}`}
+              aria-labelledby={`tab-${activeTab}`}
+              tabIndex={0}
+            >
+              {renderContent()}
+            </div>
           </div>
         </main>
       </div>

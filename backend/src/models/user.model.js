@@ -1,8 +1,9 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 const {
   ALL_ACCOUNT_TYPES,
   DEFAULT_ACCOUNT_TYPE,
-} = require("../config/accountTypes");
+} = require('../config/accountTypes');
 
 const userSchema = new mongoose.Schema({
   fullName: {
@@ -54,6 +55,10 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: false,
+  },
+  passwordHistory: {
+    type: [String],
+    default: [],
   },
   googleId: {
     type: String,
@@ -150,6 +155,8 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
-}, { timestamps: true });
+  { timestamps: true },
+);
 
-module.exports = mongoose.model("User", userSchema);
+userSchema.plugin(softDeletePlugin);
+module.exports = mongoose.model('User', userSchema);

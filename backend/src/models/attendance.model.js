@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 const {
   ALL_ATTENDANCE_STATUSES,
   ATTENDANCE_STATUS,
@@ -162,4 +163,5 @@ attendanceSchema.methods.isLocked = function isLocked() {
   return Boolean(this.lockedAt);
 };
 
+attendanceSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('Attendance', attendanceSchema);
