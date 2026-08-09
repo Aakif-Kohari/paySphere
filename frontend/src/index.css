@@ -10,7 +10,7 @@
  * Issue: #521
  */
 
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* ==========================================================================
    1. THEME CONFIGURATION (Tailwind v4 CSS-first approach)
@@ -58,6 +58,8 @@
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
   --radius-2xl: 1.5rem;
+}
+
 :root {
   color-scheme: light;
 }
@@ -70,7 +72,9 @@ html.dark {
 
 html {
   scroll-behavior: smooth;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
 }
 
 /* ==========================================================================
@@ -78,7 +82,6 @@ html {
    ========================================================================== */
 
 @layer base {
-
   /* Light Mode Defaults */
   :root {
     --bg-primary: #ffffff;
@@ -115,7 +118,9 @@ html {
   /* Apply base styles */
   body {
     @apply bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans antialiased;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
   }
 
   /* Custom Scrollbar for Webkit Browsers */
@@ -142,7 +147,6 @@ html {
    ========================================================================== */
 
 @layer utilities {
-
   /* Brand Gradient Utilities */
   .bg-brand-gradient {
     @apply bg-gradient-to-r from-brand-500 to-brand-700;

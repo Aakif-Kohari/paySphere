@@ -1,34 +1,68 @@
-import DownloadIcon from '@mui/icons-material/Download';
 import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useDashboardSummary, useRecentActivity, usePayrollTrend } from '../hooks/useDashboardData';
 import EmployeeCard from '../components/EmployeeCard';
 import EmployeeExportActions from '../components/EmployeeExportActions';
 import SettingsModal from '../components/SettingsModal';
 import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import EmptyState from '../components/common/EmptyState';
-import { getCurrencySymbol, formatCurrency } from '../utils/currency';
-import {
-    EmployeeBreakdownSkeleton,
-    EmployeeCardSkeleton,
-    StatCardSkeleton,
-} from '../components/common/Skeleton';
+import DashboardSkeleton from '../components/common/skeleton/DashboardSkeleton';
+import EmployeeManagementSkeleton from '../components/common/skeleton/EmployeeManagementSkeleton';
+import PayrollTableSkeleton from '../components/common/skeleton/PayrollTableSkeleton';
 import { logout } from '../features/auth/authSlice';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 import api from '../services/api';
-import { exportEmployeesToCsv } from '../utils/exportEmployeesToCsv';
+import { formatCurrency, getCurrencySymbol } from '../utils/currency';
 import Approvals from './Approvals';
 import Loans from './Loans';
 import Settlements from './Settlements';
+import Archive from './Archive';
 
 // Accept international phone numbers with an optional leading "+" and
 // a national number of 7-15 digits. Mirrors backend validation behavior.
 const PHONE_REGEX = /^\+?[1-9]\d{6,14}$/;
 
-const normalizePhoneValue = (value) => value.trim().replace(/[()\s-]/g, "");
+const normalizePhoneValue = (value) => value.trim().replace(/[()\s-]/g, '');
+
+// Country codes offered in the Edit Employee phone field. Extend this list
+// as needed — longer codes are checked first in getPhoneParts so a code like
+// "+91" isn't mistakenly matched by a shorter unrelated prefix.
+const COUNTRY_CODE_OPTIONS = [
+  { value: '+91', label: '+91 (India)' },
+  { value: '+1', label: '+1 (US/Canada)' },
+  { value: '+44', label: '+44 (UK)' },
+  { value: '+61', label: '+61 (Australia)' },
+  { value: '+971', label: '+971 (UAE)' },
+  { value: '+65', label: '+65 (Singapore)' },
+];
+
+// Split a stored, normalized phone number like "+919876543210" into its
+// country-code and local-number parts for the edit form's two inputs.
+// Falls back to +91 (the default used elsewhere in this file) when the
+// number is empty or its prefix doesn't match a known option.
+const getPhoneParts = (phone) => {
+  if (!phone) {
+    return { phoneCountryCode: '+91', phone: '' };
+  }
+
+  const sortedOptions = [...COUNTRY_CODE_OPTIONS].sort(
+    (a, b) => b.value.length - a.value.length,
+  );
+  const match = sortedOptions.find((option) => phone.startsWith(option.value));
+
+  if (match) {
+    return {
+      phoneCountryCode: match.value,
+      phone: phone.slice(match.value.length),
+    };
+  }
+
+  return { phoneCountryCode: '+91', phone: phone.replace(/^\+/, '') };
+};
 
 // Trigger a file download from the browser
 const downloadFile = (url, filename) => {
@@ -98,6 +132,10 @@ const DashboardOverview = ({
     setGettingStarted(false);
   }
 
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
+
   return (
     <>
       {/* Overview Header */}
@@ -151,40 +189,29 @@ const DashboardOverview = ({
 
       {/* Stats */}
       <div className="flex flex-col sm:flex-row gap-4 mb-10">
-        {loading ? (
-          <>
-            <StatCardSkeleton />
-            <div className="w-full sm:w-64">
-              <StatCardSkeleton />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex-1 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
-              <p className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold mb-2">
-                Total Monthly Payout
-              </p>
-              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-                {formatCurrency(totalPayout, currency)}
-              </h2>
-              <p className="text-gray-500 dark:text-slate-500 text-sm mt-2">
-                {employeeCount} employees on payroll
-              </p>
-            </div>
+        <div className="flex-1 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
+          <p className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold mb-2">
+            Total Monthly Payout
+          </p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+            {formatCurrency(totalPayout, currency)}
+          </h2>
+          <p className="text-gray-500 dark:text-slate-500 text-sm mt-2">
+            {employeeCount} employees on payroll
+          </p>
+        </div>
 
-            <div className="w-full sm:w-64 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
-              <p className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold mb-2">
-                Employees
-              </p>
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white">
-                {employeeCount}
-              </h2>
-              <p className="text-gray-500 dark:text-slate-500 text-sm">
-                Active this month
-              </p>
-            </div>
-          </>
-        )}
+        <div className="w-full sm:w-64 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
+          <p className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold mb-2">
+            Employees
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white">
+            {employeeCount}
+          </h2>
+          <p className="text-gray-500 dark:text-slate-500 text-sm">
+            Active this month
+          </p>
+        </div>
       </div>
 
       {/* Getting Started */}
@@ -239,11 +266,7 @@ const DashboardOverview = ({
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {loading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <EmployeeCardSkeleton key={i} />
-          ))
-        ) : filtered.length === 0 && !search ? (
+        {filtered.length === 0 && !search ? (
           <EmptyState
             title="No employees yet"
             description="Add your first employee to get started with payroll."
@@ -274,7 +297,7 @@ const DashboardOverview = ({
           ))
         )}
 
-        {!loading && (filtered.length > 0 || search) && (
+        {(filtered.length > 0 || search) && (
           <div
             role="button"
             tabIndex={0}
@@ -315,6 +338,10 @@ const EmployeeManagement = ({
     const p = payrollMap[e._id];
     return s + (p ? p.netSalary : e.monthlySalary || 0);
   }, 0);
+
+  if (loading) {
+    return <EmployeeManagementSkeleton />;
+  }
 
   return (
     <main className="p-4 sm:p-8">
@@ -365,11 +392,7 @@ const EmployeeManagement = ({
 
       {/* Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {loading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <EmployeeBreakdownSkeleton key={i} />
-          ))
-        ) : employees.length === 0 ? (
+        {employees.length === 0 ? (
           <EmptyState
             title="No employees yet"
             description="Add employees to see their salary breakdown here."
@@ -395,7 +418,7 @@ const EmployeeManagement = ({
           ))
         )}
 
-        {!loading && employees.length > 0 && (
+        {employees.length > 0 && (
           <div
             role="button"
             tabIndex={0}
@@ -411,7 +434,7 @@ const EmployeeManagement = ({
       </div>
 
       {/* Pagination */}
-      {!loading && totalPages > 1 && (
+      {totalPages > 1 && (
         <div className="flex justify-center items-center gap-4 mt-8">
           <button
             disabled={currentPage === 1}
@@ -440,8 +463,11 @@ const EmployeeManagement = ({
 const EditEmployeeModal = ({ employee, onClose, onSave }) => {
   const formRef = useRef(null);
   useCtrlEnterSubmit(formRef);
-  const { phoneCountryCode: initialPhoneCountryCode, phone: initialPhone } = getPhoneParts(employee?.phone);
+  const { phoneCountryCode: initialPhoneCountryCode, phone: initialPhone } =
+    getPhoneParts(employee?.phone);
   const currency = localStorage.getItem('currency') || 'INR';
+  // Custom role names from GET /api/roles for the Role datalist (#475)
+  const [roleSuggestions, setRoleSuggestions] = useState([]);
   const [formData, setFormData] = useState({
     fullName: employee?.fullName || '',
     role: employee?.role || '',
@@ -453,6 +479,15 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    api
+      .get('/api/roles')
+      .then((res) =>
+        setRoleSuggestions((res.data?.roles || []).map((r) => r.name)),
+      )
+      .catch(() => setRoleSuggestions([]));
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -481,7 +516,9 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
     // phone-number format.
     const trimmedPhone = formData.phone.trim();
     const trimmedCountryCode = formData.phoneCountryCode?.trim() || '+91';
-    const normalizedPhone = normalizePhoneValue(`${trimmedCountryCode}${trimmedPhone}`);
+    const normalizedPhone = normalizePhoneValue(
+      `${trimmedCountryCode}${trimmedPhone}`,
+    );
     if (trimmedPhone && !PHONE_REGEX.test(normalizedPhone)) {
       return setError('Enter a valid international phone number.');
     }
@@ -540,10 +577,16 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
               required
               type="text"
               name="role"
+              list="role-suggestions"
               value={formData.role}
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
             />
+            <datalist id="role-suggestions">
+              {roleSuggestions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
           </div>
 
           <div>
@@ -641,28 +684,52 @@ const PayrollTable = ({
   const endIdx = Math.min(currentPage * PAYROLL_LIMIT, totalCount);
 
   const STATUS_STYLE = {
-    pending_approval: 'bg-yellow-50 text-yellow-700 border border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800/40',
-    approved: 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800/40',
+    pending_approval:
+      'bg-yellow-50 text-yellow-700 border border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800/40',
+    approved:
+      'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800/40',
     paid: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800/40',
-    rejected: 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/40',
-    finalized: 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800/40',
+    rejected:
+      'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/40',
+    finalized:
+      'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800/40',
   };
 
-  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MONTH_NAMES = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
 
   const formatStatus = (s) => {
     if (!s) return 'Unknown';
-    return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
+
+  if (loading) {
+    return <PayrollTableSkeleton />;
+  }
 
   return (
     <main className="p-4 sm:p-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-2">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Payroll History</h1>
-          {!loading && totalCount > 0 && (
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+            Payroll History
+          </h1>
+          {totalCount > 0 && (
             <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">
-              Showing {startIdx}–{endIdx} of {totalCount} record{totalCount !== 1 ? 's' : ''}
+              Showing {startIdx}–{endIdx} of {totalCount} record
+              {totalCount !== 1 ? 's' : ''}
             </p>
           )}
         </div>
@@ -677,23 +744,25 @@ const PayrollTable = ({
           <span className="text-center">Status</span>
         </div>
 
-        {loading ? (
-          Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 animate-pulse">
-              <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 mb-2" />
-              <div className="h-3 bg-gray-100 dark:bg-slate-800 rounded w-1/2" />
-            </div>
-          ))
-        ) : payrolls.length === 0 ? (
+        {payrolls.length === 0 ? (
           <div className="px-6 py-16 text-center">
-            <p className="text-gray-500 dark:text-slate-500 text-sm">No payroll records found for this month.</p>
-            <p className="text-gray-400 dark:text-slate-600 text-xs mt-1">Run payroll from Monthly Updates to see records here.</p>
+            <p className="text-gray-500 dark:text-slate-500 text-sm">
+              No payroll records found for this month.
+            </p>
+            <p className="text-gray-400 dark:text-slate-600 text-xs mt-1">
+              Run payroll from Monthly Updates to see records here.
+            </p>
           </div>
         ) : (
           payrolls.map((p) => (
-            <div key={p._id} className="grid grid-cols-1 sm:grid-cols-5 px-6 py-4 border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors items-center gap-2">
+            <div
+              key={p._id}
+              className="grid grid-cols-1 sm:grid-cols-5 px-6 py-4 border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors items-center gap-2"
+            >
               <div>
-                <p className="font-semibold text-gray-900 dark:text-white text-sm">{p.employeeName}</p>
+                <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                  {p.employeeName}
+                </p>
               </div>
               <div className="text-center text-sm text-gray-600 dark:text-slate-400">
                 {MONTH_NAMES[(p.month || 1) - 1]} {p.year}
@@ -705,7 +774,9 @@ const PayrollTable = ({
                 ₹{(p.netSalary || 0).toLocaleString('en-IN')}
               </div>
               <div className="flex sm:justify-center">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[p.status] || STATUS_STYLE['finalized']}`}>
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[p.status] || STATUS_STYLE['finalized']}`}
+                >
                   {formatStatus(p.status)}
                 </span>
               </div>
@@ -714,7 +785,7 @@ const PayrollTable = ({
         )}
       </div>
 
-      {!loading && totalPages > 1 && (
+      {totalPages > 1 && (
         <div className="flex justify-center items-center gap-4 mt-6">
           <button
             disabled={currentPage === 1}
@@ -742,13 +813,27 @@ const PayrollTable = ({
 export default function PaySphereDashboard() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  
+  // Replaced useState/useEffect with TanStack Query hooks (Issue #684)
+  const { 
+    data: summary, 
+    isLoading: loading, 
+    error: queryError, 
+    refetch: refetchSummary 
+  } = useDashboardSummary();
+
+  const { data: recentActivity, isLoading: activityLoading } = useRecentActivity(5);
+  const { data: trendData, isLoading: trendLoading } = usePayrollTrend(6);
+
+  // Derived error state for backward compatibility with existing JSX
+  const error = queryError ? queryError.message : null;
+
   const [activePage, setActivePage] = useState('Dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
@@ -825,12 +910,9 @@ export default function PaySphereDashboard() {
         setPayrolls(payRes.data.payrolls || []);
       } catch (err) {
         console.error('Failed to fetch data:', err);
-      } finally {
-        setLoading(false);
       }
     };
     if (token) fetchData();
-    else setTimeout(() => setLoading(false), 0);
   }, [token, currentPage, debouncedSearch]);
 
   // Fetch paginated payroll records when viewing the Payroll tab
@@ -839,7 +921,9 @@ export default function PaySphereDashboard() {
     const fetchPayrollPage = async () => {
       setPayrollLoading(true);
       try {
-        const res = await api.get(`/api/payroll/summary?page=${payrollPage}&limit=10`);
+        const res = await api.get(
+          `/api/payroll/summary?page=${payrollPage}&limit=10`,
+        );
         setPaginatedPayrolls(res.data.payrolls || []);
         setPayrollTotalPages(res.data.totalPages || 1);
         setPayrollTotalCount(res.data.totalCount || 0);
@@ -907,13 +991,15 @@ export default function PaySphereDashboard() {
     }
   };
 
-  const getInitials = (name) =>
-    name
+  const getInitials = (name) => {
+    if (!name) return '';
+    return name
       .split(' ')
       .map((w) => w[0])
       .join('')
       .slice(0, 2)
       .toUpperCase();
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-slate-950 flex font-sans text-slate-800 dark:text-slate-200 transition-colors duration-200">
@@ -974,9 +1060,12 @@ export default function PaySphereDashboard() {
 
           <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
             <ThemeToggle />
-            <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+            <button
+              onClick={() => navigate('/profile')}
+              className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+            >
               {getInitials(companyName)}
-            </div>
+            </button>
             <button
               onClick={() => {
                 dispatch(logout());
@@ -1020,6 +1109,8 @@ export default function PaySphereDashboard() {
             payrolls={payrolls}
             onEditEmployee={(emp) => setEmployeeToEdit(emp)}
           />
+        ) : activePage === 'Archive' ? (
+          <Archive />
         ) : (
           <EmployeeManagement
             search={search}

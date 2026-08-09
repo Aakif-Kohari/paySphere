@@ -43,16 +43,16 @@ function App() {
     const handleAuthLogout = () => {
       dispatch(logout());
     };
-    window.addEventListener("auth:logout", handleAuthLogout);
-    return () => window.removeEventListener("auth:logout", handleAuthLogout);
+    window.addEventListener('auth:logout', handleAuthLogout);
+    return () => window.removeEventListener('auth:logout', handleAuthLogout);
   }, [dispatch]);
 
   // Sync dark class on html document element for Tailwind v4 custom dark variant
   useEffect(() => {
-    if (themeMode === "dark") {
-      document.documentElement.classList.add("dark");
+    if (themeMode === 'dark') {
+      document.documentElement.classList.add('dark');
     } else {
-      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.remove('dark');
     }
   }, [themeMode]);
 
@@ -62,11 +62,11 @@ function App() {
       palette: {
         mode: themeMode,
         primary: {
-          main: "#3b82f6",
+          main: '#3b82f6',
         },
         background: {
-          default: themeMode === "dark" ? "#090d16" : "#f3f4f6",
-          paper: themeMode === "dark" ? "#111827" : "#ffffff",
+          default: themeMode === 'dark' ? '#090d16' : '#f3f4f6',
+          paper: themeMode === 'dark' ? '#111827' : '#ffffff',
         },
       },
     });
@@ -79,10 +79,38 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<LoginSignUp />} />
-          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-          <Route path="/employee-portal" element={<ProtectedRoute><EmployeePortal /></ProtectedRoute>} />
-          <Route path="/monthly-updates" element={<ProtectedRoute><MonthlyUpdates /></ProtectedRoute>} />
-          <Route path="/add-employee" element={<ProtectedRoute><AddEmployee /></ProtectedRoute>} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/employee-portal"
+            element={
+              <ProtectedRoute>
+                <EmployeePortal />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/monthly-updates"
+            element={
+              <ProtectedRoute>
+                <MonthlyUpdates />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/add-employee"
+            element={
+              <ProtectedRoute>
+                <AddEmployee />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/settings/system-health" element={<ProtectedRoute><SystemHealth /></ProtectedRoute>} />
@@ -110,7 +138,7 @@ function App() {
         </Alert>
       </Snackbar>
     </ThemeProvider>
-  )
+  );
 }
 
-export default App
+export default App;

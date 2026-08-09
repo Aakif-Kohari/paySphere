@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -11,6 +11,16 @@ const GoogleIcon = () => (
     <path
       fill="#FFC107"
       d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+    />
+  </svg>
+);
+
+const GitHubIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z"
     />
   </svg>
 );
@@ -41,6 +51,51 @@ export default function PaySphereLogin() {
   const [forgotEmail, setForgotEmail] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  const handleGitHubCallback = async (code) => {
+    setLoading(true);
+    setError('');
+
+    // Clear code from URL
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, newUrl);
+
+    try {
+      const storedCompanyName = sessionStorage.getItem('github_signup_company');
+      const payload = { code };
+      if (storedCompanyName) {
+        payload.companyName = storedCompanyName;
+      }
+
+      const response = await api.post(`/api/auth/github`, payload);
+
+      if (response.status === 202 && response.data.needsCompanyName) {
+        setError(response.data.message);
+        setActiveTab('signup');
+      } else {
+        const { token, companyName: savedCompanyName } = response.data;
+        localStorage.setItem('token', token);
+        localStorage.setItem('companyName', savedCompanyName);
+        if (response.data.currency) {
+          localStorage.setItem('currency', response.data.currency);
+        }
+        sessionStorage.removeItem('github_signup_company');
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'GitHub Login failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle GitHub Callback
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (code) {
+      handleGitHubCallback(code);
+    }
+  }, [searchParams]);
+
   const handleAuth = async (e) => {
     e.preventDefault();
     setError('');
@@ -69,7 +124,7 @@ export default function PaySphereLogin() {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-        'Something went wrong. Please try again.',
+          'Something went wrong. Please try again.',
       );
     } finally {
       setLoading(false);
@@ -93,7 +148,7 @@ export default function PaySphereLogin() {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-        'Failed to send reset link. Please try again.',
+          'Failed to send reset link. Please try again.',
       );
     } finally {
       setLoading(false);
@@ -142,6 +197,24 @@ export default function PaySphereLogin() {
       return;
     }
     handleGoogleLogin();
+  };
+
+  const onGitHubClick = () => {
+    if (activeTab === 'signup') {
+      if (!companyName) {
+        setError('Please enter your Company Name to sign up with GitHub.');
+        return;
+      }
+      sessionStorage.setItem('github_signup_company', companyName);
+    } else {
+      sessionStorage.removeItem('github_signup_company');
+    }
+    const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
+    if (!clientId) {
+      setError('GitHub Client ID is not configured.');
+      return;
+    }
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=user:email`;
   };
 
   return (
@@ -210,10 +283,11 @@ export default function PaySphereLogin() {
                   setActiveTab('login');
                   resetFormState();
                 }}
-                className={`flex-1 py-2 cursor-pointer rounded-lg text-sm font-medium transition ${activeTab === 'login'
+                className={`flex-1 py-2 cursor-pointer rounded-lg text-sm font-medium transition ${
+                  activeTab === 'login'
                     ? 'bg-white dark:bg-slate-900 shadow text-gray-900 dark:text-white'
                     : 'text-gray-500 dark:text-slate-450 hover:text-gray-700 dark:hover:text-slate-200'
-                  }`}
+                }`}
               >
                 Login
               </button>
@@ -223,10 +297,11 @@ export default function PaySphereLogin() {
                   setActiveTab('signup');
                   resetFormState();
                 }}
-                className={`flex-1 py-2 cursor-pointer rounded-lg text-sm font-medium transition ${activeTab === 'signup'
+                className={`flex-1 py-2 cursor-pointer rounded-lg text-sm font-medium transition ${
+                  activeTab === 'signup'
                     ? 'bg-white dark:bg-slate-900 shadow text-gray-900 dark:text-white'
                     : 'text-gray-500 dark:text-slate-450 hover:text-gray-700 dark:hover:text-slate-200'
-                  }`}
+                }`}
               >
                 Create Account
               </button>
@@ -248,6 +323,9 @@ export default function PaySphereLogin() {
                     <form onSubmit={handleForgotPassword}>
                       <input
                         type="email"
+                        id="forgot-email"
+                        name="forgotEmail"
+                        aria-label="Email address for password reset"
                         placeholder="name@company.com"
                         value={forgotEmail}
                         onChange={(e) => setForgotEmail(e.target.value)}
@@ -298,6 +376,9 @@ export default function PaySphereLogin() {
                     <form onSubmit={handleAuth}>
                       <input
                         type="email"
+                        id="login-email"
+                        name="email"
+                        aria-label="Email address"
                         placeholder="name@company.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -307,6 +388,9 @@ export default function PaySphereLogin() {
 
                       <input
                         type="password"
+                        id="login-password"
+                        name="password"
+                        aria-label="Password"
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -351,14 +435,42 @@ export default function PaySphereLogin() {
                   <div className="flex-1 h-px bg-gray-200 dark:bg-slate-800" />
                 </div>
 
-                <button
-                  onClick={onGoogleClick}
-                  disabled={loading}
-                  className="w-full border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-                >
-                  <GoogleIcon />
-                  Sign in with Google
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={onGoogleClick}
+                    disabled={loading}
+                    className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                  >
+                    <GoogleIcon />
+                    Google
+                  </button>
+
+                  <button
+                    onClick={onGitHubClick}
+                    disabled={loading}
+                    className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                  >
+                    <GitHubIcon />
+                    GitHub
+                  </button>
+                </div>
+
+                <p className="text-center text-sm text-gray-600 dark:text-slate-400 mt-6">
+                  {activeTab === 'login'
+                    ? "Don't have an account?"
+                    : 'Already have an account?'}
+                  {/* Fixed: Replaced anchor with button for valid semantics (Issue #660) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(activeTab === 'login' ? 'signup' : 'login');
+                      resetFormState();
+                    }}
+                    className="ml-1 font-bold text-brand-600 dark:text-brand-400 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500 rounded"
+                  >
+                    {activeTab === 'login' ? 'Sign Up' : 'Login'}
+                  </button>
+                </p>
               </>
             ) : (
               <>
@@ -372,6 +484,9 @@ export default function PaySphereLogin() {
                 <form onSubmit={handleAuth}>
                   <input
                     type="text"
+                    id="signup-fullname"
+                    name="fullName"
+                    aria-label="Full name"
                     placeholder="Full Name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
@@ -381,6 +496,9 @@ export default function PaySphereLogin() {
 
                   <input
                     type="email"
+                    id="signup-email"
+                    name="email"
+                    aria-label="Email address"
                     placeholder="Email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -390,6 +508,9 @@ export default function PaySphereLogin() {
 
                   <input
                     type="text"
+                    id="signup-company"
+                    name="companyName"
+                    aria-label="Company name"
                     placeholder="Company Name"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
@@ -399,6 +520,9 @@ export default function PaySphereLogin() {
 
                   <input
                     type="password"
+                    id="signup-password"
+                    name="password"
+                    aria-label="Password"
                     placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -427,14 +551,42 @@ export default function PaySphereLogin() {
                   <div className="flex-1 h-px bg-gray-200 dark:bg-slate-800" />
                 </div>
 
-                <button
-                  onClick={onGoogleClick}
-                  disabled={loading}
-                  className="w-full border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-                >
-                  <GoogleIcon />
-                  Sign Up with Google
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={onGoogleClick}
+                    disabled={loading}
+                    className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                  >
+                    <GoogleIcon />
+                    Google
+                  </button>
+
+                  <button
+                    onClick={onGitHubClick}
+                    disabled={loading}
+                    className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                  >
+                    <GitHubIcon />
+                    GitHub
+                  </button>
+                </div>
+
+                <p className="text-center text-sm text-gray-600 dark:text-slate-400 mt-6">
+                  {activeTab === 'login'
+                    ? "Don't have an account?"
+                    : 'Already have an account?'}
+                  {/* Fixed: Replaced anchor with button for valid semantics (Issue #660) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(activeTab === 'login' ? 'signup' : 'login');
+                      resetFormState();
+                    }}
+                    className="ml-1 font-bold text-brand-600 dark:text-brand-400 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500 rounded"
+                  >
+                    {activeTab === 'login' ? 'Sign Up' : 'Login'}
+                  </button>
+                </p>
               </>
             )}
           </div>
