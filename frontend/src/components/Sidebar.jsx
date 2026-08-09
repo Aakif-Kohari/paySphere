@@ -6,8 +6,8 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PeopleIcon from '@mui/icons-material/People';
 import SchoolIcon from '@mui/icons-material/School';
-import ArchiveIcon from '@mui/icons-material/Archive';
-import { useEffect, useMemo, useRef } from 'react';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
+import { useMemo } from 'react';
 import ThemeToggle from './ThemeToggle';
 
 const Sidebar = ({
@@ -50,7 +50,8 @@ const Sidebar = ({
       { id: 'Loans', label: 'Advances', icon: <AccountBalanceWalletIcon /> },
       { id: 'Reports', label: 'Reports', icon: <AssessmentIcon /> },
       { id: 'Flashcards', label: 'AI Study Circle', icon: <SchoolIcon /> },
-      { id: 'Archive', label: 'Archive', icon: <ArchiveIcon /> },
+      { id: 'PYQs', label: 'AI PYQ Trends', icon: <AssessmentIcon /> },
+      { id: 'QuizBattle', label: 'Quiz Battle Arena', icon: <SportsEsportsIcon /> },
     ],
     [],
   );
