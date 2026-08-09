@@ -48,7 +48,7 @@ const archiveRoutes = require('./routes/archive.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
-const searchRoutes  = require('./routes/search.routes');
+const searchRoutes = require('./routes/search.routes');
 
 const errorHandler = require('./middlewares/error.middleware');
 const { generalRateLimiter } = require('./middlewares/rateLimiter.middleware');
@@ -134,7 +134,7 @@ app.use('/api/webhooks', webhookRoutes);
 // Custom role management (#475) — the owner role manages the permission sets
 // that decide what every other account can do. Mounted once, after the security
 // middleware, like the rest of the API.
-app.use("/api/roles", roleRoutes);
+app.use('/api/roles', roleRoutes);
 
 // Mounted here, once (#663).
 //
@@ -164,6 +164,23 @@ app.use('/api/expenses', expenseRoutes);
 // Full-text search via Elasticsearch (#771). Returns ranked results across
 // employees, payroll, and audit-log indices without exposing raw Mongo regex.
 app.use('/api/search', searchRoutes);
+
+// ─── 404 Handler ──────────────────────────────────────────────────────────
+// Must be registered AFTER all valid routes but BEFORE error handlers.
+// Uses NotFoundError if available, otherwise falls back to a standard Error
+// so the centralized error handler can format the response consistently.
+app.all('*', (req, res, next) => {
+  let err;
+  try {
+    const { NotFoundError } = require('./utils/apiError');
+    err = new NotFoundError(`Cannot find ${req.originalUrl} on this server!`);
+  } catch {
+    // Fallback if apiError module doesn't exist yet
+    err = new Error(`Cannot find ${req.originalUrl} on this server!`);
+    err.statusCode = 404;
+  }
+  next(err);
+});
 
 // ─── Error handlers ────────────────────────────────────────────────────────
 
