@@ -1,6 +1,6 @@
 import { Alert, Snackbar } from '@mui/material';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import ApprovalsSkeleton from '../components/common/skeleton/ApprovalsSkeleton';
+import ApprovalsSkeleton from '../components/common/skeleton/ApprovalSkeleton';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 import api from '../services/api';
 

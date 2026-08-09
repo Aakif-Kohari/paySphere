@@ -1,6 +1,6 @@
 import { Alert, Snackbar } from '@mui/material';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import LoansSkeleton from '../components/common/skeleton/LoansSkeleton';
+import LoansSkeleton from '../components/common/skeleton/LoanSkeleton';
 import api from '../services/api';
 
 const MONTH_NAMES = [

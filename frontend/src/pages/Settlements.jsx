@@ -1,7 +1,7 @@
 import { Alert, Snackbar } from '@mui/material';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Pagination from '../components/Pagination';
-import SettlementsSkeleton from '../components/common/skeleton/SettlementsSkeleton';
+import Pagination from '../components/common/Pagination';
+import SettlementsSkeleton from '../components/common/skeleton/SettlementSkeleton';
 import api from '../services/api';
 
 const STATUS_LABELS = {
