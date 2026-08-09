@@ -9,6 +9,7 @@ import { getCurrencySymbol, formatCurrency } from "../utils/currency";
 import AttendanceCalendarModal from "../components/AttendanceCalendarModal";
 import { Snackbar, Alert } from '@mui/material';
 import PayrollWizard from "../components/PayrollWizard";
+import "./MonthlyUpdates.css";
 
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -433,49 +434,7 @@ export default function MonthlyUpdates() {
         <title>Monthly Updates | PaySphere</title>
         <meta name="description" content="Log employee earnings, deductions, and leave updates for the current payroll cycle." />
       </Helmet>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=DM+Serif+Display&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        .nav-btn { width:100%; display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:10px; border:none; font-family:'DM Sans',sans-serif; font-size:14.5px; cursor:pointer; margin-bottom:2px; text-align:left; transition:background 0.15s, color 0.15s; }
-        .chip-btn { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; background:white; border:1.5px solid #E5E7EB; border-radius:99px; font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:500; color:#374151; cursor:pointer; transition:border-color 0.15s, background 0.15s, box-shadow 0.15s; }
-        .chip-btn:hover { border-color:#9CA3AF; background:#F9FAFB; box-shadow:0 2px 6px rgba(0,0,0,0.06); }
-        .icon-btn { background:none; border:none; cursor:pointer; display:flex; align-items:center; padding:6px; border-radius:8px; transition:background 0.15s; }
-        .icon-btn:hover { background:#F3F4F6; }
-        .activity-row { display:flex; align-items:center; gap:14px; padding:16px 20px; background:white; border-bottom:1px solid #F0F1F3; transition:background 0.15s; }
-        .activity-row:last-child { border-bottom:none; }
-        .activity-row:hover { background:#FAFAFA; }
-        .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:100; backdrop-filter:blur(4px); }
-        .modal-box { background:white; border-radius:20px; width:92%; max-width:600px; max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
-        
-        /* Dark Mode Overrides */
-        .dark .chip-btn { background: #111827; border-color: #1e293b; color: #cbd5e1; }
-        .dark .chip-btn:hover { border-color: #475569; background: #1e293b; }
-        .dark .icon-btn:hover { background: #1e293b; }
-        .dark .activity-row { background: #111827; border-bottom: 1px solid #1e293b; }
-        .dark .activity-row:hover { background: #1e293b; }
-        .dark .modal-box { background: #111827; border: 1.5px solid #1e293b; color: white; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
-        .dark .modal-overlay { background: rgba(0,0,0,0.7); }
-        
-        @media (min-width: 768px) {
-          .desktop-ml { margin-left: 236px !important; }
-          aside { transform: translateX(0) !important; }
-          .desktop-p { padding: 44px 48px 80px !important; }
-          .desktop-flex-row { flex-direction: row !important; }
-          .desktop-bottom-left { left: 236px !important; }
-          .desktop-row-padding { padding: 16px 36px !important; }
-        }
-        
-        @media (max-width: 480px) {
-          .activity-row { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
-          .chip-btn { padding: 7px 12px !important; font-size: 12px !important; }
-        }
-        
-        @media (max-width: 640px) {
-          .bottom-cta-inner { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; text-align: center !important; }
-          .bottom-cta-btn { width: 100% !important; }
-          .modal-box { width: 96% !important; margin: 10px !important; }
-        }
-      `}</style>
+
 
       {/* ── Sidebar Backdrop ── */}
       {isSidebarOpen && (

@@ -1,74 +1,52 @@
-/**
- * @fileoverview Centralized Winston Logger Configuration
- * @description Replaces all console.log statements with a structured, production-ready 
- * logging system. Supports log rotation, JSON formatting for log aggregators (like ELK/Datadog), 
- * and colorized console output for development.
- * 
- * Issue: #723
- */
+const winston = require("winston");
+const path = require("path");
+const { redact } = require("./redaction");
+require("winston-daily-rotate-file");
 
-const winston = require('winston');
-const DailyRotateFile = require('winston-daily-rotate-file');
-const path = require('path');
-const fs = require('fs');
+const logDir = path.join(__dirname, "../../logs");
 
-// Ensure logs directory exists before creating transports
-const logDir = path.join(__dirname, '../../logs');
-if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir, { recursive: true });
-}
+const redactFormat = winston.format((info) => {
+  const redacted = redact(info);
+  return Object.assign(info, redacted);
+})();
 
-const { combine, timestamp, printf, json, colorize, errors } = winston.format;
-
-/**
- * Custom format for development console output
- */
-const devFormat = printf(({ level, message, timestamp, stack, ...meta }) => {
-  let msg = `${timestamp} [${level}]: ${message}`;
-
-  // Append metadata if present (excluding internal winston symbols)
-  const metaKeys = Object.keys(meta).filter(k => !k.startsWith('Symbol'));
-  if (metaKeys.length > 0) {
-    msg += ` ${JSON.stringify(meta)}`;
-  }
-
-  return stack ? `${msg}\n${stack}` : msg;
+const fileRotateTransport = new winston.transports.DailyRotateFile({
+  filename: path.join(logDir, "paysphere-%DATE%.log"),
+  datePattern: "YYYY-MM-DD",
+  maxSize: "20m",
+  maxFiles: "30d",
+  format: winston.format.combine(
+    redactFormat,
+    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+    winston.format.json()
+  ),
 });
 
-/**
- * Transport: Daily Rotating Error Logs
- * Keeps error logs for 30 days, max 20MB per file
- */
-const errorRotateTransport = new DailyRotateFile({
-  filename: path.join(logDir, 'error-%DATE%.log'),
-  datePattern: 'YYYY-MM-DD',
-  level: 'error',
-  maxSize: '20m',
-  maxFiles: '30d',
-  format: combine(timestamp(), json()),
-});
-
-/**
- * Transport: Daily Rotating Combined Logs
- * Keeps all logs for 30 days (restored from original retention policy)
- */
-const combinedRotateTransport = new DailyRotateFile({
-  filename: path.join(logDir, 'combined-%DATE%.log'),
-  datePattern: 'YYYY-MM-DD',
-  maxSize: '20m',
-  maxFiles: '30d',
-  format: combine(timestamp(), json()),
+const errorFileRotateTransport = new winston.transports.DailyRotateFile({
+  filename: path.join(logDir, "error-%DATE%.log"),
+  datePattern: "YYYY-MM-DD",
+  maxSize: "20m",
+  maxFiles: "30d",
+  level: "error",
+  format: winston.format.combine(
+    redactFormat,
+    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+    winston.format.json()
+  ),
 });
 
 /**
  * Transport: Console (Colorized for Dev only, disabled in production)
  */
 const consoleTransport = new winston.transports.Console({
-  format: combine(
-    colorize(),
-    timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    errors({ stack: true }),
-    devFormat
+  format: winston.format.combine(
+    redactFormat,
+    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+    winston.format.colorize(),
+    winston.format.printf(({ timestamp, level, message, ...meta }) => {
+      const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : "";
+      return `${timestamp} [${level}]: ${message}${metaStr}`;
+    })
   ),
 });
 

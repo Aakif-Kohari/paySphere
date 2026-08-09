@@ -1024,6 +1024,10 @@ export default function PaySphereDashboard() {
             navigate('/reports');
           } else if (page === 'Flashcards') {
             navigate('/flashcards');
+          } else if (page === 'PYQs') {
+            navigate('/pyqs');
+          } else if (page === 'QuizBattle') {
+            navigate('/quiz-battle');
           } else {
             setActivePage(page);
           }

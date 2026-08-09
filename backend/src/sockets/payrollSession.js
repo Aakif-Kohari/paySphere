@@ -142,6 +142,70 @@ class PresenceRegistry {
   }
 }
 
+class LockRegistry {
+  constructor() {
+    /** @type {Map<string, Map<string, {userId: string, userName: string, socketId: string}>>} */
+    this.rooms = new Map();
+  }
+
+  acquire(roomId, empId, { userId, userName, socketId }) {
+    if (!roomId || !empId || !mongoose.Types.ObjectId.isValid(empId)) return false;
+    if (!this.rooms.has(roomId)) this.rooms.set(roomId, new Map());
+    
+    const locks = this.rooms.get(roomId);
+    const existing = locks.get(String(empId));
+    if (existing && existing.socketId !== socketId) {
+      return false;
+    }
+    
+    locks.set(String(empId), { userId, userName, socketId });
+    return true;
+  }
+
+  release(roomId, empId, socketId) {
+    const locks = this.rooms.get(roomId);
+    if (!locks) return false;
+
+    const existing = locks.get(String(empId));
+    if (existing && existing.socketId === socketId) {
+      locks.delete(String(empId));
+      if (locks.size === 0) this.rooms.delete(roomId);
+      return true;
+    }
+    return false;
+  }
+
+  releaseAllForSocket(roomId, socketId) {
+    const locks = this.rooms.get(roomId);
+    if (!locks) return [];
+
+    const releasedEmpIds = [];
+    for (const [empId, lock] of locks.entries()) {
+      if (lock.socketId === socketId) {
+        locks.delete(empId);
+        releasedEmpIds.push(empId);
+      }
+    }
+    if (locks.size === 0) this.rooms.delete(roomId);
+    return releasedEmpIds;
+  }
+
+  getLocks(roomId) {
+    const locks = this.rooms.get(roomId);
+    if (!locks) return [];
+
+    return [...locks.entries()].map(([empId, lock]) => ({
+      empId,
+      userId: lock.userId,
+      userName: lock.userName,
+    }));
+  }
+
+  clear() {
+    this.rooms.clear();
+  }
+}
+
 /**
  * Is this adjustment payload something worth re-broadcasting?
  *
@@ -168,5 +232,6 @@ module.exports = {
   isValidPeriod,
   roomIdFor,
   PresenceRegistry,
+  LockRegistry,
   normalizeAdjustment,
 };
