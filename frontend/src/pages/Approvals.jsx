@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Snackbar } from '@mui/material';
-import api from '../services/api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import ApprovalSkeleton from '../components/common/skeleton/ApprovalSkeleton';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
+import api from '../services/api';
 
 const MONTH_NAMES = [
   'January',
@@ -17,7 +18,6 @@ const MONTH_NAMES = [
   'November',
   'December',
 ];
-
 const MAX_REASON_LENGTH = 500;
 
 const formatCurrency = (value, currency = 'INR') => {
@@ -65,7 +65,10 @@ const describeError = (error, fallback) => {
 
   if (data.message) parts.push(data.message);
 
-  if (Array.isArray(data.invalidTransition) && data.invalidTransition.length > 0) {
+  if (
+    Array.isArray(data.invalidTransition) &&
+    data.invalidTransition.length > 0
+  ) {
     parts.push(
       data.invalidTransition
         .map((item) => `${item.employeeName || 'A record'}: ${item.reason}`)
@@ -294,14 +297,7 @@ const Approvals = () => {
       )}
 
       {loading ? (
-        <div className="space-y-3">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-20 rounded-xl bg-gray-100 dark:bg-slate-800/60 animate-pulse"
-            />
-          ))}
-        </div>
+        <ApprovalSkeleton />
       ) : pending.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
           <p className="text-gray-500 dark:text-slate-500">
@@ -325,7 +321,8 @@ const Approvals = () => {
               {selectedIds.size > 0 && (
                 <>
                   <span className="text-sm text-gray-500 dark:text-slate-500">
-                    {selectedIds.size} selected · {formatCurrency(selectedTotal)}
+                    {selectedIds.size} selected ·{' '}
+                    {formatCurrency(selectedTotal)}
                   </span>
                   <div className="ml-auto flex gap-2">
                     <button

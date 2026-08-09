@@ -10,16 +10,16 @@
 // --- Permissions -----------------------------------------------------------
 
 const PERMISSIONS = {
-  READ_EMPLOYEE: "READ_EMPLOYEE",
-  WRITE_EMPLOYEE: "WRITE_EMPLOYEE",
-  DELETE_EMPLOYEE: "DELETE_EMPLOYEE",
-  READ_PAYROLL: "READ_PAYROLL",
-  WRITE_PAYROLL: "WRITE_PAYROLL",
+  READ_EMPLOYEE: 'READ_EMPLOYEE',
+  WRITE_EMPLOYEE: 'WRITE_EMPLOYEE',
+  DELETE_EMPLOYEE: 'DELETE_EMPLOYEE',
+  READ_PAYROLL: 'READ_PAYROLL',
+  WRITE_PAYROLL: 'WRITE_PAYROLL',
   // Maker–checker: the account that submits a payroll run should not be the
   // only thing standing between a figure and a bank transfer. Kept separate
   // from WRITE_PAYROLL so the two can be held by different people (#458).
-  APPROVE_PAYROLL: "APPROVE_PAYROLL",
-  READ_REPORT: "READ_REPORT",
+  APPROVE_PAYROLL: 'APPROVE_PAYROLL',
+  READ_REPORT: 'READ_REPORT',
   // Kept apart from READ_REPORT because they are not the same act. Viewing a
   // report is a read; standing up a recurring job that mails a payroll register
   // to an address of your choosing is a write, and a fairly serious one. Both
@@ -27,52 +27,102 @@ const PERMISSIONS = {
   // including Employee — so anyone who could view a report could also schedule
   // an export of company salary data to an external mailbox, or delete another
   // admin's schedule (#666).
-  MANAGE_REPORT_SCHEDULE: "MANAGE_REPORT_SCHEDULE",
+  MANAGE_REPORT_SCHEDULE: 'MANAGE_REPORT_SCHEDULE',
+  // A webhook endpoint is a standing instruction to POST company payroll and
+  // employee data to an external URL, signed with a secret this account owns.
+  // Creating, editing, rotating the secret for or deleting one is a write that
+  // can point data anywhere, so it is its own permission and it stays with the
+  // owner role — deliberately not something every admin of the workspace can do
+  // (#474).
+  MANAGE_WEBHOOKS: 'MANAGE_WEBHOOKS',
+  // Expense claims (#719). routes/expense.routes.js has asked for these since
+  // it was written and none of them existed here, so the seeder never created
+  // them, no role held them, and every expense endpoint answered 403 for every
+  // account in the product — the owner included, because SUPER_ADMIN below is a
+  // fixed list and not a wildcard (#794).
+  READ_EXPENSE: 'READ_EXPENSE',
+  WRITE_EXPENSE: 'WRITE_EXPENSE',
+  // Kept apart from WRITE_EXPENSE for the same reason APPROVE_PAYROLL is kept
+  // apart from WRITE_PAYROLL: whoever submits a claim for payment should not be
+  // the only person standing between it and a bank transfer.
+  APPROVE_EXPENSE: 'APPROVE_EXPENSE',
+  // A category carries the `isTaxable` flag, which decides whether a claim is
+  // paid as taxable earnings or as a tax-free reimbursement. That is a tax
+  // decision rather than day-to-day expense admin, so it stays with the owner.
+  MANAGE_EXPENSE_CATEGORY: 'MANAGE_EXPENSE_CATEGORY',
 };
 
 const PERMISSION_DEFINITIONS = [
   {
     name: PERMISSIONS.READ_EMPLOYEE,
-    description: "View the employee directory and individual employee records",
+    description: 'View the employee directory and individual employee records',
   },
   {
     name: PERMISSIONS.WRITE_EMPLOYEE,
-    description: "Create and update employees, and import them from CSV",
+    description: 'Create and update employees, and import them from CSV',
   },
   {
     name: PERMISSIONS.DELETE_EMPLOYEE,
-    description: "Permanently delete an employee and their payroll history",
+    description: 'Permanently delete an employee and their payroll history',
   },
   {
     name: PERMISSIONS.READ_PAYROLL,
-    description: "View payroll summaries and export payroll data",
+    description: 'View payroll summaries and export payroll data',
   },
   {
     name: PERMISSIONS.WRITE_PAYROLL,
-    description: "Finalize payroll runs and dispatch payslip emails",
+    description: 'Finalize payroll runs and dispatch payslip emails',
   },
   {
     name: PERMISSIONS.APPROVE_PAYROLL,
     description:
-      "Approve or reject a submitted payroll run before it can be paid",
+      'Approve or reject a submitted payroll run before it can be paid',
   },
   {
     name: PERMISSIONS.READ_REPORT,
-    description: "View analytics and download generated reports",
+    description: 'View analytics and download generated reports',
   },
   {
     name: PERMISSIONS.MANAGE_REPORT_SCHEDULE,
     description:
-      "Create and delete recurring report schedules, which mail company data to their recipients",
+      'Create and delete recurring report schedules, which mail company data to their recipients',
+  },
+  {
+    name: PERMISSIONS.MANAGE_WEBHOOKS,
+    description:
+      'Create, update and delete webhook endpoints, which receive company data when payroll or employee events fire',
+  },
+  {
+    name: PERMISSIONS.READ_EXPENSE,
+    description: 'View expense claims and the categories they are filed under',
+  },
+  {
+    name: PERMISSIONS.WRITE_EXPENSE,
+    description: 'Submit expense claims with receipts',
+  },
+  {
+    name: PERMISSIONS.APPROVE_EXPENSE,
+    description:
+      'Approve or reject a submitted expense claim, which schedules it for reimbursement in the next payroll run',
+  },
+  {
+    name: PERMISSIONS.MANAGE_EXPENSE_CATEGORY,
+    description:
+      'Create and edit expense categories, including whether a category is taxable',
+  },
+  {
+    name: PERMISSIONS.MANAGE_ROLES,
+    description:
+      "Create, update and delete custom roles and their permission sets",
   },
 ];
 
 // --- Roles -----------------------------------------------------------------
 
 const ROLES = {
-  SUPER_ADMIN: "SuperAdmin",
-  HR_MANAGER: "HRManager",
-  EMPLOYEE: "Employee",
+  SUPER_ADMIN: 'SuperAdmin',
+  HR_MANAGER: 'HRManager',
+  EMPLOYEE: 'Employee',
 };
 
 /**
@@ -98,6 +148,11 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.APPROVE_PAYROLL,
       PERMISSIONS.READ_REPORT,
       PERMISSIONS.MANAGE_REPORT_SCHEDULE,
+      PERMISSIONS.MANAGE_WEBHOOKS,
+      PERMISSIONS.READ_EXPENSE,
+      PERMISSIONS.WRITE_EXPENSE,
+      PERMISSIONS.APPROVE_EXPENSE,
+      PERMISSIONS.MANAGE_EXPENSE_CATEGORY,
     ],
   },
   {
@@ -111,12 +166,26 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_PAYROLL,
       PERMISSIONS.WRITE_PAYROLL,
       PERMISSIONS.READ_REPORT,
+      // Expenses are HR's day job: file them on an employee's behalf, and sign
+      // off the ones that come in. Not MANAGE_EXPENSE_CATEGORY — `isTaxable`
+      // decides how a claim is taxed, and that stays with the owner.
+      PERMISSIONS.READ_EXPENSE,
+      PERMISSIONS.WRITE_EXPENSE,
+      PERMISSIONS.APPROVE_EXPENSE,
     ],
   },
   {
     name: ROLES.EMPLOYEE,
-    // Read-only.
-    permissions: [PERMISSIONS.READ_EMPLOYEE, PERMISSIONS.READ_PAYROLL],
+    // Read-only, plus the one thing #719 exists for: an employee filing their
+    // own receipts. `submitExpense` restricts an EMPLOYEE account to its own
+    // linked employee record, so holding WRITE_EXPENSE does not let someone
+    // file a claim against a colleague.
+    permissions: [
+      PERMISSIONS.READ_EMPLOYEE,
+      PERMISSIONS.READ_PAYROLL,
+      PERMISSIONS.READ_EXPENSE,
+      PERMISSIONS.WRITE_EXPENSE,
+    ],
   },
 ];
 

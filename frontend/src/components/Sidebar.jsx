@@ -17,11 +17,34 @@ const Sidebar = ({
   isSidebarOpen,
   onClose,
 }) => {
+  const sidebarRef = useRef(null);
+
+  useEffect(() => {
+    if (!isSidebarOpen) return undefined;
+
+    const handleOutsideClick = (event) => {
+      if (sidebarRef.current && !sidebarRef.current.contains(event.target)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [isSidebarOpen, onClose]);
   const sidebarItems = useMemo(
     () => [
       { id: 'Dashboard', label: 'Dashboard', icon: <GridViewIcon /> },
       { id: 'Employees', label: 'Employees', icon: <PeopleIcon /> },
-      { id: 'Payroll', label: 'Payroll History', icon: <AccountBalanceWalletIcon /> },
+      {
+        id: 'Payroll',
+        label: 'Payroll History',
+        icon: <AccountBalanceWalletIcon />,
+      },
       { id: 'Approvals', label: 'Approvals', icon: <FactCheckIcon /> },
       { id: 'Settlements', label: 'Exits & F&F', icon: <LogoutIcon /> },
       { id: 'Loans', label: 'Advances', icon: <AccountBalanceWalletIcon /> },
@@ -34,6 +57,7 @@ const Sidebar = ({
   );
 
   const initials = useMemo(() => {
+    if (!companyName) return '';
     return companyName
       .split(' ')
       .map((w) => w[0])
@@ -45,15 +69,20 @@ const Sidebar = ({
   return (
     <>
       {isSidebarOpen && (
-        <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
+        <div
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={onClose}
         />
       )}
 
       <aside
-        className={`w-56 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 fixed inset-y-0 left-0 flex flex-col z-50 transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          } md:translate-x-0`}
+        className={`w-56 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 fixed inset-y-0 left-0 flex flex-col z-50 transition-transform duration-300 transform ${
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } md:translate-x-0`}
+        ref={sidebarRef}
       >
         <div className="p-5 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -79,25 +108,37 @@ const Sidebar = ({
 
         <nav className="flex-1 p-3 space-y-1">
           {sidebarItems.map((item) => (
-            <button
+            /* Fixed: Added href and role for screen readers (Issue #660) */
+            <a
               key={item.id}
-              onClick={() => {
+              href={`/${item.id.toLowerCase()}`}
+              onClick={(e) => {
+                e.preventDefault();
                 setActivePage(item.id);
                 onClose();
               }}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activePage === item.id
+              aria-current={activePage === item.id ? 'page' : undefined}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500 ${
+                activePage === item.id
                   ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20 dark:shadow-none' /* Issue #521: Replaced hardcoded hex */
                   : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-                }`}
+              }`}
             >
               {item.icon}
               {item.label}
-            </button>
+            </a>
           ))}
         </nav>
 
         <div className="p-3 border-t border-gray-200 dark:border-slate-800 space-y-2">
           <ThemeToggle showLabel className="w-full" />
+          <a
+            href="/profile"
+            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
+          >
+            <PeopleIcon />
+            Profile Settings
+          </a>
           <button
             onClick={() => {
               window.location.href = 'mailto:support@paysphere.com';
