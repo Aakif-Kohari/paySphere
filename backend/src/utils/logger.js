@@ -1,9 +1,9 @@
-const winston = require("winston");
-const path = require("path");
-const { redact } = require("./redaction");
-require("winston-daily-rotate-file");
+const winston = require('winston');
+const path = require('path');
+const { redact } = require('./redaction');
+require('winston-daily-rotate-file');
 
-const logDir = path.join(__dirname, "../../logs");
+const logDir = path.join(__dirname, '../../logs');
 
 const redactFormat = winston.format((info) => {
   const redacted = redact(info);
@@ -11,27 +11,27 @@ const redactFormat = winston.format((info) => {
 })();
 
 const fileRotateTransport = new winston.transports.DailyRotateFile({
-  filename: path.join(logDir, "paysphere-%DATE%.log"),
-  datePattern: "YYYY-MM-DD",
-  maxSize: "20m",
-  maxFiles: "30d",
+  filename: path.join(logDir, 'paysphere-%DATE%.log'),
+  datePattern: 'YYYY-MM-DD',
+  maxSize: '20m',
+  maxFiles: '30d',
   format: winston.format.combine(
     redactFormat,
-    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
-    winston.format.json()
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    winston.format.json(),
   ),
 });
 
 const errorFileRotateTransport = new winston.transports.DailyRotateFile({
-  filename: path.join(logDir, "error-%DATE%.log"),
-  datePattern: "YYYY-MM-DD",
-  maxSize: "20m",
-  maxFiles: "30d",
-  level: "error",
+  filename: path.join(logDir, 'error-%DATE%.log'),
+  datePattern: 'YYYY-MM-DD',
+  maxSize: '20m',
+  maxFiles: '30d',
+  level: 'error',
   format: winston.format.combine(
     redactFormat,
-    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
-    winston.format.json()
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+    winston.format.json(),
   ),
 });
 
@@ -41,12 +41,14 @@ const errorFileRotateTransport = new winston.transports.DailyRotateFile({
 const consoleTransport = new winston.transports.Console({
   format: winston.format.combine(
     redactFormat,
-    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.colorize(),
     winston.format.printf(({ timestamp, level, message, ...meta }) => {
-      const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : "";
+      const metaStr = Object.keys(meta).length
+        ? ` ${JSON.stringify(meta)}`
+        : '';
       return `${timestamp} [${level}]: ${message}${metaStr}`;
-    })
+    }),
   ),
 });
 
@@ -59,13 +61,10 @@ const logger = winston.createLogger({
     service: 'paysphere-api',
     env: process.env.NODE_ENV || 'development',
   },
-  transports: [
-    errorRotateTransport,
-    combinedRotateTransport,
-  ],
+  transports: [errorFileRotateTransport, fileRotateTransport],
   // Handle uncaught exceptions and unhandled rejections
   exceptionHandlers: [
-    new DailyRotateFile({
+    new winston.transports.DailyRotateFile({
       filename: path.join(logDir, 'exceptions-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
       maxSize: '20m',
@@ -73,7 +72,7 @@ const logger = winston.createLogger({
     }),
   ],
   rejectionHandlers: [
-    new DailyRotateFile({
+    new winston.transports.DailyRotateFile({
       filename: path.join(logDir, 'rejections-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
       maxSize: '20m',
