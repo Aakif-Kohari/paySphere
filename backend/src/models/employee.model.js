@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const softDeletePlugin = require('../utils/softDelete.plugin');
+const auditTrailPlugin = require('../middlewares/auditTrail.middleware');
 const {
   MONTHLY_SALARY_MAX,
   OVERTIME_RATE_MAX,
@@ -199,4 +200,5 @@ employeeSchema.index(
 employeeSchema.index({ tenantId: 1, isDeleted: 1, isActive: 1 });
 
 employeeSchema.plugin(softDeletePlugin);
+employeeSchema.plugin(auditTrailPlugin);
 module.exports = mongoose.model('Employee', employeeSchema);
