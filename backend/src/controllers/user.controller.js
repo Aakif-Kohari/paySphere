@@ -31,7 +31,6 @@ const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
 
 const RefreshToken = require('../models/refreshToken.model');
-const crypto = require('crypto');
 
 /**
  * Generates access and refresh tokens with rotation support (Issue #725)
@@ -50,7 +49,7 @@ const generateTokens = async (user, res, family = null) => {
       tokenVersion: user.tokenVersion,
     },
     process.env.JWT_SECRET,
-    { expiresIn: '15m' } // Changed from 7d to 15m for security
+    { expiresIn: '15m' }, // Changed from 7d to 15m for security
   );
 
   // Generate cryptographically secure refresh token
@@ -998,7 +997,7 @@ exports.refresh = async (req, res, next) => {
       if (storedToken) {
         await RefreshToken.updateMany(
           { family: storedToken.family, isRevoked: false },
-          { $set: { isRevoked: true } }
+          { $set: { isRevoked: true } },
         );
         logger.warn('Token reuse detected - family revoked', {
           userId: storedToken.userId,
@@ -1013,7 +1012,7 @@ exports.refresh = async (req, res, next) => {
       });
 
       return res.status(403).json({
-        message: 'Invalid or revoked refresh token. Session terminated.'
+        message: 'Invalid or revoked refresh token. Session terminated.',
       });
     }
 
@@ -1071,13 +1070,13 @@ exports.refresh = async (req, res, next) => {
 exports.logout = async (req, res, next) => {
   try {
     const rawRefreshToken = req.cookies.refreshToken;
-    
+
     // Revoke the refresh token in database
     if (rawRefreshToken) {
       const tokenHash = RefreshToken.hashToken(rawRefreshToken);
       await RefreshToken.findOneAndUpdate(
         { tokenHash },
-        { $set: { isRevoked: true } }
+        { $set: { isRevoked: true } },
       );
     }
 
@@ -1105,7 +1104,7 @@ exports.logout = async (req, res, next) => {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
     });
-    
+
     res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
     next(error);
