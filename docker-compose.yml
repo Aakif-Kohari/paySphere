@@ -59,6 +59,16 @@ services:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
 
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: paysphere-jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "14268:14268" # Collector HTTP endpoint
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+
 volumes:
   mongo_data:
   backend_node_modules:
