@@ -1980,3 +1980,34 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * GET /api/payroll/anomalies
+ * Analyze active or past payroll records for statistical and fraud anomalies.
+ */
+exports.inspectAnomalies = async (req, res, next) => {
+  try {
+    const tenantId = requireTenant(req, res);
+    if (!tenantId) return;
+
+    const month = parseInt(req.query.month, 10) || new Date().getMonth() + 1;
+    const year = parseInt(req.query.year, 10) || new Date().getFullYear();
+
+    const [currentPayrolls, historicalPayrolls] = await Promise.all([
+      PayrollUpdate.find({ tenantId, month, year }).lean(),
+      PayrollUpdate.find({ tenantId, createdAt: { $gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) } }).lean(),
+    ]);
+
+    const report = AnomalyService.detectAnomalies(currentPayrolls, historicalPayrolls);
+
+    return res.status(200).json({
+      success: true,
+      month,
+      year,
+      report,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

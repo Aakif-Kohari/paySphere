@@ -1,17 +1,9 @@
-/**
- * The rate limiter module (#793).
- *
- * The previous version of this file asserted only that three names were
- * `defined`, which is the one thing a rename breaks loudest and the one thing
- * that test could not catch — it imported the old names, so when #685 renamed
- * them the suite failed to *load* rather than failing an assertion, and
- * "cannot find module" reads like an environment problem.
- *
- * So this suite checks the properties that actually matter: the module can be
- * required with no Redis, every name its callers import is exported and is
- * usable as express middleware, the thresholds are the ones #287/#540 settled
- * on, and the limiters actually limit.
- */
+const {
+  authRateLimiter,
+  generalRateLimiter,
+  writeRateLimiter,
+  _memoryStore,
+} = require('../rateLimiter.middleware');
 
 const express = require('express');
 const request = require('supertest');
@@ -274,3 +266,61 @@ describe('write limiter keying (#685)', () => {
     expect(res.status).toBe(429);
   });
 });
+
+describe('Sliding Window Rate Limiter Middleware Logic', () => {
+  let req;
+  let res;
+  let next;
+
+  beforeEach(() => {
+    if (_memoryStore) {
+      _memoryStore.clear();
+    }
+    req = {
+      ip: '127.0.0.1',
+      headers: {},
+      connection: {},
+    };
+    res = {
+      headers: {},
+      setHeader(name, value) {
+        this.headers[name] = value;
+      },
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(data) {
+        this.body = data;
+        return this;
+      },
+    };
+    next = jest.fn();
+  });
+
+  it('allows request within limit and sets correct rate limit headers', async () => {
+    await authRateLimiter(req, res, next);
+    expect(next).toHaveBeenCalled();
+    expect(res.headers['X-RateLimit-Limit']).toBe(30);
+    expect(res.headers['X-RateLimit-Remaining']).toBe(29);
+    expect(res.headers['X-RateLimit-Reset']).toBeDefined();
+  });
+
+  it('blocks requests once the limit is exceeded', async () => {
+    // Limit is 30, let's call it 30 times
+    for (let i = 0; i < 30; i++) {
+      const mockNext = jest.fn();
+      await authRateLimiter(req, res, mockNext);
+      expect(mockNext).toHaveBeenCalled();
+    }
+
+    // 31st call should be blocked
+    const mockNext = jest.fn();
+    await authRateLimiter(req, res, mockNext);
+    expect(mockNext).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(429);
+    expect(res.body.message).toContain('Too many authentication attempts');
+    expect(res.headers['X-RateLimit-Remaining']).toBe(0);
+  });
+});
+
