@@ -1,0 +1,52 @@
+# ============================================================================
+# Dependabot Auto-Approve & Auto-Merge
+# ============================================================================
+# Automatically approves and enables auto-merge for Dependabot PRs that only
+# contain minor or patch dependency bumps. GitHub's native auto-merge feature
+# waits for all required CI checks to pass before merging, so a failing test
+# suite blocks the merge automatically.
+#
+# Issue: #769
+#
+# Documentation:
+#   https://github.com/dependabot/fetch-metadata
+#   https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/automatically-merging-a-pull-request
+# ============================================================================
+
+name: Dependabot auto-approve and auto-merge
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dependabot:
+    runs-on: ubuntu-latest
+    # Only run for Dependabot PRs in this repository
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'Dev1822/paySphere'
+
+    steps:
+      - name: Fetch Dependabot metadata
+        id: dependabot-metadata
+        uses: dependabot/fetch-metadata@v3
+
+      # Approve minor/patch bumps (major bumps still need manual review)
+      - name: Approve minor and patch updates
+        if: ${{ steps.dependabot-metadata.outputs.update-type == 'version-update:semver-minor' || steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch' }}
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Enable auto-merge for minor/patch updates.
+      # Auto-merge only merges once all required CI checks pass.
+      - name: Enable auto-merge for minor and patch updates
+        if: ${{ steps.dependabot-metadata.outputs.update-type == 'version-update:semver-minor' || steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch' }}
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
