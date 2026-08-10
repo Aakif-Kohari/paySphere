@@ -31,6 +31,7 @@
     "@tanstack/react-query": "^5.101.4",
     "axios": "^1.15.2",
     "cmdk": "^1.1.1",
+    "formik": "^2.4.9",
     "i18next": "^26.3.6",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
@@ -43,7 +44,8 @@
     "react-select": "^5.10.2",
     "recharts": "^3.10.0",
     "socket.io-client": "^4.8.3",
-    "tailwindcss": "^4.2.4"
+    "tailwindcss": "^4.2.4",
+    "yup": "^1.7.1"
   },
   "optionalDependencies": {
     "@esbuild/linux-x64": "^0.28.1",
