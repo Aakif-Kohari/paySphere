@@ -11,6 +11,7 @@ const {
   rejectPayroll,
   markPayrollPaid,
   inspectAnomalies,
+  getExchangeRates,
 } = require('../controllers/payroll.controller');
 const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
@@ -114,10 +115,10 @@ router.post(
 );
 
 router.get(
-  '/anomalies',
+  '/fx-rates',
   auth,
   requirePermission(PERMISSIONS.READ_PAYROLL),
-  inspectAnomalies,
+  getExchangeRates,
 );
 
 module.exports = router;

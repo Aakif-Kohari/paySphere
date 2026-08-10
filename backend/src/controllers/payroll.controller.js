@@ -14,6 +14,7 @@ const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const cacheService = require('../services/cache.service');
 const AnomalyService = require('../services/anomaly.service');
+const FXService = require('../services/fx.service');
 // `webhookService` was imported for the stray `triggerEvent` call #543 left in
 // the middle of submitPayrollForReview. That call is gone (see below) and the
 // service has never exported `triggerEvent` anyway — payroll webhooks are
@@ -680,6 +681,24 @@ exports.parsePayrollCSV = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * GET /api/payroll/fx-rates
+ * Fetch multi-currency FX rates and supported currencies.
+ */
+exports.getExchangeRates = async (req, res, next) => {
+  try {
+    const baseCurrency = req.query.baseCurrency || 'USD';
+    const fxData = await FXService.getRatesForBase(baseCurrency);
+    return res.status(200).json({
+      success: true,
+      ...fxData,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 exports.submitPayrollForReview = async (req, res, next) => {
   let session = null;
