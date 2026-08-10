@@ -9,6 +9,8 @@
 import PropTypes from 'prop-types';
 import { formatCurrency } from '../../utils/currency';
 
+import { useVirtual } from '../../hooks/useVirtual';
+
 /**
  * PayrollTable Component
  * 
@@ -18,6 +20,12 @@ import { formatCurrency } from '../../utils/currency';
  * @returns {JSX.Element} The rendered payroll table
  */
 export default function PayrollTable({ data = [], currency = 'INR' }) {
+  const { virtualItems, startIndex, endIndex, containerRef } = useVirtual({
+    itemCount: data.length,
+    itemHeight: 73,
+    overscan: 5,
+  });
+
   if (!data || data.length === 0) {
     return (
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-12 text-center">
@@ -25,6 +33,9 @@ export default function PayrollTable({ data = [], currency = 'INR' }) {
       </div>
     );
   }
+
+  const paddingTop = startIndex * 73;
+  const paddingBottom = (data.length - endIndex - 1) * 73;
 
   /**
    * Renders a status badge with appropriate color coding
@@ -51,10 +62,10 @@ export default function PayrollTable({ data = [], currency = 'INR' }) {
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+      <div ref={containerRef} className="overflow-auto max-h-[600px]">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700 table-fixed">
           {/* Standardized Header: text-xs uppercase tracking-wider */}
-          <thead className="bg-gray-50 dark:bg-slate-900/50">
+          <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-slate-900 shadow-[inset_0_-1px_0_rgba(0,0,0,0.1)] dark:shadow-[inset_0_-1px_0_rgba(255,255,255,0.1)]">
             <tr>
               <th scope="col" className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">
                 Employee
@@ -82,46 +93,60 @@ export default function PayrollTable({ data = [], currency = 'INR' }) {
 
           {/* Standardized Body: text-sm */}
           <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-            {data.map((row, index) => (
-              <tr
-                key={row.id || index}
-                className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors duration-150"
-              >
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm">
-                      {row.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {row.name}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-slate-400">
-                        {row.date || '-'}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-slate-300">
-                  {row.department || 'Unassigned'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-slate-300 text-right font-mono">
-                  {formatCurrency(row.salary, currency)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400 text-right font-mono">
-                  +{formatCurrency(row.overtime, currency)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400 text-right font-mono">
-                  -{formatCurrency(row.deduction, currency)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white text-right font-mono">
-                  {formatCurrency(row.net, currency)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-center">
-                  {renderStatusBadge(row.status)}
-                </td>
+            {paddingTop > 0 && (
+              <tr style={{ height: `${paddingTop}px` }}>
+                <td colSpan={7} style={{ height: `${paddingTop}px`, padding: 0 }} />
               </tr>
-            ))}
+            )}
+            {virtualItems.map((item) => {
+              const row = data[item.index];
+              return (
+                <tr
+                  key={row.id || item.index}
+                  className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors duration-150"
+                  style={{ height: '73px' }}
+                >
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-semibold text-sm">
+                        {row.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          {row.name}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-slate-400">
+                          {row.date || '-'}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-slate-300">
+                    {row.department || 'Unassigned'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-slate-300 text-right font-mono">
+                    {formatCurrency(row.salary, currency)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 dark:text-green-400 text-right font-mono">
+                    +{formatCurrency(row.overtime, currency)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 dark:text-red-400 text-right font-mono">
+                    -{formatCurrency(row.deduction, currency)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-white text-right font-mono">
+                    {formatCurrency(row.net, currency)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    {renderStatusBadge(row.status)}
+                  </td>
+                </tr>
+              );
+            })}
+            {paddingBottom > 0 && (
+              <tr style={{ height: `${paddingBottom}px` }}>
+                <td colSpan={7} style={{ height: `${paddingBottom}px`, padding: 0 }} />
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

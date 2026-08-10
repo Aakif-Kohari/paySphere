@@ -21,10 +21,11 @@ const {
   authRateLimiter,
   writeRateLimiter,
 } = require('../middlewares/rateLimiter.middleware');
+const validateRecaptcha = require('../middlewares/recaptcha.middleware');
 const router = express.Router();
 
-router.post('/signup', authRateLimiter, signup);
-router.post('/login', authRateLimiter, login);
+router.post('/signup', authRateLimiter, validateRecaptcha, signup);
+router.post('/login', authRateLimiter, validateRecaptcha, login);
 router.post('/google', authRateLimiter, googleAuth);
 router.post('/github', authRateLimiter, githubAuth);
 router.post('/forgot-password', authRateLimiter, forgotPassword);

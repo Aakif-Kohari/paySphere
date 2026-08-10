@@ -8,6 +8,9 @@ import App from './App';
 import './index.css';
 import './i18n'; // Initialize i18n before app renders (Issue #736)
 
+import ErrorBoundary from './components/common/ErrorBoundary.jsx'
+
+// Configure QueryClient with default options (Issue #684)
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { refetchOnWindowFocus: false, retry: 1 },

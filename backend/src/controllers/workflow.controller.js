@@ -17,6 +17,7 @@ const {
   hasNode,
   hasEdge,
   nextNodesFrom,
+  allNextNodesFrom,
   isTerminalNode,
 } = require('../utils/workflowGraph');
 
@@ -52,6 +53,76 @@ function scopeOf(req) {
   if (!tenantId || !mongoose.Types.ObjectId.isValid(tenantId)) return null;
 
   return tenantId;
+}
+
+/**
+ * The mongoose model behind each `targetEntityType`.
+ *
+ * Written out rather than derived with `mongoose.model(instance.targetEntityType)`
+ * for two reasons. The names do not line up — the payroll model registers
+ * itself as `PayrollUpdate` while `TARGET_ENTITY_TYPE.PAYROLL` is `'Payroll'`,
+ * so the derived lookup throws `MissingSchemaError`. And a lookup keyed on a
+ * value that reached us in a request body is a lookup that can be pointed at
+ * any registered schema in the process; a literal map can only ever return one
+ * of these three.
+ */
+const TARGET_ENTITY_MODELS = {
+  Payroll: require('../models/payroll.model'),
+  Loan: require('../models/loan.model'),
+  Employee: require('../models/employee.model'),
+};
+
+/**
+ * The entity an instance was raised against, as a plain object for the rule
+ * evaluator (#894).
+ *
+ * Conditional edges are written against the record under approval — an expense
+ * over a threshold routes to finance, a loan under one skips a step. Evaluating
+ * them needs the record. Until now nothing loaded it, so every condition was
+ * evaluated against `{}`, every `Identifier` resolved to `undefined`, and every
+ * conditional edge was closed. See utils/workflowGraph.js.
+ *
+ * Two shapes are returned at once, deliberately: the fields at the top level so
+ * a rule can say `field: 'netSalary'`, and the whole document again under a key
+ * named for its type so a rule can say `field: 'payroll.netSalary'`. Both forms
+ * appear in the seeded definitions, and `_getValueFromContext` handles the
+ * dotted one natively.
+ *
+ * Never throws. A rule that cannot be evaluated because its entity has been
+ * deleted should close the edge and produce a 400 the approver can read, not a
+ * 500 in the middle of an approval.
+ *
+ * @param {object} instance a WorkflowInstance document
+ * @param {string|object} tenantId
+ * @returns {Promise<object>}
+ */
+async function buildEntityContext(instance, tenantId) {
+  const Model = TARGET_ENTITY_MODELS[instance?.targetEntityType];
+  if (!Model || !instance?.targetEntityId) return {};
+
+  try {
+    // Scoped, like every other read in this file: the id came off a stored
+    // instance rather than a request body, but an instance whose target was
+    // moved between tenants must not become a read of another company's row.
+    const entity = await Model.findOne({
+      _id: instance.targetEntityId,
+      tenantId,
+    }).lean();
+
+    if (!entity) return {};
+
+    const key = instance.targetEntityType.toLowerCase();
+
+    return { ...entity, [key]: entity };
+  } catch (error) {
+    logger.error('Could not load the entity a workflow instance is about', {
+      instanceId: String(instance?._id),
+      targetEntityType: instance?.targetEntityType,
+      error: error.message,
+    });
+
+    return {};
+  }
 }
 
 /** 403 for an unscoped request. */
@@ -173,7 +244,9 @@ exports.startInstance = async (req, res, next) => {
     const { targetEntityId, targetEntityType } = req.body || {};
 
     if (!mongoose.Types.ObjectId.isValid(targetEntityId)) {
-      return res.status(400).json({ message: 'Invalid target entity id format' });
+      return res
+        .status(400)
+        .json({ message: 'Invalid target entity id format' });
     }
 
     if (!ALL_TARGET_ENTITY_TYPES.includes(targetEntityType)) {
@@ -291,7 +364,10 @@ exports.transitionInstance = async (req, res, next) => {
       });
     }
 
-    const instance = await WorkflowInstance.findOne({ _id: instanceId, tenantId });
+    const instance = await WorkflowInstance.findOne({
+      _id: instanceId,
+      tenantId,
+    });
     if (!instance) {
       return res.status(404).json({ message: 'Instance not found' });
     }
@@ -306,7 +382,10 @@ exports.transitionInstance = async (req, res, next) => {
       });
     }
 
-    const workflow = await Workflow.findOne({ _id: instance.workflowId, tenantId });
+    const workflow = await Workflow.findOne({
+      _id: instance.workflowId,
+      tenantId,
+    });
     if (!workflow) {
       logger.error('Workflow instance points at a workflow that is gone', {
         instanceId: String(instance._id),
@@ -319,15 +398,26 @@ exports.transitionInstance = async (req, res, next) => {
 
     const fromNodeId = instance.currentNodeId;
 
+    // Loaded once and reused by all three graph questions below. Every edge
+    // condition in this workflow is a statement about this record, so asking
+    // any of them without it gets `undefined` and answers false (#894).
+    const entityContext = await buildEntityContext(instance, tenantId);
+    const openNodes = nextNodesFrom(workflow, fromNodeId, entityContext);
+
     // Rejecting ends the chain wherever it is standing, so it needs no target.
     // Approving has to move somewhere real, along an edge that exists.
     if (action === WORKFLOW_ACTION.APPROVE_FINAL) {
       // Completing three steps early is the same bug as skipping them.
+      //
+      // Asked of the graph rather than of `openNodes`: a node whose only way
+      // out is gated on a condition that does not hold for *this* record is
+      // still a node with a way out. Treating it as terminal is how a chain got
+      // signed off from its second step.
       if (!isTerminalNode(workflow, fromNodeId)) {
         return res.status(400).json({
           message:
             'This is not the final step — use "approve" to move to the next one',
-          nextNodes: nextNodesFrom(workflow, fromNodeId),
+          nextNodes: openNodes,
         });
       }
     } else if (action === WORKFLOW_ACTION.APPROVE) {
@@ -336,15 +426,27 @@ exports.transitionInstance = async (req, res, next) => {
         // node no participant could ever be standing at.
         return res.status(400).json({
           message: `"${nextNodeId}" is not a node in this workflow`,
-          nextNodes: nextNodesFrom(workflow, fromNodeId),
+          nextNodes: openNodes,
         });
       }
 
-      if (!hasEdge(workflow, fromNodeId, nextNodeId)) {
+      if (!hasEdge(workflow, fromNodeId, nextNodeId, entityContext)) {
         // The check that makes a multi-step chain multi-step.
+        //
+        // Two different failures land here and they need different words. An
+        // edge that does not exist is a caller mistake. An edge that exists but
+        // whose condition does not hold for this record is the workflow working
+        // as designed, and "no step from x to y" is a misleading way to say so
+        // — the approver can see the step in the builder.
+        const edgeExists = allNextNodesFrom(workflow, fromNodeId).includes(
+          nextNodeId,
+        );
+
         return res.status(400).json({
-          message: `This workflow has no step from "${fromNodeId}" to "${nextNodeId}"`,
-          nextNodes: nextNodesFrom(workflow, fromNodeId),
+          message: edgeExists
+            ? `The step from "${fromNodeId}" to "${nextNodeId}" exists, but its condition does not hold for this ${instance.targetEntityType}`
+            : `This workflow has no step from "${fromNodeId}" to "${nextNodeId}"`,
+          nextNodes: openNodes,
         });
       }
     }
