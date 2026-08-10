@@ -48,6 +48,7 @@ const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
 const searchRoutes = require('./routes/search.routes');
+const emailRoutes = require('./routes/email.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -212,6 +213,7 @@ app.use('/api/workflows', workflowRoutes);
 
 app.use('/api', salaryHistoryRoutes);
 app.use('/api/flashcards', flashcardRoutes);
+app.use('/api/email', emailRoutes);
 
 // Webhook endpoints (#474) — an admin lets an external system subscribe to
 // payroll and employee events. The controller and models were written in #645
