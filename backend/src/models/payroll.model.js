@@ -25,6 +25,22 @@ const payrollUpdateSchema = new mongoose.Schema(
       type: String,
       default: 'INR',
     },
+    baseCurrency: {
+      type: String,
+      default: 'USD',
+    },
+    disbursementCurrency: {
+      type: String,
+      default: 'USD',
+    },
+    fxRate: {
+      type: Number,
+      default: 1.0,
+    },
+    convertedNetSalary: {
+      type: Number,
+      default: null,
+    },
     year: {
       type: Number,
       required: true,
