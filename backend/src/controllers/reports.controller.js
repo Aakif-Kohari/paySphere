@@ -137,7 +137,7 @@ exports.getAnalytics = async (req, res, next) => {
       tenantId,
       ...payableStatusFilter(),
       ...periodQuery,
-    });
+    }).sort({ year: 1, month: 1 });
 
     // Fetch all employees for role breakdown - filter by departments if specified
     const employeeQuery = { 
