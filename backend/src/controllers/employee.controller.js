@@ -751,7 +751,7 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    if (employee.createdBy.toString() !== req.userId) {
+    if (employee.tenantId.toString() !== req.tenantId) {
       return res
         .status(403)
         .json({ message: 'Not authorized to update this employee' });
