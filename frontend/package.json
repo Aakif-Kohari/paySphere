@@ -23,6 +23,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@hello-pangea/dnd": "^18.0.1",
     "@mui/icons-material": "^9.0.1",
     "@mui/material": "^9.0.1",
     "@react-oauth/google": "^0.13.5",
@@ -47,8 +48,8 @@
   },
   "optionalDependencies": {
     "@esbuild/linux-x64": "^0.28.1",
-    "@rollup/rollup-linux-x64-gnu": "^4.62.4",
     "@rollup/rollup-darwin-arm64": "^4.62.4",
+    "@rollup/rollup-linux-x64-gnu": "^4.62.4",
     "@tailwindcss/oxide-darwin-arm64": "^4.3.3",
     "lightningcss-darwin-arm64": "^1.33.0"
   },
