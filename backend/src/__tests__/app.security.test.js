@@ -42,6 +42,23 @@ jest.mock('otplib', () => ({
   },
 }));
 
+// The same class of problem one layer out, and the reason
+// `app.routeMounting.test.js` currently cannot run at all:
+// `sanitize.middleware` → `utils/sanitizers` → `jsdom` →
+// `html-encoding-sniffer` → `@exodus/bytes`, which is pure ESM. Every suite
+// that requires `app.js` dies on `Unexpected token 'export'` before reaching an
+// assertion, and the `transformIgnorePatterns` in jest.config.js does not cover
+// that chain.
+//
+// Stubbed rather than fixed here: it is a toolchain problem whose blast radius
+// is the whole suite, and this file is about the middleware stack. The stub is
+// a pass-through, so nothing asserted below is weakened by it — sanitisation
+// runs below Helmet and has no bearing on response headers.
+jest.mock(
+  '../middlewares/sanitize.middleware',
+  () => (req, res, next) => next(),
+);
+
 const app = require('../app');
 
 describe('app.js can be evaluated at all (#896)', () => {
