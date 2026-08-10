@@ -52,6 +52,50 @@ export default function PaySphereLogin() {
   const [forgotEmail, setForgotEmail] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Pre-load reCAPTCHA v3 script in background if site key is present
+  useEffect(() => {
+    const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+    if (siteKey && !window.grecaptcha) {
+      const script = document.createElement('script');
+      script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  const executeRecaptcha = async (action) => {
+    const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+    if (!siteKey) {
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      const runTokenGen = () => {
+        window.grecaptcha.ready(async () => {
+          try {
+            const token = await window.grecaptcha.execute(siteKey, { action });
+            resolve(token);
+          } catch (e) {
+            console.error('reCAPTCHA execution error:', e);
+            resolve(null);
+          }
+        });
+      };
+
+      if (!window.grecaptcha) {
+        const script = document.createElement('script');
+        script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
+        script.async = true;
+        script.defer = true;
+        script.onload = runTokenGen;
+        document.body.appendChild(script);
+      } else {
+        runTokenGen();
+      }
+    });
+  };
+
   const handleGitHubCallback = async (code) => {
     setLoading(true);
     setError('');
@@ -111,11 +155,22 @@ export default function PaySphereLogin() {
       }
     }
 
+    const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+    let recaptchaToken = null;
+    if (siteKey) {
+      recaptchaToken = await executeRecaptcha(activeTab === 'signup' ? 'signup' : 'login');
+      if (!recaptchaToken) {
+        setError('Failed to generate security verification. Please try again.');
+        setLoading(false);
+        return;
+      }
+    }
+
     const endpoint = activeTab === 'signup' ? '/signup' : '/login';
     const payload =
       activeTab === 'signup'
-        ? { fullName, email, companyName, password }
-        : { email, password };
+        ? { fullName, email, companyName, password, recaptchaToken }
+        : { email, password, recaptchaToken };
 
     try {
       const response = await api.post(`/api/auth${endpoint}`, payload);
