@@ -16,10 +16,12 @@ import NotFound from "./pages/NotFound"
 import ProtectedRoute from "./components/ProtectedRoute"
 import ScrollToTop from "./components/common/ScrollToTop"
 import CommandPalette from "./components/common/CommandPalette"
+import OfflineSyncIndicator from './components/OfflineSyncIndicator';
 import SystemHealth from "./pages/SystemHealth"
 import Flashcards from "./pages/Flashcards"
 import PyqDashboard from "./pages/PyqDashboard"
 import QuizBattle from "./pages/QuizBattle"
+
 function App() {
   const dispatch = useDispatch();
   const themeMode = useSelector((state) => state.ui.themeMode);
@@ -122,6 +124,8 @@ function App() {
         </Routes>
         <ScrollToTop />
         <CommandPalette />
+        {/* Global Offline Sync Indicator (Issue #815) */}
+        <OfflineSyncIndicator />
       </BrowserRouter>
       <Snackbar
         open={toast.open}
