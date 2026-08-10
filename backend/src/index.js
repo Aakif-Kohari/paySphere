@@ -20,8 +20,10 @@ const { startWebhookWorker } = require('./workers/webhook.worker');
 const { isRedisAvailable } = require('./config/redis');
 const { attachGraphQL } = require('./graphql');
 const logger = require('./utils/logger');
+const TelemetryService = require('./config/telemetry');
 
 const startServer = async () => {
+  TelemetryService.initTelemetry();
   await connectDB();
 
   // Separate the account type from the RBAC role reference on accounts written
