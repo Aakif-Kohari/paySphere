@@ -66,22 +66,9 @@ const getPhoneParts = (phone) => {
 
 // Trigger a file download from the browser
 const downloadFile = (url, filename) => {
-  const token = localStorage.getItem('token');
-  const baseUrl =
-    import.meta.env.VITE_API_URL ||
-    (import.meta.env.PROD
-      ? typeof window !== 'undefined'
-        ? window.location.origin
-        : ''
-      : 'http://localhost:5000');
-  fetch(`${baseUrl}${url}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  api.get(url, { responseType: 'blob' })
     .then((res) => {
-      if (!res.ok) throw new Error('No data to export');
-      return res.blob();
-    })
-    .then((blob) => {
+      const blob = res.data;
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       link.download = filename;
