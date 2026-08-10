@@ -13,6 +13,7 @@ const { generatePayrollCSV } = require('../utils/csvExport');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const cacheService = require('../services/cache.service');
+const AnomalyService = require('../services/anomaly.service');
 // `webhookService` was imported for the stray `triggerEvent` call #543 left in
 // the middle of submitPayrollForReview. That call is gone (see below) and the
 // service has never exported `triggerEvent` anyway — payroll webhooks are
@@ -1960,3 +1961,34 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * GET /api/payroll/anomalies
+ * Analyze active or past payroll records for statistical and fraud anomalies.
+ */
+exports.inspectAnomalies = async (req, res, next) => {
+  try {
+    const tenantId = requireTenant(req, res);
+    if (!tenantId) return;
+
+    const month = parseInt(req.query.month, 10) || new Date().getMonth() + 1;
+    const year = parseInt(req.query.year, 10) || new Date().getFullYear();
+
+    const [currentPayrolls, historicalPayrolls] = await Promise.all([
+      PayrollUpdate.find({ tenantId, month, year }).lean(),
+      PayrollUpdate.find({ tenantId, createdAt: { $gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) } }).lean(),
+    ]);
+
+    const report = AnomalyService.detectAnomalies(currentPayrolls, historicalPayrolls);
+
+    return res.status(200).json({
+      success: true,
+      month,
+      year,
+      report,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
