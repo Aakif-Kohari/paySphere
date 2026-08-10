@@ -59,7 +59,38 @@ services:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
 
+  # Prometheus scraper for the backend /metrics endpoint (issue #765).
+  # Config: monitoring/prometheus.yml
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: paysphere-prometheus
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+  # Grafana dashboard server (issue #765).
+  # Import monitoring/grafana-dashboard.json after first login (admin/admin).
+  grafana:
+    image: grafana/grafana:latest
+    container_name: paysphere-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+
 volumes:
   mongo_data:
   backend_node_modules:
   frontend_node_modules:
+  prometheus_data:
+  grafana_data:

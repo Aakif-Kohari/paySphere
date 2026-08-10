@@ -10,6 +10,8 @@ const {
   approvePayroll,
   rejectPayroll,
   markPayrollPaid,
+  inspectAnomalies,
+  getExchangeRates,
 } = require('../controllers/payroll.controller');
 const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
@@ -110,6 +112,13 @@ router.post(
   requirePermission(PERMISSIONS.WRITE_PAYROLL),
   writeRateLimiter,
   sendAllPayslipsEmailHandler,
+);
+
+router.get(
+  '/fx-rates',
+  auth,
+  requirePermission(PERMISSIONS.READ_PAYROLL),
+  getExchangeRates,
 );
 
 module.exports = router;

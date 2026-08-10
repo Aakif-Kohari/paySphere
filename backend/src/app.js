@@ -55,6 +55,7 @@ const { generalRateLimiter } = require('./middlewares/rateLimiter.middleware');
 const requireBody = require('./middlewares/requireBody.middleware');
 const { MAX_FILE_SIZE } = require('./middlewares/upload.middleware');
 const logger = require('./utils/logger');
+const { trackHttpMetrics, metricsHandler } = require('./utils/metrics');
 
 const app = express();
 
@@ -95,14 +96,18 @@ app.use(cors(corsOptions));
 const redactionMiddleware = require("./middlewares/redaction.middleware");
 app.use(redactionMiddleware);
 
-const { generalRateLimiter } = require("./middlewares/rateLimiter.middleware");
-const requireBody = require("./middlewares/requireBody.middleware");
-const { MAX_FILE_SIZE } = require("./middlewares/upload.middleware");
-
 // Require request body for state-changing methods
 app.use('/api', requireBody);
 
+// Prometheus HTTP metrics (#765). Mounted once, above the route table, so
+// every request is captured. Must stay above `app.use('/api', …)`.
+app.use(trackHttpMetrics);
+
 // ─── Routes ────────────────────────────────────────────────────────────────
+
+// Prometheus metrics (#765). Public on purpose — scrapers carry no auth token —
+// so it sits beside the root probe, above the /api auth/rate-limit stack.
+app.get('/metrics', metricsHandler);
 
 app.get('/', (req, res) => res.send('PaySphere API is running...'));
 

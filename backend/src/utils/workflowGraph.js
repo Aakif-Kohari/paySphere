@@ -118,26 +118,54 @@ function hasNode(graph, nodeId) {
  * @param {string} target
  * @returns {boolean}
  */
-function hasEdge(graph, source, target) {
+const { NODE_TYPE } = require('../config/workflow');
+const ASTEvaluator = require('../services/astEvaluator.service');
+
+/**
+ * Is there an edge from `source` to `target`?
+ *
+ * Checks existence of edge and evaluates any AST rule condition attached to the edge.
+ *
+ * @param {{edges?: object[]}} graph
+ * @param {string} source
+ * @param {string} target
+ * @param {object} [entityContext={}] Optional context for conditional rule evaluation
+ * @returns {boolean}
+ */
+function hasEdge(graph, source, target, entityContext = {}) {
   const edges = Array.isArray(graph?.edges) ? graph.edges : [];
 
-  return edges.some((e) => e?.source === source && e?.target === target);
+  return edges.some((e) => {
+    if (e?.source !== source || e?.target !== target) return false;
+    if (e?.condition || e?.rule) {
+      return ASTEvaluator.evaluateRule(e.condition || e.rule, entityContext);
+    }
+    return true;
+  });
 }
 
 /**
  * The nodes reachable in one step from `nodeId`.
  *
- * Returned on a rejected transition so the client can say "you can go to X or
- * Y from here" rather than only "no".
+ * Evaluates conditional edge predicates if entityContext is provided.
  *
  * @param {{nodes?: object[], edges?: object[]}} graph
  * @param {string} nodeId
+ * @param {object} [entityContext={}] Optional context for conditional rule evaluation
  * @returns {string[]}
  */
-function nextNodesFrom(graph, nodeId) {
+function nextNodesFrom(graph, nodeId, entityContext = {}) {
   const edges = Array.isArray(graph?.edges) ? graph.edges : [];
 
-  return edges.filter((e) => e?.source === nodeId).map((e) => e.target);
+  return edges
+    .filter((e) => {
+      if (e?.source !== nodeId) return false;
+      if (e?.condition || e?.rule) {
+        return ASTEvaluator.evaluateRule(e.condition || e.rule, entityContext);
+      }
+      return true;
+    })
+    .map((e) => e.target);
 }
 
 /**
