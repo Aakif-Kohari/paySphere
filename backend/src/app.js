@@ -262,7 +262,25 @@ app.use('/api/search', searchRoutes);
 // Must be registered AFTER all valid routes but BEFORE error handlers.
 // Uses NotFoundError if available, otherwise falls back to a standard Error
 // so the centralized error handler can format the response consistently.
-app.all('*', (req, res, next) => {
+//
+// This was `app.all('*', …)`, which is the fourth thing on this file's require
+// path that stopped the server booting (#896):
+//
+//   PathError: Missing parameter name at index 1: *
+//
+// `express@5` moved to path-to-regexp v8, where a bare `*` is no longer a
+// wildcard — it reads as a parameter with no name, and an unnamed parameter is
+// a parse error rather than a pattern that matches nothing. The throw happens
+// while `app.js` is being evaluated, so like the other three this is not a
+// broken 404 handler, it is no server. It has been latent since the upgrade to
+// express@5 and was invisible behind the three failures ahead of it.
+//
+// `app.use` with no path is the version-agnostic form: it matches every method
+// and every path, and because it is registered after the whole route table it
+// only runs when nothing above it matched. The alternative express@5 offers is
+// a named wildcard (`'/*splat'`), which works but ties the catch-all to a
+// routing syntax that has now changed twice.
+app.use((req, res, next) => {
   let err;
   try {
     const { NotFoundError } = require('./utils/apiError');
