@@ -230,8 +230,7 @@ export default function AddEmployee() {
     try {
       const dobDate = dateOfBirth ? new Date(dateOfBirth + "T12:00:00.000Z") : undefined;
       const joiningDateDate = joiningDate ? new Date(joiningDate + "T12:00:00.000Z") : undefined;
-
-      await api.post(`/api/employees`, {
+      const response = await api.post(`/api/employees`, {
         fullName,
         role,
         department,
@@ -242,19 +241,21 @@ export default function AddEmployee() {
         dateOfBirth: dobDate,
         joiningDate: joiningDateDate,
       });
-
-      setSuccess("Employee added successfully!");
-      setFullName("");
-      setRole("");
-      setDepartment("");
-      setMonthlySalary("");
-      setOvertimeRate("");
-      setPhoneCountryCode("+91");
-      setPhone("");
-      setPhoneError("");
-      setDateOfBirth("");
-      setJoiningDate("");
-      fetchRecent(); // Refresh recent list
+      if (response.status === 201) {
+        setSuccess("Employee added successfully!");
+        setFullName("");
+        setRole("");
+        setDepartment("");
+        setMonthlySalary("");
+        setOvertimeRate("");
+        setCurrency("");
+        setPhoneCountryCode("+91");
+        setPhone("");
+        setPhoneError("");
+        setDateOfBirth("");
+        setJoiningDate("");
+        fetchRecent();
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Failed to add employee.");
     } finally {
