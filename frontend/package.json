@@ -31,6 +31,8 @@
     "@tanstack/react-query": "^5.101.4",
     "axios": "^1.15.2",
     "cmdk": "^1.1.1",
+    "dexie": "^4.4.4",
+    "dexie-react-hooks": "^4.4.0",
     "i18next": "^26.3.6",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
@@ -47,8 +49,8 @@
   },
   "optionalDependencies": {
     "@esbuild/linux-x64": "^0.28.1",
-    "@rollup/rollup-linux-x64-gnu": "^4.62.4",
     "@rollup/rollup-darwin-arm64": "^4.62.4",
+    "@rollup/rollup-linux-x64-gnu": "^4.62.4",
     "@tailwindcss/oxide-darwin-arm64": "^4.3.3",
     "lightningcss-darwin-arm64": "^1.33.0"
   },
