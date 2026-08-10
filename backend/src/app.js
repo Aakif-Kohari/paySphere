@@ -49,6 +49,7 @@ const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
 const searchRoutes = require('./routes/search.routes');
+const emailRoutes = require('./routes/email.routes');
 
 const errorHandler = require('./middlewares/error.middleware');
 const { generalRateLimiter } = require('./middlewares/rateLimiter.middleware');
@@ -139,6 +140,7 @@ app.use('/api/workflows', workflowRoutes);
 
 app.use('/api', salaryHistoryRoutes);
 app.use('/api/flashcards', flashcardRoutes);
+app.use('/api/email', emailRoutes);
 
 // Webhook endpoints (#474) — an admin lets an external system subscribe to
 // payroll and employee events. The controller and models were written in #645
