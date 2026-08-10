@@ -56,8 +56,11 @@ const requireBody = require('./middlewares/requireBody.middleware');
 const { MAX_FILE_SIZE } = require('./middlewares/upload.middleware');
 const logger = require('./utils/logger');
 const { trackHttpMetrics, metricsHandler } = require('./utils/metrics');
+const auditContextMiddleware = require('./middlewares/auditContext.middleware');
 
 const app = express();
+
+app.use(auditContextMiddleware);
 
 // ─── Middleware ────────────────────────────────────────────────────────────
 //
