@@ -11,6 +11,8 @@ import store from './store/store'
 import './index.css'
 import App from './App.jsx'
 
+import ErrorBoundary from './components/common/ErrorBoundary.jsx'
+
 // Configure QueryClient with default options (Issue #684)
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,18 +30,20 @@ if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <I18nextProvider i18n={i18n}>
-      <StyledEngineProvider injectFirst>
-        <Provider store={store}>
-          <QueryClientProvider client={queryClient}>
-            <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-              <HelmetProvider>
-                <App />
-              </HelmetProvider>
-            </GoogleOAuthProvider>
-          </QueryClientProvider>
-        </Provider>
-      </StyledEngineProvider>
-    </I18nextProvider>
+    <ErrorBoundary>
+      <I18nextProvider i18n={i18n}>
+        <StyledEngineProvider injectFirst>
+          <Provider store={store}>
+            <QueryClientProvider client={queryClient}>
+              <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+                <HelmetProvider>
+                  <App />
+                </HelmetProvider>
+              </GoogleOAuthProvider>
+            </QueryClientProvider>
+          </Provider>
+        </StyledEngineProvider>
+      </I18nextProvider>
+    </ErrorBoundary>
   </StrictMode>,
 )

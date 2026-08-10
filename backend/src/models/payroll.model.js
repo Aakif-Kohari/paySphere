@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const softDeletePlugin = require('../utils/softDelete.plugin');
+const auditTrailPlugin = require('../middlewares/auditTrail.middleware');
 const {
   ALL_STATUSES,
   PAYROLL_STATUS,
@@ -300,4 +301,5 @@ payrollUpdateSchema.index({ tenantId: 1, year: -1, month: -1, status: 1 });
 payrollUpdateSchema.index({ tenantId: 1, submittedBy: 1, status: 1 });
 
 payrollUpdateSchema.plugin(softDeletePlugin);
+payrollUpdateSchema.plugin(auditTrailPlugin);
 module.exports = mongoose.model('PayrollUpdate', payrollUpdateSchema);

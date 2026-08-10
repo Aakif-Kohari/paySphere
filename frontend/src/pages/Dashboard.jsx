@@ -21,6 +21,8 @@ import Approvals from './Approvals';
 import Loans from './Loans';
 import Settlements from './Settlements';
 import Archive from './Archive';
+import ErrorBoundary, { ComponentFeedbackFallback } from '../components/common/ErrorBoundary';
+
 
 // Accept international phone numbers with an optional leading "+" and
 // a national number of 7-15 digits. Mirrors backend validation behavior.
@@ -66,22 +68,9 @@ const getPhoneParts = (phone) => {
 
 // Trigger a file download from the browser
 const downloadFile = (url, filename) => {
-  const token = localStorage.getItem('token');
-  const baseUrl =
-    import.meta.env.VITE_API_URL ||
-    (import.meta.env.PROD
-      ? typeof window !== 'undefined'
-        ? window.location.origin
-        : ''
-      : 'http://localhost:5000');
-  fetch(`${baseUrl}${url}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  api.get(url, { responseType: 'blob' })
     .then((res) => {
-      if (!res.ok) throw new Error('No data to export');
-      return res.blob();
-    })
-    .then((blob) => {
+      const blob = res.data;
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       link.download = filename;
@@ -1080,53 +1069,55 @@ export default function PaySphereDashboard() {
         </header>
 
         {/* Dynamic Content */}
-        {activePage === 'Approvals' ? (
-          <Approvals />
-        ) : activePage === 'Settlements' ? (
-          <Settlements />
-        ) : activePage === 'Loans' ? (
-          <Loans />
-        ) : activePage === 'Payroll' ? (
-          <PayrollTable
-            payrolls={paginatedPayrolls}
-            loading={payrollLoading}
-            currentPage={payrollPage}
-            totalPages={payrollTotalPages}
-            totalCount={payrollTotalCount}
-            setCurrentPage={setPayrollPage}
-          />
-        ) : activePage === 'Dashboard' ? (
-          <DashboardOverview
-            search={search}
-            setSearch={setSearch}
-            filtered={filtered}
-            navigate={navigate}
-            onAddUpdate={() => navigate('/monthly-updates')}
-            onAddEmployee={() => navigate('/add-employee')}
-            totalPayout={totalPayout}
-            employeeCount={totalEmployees}
-            loading={loading}
-            payrolls={payrolls}
-            onEditEmployee={(emp) => setEmployeeToEdit(emp)}
-          />
-        ) : activePage === 'Archive' ? (
-          <Archive />
-        ) : (
-          <EmployeeManagement
-            search={search}
-            setSearch={setSearch}
-            employees={employees}
-            loading={loading}
-            onAddEmployee={() => navigate('/add-employee')}
-            onAddUpdate={() => navigate('/monthly-updates')}
-            payrolls={payrolls}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            setCurrentPage={setCurrentPage}
-            onDeleteEmployee={(emp) => setEmployeeToDelete(emp)}
-            onEditEmployee={(emp) => setEmployeeToEdit(emp)}
-          />
-        )}
+        <ErrorBoundary fallback={<ComponentFeedbackFallback />}>
+          {activePage === 'Approvals' ? (
+            <Approvals />
+          ) : activePage === 'Settlements' ? (
+            <Settlements />
+          ) : activePage === 'Loans' ? (
+            <Loans />
+          ) : activePage === 'Payroll' ? (
+            <PayrollTable
+              payrolls={paginatedPayrolls}
+              loading={payrollLoading}
+              currentPage={payrollPage}
+              totalPages={payrollTotalPages}
+              totalCount={payrollTotalCount}
+              setCurrentPage={setPayrollPage}
+            />
+          ) : activePage === 'Dashboard' ? (
+            <DashboardOverview
+              search={search}
+              setSearch={setSearch}
+              filtered={filtered}
+              navigate={navigate}
+              onAddUpdate={() => navigate('/monthly-updates')}
+              onAddEmployee={() => navigate('/add-employee')}
+              totalPayout={totalPayout}
+              employeeCount={totalEmployees}
+              loading={loading}
+              payrolls={payrolls}
+              onEditEmployee={(emp) => setEmployeeToEdit(emp)}
+            />
+          ) : activePage === 'Archive' ? (
+            <Archive />
+          ) : (
+            <EmployeeManagement
+              search={search}
+              setSearch={setSearch}
+              employees={employees}
+              loading={loading}
+              onAddEmployee={() => navigate('/add-employee')}
+              onAddUpdate={() => navigate('/monthly-updates')}
+              payrolls={payrolls}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              setCurrentPage={setCurrentPage}
+              onDeleteEmployee={(emp) => setEmployeeToDelete(emp)}
+              onEditEmployee={(emp) => setEmployeeToEdit(emp)}
+            />
+          )}
+        </ErrorBoundary>
 
         {/* Edit Form Modal (Steps 2-5) */}
         {employeeToEdit && (
