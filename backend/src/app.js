@@ -47,6 +47,7 @@ const archiveRoutes = require('./routes/archive.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
+const varianceReportRoutes = require('./routes/varianceReport.routes');
 const searchRoutes = require('./routes/search.routes');
 const emailRoutes = require('./routes/email.routes');
 
@@ -255,6 +256,9 @@ app.use('/api/monthly-updates', monthlyUpdatesRoutes);
 // answer 403 until the EXPENSE permissions exist (#794); mounting them is the
 // part that belongs to this file.
 app.use('/api/expenses', expenseRoutes);
+
+// Payroll variance reports, budget tracking, annual forecasting (#915).
+app.use('/api/reports', varianceReportRoutes);
 
 // Full-text search via Elasticsearch (#771). Returns ranked results across
 // employees, payroll, and audit-log indices without exposing raw Mongo regex.
