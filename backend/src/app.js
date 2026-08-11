@@ -202,6 +202,29 @@ app.get('/metrics', metricsHandler);
 
 app.get('/', (req, res) => res.send('PaySphere API is running...'));
 
+// Swagger API documentation configuration (#767)
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'PaySphere REST API',
+      version: '1.0.0',
+      description:
+        'Interactive API documentation for PaySphere backend services.',
+    },
+    servers: [
+      {
+        url: 'http://localhost:5000',
+        description: 'Development Server',
+      },
+    ],
+  },
+  apis: ['./src/routes/*.js', './src/app.js', './backend/src/routes/*.js'],
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 // Health probes (#913) - outside /api so Kubernetes and Prometheus can reach without auth.
 const healthRoutes = require('./routes/health.routes');
 app.use(healthRoutes);
