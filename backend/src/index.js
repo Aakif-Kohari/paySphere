@@ -15,13 +15,18 @@ const {
 } = require('./migrations/backfillSalaryStructures');
 const { backfillTenants } = require('./migrations/backfillTenants');
 const { registerAuditListener } = require('./listeners/audit.listener');
+const {
+  registerNotificationListener,
+} = require('./listeners/notification.listener');
 const { initializeWebhookService } = require('./services/webhook.service');
 const { startWebhookWorker } = require('./workers/webhook.worker');
 const { isRedisAvailable } = require('./config/redis');
 const { attachGraphQL } = require('./graphql');
 const logger = require('./utils/logger');
+const TelemetryService = require('./config/telemetry');
 
 const startServer = async () => {
+  TelemetryService.initTelemetry();
   await connectDB();
 
   // Separate the account type from the RBAC role reference on accounts written
@@ -62,6 +67,15 @@ const startServer = async () => {
   // (#664). Called here rather than imported for its side effect, because a
   // side-effect import is what got deleted the first time.
   registerAuditListener();
+
+  // Subscribe to AUDIT_LOG for the in-app notification centre (#898). Same
+  // shape and the same reasoning as the line above: #440 shipped the model, the
+  // controller, the router and the bell in the navbar, and nothing in the
+  // codebase ever created a Notification — `grep -rn "Notification.create"`
+  // returned nothing — so every account's bell was permanently empty. The
+  // events were already being emitted at the right moments; only a subscriber
+  // was missing.
+  registerNotificationListener();
 
   // Subscribe to AUDIT_LOG for webhook dispatch (#645/#474). Same shape as
   // `registerAuditListener` above — an exported call in the boot sequence, not
