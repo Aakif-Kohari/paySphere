@@ -24,7 +24,76 @@ const {
 const validateRecaptcha = require('../middlewares/recaptcha.middleware');
 const router = express.Router();
 
+/**
+ * @openapi
+ * /api/auth/signup:
+ *   post:
+ *     summary: Create a new user account
+ *     tags:
+ *       - Authentication
+ *     description: Registers a new user.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *               - name
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: dev@example.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: SecurePass123!
+ *               name:
+ *                 type: string
+ *                 example: Dev Patel
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *       400:
+ *         description: Bad request (validation errors)
+ */
 router.post('/signup', authRateLimiter, validateRecaptcha, signup);
+
+/**
+ * @openapi
+ * /api/auth/login:
+ *   post:
+ *     summary: Login to an existing account
+ *     tags:
+ *       - Authentication
+ *     description: Authenticates user credentials and returns user details.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: dev@example.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: SecurePass123!
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       401:
+ *         description: Invalid credentials
+ */
 router.post('/login', authRateLimiter, validateRecaptcha, login);
 router.post('/google', authRateLimiter, googleAuth);
 router.post('/github', authRateLimiter, githubAuth);
