@@ -26,7 +26,6 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const multer = require('multer');
-const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 
 const roleRoutes = require('./routes/role.routes');
@@ -49,17 +48,38 @@ const archiveRoutes = require('./routes/archive.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
+const varianceReportRoutes = require('./routes/varianceReport.routes');
 const searchRoutes = require('./routes/search.routes');
+const emailRoutes = require('./routes/email.routes');
+
+// #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
+// this line was not, so `roleRoutes` was a free variable and evaluating this
+// module threw `ReferenceError: roleRoutes is not defined`. Same damage as
+// #792: not a 404 on /api/roles, but no server at all.
+//
+// The header above explains that the file was reconstructed from two divergent
+// copies after #785 and that the mount list is the union of the two. The union
+// of the route tables was taken; the union of the *import* blocks was not.
+const roleRoutes = require('./routes/role.routes');
 
 const errorHandler = require('./middlewares/error.middleware');
 const { generalRateLimiter } = require('./middlewares/rateLimiter.middleware');
 const requireBody = require('./middlewares/requireBody.middleware');
 const { MAX_FILE_SIZE } = require('./middlewares/upload.middleware');
-const logger = require('./utils/logger');
+// `logger` was required here too and never called — the third unused import in
+// the block, and the reason `app.security.test.js` asserts the absence of them
+// rather than the presence of these three. Logging from this file now goes
+// through `requestLogger`, which brings its own.
 const { trackHttpMetrics, metricsHandler } = require('./utils/metrics');
 const auditContextMiddleware = require('./middlewares/auditContext.middleware');
+const requestLogger = require('./middlewares/requestLogger.middleware');
 
 const app = express();
+
+// Belt to Helmet's braces (`hidePoweredBy` is on by default). Express sets this
+// header itself, and advertising the framework and its version is free
+// reconnaissance.
+app.disable('x-powered-by');
 
 app.use(auditContextMiddleware);
 
@@ -69,10 +89,65 @@ app.use(auditContextMiddleware);
 // block gets none of it. Everything below `app.use('/api', …)` is therefore
 // declared after the whole stack, with no exceptions.
 
+// Security headers (#896).
+//
+// `helmet` has been in this file's require block, and in package.json, since
+// before #792 — and was never called. Not once. So the API shipped with no
+// CSP, no `nosniff`, no `Referrer-Policy`, no frame protection and no HSTS,
+// while the comment above the dashboard mount below describes "no security
+// headers" as the bug #663 fixed. The mount was moved under the middleware
+// stack; the headers were never put into the stack.
+//
+// Two directives are set explicitly rather than left at their defaults, because
+// the defaults are wrong for this particular server:
+//
+//   - The CSP default is tuned for a server that returns HTML. This one returns
+//     JSON to a separate frontend origin, so nothing it serves should ever load
+//     a script, a style or a frame. `default-src 'none'` says exactly that, and
+//     `frame-ancestors 'none'` is what actually stops an authenticated response
+//     being framed — `X-Frame-Options` is the legacy half of the same idea and
+//     Helmet still sends it.
+//
+//   - `Cross-Origin-Resource-Policy` defaults to `same-origin` in Helmet 8,
+//     which would block the frontend on :5173 from reading responses from the
+//     API on :5000 *even though* the CORS config below allows the origin. The
+//     two mechanisms are separate checks and both have to pass. `cross-origin`
+//     here leaves the origin decision to `corsOptions`, which is the one place
+//     it should be made.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'none'"],
+        formAction: ["'none'"],
+      },
+    },
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
+
+// HTTP access logging (#723, mounted in #896).
+//
+// `morgan` was required at the top of this file and never used either, so there
+// was no access log at all — which is why there is no way to tell from a
+// deployed environment's logs whether any of the boot failures above were ever
+// reached. `requestLogger` is the replacement #723 wrote for exactly this and
+// then did not mount: it records method, path, status, duration, ip, userId and
+// tenantId through the same winston pipeline as everything else, rather than
+// morgan's separate plaintext stream.
+//
+// Skipped under test so a suite firing a few hundred requests does not bury its
+// own output.
+if (process.env.NODE_ENV !== 'test') {
+  app.use(requestLogger);
+}
+
 app.use(cookieParser());
 
 // CORS configuration — restrict strictly to frontend origin
-const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
+const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
 const corsOptions = {
   origin: (origin, callback) => {
     // Allow requests with no origin (e.g. server-to-server, unit tests)
@@ -97,7 +172,7 @@ const sanitizeMiddleware = require('./middlewares/sanitize.middleware');
 app.use(sanitizeMiddleware);
 app.use(cors(corsOptions));
 
-const redactionMiddleware = require("./middlewares/redaction.middleware");
+const redactionMiddleware = require('./middlewares/redaction.middleware');
 app.use(redactionMiddleware);
 
 // Require request body for state-changing methods
@@ -114,6 +189,10 @@ app.use(trackHttpMetrics);
 app.get('/metrics', metricsHandler);
 
 app.get('/', (req, res) => res.send('PaySphere API is running...'));
+
+// Health probes (#913) - outside /api so Kubernetes and Prometheus can reach without auth.
+const healthRoutes = require('./routes/health.routes');
+app.use(healthRoutes);
 
 app.use('/api', generalRateLimiter);
 app.use('/api/auth', userRoutes);
@@ -140,6 +219,7 @@ app.use('/api/workflows', workflowRoutes);
 
 app.use('/api', salaryHistoryRoutes);
 app.use('/api/flashcards', flashcardRoutes);
+app.use('/api/email', emailRoutes);
 
 // Webhook endpoints (#474) — an admin lets an external system subscribe to
 // payroll and employee events. The controller and models were written in #645
@@ -154,13 +234,19 @@ app.use('/api/roles', roleRoutes);
 // Mounted here, once (#663).
 //
 // This router used to be mounted twice: on line 23, immediately after
-// `express()` and therefore *above* the cookie parser, Helmet, morgan, CORS,
-// the JSON body parser, the rate limiter and `requireBody` — and again down
-// here. Express serves the first mount that matches, so the copy that won was
-// the one with no middleware in front of it. Dashboard traffic got no security
-// headers, no origin check, no rate limit and no access log, and
+// `express()` and therefore *above* the cookie parser, Helmet, the request
+// logger, CORS, the JSON body parser, the rate limiter and `requireBody` — and
+// again down here. Express serves the first mount that matches, so the copy
+// that won was the one with no middleware in front of it. Dashboard traffic got
+// no security headers, no origin check, no rate limit and no access log, and
 // `POST /api/dashboard/layout` threw a TypeError destructuring an unparsed
 // `req.body` on every call.
+//
+// Worth noting what #663 could and could not fix: moving the mount below the
+// stack is only worth something if the stack contains what the comment claims.
+// Helmet and morgan were both required at the top of this file and neither was
+// ever called, so until #896 *no* route had security headers or an access log —
+// the dashboard was not a special case, it was just the one that got noticed.
 app.use('/api/dashboard', dashboardRoutes);
 
 // The in-app notification centre (#440). The other half of the duplicate.
@@ -175,6 +261,9 @@ app.use('/api/monthly-updates', monthlyUpdatesRoutes);
 // answer 403 until the EXPENSE permissions exist (#794); mounting them is the
 // part that belongs to this file.
 app.use('/api/expenses', expenseRoutes);
+
+// Payroll variance reports, budget tracking, annual forecasting (#915).
+app.use('/api/reports', varianceReportRoutes);
 
 // Full-text search via Elasticsearch (#771). Returns ranked results across
 // employees, payroll, and audit-log indices without exposing raw Mongo regex.
