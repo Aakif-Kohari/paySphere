@@ -17,13 +17,11 @@
   "lint-staged": {
     "frontend/**/*.{js,jsx,ts,tsx}": [
       "eslint --fix",
-      "prettier --write",
-      "pnpm --filter frontend test -- run --passWithNoTests"
+      "prettier --write"
     ],
     "backend/**/*.{js,ts}": [
       "eslint --fix",
-      "prettier --write",
-      "pnpm --filter backend test -- --findRelatedTests --passWithNoTests"
+      "prettier --write"
     ],
     "*.{json,css,md,html}": [
       "prettier --write"

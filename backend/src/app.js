@@ -24,8 +24,7 @@
 
 const express = require('express');
 const cors = require('cors');
-const swaggerUi = require('swagger-ui-express');
-const swaggerJsdoc = require('swagger-jsdoc');
+const Sentry = require('@sentry/node');
 const helmet = require('helmet');
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
@@ -83,6 +82,18 @@ const app = express();
 app.disable('x-powered-by');
 
 app.use(auditContextMiddleware);
+
+// Sentry user context configuration (#770)
+app.use((req, res, next) => {
+  if (req.auditContext) {
+    Sentry.setUser({
+      id: req.auditContext.userId || undefined,
+      tenantId: req.auditContext.tenantId || undefined,
+      ip_address: req.ip,
+    });
+  }
+  next();
+});
 
 // ─── Middleware ────────────────────────────────────────────────────────────
 //
@@ -333,6 +344,9 @@ app.use((err, req, res, next) => {
   }
   next(err);
 });
+
+// Sentry error handler — must be registered before general error handlers (#770)
+Sentry.setupExpressErrorHandler(app);
 
 // Centralized error handler
 app.use(errorHandler);
