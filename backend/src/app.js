@@ -188,6 +188,10 @@ app.get('/metrics', metricsHandler);
 
 app.get('/', (req, res) => res.send('PaySphere API is running...'));
 
+// Health probes (#913) - outside /api so Kubernetes and Prometheus can reach without auth.
+const healthRoutes = require('./routes/health.routes');
+app.use(healthRoutes);
+
 app.use('/api', generalRateLimiter);
 app.use('/api/auth', userRoutes);
 app.use('/api/employees', employeeRoutes);
