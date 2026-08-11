@@ -20,9 +20,15 @@
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\""
   },
   "lint-staged": {
-    "*.{js,jsx,ts,tsx}": [
+    "frontend/**/*.{js,jsx,ts,tsx}": [
       "eslint --fix",
-      "prettier --write"
+      "prettier --write",
+      "pnpm --filter frontend test -- run --passWithNoTests"
+    ],
+    "backend/**/*.{js,ts}": [
+      "eslint --fix",
+      "prettier --write",
+      "pnpm --filter backend test -- --findRelatedTests --passWithNoTests"
     ],
     "*.{json,css,md,html}": [
       "prettier --write"
