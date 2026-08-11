@@ -3,12 +3,12 @@ import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { HelmetProvider } from 'react-helmet-async';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import store from './store';
+import store from './store/store';
 import App from './App';
 import './index.css';
 import './i18n'; // Initialize i18n before app renders (Issue #736)
 
-import ErrorBoundary from './components/common/ErrorBoundary.jsx'
+import ErrorBoundary from './components/common/ErrorBoundary.jsx';
 
 // Configure QueryClient with default options (Issue #684)
 const queryClient = new QueryClient({
@@ -26,5 +26,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         </QueryClientProvider>
       </HelmetProvider>
     </Provider>
-  </React.StrictMode>
+  </React.StrictMode>,
 );
