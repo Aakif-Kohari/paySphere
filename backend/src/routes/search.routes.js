@@ -6,12 +6,12 @@
  */
 'use strict';
 
-const { Router } = require('express');
-const { verifyToken } = require('../middlewares/auth.middleware');
+const express = require('express');
+const auth = require('../middlewares/auth.middleware');
 const { globalSearch } = require('../controllers/search.controller');
 
-const router = Router();
+const router = express.Router();
 
-router.get('/', verifyToken, globalSearch);
+router.get('/', auth, globalSearch);
 
 module.exports = router;

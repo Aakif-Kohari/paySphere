@@ -9,7 +9,7 @@
  */
 'use strict';
 
-const logger = require('./logger');
+const logger = require('../utils/logger');
 
 const ES_NODE = process.env.ELASTICSEARCH_URL || 'http://localhost:9200';
 

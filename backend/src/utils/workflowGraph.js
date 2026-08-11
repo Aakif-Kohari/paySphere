@@ -1,4 +1,5 @@
 const { NODE_TYPE } = require('../config/workflow');
+const ASTEvaluator = require('../services/astEvaluator.service');
 
 /**
  * The graph rules a workflow has to satisfy, and the questions a transition has
@@ -113,18 +114,8 @@ function hasNode(graph, nodeId) {
  * This is what makes the chain a chain. Without it, `transitionInstance` will
  * move an instance from the first approval straight to the last one.
  *
- * @param {{edges?: object[]}} graph
- * @param {string} source
- * @param {string} target
- * @returns {boolean}
- */
-const { NODE_TYPE } = require('../config/workflow');
-const ASTEvaluator = require('../services/astEvaluator.service');
-
-/**
- * Is there an edge from `source` to `target`?
- *
- * Checks existence of edge and evaluates any AST rule condition attached to the edge.
+ * Checks existence of edge and evaluates any AST rule condition attached to the
+ * edge.
  *
  * @param {{edges?: object[]}} graph
  * @param {string} source

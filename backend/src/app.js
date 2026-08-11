@@ -29,6 +29,7 @@ const multer = require('multer');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 
+const roleRoutes = require('./routes/role.routes');
 const userRoutes = require('./routes/user.routes');
 const employeeRoutes = require('./routes/employee.routes');
 const payrollRoutes = require('./routes/payroll.routes');
@@ -183,7 +184,7 @@ app.use('/api/search', searchRoutes);
 // Must be registered AFTER all valid routes but BEFORE error handlers.
 // Uses NotFoundError if available, otherwise falls back to a standard Error
 // so the centralized error handler can format the response consistently.
-app.all('*', (req, res, next) => {
+app.use((req, res, next) => {
   let err;
   try {
     const { NotFoundError } = require('./utils/apiError');
