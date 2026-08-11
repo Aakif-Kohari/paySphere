@@ -110,6 +110,20 @@ const attendanceSchema = new mongoose.Schema(
 
     days: [attendanceDaySchema],
 
+    // Clock-in/out timestamps (Issue #930)
+    clockIn: { type: Date, required: true },
+    clockOut: { type: Date },
+
+    // Geo-fencing telemetry (Issue #930)
+    clockInCoordinates: {
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: { type: [Number], default: [0, 0] }, // [longitude, latitude]
+    },
+    distanceFromOffice: { type: Number, default: null }, // in meters
+    deviceFingerprint: { type: String, default: '' }, // Hashed browser/device ID
+    isFieldDuty: { type: Boolean, default: false }, // True if clocked in outside fence with permission
+    spoofingFlags: [{ type: String }], // e.g., ['mock_location', 'impossible_speed']
+
     /**
      * Recomputed server-side on every write from `days`, never accepted from
      * the client. A client that could post its own totals could post a month
@@ -155,6 +169,9 @@ attendanceSchema.index(
 
 // The payroll screen reads "every employee's totals for this month".
 attendanceSchema.index({ tenantId: 1, year: -1, month: -1 });
+
+// GeoJSON index for location-based queries (Issue #930)
+attendanceSchema.index({ clockInCoordinates: '2dsphere' });
 
 /**
  * @returns {boolean} whether the month is settled and immutable
