@@ -28,6 +28,7 @@ const helmet = require('helmet');
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
 
+const roleRoutes = require('./routes/role.routes');
 const userRoutes = require('./routes/user.routes');
 const employeeRoutes = require('./routes/employee.routes');
 const payrollRoutes = require('./routes/payroll.routes');
@@ -47,6 +48,7 @@ const archiveRoutes = require('./routes/archive.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
+const varianceReportRoutes = require('./routes/varianceReport.routes');
 const searchRoutes = require('./routes/search.routes');
 const emailRoutes = require('./routes/email.routes');
 
@@ -188,6 +190,10 @@ app.get('/metrics', metricsHandler);
 
 app.get('/', (req, res) => res.send('PaySphere API is running...'));
 
+// Health probes (#913) - outside /api so Kubernetes and Prometheus can reach without auth.
+const healthRoutes = require('./routes/health.routes');
+app.use(healthRoutes);
+
 app.use('/api', generalRateLimiter);
 app.use('/api/auth', userRoutes);
 app.use('/api/employees', employeeRoutes);
@@ -256,6 +262,9 @@ app.use('/api/monthly-updates', monthlyUpdatesRoutes);
 // part that belongs to this file.
 app.use('/api/expenses', expenseRoutes);
 
+// Payroll variance reports, budget tracking, annual forecasting (#915).
+app.use('/api/reports', varianceReportRoutes);
+
 // Full-text search via Elasticsearch (#771). Returns ranked results across
 // employees, payroll, and audit-log indices without exposing raw Mongo regex.
 app.use('/api/search', searchRoutes);
@@ -264,24 +273,6 @@ app.use('/api/search', searchRoutes);
 // Must be registered AFTER all valid routes but BEFORE error handlers.
 // Uses NotFoundError if available, otherwise falls back to a standard Error
 // so the centralized error handler can format the response consistently.
-//
-// This was `app.all('*', …)`, which is the fourth thing on this file's require
-// path that stopped the server booting (#896):
-//
-//   PathError: Missing parameter name at index 1: *
-//
-// `express@5` moved to path-to-regexp v8, where a bare `*` is no longer a
-// wildcard — it reads as a parameter with no name, and an unnamed parameter is
-// a parse error rather than a pattern that matches nothing. The throw happens
-// while `app.js` is being evaluated, so like the other three this is not a
-// broken 404 handler, it is no server. It has been latent since the upgrade to
-// express@5 and was invisible behind the three failures ahead of it.
-//
-// `app.use` with no path is the version-agnostic form: it matches every method
-// and every path, and because it is registered after the whole route table it
-// only runs when nothing above it matched. The alternative express@5 offers is
-// a named wildcard (`'/*splat'`), which works but ties the catch-all to a
-// routing syntax that has now changed twice.
 app.use((req, res, next) => {
   let err;
   try {

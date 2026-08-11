@@ -10,7 +10,6 @@ const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
 const { writeRateLimiter } = require('../middlewares/rateLimiter.middleware');
 const { PERMISSIONS } = require('../config/permissions');
-
 const router = express.Router();
 
 /**
