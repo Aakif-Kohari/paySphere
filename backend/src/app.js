@@ -24,6 +24,7 @@
 
 const express = require('express');
 const cors = require('cors');
+const Sentry = require('@sentry/node');
 const helmet = require('helmet');
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
@@ -60,7 +61,6 @@ const emailRoutes = require('./routes/email.routes');
 // The header above explains that the file was reconstructed from two divergent
 // copies after #785 and that the mount list is the union of the two. The union
 // of the route tables was taken; the union of the *import* blocks was not.
-const roleRoutes = require('./routes/role.routes');
 
 const errorHandler = require('./middlewares/error.middleware');
 const { generalRateLimiter } = require('./middlewares/rateLimiter.middleware');
@@ -82,6 +82,18 @@ const app = express();
 app.disable('x-powered-by');
 
 app.use(auditContextMiddleware);
+
+// Sentry user context configuration (#770)
+app.use((req, res, next) => {
+  if (req.auditContext) {
+    Sentry.setUser({
+      id: req.auditContext.userId || undefined,
+      tenantId: req.auditContext.tenantId || undefined,
+      ip_address: req.ip,
+    });
+  }
+  next();
+});
 
 // ─── Middleware ────────────────────────────────────────────────────────────
 //
@@ -309,6 +321,9 @@ app.use((err, req, res, next) => {
   }
   next(err);
 });
+
+// Sentry error handler — must be registered before general error handlers (#770)
+Sentry.setupExpressErrorHandler(app);
 
 // Centralized error handler
 app.use(errorHandler);

@@ -1,4 +1,12 @@
 require('dotenv').config();
+const Sentry = require('@sentry/node');
+
+// Initialize Sentry for production error tracking (#770)
+Sentry.init({
+  dsn: process.env.SENTRY_DSN || 'https://public@o0.ingest.sentry.io/0',
+  tracesSampleRate: 1.0,
+  environment: process.env.NODE_ENV || 'production',
+});
 
 const app = require('./app');
 const connectDB = require('./config/db');
