@@ -13,6 +13,7 @@ import EmptyState from '../components/common/EmptyState';
 import DashboardSkeleton from '../components/common/skeleton/DashboardSkeleton';
 import EmployeeManagementSkeleton from '../components/common/skeleton/EmployeeManagementSkeleton';
 import PayrollTableSkeleton from '../components/common/skeleton/PayrollTableSkeleton';
+import DashboardGrid from '../components/dashboard/DashboardGrid';
 import { logout } from '../features/auth/authSlice';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 import api from '../services/api';
@@ -174,6 +175,11 @@ const DashboardOverview = ({
             {t('dashboard.runPayroll', 'Run Payroll')}
           </button>
         </div>
+      </div>
+
+      {/* Dynamic Dashboard Grid (Replaces manual SummaryCards/Charts) */}
+      <div className="space-y-6">
+        <DashboardGrid />
       </div>
 
       {/* Stats */}
