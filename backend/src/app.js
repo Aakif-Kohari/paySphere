@@ -24,6 +24,8 @@
 
 const express = require('express');
 const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
 const helmet = require('helmet');
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
@@ -60,7 +62,6 @@ const emailRoutes = require('./routes/email.routes');
 // The header above explains that the file was reconstructed from two divergent
 // copies after #785 and that the mount list is the union of the two. The union
 // of the route tables was taken; the union of the *import* blocks was not.
-const roleRoutes = require('./routes/role.routes');
 
 const errorHandler = require('./middlewares/error.middleware');
 const { generalRateLimiter } = require('./middlewares/rateLimiter.middleware');
@@ -189,6 +190,29 @@ app.use(trackHttpMetrics);
 app.get('/metrics', metricsHandler);
 
 app.get('/', (req, res) => res.send('PaySphere API is running...'));
+
+// Swagger API documentation configuration (#767)
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'PaySphere REST API',
+      version: '1.0.0',
+      description:
+        'Interactive API documentation for PaySphere backend services.',
+    },
+    servers: [
+      {
+        url: 'http://localhost:5000',
+        description: 'Development Server',
+      },
+    ],
+  },
+  apis: ['./src/routes/*.js', './src/app.js', './backend/src/routes/*.js'],
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Health probes (#913) - outside /api so Kubernetes and Prometheus can reach without auth.
 const healthRoutes = require('./routes/health.routes');
