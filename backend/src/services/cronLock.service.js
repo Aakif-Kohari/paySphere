@@ -26,7 +26,7 @@
 'use strict';
 
 const CronLock = require('../models/cronlock.model');
-const logger   = require('./logger');
+const logger   = require('../utils/logger');
 
 /** Default lock TTL — 5 minutes. Override per job as needed. */
 const DEFAULT_TTL_MS = 5 * 60 * 1000;

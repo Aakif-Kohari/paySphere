@@ -233,11 +233,8 @@ function hasNode(graph, nodeId) {
  * This is what makes the chain a chain. Without it, `transitionInstance` will
  * move an instance from the first approval straight to the last one.
  *
- * "Open right now" rather than "exists": an edge carrying a condition is only
- * traversable when that condition holds for the entity the run is about, which
- * is what `entityContext` is for. Omitting the context does not mean "ignore
- * conditions" — it means every condition is evaluated against nothing and
- * therefore fails, so callers must pass one. See the file header.
+ * Checks existence of edge and evaluates any AST rule condition attached to the
+ * edge.
  *
  * @param {{edges?: object[]}} graph
  * @param {string} source
@@ -324,7 +321,4 @@ module.exports = {
   nextNodesFrom,
   allNextNodesFrom,
   isTerminalNode,
-  isEvaluableCondition,
-  conditionOf,
-  SUPPORTED_OPERATORS,
 };

@@ -529,7 +529,7 @@ const Settlements = () => {
       )}
 
       {loading ? (
-        <SettlementsSkeleton />
+        <SettlementSkeleton />
       ) : settlements.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
           <p className="text-gray-500 dark:text-slate-400">

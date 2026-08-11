@@ -24,53 +24,12 @@
  */
 'use strict';
 
-const { Router } = require('express');
+const express = require('express');
 const auth = require('../middlewares/auth.middleware');
-const { requirePermission } = require('../middlewares/rbac.middleware');
-const { requireTenantScope } = require('../utils/tenantScope');
-const {
-  globalSearch,
-  permissionForRequest,
-  VALID_INDEX_KEYS,
-} = require('../controllers/search.controller');
+const { globalSearch } = require('../controllers/search.controller');
 
-const router = Router();
+const router = express.Router();
 
-/**
- * Apply the permission that guards the index being searched.
- *
- * The gate cannot be chosen at mount time because the index arrives as a query
- * parameter, and one route serving several indices must not settle on the
- * weakest of their permissions. So the permission is resolved per request and
- * handed to the ordinary `requirePermission` middleware — the same
- * implementation every other route uses, rather than a second copy of the
- * permission logic living in the search feature.
- *
- * An unknown index is rejected here rather than passed through, so a caller
- * cannot skip the gate by naming an index that resolves to no permission.
- *
- * @returns {import('express').RequestHandler}
- */
-function requireIndexPermission() {
-  return (req, res, next) => {
-    const permission = permissionForRequest(req);
-
-    if (!permission) {
-      return res.status(400).json({
-        message: `Unknown index "${req.query?.index}". Valid values: ${VALID_INDEX_KEYS.join(', ')}`,
-      });
-    }
-
-    return requirePermission(permission)(req, res, next);
-  };
-}
-
-router.get(
-  '/',
-  auth,
-  requireTenantScope(),
-  requireIndexPermission(),
-  globalSearch,
-);
+router.get('/', auth, globalSearch);
 
 module.exports = router;
