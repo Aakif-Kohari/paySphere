@@ -1,11 +1,16 @@
 require('dotenv').config();
+const Sentry = require('@sentry/node');
+
+// Initialize Sentry for production error tracking (#770)
+Sentry.init({
+  dsn: process.env.SENTRY_DSN || 'https://public@o0.ingest.sentry.io/0',
+  tracesSampleRate: 1.0,
+  environment: process.env.NODE_ENV || 'production',
+});
+
 const app = require('./app');
 const connectDB = require('./config/db');
 const { startCronJobs } = require('./jobs/cron.jobs');
-// Was `require("./jobs/reportCron")` for its side effect: the module called
-// cron.schedule() at require time, so anything importing it — a test wanting
-// one function out of it — started a live timer. It exports a starter now, the
-// same shape cron.jobs.js already uses (#667).
 const { startReportCron } = require('./jobs/reportCron');
 const { seedRbac } = require('./seeds/rbac.seed');
 const { backfillAccountType } = require('./migrations/backfillAccountType');
@@ -15,13 +20,18 @@ const {
 } = require('./migrations/backfillSalaryStructures');
 const { backfillTenants } = require('./migrations/backfillTenants');
 const { registerAuditListener } = require('./listeners/audit.listener');
+const {
+  registerNotificationListener,
+} = require('./listeners/notification.listener');
 const { initializeWebhookService } = require('./services/webhook.service');
 const { startWebhookWorker } = require('./workers/webhook.worker');
 const { isRedisAvailable } = require('./config/redis');
 const { attachGraphQL } = require('./graphql');
 const logger = require('./utils/logger');
+const TelemetryService = require('./config/telemetry');
 
 const startServer = async () => {
+  TelemetryService.initTelemetry();
   await connectDB();
 
   // Separate the account type from the RBAC role reference on accounts written
@@ -63,6 +73,15 @@ const startServer = async () => {
   // side-effect import is what got deleted the first time.
   registerAuditListener();
 
+  // Subscribe to AUDIT_LOG for the in-app notification centre (#898). Same
+  // shape and the same reasoning as the line above: #440 shipped the model, the
+  // controller, the router and the bell in the navbar, and nothing in the
+  // codebase ever created a Notification — `grep -rn "Notification.create"`
+  // returned nothing — so every account's bell was permanently empty. The
+  // events were already being emitted at the right moments; only a subscriber
+  // was missing.
+  registerNotificationListener();
+
   // Subscribe to AUDIT_LOG for webhook dispatch (#645/#474). Same shape as
   // `registerAuditListener` above — an exported call in the boot sequence, not
   // a side-effect import, so it cannot silently go unrequired.
@@ -98,4 +117,7 @@ const startServer = async () => {
   require('./sockets/payroll.socket').init(server);
 };
 
-startServer();
+startServer().catch((error) => {
+  console.error('SERVER STARTUP FAILED:', error);
+  process.exit(1);
+});

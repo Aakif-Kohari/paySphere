@@ -57,12 +57,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
-    googleId: {
-      type: String,
-      unique: true,
-      sparse: true,
+    passwordHistory: {
+      type: [String],
+      default: [],
     },
-    githubId: {
+    googleId: {
       type: String,
       unique: true,
       sparse: true,

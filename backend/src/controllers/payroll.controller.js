@@ -681,6 +681,24 @@ exports.parsePayrollCSV = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/payroll/fx-rates
+ * Fetch multi-currency FX rates and supported currencies.
+ */
+exports.getExchangeRates = async (req, res, next) => {
+  try {
+    const baseCurrency = req.query.baseCurrency || 'USD';
+    const fxData = await FXService.getRatesForBase(baseCurrency);
+    return res.status(200).json({
+      success: true,
+      ...fxData,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 exports.submitPayrollForReview = async (req, res, next) => {
   let session = null;
   try {
@@ -983,8 +1001,8 @@ exports.submitPayrollForReview = async (req, res, next) => {
           : leaveDays;
       overtimeHours =
         isNaN(overtimeHours) ||
-        !Number.isFinite(overtimeHours) ||
-        overtimeHours < 0
+          !Number.isFinite(overtimeHours) ||
+          overtimeHours < 0
           ? 0
           : overtimeHours;
       bonus = isNaN(bonus) || !Number.isFinite(bonus) || bonus < 0 ? 0 : bonus;
@@ -1122,9 +1140,13 @@ exports.submitPayrollForReview = async (req, res, next) => {
       // A tax-free reimbursement is not earnings — it is the employee being made
       // whole for money they already spent — so it lands after tax and after
       // loan recovery. Recovering a loan instalment out of somebody's train
-      // fare would be taking the same money twice.
-      const finalNetSalary =
-        Math.round((netAfterRecovery + empExpenses.nonTaxable) * 100) / 100;
+      // fare would be taking the same money twice. 
+      // Bundle Unreleased Arrears (Issue #931)
+      const { bundleUnreleasedArrears, markArrearsReleased } = require('../utils/arrearsCalculator');
+      const { totalArrears, arrearsBreakdown, ledgerIds } = await bundleUnreleasedArrears(employee._id, req.tenantId);
+
+      // Add arrears to net salary (Arrears are typically taxed in the month of receipt)
+      const finalNetSalary = (Math.round((netAfterRecovery + empExpenses.nonTaxable) * 100) / 100) + totalArrears;
 
       preparedItems.push({
         employee,
@@ -1143,6 +1165,9 @@ exports.submitPayrollForReview = async (req, res, next) => {
         loanRecoveryTotal: recovery.totalRecovered,
         attendanceSource,
         salarySnapshot,
+        arrearsPayout: totalArrears,
+        arrearsBreakdown: arrearsBreakdown,
+        arrearsLedgerIds: ledgerIds,
       });
     }
 
@@ -1283,6 +1308,14 @@ exports.submitPayrollForReview = async (req, res, next) => {
 
     const bulkWriteOptions = session ? { session } : {};
     await PayrollUpdate.bulkWrite(bulkOps, bulkWriteOptions);
+
+    // Mark Arrears as Released (Issue #931)
+    for (const item of preparedItems) {
+      if (item.arrearsLedgerIds && item.arrearsLedgerIds.length > 0) {
+        const payrollId = payrollMap[item.employee._id.toString()];
+        await markArrearsReleased(item.arrearsLedgerIds, payrollId);
+      }
+    }
 
     // Issue #719: Mark expense claims as reimbursed and link to payroll
     const allReimbursedIds = preparedItems.flatMap(
@@ -1569,9 +1602,9 @@ exports.getPayrollSummary = async (req, res, next) => {
       PayrollUpdate.countDocuments(baseQuery),
       limit > 0
         ? PayrollUpdate.find(baseQuery)
-            .sort({ employeeName: 1 })
-            .skip(skip)
-            .limit(limit)
+          .sort({ employeeName: 1 })
+          .skip(skip)
+          .limit(limit)
         : PayrollUpdate.find(baseQuery).sort({ employeeName: 1 }),
     ]);
 

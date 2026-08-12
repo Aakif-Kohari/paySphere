@@ -40,19 +40,9 @@ export default function EmployeeExportActions({ employees }) {
 
         setIsExportingCSV(true);
         try {
-            const token = localStorage.getItem('token');
-            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const res = await api.get('/api/employees/export-csv', { responseType: 'blob' });
 
-            const res = await fetch(`${baseUrl}/api/employees/export-csv`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
-            if (!res.ok) {
-                const errJson = await res.json().catch(() => ({}));
-                throw new Error(errJson.message || 'Failed to generate CSV');
-            }
-
-            const blob = await res.blob();
+            const blob = res.data;
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
             link.download = `employees-${new Date().toISOString().split('T')[0]}.csv`;
@@ -64,7 +54,19 @@ export default function EmployeeExportActions({ employees }) {
             setSnackbar({ open: true, message: 'CSV exported successfully!', severity: 'success' });
         } catch (err) {
             console.error('CSV Export failed:', err);
-            setSnackbar({ open: true, message: err.message || 'Failed to export CSV.', severity: 'error' });
+            let errorMessage = 'Failed to export CSV.';
+            if (err.response && err.response.data instanceof Blob) {
+                try {
+                    const text = await err.response.data.text();
+                    const json = JSON.parse(text);
+                    errorMessage = json.message || errorMessage;
+                } catch (e) {}
+            } else if (err.response?.data?.message) {
+                errorMessage = err.response.data.message;
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+            setSnackbar({ open: true, message: errorMessage, severity: 'error' });
         } finally {
             setIsExportingCSV(false);
         }

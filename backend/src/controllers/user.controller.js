@@ -1,6 +1,7 @@
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const zxcvbn = require('../utils/zxcvbn');
 const mongoose = require('mongoose');
 const { OAuth2Client } = require('google-auth-library');
 const crypto = require('crypto');
@@ -29,30 +30,48 @@ const GOOGLE_CLIENT_ID =
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
 
-const generateTokens = (user, res) => {
+const RefreshToken = require('../models/refreshToken.model');
+
+/**
+ * Generates access and refresh tokens with rotation support (Issue #725)
+ * @param {Object} user - The user document
+ * @param {Object} res - Express response object for setting cookies
+ * @param {string} [family=null] - Token family for rotation tracking
+ * @returns {Promise<string>} The access token
+ */
+const generateTokens = async (user, res, family = null) => {
+  // Short-lived access token (15 minutes)
   const accessToken = jwt.sign(
     {
       id: user._id,
       role: user.role,
       tenantId: user.tenantId,
-      tokenVersion: user.tokenVersion || 0,
+      tokenVersion: user.tokenVersion,
     },
     process.env.JWT_SECRET,
-    { expiresIn: '15m' },
+    { expiresIn: '15m' }, // Changed from 7d to 15m for security
   );
 
-  const refreshToken = jwt.sign(
-    {
-      id: user._id,
-      role: user.role,
-      tenantId: user.tenantId,
-      tokenVersion: user.tokenVersion || 0,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' },
-  );
+  // Generate cryptographically secure refresh token
+  const rawRefreshToken = crypto.randomBytes(64).toString('hex');
+  const tokenHash = RefreshToken.hashToken(rawRefreshToken);
 
-  res.cookie('refreshToken', refreshToken, {
+  // Use existing family or create new one
+  const tokenFamily = family || crypto.randomBytes(16).toString('hex');
+
+  // Store hashed refresh token in database
+  await RefreshToken.create({
+    tokenHash,
+    userId: user._id,
+    tenantId: user.tenantId,
+    family: tokenFamily,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    userAgent: '', // Will be set by caller if available
+    ip: '', // Will be set by caller if available
+  });
+
+  // Set refresh token in HTTP-only cookie
+  res.cookie('refreshToken', rawRefreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
@@ -93,6 +112,13 @@ exports.signup = async (req, res, next) => {
       });
     }
 
+    const strength = zxcvbn(password);
+    if (strength.score < 3) {
+      return res.status(400).json({
+        message: `Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`,
+      });
+    }
+
     const cleanEmail = email.trim().toLowerCase();
     const existingUser = await User.findOne({ email: cleanEmail });
     if (existingUser)
@@ -109,6 +135,7 @@ exports.signup = async (req, res, next) => {
       email: cleanEmail,
       companyName: sanitizeText(companyName),
       password: hashedPassword,
+      passwordHistory: [hashedPassword],
       ...(defaultRole ? { role: defaultRole._id } : {}),
     });
 
@@ -133,7 +160,7 @@ exports.signup = async (req, res, next) => {
     // filter, so they returned every company's rows (#612).
     await ensureTenantForUser(newUser);
 
-    const token = generateTokens(newUser, res);
+    const token = await generateTokens(newUser, res); // Added await for Issue #725
 
     // `role` here is the *account type* the client renders navigation from, not
     // the RBAC role reference — see config/accountTypes.js (#558).
@@ -191,7 +218,7 @@ exports.login = async (req, res, next) => {
     // answered 500 for every account. It stayed invisible because the suite
     // covering it cannot even load: `otplib@13` pulls in ESM that jest is not
     // configured to transform (#792).
-    const token = generateTokens(user, res);
+    const token = await generateTokens(user, res); // Added await for Issue #725
 
     res.status(200).json({
       token,
@@ -433,6 +460,13 @@ exports.updatePassword = async (req, res, next) => {
       });
     }
 
+    const strength = zxcvbn(newPassword);
+    if (strength.score < 3) {
+      return res.status(400).json({
+        message: `Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`,
+      });
+    }
+
     if (!user.password) {
       return res
         .status(400)
@@ -443,8 +477,26 @@ exports.updatePassword = async (req, res, next) => {
     if (!isMatch)
       return res.status(400).json({ message: 'Incorrect current password' });
 
+    if (user.passwordHistory && user.passwordHistory.length > 0) {
+      for (const oldHash of user.passwordHistory) {
+        const isReused = await bcrypt.compare(newPassword, oldHash);
+        if (isReused) {
+          return res.status(400).json({
+            message: 'You cannot reuse any of your last 5 passwords',
+          });
+        }
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     user.password = hashedPassword;
+    if (!user.passwordHistory) {
+      user.passwordHistory = [];
+    }
+    user.passwordHistory.push(hashedPassword);
+    if (user.passwordHistory.length > 5) {
+      user.passwordHistory.shift();
+    }
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
 
@@ -542,7 +594,7 @@ exports.googleAuth = async (req, res, next) => {
     // it needs a tenant just as much as `signup` does (#612).
     await ensureTenantForUser(user);
 
-    const token = generateTokens(user, res);
+    const token = await generateTokens(user, res); // Added await for Issue #725
 
     const statusCode = isNewUser ? 201 : 200;
     res.status(statusCode).json({
@@ -647,7 +699,7 @@ exports.githubAuth = async (req, res, next) => {
 
     await ensureTenantForUser(user);
 
-    const token = generateTokens(user, res);
+    const token = await generateTokens(user, res); // Added await for Issue #725
 
     const statusCode = isNewUser ? 201 : 200;
     res.status(statusCode).json({
@@ -776,6 +828,13 @@ exports.resetPassword = async (req, res, next) => {
       });
     }
 
+    const strength = zxcvbn(password);
+    if (strength.score < 3) {
+      return res.status(400).json({
+        message: `Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`,
+      });
+    }
+
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
     const user = await User.findOne({
@@ -789,11 +848,29 @@ exports.resetPassword = async (req, res, next) => {
         .json({ message: 'Password reset token is invalid or has expired' });
     }
 
+    if (user.passwordHistory && user.passwordHistory.length > 0) {
+      for (const oldHash of user.passwordHistory) {
+        const isReused = await bcrypt.compare(password, oldHash);
+        if (isReused) {
+          return res.status(400).json({
+            message: 'You cannot reuse any of your last 5 passwords',
+          });
+        }
+      }
+    }
+
     // Hash the new password
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Save user new password, clear token fields, and increment tokenVersion
     user.password = hashedPassword;
+    if (!user.passwordHistory) {
+      user.passwordHistory = [];
+    }
+    user.passwordHistory.push(hashedPassword);
+    if (user.passwordHistory.length > 5) {
+      user.passwordHistory.shift();
+    }
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     user.tokenVersion = (user.tokenVersion || 0) + 1;
@@ -902,59 +979,113 @@ exports.deleteAccount = async (req, res, next) => {
   }
 };
 
-// REFRESH TOKEN
+// REFRESH TOKEN (Issue #725 - Token Rotation)
 exports.refresh = async (req, res, next) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
-    if (!refreshToken)
+    const rawRefreshToken = req.cookies.refreshToken;
+    if (!rawRefreshToken) {
       return res.status(401).json({ message: 'No refresh token provided' });
-
-    let decoded;
-    try {
-      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
-    } catch {
-      return res
-        .status(401)
-        .json({ message: 'Invalid or expired refresh token' });
     }
 
-    // `role`, `tenantId`, `companyName` and `employeeId` are selected because
-    // `generateTokens` reads all four into the claim. The projection used to
-    // stop at `tokenVersion`, so every refresh minted a token carrying
-    // `role: undefined, tenantId: undefined` — a session lost its tenant fifteen
-    // minutes after logging in, whatever `login` had put there (#612).
-    const user = await User.findById(decoded.id).select(
+    // Hash the token and look it up in the database
+    const tokenHash = RefreshToken.hashToken(rawRefreshToken);
+    const storedToken = await RefreshToken.findOne({ tokenHash });
+
+    // Security Check: Token not found or already revoked = potential theft
+    if (!storedToken || storedToken.isRevoked) {
+      // If token exists but is revoked, someone is reusing it - revoke entire family
+      if (storedToken) {
+        await RefreshToken.updateMany(
+          { family: storedToken.family, isRevoked: false },
+          { $set: { isRevoked: true } },
+        );
+        logger.warn('Token reuse detected - family revoked', {
+          userId: storedToken.userId,
+          family: storedToken.family,
+        });
+      }
+
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      });
+
+      return res.status(403).json({
+        message: 'Invalid or revoked refresh token. Session terminated.',
+      });
+    }
+
+    // Check expiration
+    if (storedToken.expiresAt < new Date()) {
+      storedToken.isRevoked = true;
+      await storedToken.save();
+
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      });
+
+      return res.status(401).json({ message: 'Refresh token expired' });
+    }
+
+    // Fetch user with all required fields
+    const user = await User.findById(storedToken.userId).select(
       '_id isActive tokenVersion role tenantId companyName fullName employeeId',
     );
+
     if (!user || user.isActive === false) {
+      storedToken.isRevoked = true;
+      await storedToken.save();
       return res.status(401).json({ message: 'User not found or deactivated' });
     }
 
+    // Check token version (password change invalidation)
     if (
-      decoded.tokenVersion !== undefined &&
       user.tokenVersion !== undefined &&
-      decoded.tokenVersion !== user.tokenVersion
+      user.tokenVersion !== storedToken.tokenVersion
     ) {
+      storedToken.isRevoked = true;
+      await storedToken.save();
       return res.status(401).json({ message: 'Token is no longer valid' });
     }
 
     await ensureTenantForUser(user);
 
-    const token = generateTokens(user, res);
-    res.status(200).json({ token });
+    // ROTATION: Revoke old token and issue new one in same family
+    storedToken.isRevoked = true;
+    await storedToken.save();
+
+    // Generate new tokens with same family
+    const newAccessToken = await generateTokens(user, res, storedToken.family);
+
+    res.status(200).json({ token: newAccessToken });
   } catch (error) {
     next(error);
   }
 };
 
-// LOGOUT
+// LOGOUT (Issue #725 - Proper Token Revocation)
 exports.logout = async (req, res, next) => {
   try {
+    const rawRefreshToken = req.cookies.refreshToken;
+
+    // Revoke the refresh token in database
+    if (rawRefreshToken) {
+      const tokenHash = RefreshToken.hashToken(rawRefreshToken);
+      await RefreshToken.findOneAndUpdate(
+        { tokenHash },
+        { $set: { isRevoked: true } },
+      );
+    }
+
+    // Also increment tokenVersion to invalidate all access tokens
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
+      const accessToken = authHeader.split(' ')[1];
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+        const decoded = jwt.verify(accessToken, process.env.JWT_SECRET, {
           ignoreExpiration: true,
         });
         if (decoded && decoded.id) {
@@ -967,16 +1098,19 @@ exports.logout = async (req, res, next) => {
       }
     }
 
+    // Clear the refresh token cookie
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
     });
+
     res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
     next(error);
   }
 };
+
 // GENERATE 2FA QR CODE & SECRET
 exports.generate2FA = async (req, res, next) => {
   try {
@@ -1097,7 +1231,7 @@ exports.validate2FALogin = async (req, res, next) => {
     }
 
     // Generate full JWT access token after successful 2FA
-    const accessToken = generateTokens(user, res);
+    const accessToken = await generateTokens(user, res); // Added await for Issue #725
 
     return res.status(200).json({
       message: '2FA verification successful',

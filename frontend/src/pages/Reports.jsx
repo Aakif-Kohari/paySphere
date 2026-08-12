@@ -53,24 +53,10 @@ const MonthYearSelector = ({ month, year, onChange }) => (
 
 // --- Download Helper ---
 const downloadFileWithProgress = async (url, filename, type, setExportingType, setSnackbar) => {
-  const token = localStorage.getItem('token');
-  const baseUrl =
-    import.meta.env.VITE_API_URL ||
-    (import.meta.env.PROD
-      ? typeof window !== 'undefined'
-        ? window.location.origin
-        : ''
-      : 'http://localhost:5000');
   setExportingType(type);
   try {
-    const res = await fetch(`${baseUrl}${url}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      throw new Error(errJson.message || 'Failed to generate report');
-    }
-    const blob = await res.blob();
+    const res = await api.get(url, { responseType: 'blob' });
+    const blob = res.data;
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = filename;
@@ -81,7 +67,19 @@ const downloadFileWithProgress = async (url, filename, type, setExportingType, s
     setSnackbar({ open: true, message: 'Download completed successfully!', severity: 'success' });
   } catch (err) {
     console.error('Export failed:', err);
-    setSnackbar({ open: true, message: err.message || 'Failed to download report. No data for the selected period.', severity: 'error' });
+    let errorMessage = 'Failed to download report. No data for the selected period.';
+    if (err.response && err.response.data instanceof Blob) {
+      try {
+        const text = await err.response.data.text();
+        const json = JSON.parse(text);
+        errorMessage = json.message || errorMessage;
+      } catch (e) {}
+    } else if (err.response?.data?.message) {
+      errorMessage = err.response.data.message;
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    setSnackbar({ open: true, message: errorMessage, severity: 'error' });
   } finally {
     setExportingType(null);
   }
