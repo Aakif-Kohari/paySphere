@@ -1,46 +1,79 @@
 {
-  "dashboard": {
-    "title": "Dashboard",
-    "welcome": "Welcome back",
-    "totalEmployees": "Total Employees",
-    "monthlyPayroll": "Monthly Payroll",
-    "pendingApprovals": "Pending Approvals",
-    "activeEmployees": "Active Employees",
-    "recentEmployees": "Recent Employees",
-    "employeeBreakdown": "Employee Breakdown",
-    "noEmployees": "No employees found",
-    "addFirstEmployee": "Add your first employee to get started",
-    "viewAll": "View All",
-    "runPayroll": "Run Payroll",
-    "exportCsv": "Export CSV",
-    "searchEmployees": "Search employees...",
-    "addEmployee": "Add Employee",
-    "payrollHistory": "Payroll History",
-    "reports": "Reports"
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search...",
+    "loading": "Loading...",
+    "noData": "No data available",
+    "actions": "Actions",
+    "status": "Status",
+    "date": "Date",
+    "amount": "Amount",
+    "submit": "Submit",
+    "back": "Back"
   },
   "nav": {
     "dashboard": "Dashboard",
     "employees": "Employees",
     "payroll": "Payroll",
     "reports": "Reports",
-    "loans": "Loans",
-    "approvals": "Approvals",
     "settings": "Settings",
+    "approvals": "Approvals",
     "logout": "Logout"
+  },
+  "dashboard": {
+    "title": "Dashboard Overview",
+    "welcome": "Welcome back, {{name}}",
+    "stats": {
+      "totalEmployees": "Total Employees",
+      "activeEmployees": "Active Employees",
+      "monthlyPayroll": "Monthly Payroll",
+      "pendingApprovals": "Pending Approvals"
+    },
+    "recentActivity": "Recent Activity",
+    "quickActions": "Quick Actions",
+    "runPayroll": "Run Payroll",
+    "addEmployee": "Add Employee"
+  },
+  "employees": {
+    "title": "Employee Directory",
+    "addNew": "Add New Employee",
+    "exportCsv": "Export CSV",
+    "exportPdf": "Export PDF",
+    "table": {
+      "name": "Full Name",
+      "role": "Role",
+      "department": "Department",
+      "salary": "Monthly Salary",
+      "status": "Status"
+    },
+    "form": {
+      "personalInfo": "Personal Information",
+      "employmentDetails": "Employment Details",
+      "compensation": "Compensation",
+      "bankDetails": "Bank Details"
+    }
   },
   "settings": {
     "title": "Settings",
+    "profile": "Profile",
+    "security": "Account Security",
     "preferences": "Preferences",
-    "language": "Language",
+    "company": "Company Info",
+    "payrollConfig": "Payroll Config",
+    "notifications": "Notifications",
     "theme": "Theme",
-    "savePreferences": "Save Preferences"
+    "language": "Language",
+    "lightMode": "Light Mode",
+    "darkMode": "Dark Mode",
+    "systemDefault": "System Default"
   },
-  "common": {
-    "save": "Save Changes",
-    "cancel": "Cancel",
-    "delete": "Delete",
-    "edit": "Edit",
-    "loading": "Loading...",
-    "noData": "No data available"
+  "errors": {
+    "required": "This field is required",
+    "invalidEmail": "Invalid email address",
+    "networkError": "Network error. Please check your connection.",
+    "unauthorized": "Session expired. Please login again."
   }
 }

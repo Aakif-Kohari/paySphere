@@ -10,6 +10,7 @@ const {
   approvePayroll,
   rejectPayroll,
   markPayrollPaid,
+  getMerkleProofHandler,
 } = require('../controllers/payroll.controller');
 const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
@@ -110,6 +111,13 @@ router.post(
   requirePermission(PERMISSIONS.WRITE_PAYROLL),
   writeRateLimiter,
   sendAllPayslipsEmailHandler,
+);
+
+router.get(
+  '/:id/merkle-proof',
+  auth,
+  requirePermission(PERMISSIONS.READ_PAYROLL),
+  getMerkleProofHandler,
 );
 
 module.exports = router;

@@ -8,9 +8,11 @@ const {
 } = require('../reports.controller');
 const PayrollUpdate = require('../../models/payroll.model');
 const Employee = require('../../models/employee.model');
+const User = require('../../models/user.model');
 
 jest.mock('../../models/payroll.model');
 jest.mock('../../models/employee.model');
+jest.mock('../../models/user.model');
 jest.mock('../../services/audit.service', () => ({
   createAuditLog: jest.fn(),
 }));
@@ -257,7 +259,7 @@ describe('Reports Controller - getAnalytics', () => {
 
   test('should accept a valid date range and filter payrolls by period (#527)', async () => {
     req.query = { startDate: '2026-01-01', endDate: '2026-06-30' };
-    PayrollUpdate.find.mockResolvedValue([]);
+    PayrollUpdate.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
     Employee.find.mockResolvedValue([]);
 
     await getAnalytics(req, res, next);
@@ -272,7 +274,7 @@ describe('Reports Controller - getAnalytics', () => {
 
   test('should accept a date range spanning multiple years (#527)', async () => {
     req.query = { startDate: '2025-11-01', endDate: '2026-02-28' };
-    PayrollUpdate.find.mockResolvedValue([]);
+    PayrollUpdate.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
     Employee.find.mockResolvedValue([]);
 
     await getAnalytics(req, res, next);
@@ -288,7 +290,7 @@ describe('Reports Controller - getAnalytics', () => {
 
   test('should accept a single-sided date range (#527)', async () => {
     req.query = { startDate: '2026-01-01' };
-    PayrollUpdate.find.mockResolvedValue([]);
+    PayrollUpdate.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
     Employee.find.mockResolvedValue([]);
 
     await getAnalytics(req, res, next);
@@ -322,6 +324,9 @@ describe('Reports Controller - downloadPDFReport', () => {
     };
     next = jest.fn();
     jest.clearAllMocks();
+    User.findById.mockResolvedValue({
+      settings: { payrollConfig: { currency: 'INR' }, companyInfo: {} },
+    });
   });
 
   test('should return 400 for invalid month', async () => {
@@ -435,7 +440,10 @@ describe('Reports Controller - downloadPDFReport', () => {
 
   test('should filter by departments query param without crashing (#656)', async () => {
     req.query = { month: '6', year: '2026', departments: 'Engineering,Design' };
-    Employee.find.mockResolvedValue([{ _id: 'emp1' }, { _id: 'emp2' }]);
+    // getEmployeeIdsByDepartments calls Employee.find({...}).select('_id')
+    Employee.find.mockReturnValue({
+      select: jest.fn().mockResolvedValue([{ _id: 'emp1' }, { _id: 'emp2' }]),
+    });
     PayrollUpdate.find.mockReturnValue({
       sort: jest.fn().mockResolvedValue([]),
     });
@@ -478,6 +486,9 @@ describe('Reports Controller - exportExcelReport', () => {
     };
     next = jest.fn();
     jest.clearAllMocks();
+    User.findById.mockResolvedValue({
+      settings: { payrollConfig: { currency: 'INR' } },
+    });
   });
 
   test('should return 400 for invalid month', async () => {
@@ -548,6 +559,9 @@ describe('Reports Controller - downloadPayslipsZip', () => {
     };
     next = jest.fn();
     jest.clearAllMocks();
+    User.findById.mockResolvedValue({
+      settings: { payrollConfig: { currency: 'INR' } },
+    });
   });
 
   test('should return 400 for invalid month', async () => {

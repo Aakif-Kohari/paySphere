@@ -5,10 +5,13 @@ import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
 import WebhooksSection from '../components/WebhooksSection';
+import RolesPermissions from '../components/RolesPermissions';
 import { logout } from '../features/auth/authSlice';
 import { setThemeMode } from '../features/ui/uiSlice';
 import api from '../services/api';
 import { getCurrencySymbol } from '../utils/currency';
+import zxcvbn from '../utils/zxcvbn';
+import EmailTemplateEditor from '../components/common/EmailTemplateEditor';
 
 // ── Icons for Sidebar (Copied from AddEmployee for consistency) ──
 const GridIcon = () => (
@@ -218,6 +221,61 @@ const InfoIcon = () => (
     <line x1="12" y1="8" x2="12.01" y2="8"></line>
   </svg>
 );
+const ShieldIcon = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+  </svg>
+);
+
+function EmailTemplatesManager() {
+  const [templateHtml, setTemplateHtml] = useState('<p>Dear {{employeeName}},</p><p>Your payslip for {{month}} {{year}} is ready.</p>');
+  const [subject, setSubject] = useState('Payslip for {{month}} {{year}}');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.post('/api/email-templates', { name: 'Monthly Payslip', subject, htmlContent: templateHtml });
+      alert('Template saved successfully!');
+    } catch (err) {
+      alert('Failed to save template');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold text-gray-900 dark:text-white">Email Templates</h2>
+      <p className="text-sm text-gray-500 dark:text-slate-400">Customize the HTML content for automated notifications. Use the "Insert Variable" button to add dynamic data.</p>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Email Subject</label>
+          <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500" />
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Email Body (HTML)</label>
+          <EmailTemplateEditor initialContent={templateHtml} onChange={setTemplateHtml} />
+        </div>
+
+        <button onClick={handleSave} disabled={saving} className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg shadow-md transition-colors disabled:opacity-50">
+          {saving ? 'Saving...' : 'Save Template'}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -406,6 +464,10 @@ export default function Settings() {
         'New password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character.',
       );
     }
+    const strength = zxcvbn(newPassword);
+    if (strength.score < 3) {
+      return alert(`Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`);
+    }
     try {
       await api.patch('/api/auth/security/password', {
         currentPassword,
@@ -508,10 +570,14 @@ export default function Settings() {
   ];
 
   const settingsTabs = [
+    { id: 'profile', label: 'Profile', icon: <UserIcon /> },
+    { id: 'account', label: 'Account Security', icon: <LockIcon /> },
     { id: 'preferences', label: 'Preferences', icon: <PaletteIcon /> },
     { id: 'company', label: 'Company Info', icon: <BuildingIcon /> },
     { id: 'payroll', label: 'Payroll Config', icon: <WalletIcon /> },
     { id: 'webhooks', label: 'Webhooks', icon: <WebhookIcon /> },
+    { id: 'emailTemplates', label: 'Email Templates', icon: <EmailIcon /> },
+    { id: 'notifications', label: 'Notifications', icon: <BellIcon /> },
     { id: 'about', label: 'About PaySphere', icon: <InfoIcon /> },
   ];
 
@@ -594,8 +660,8 @@ export default function Settings() {
                     setUserProfile({ ...userProfile, fullName: e.target.value })
                   }
                   className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.fullName
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                      : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                    : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
                     }`}
                 />
                 {profileErrors.fullName && (
@@ -615,8 +681,8 @@ export default function Settings() {
                     setUserProfile({ ...userProfile, email: e.target.value })
                   }
                   className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.email
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                      : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                    : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
                     }`}
                 />
                 {profileErrors.email && (
@@ -713,8 +779,8 @@ export default function Settings() {
                 </div>
                 <span
                   className={`px-2.5 py-1 rounded-full text-xs font-bold ${userProfile.isTwoFactorEnabled
-                      ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400'
-                      : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400'
+                    : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
                     }`}
                 >
                   {userProfile.isTwoFactorEnabled ? 'Enabled' : 'Disabled'}
@@ -1178,6 +1244,9 @@ export default function Settings() {
           </div>
         );
 
+      case 'emailTemplates':
+        return <EmailTemplatesManager />; // Component defined below or imported
+
       case 'notifications':
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -1306,6 +1375,9 @@ export default function Settings() {
             </div>
           </div>
         );
+
+      case 'roles':
+        return <RolesPermissions />;
 
       case 'webhooks':
         return <WebhooksSection />;
@@ -1476,8 +1548,8 @@ export default function Settings() {
                 setIsSidebarOpen(false);
               }}
               className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${item.id === 'settings'
-                  ? 'bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold'
-                  : 'text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
+                ? 'bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold'
+                : 'text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
                 }`}
             >
               {item.icon}
@@ -1562,8 +1634,8 @@ export default function Settings() {
                     aria-controls={`panel-${tab.id}`}
                     id={`tab-${tab.id}`}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === tab.id
-                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-100 dark:border-slate-800'
-                        : 'text-gray-500 dark:text-slate-500 hover:bg-white/60 dark:hover:bg-slate-900/50 hover:text-gray-900 dark:hover:text-white border border-transparent'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-100 dark:border-slate-800'
+                      : 'text-gray-500 dark:text-slate-500 hover:bg-white/60 dark:hover:bg-slate-900/50 hover:text-gray-900 dark:hover:text-white border border-transparent'
                       }`}
                   >
                     <span

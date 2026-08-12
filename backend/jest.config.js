@@ -1,1 +1,3 @@
-module.exports = { transformIgnorePatterns: ['/node_modules/(?!(@scure|otplib)/)'] };
+module.exports = {
+  transformIgnorePatterns: ['node_modules/(?!(\\.pnpm|@scure|@exodus|otplib))'],
+};

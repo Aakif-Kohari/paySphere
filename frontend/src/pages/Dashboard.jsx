@@ -13,6 +13,7 @@ import EmptyState from '../components/common/EmptyState';
 import DashboardSkeleton from '../components/common/skeleton/DashboardSkeleton';
 import EmployeeManagementSkeleton from '../components/common/skeleton/EmployeeManagementSkeleton';
 import PayrollTableSkeleton from '../components/common/skeleton/PayrollTableSkeleton';
+import DashboardGrid from '../components/dashboard/DashboardGrid';
 import { logout } from '../features/auth/authSlice';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 import api from '../services/api';
@@ -21,6 +22,8 @@ import Approvals from './Approvals';
 import Loans from './Loans';
 import Settlements from './Settlements';
 import Archive from './Archive';
+import ErrorBoundary, { ComponentFeedbackFallback } from '../components/common/ErrorBoundary';
+
 
 // Accept international phone numbers with an optional leading "+" and
 // a national number of 7-15 digits. Mirrors backend validation behavior.
@@ -66,22 +69,9 @@ const getPhoneParts = (phone) => {
 
 // Trigger a file download from the browser
 const downloadFile = (url, filename) => {
-  const token = localStorage.getItem('token');
-  const baseUrl =
-    import.meta.env.VITE_API_URL ||
-    (import.meta.env.PROD
-      ? typeof window !== 'undefined'
-        ? window.location.origin
-        : ''
-      : 'http://localhost:5000');
-  fetch(`${baseUrl}${url}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  api.get(url, { responseType: 'blob' })
     .then((res) => {
-      if (!res.ok) throw new Error('No data to export');
-      return res.blob();
-    })
-    .then((blob) => {
+      const blob = res.data;
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       link.download = filename;
@@ -185,6 +175,11 @@ const DashboardOverview = ({
             {t('dashboard.runPayroll', 'Run Payroll')}
           </button>
         </div>
+      </div>
+
+      {/* Dynamic Dashboard Grid (Replaces manual SummaryCards/Charts) */}
+      <div className="space-y-6">
+        <DashboardGrid />
       </div>
 
       {/* Stats */}
@@ -466,6 +461,8 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
   const { phoneCountryCode: initialPhoneCountryCode, phone: initialPhone } =
     getPhoneParts(employee?.phone);
   const currency = localStorage.getItem('currency') || 'INR';
+  // Custom role names from GET /api/roles for the Role datalist (#475)
+  const [roleSuggestions, setRoleSuggestions] = useState([]);
   const [formData, setFormData] = useState({
     fullName: employee?.fullName || '',
     role: employee?.role || '',
@@ -477,6 +474,15 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    api
+      .get('/api/roles')
+      .then((res) =>
+        setRoleSuggestions((res.data?.roles || []).map((r) => r.name)),
+      )
+      .catch(() => setRoleSuggestions([]));
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -566,10 +572,16 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
               required
               type="text"
               name="role"
+              list="role-suggestions"
               value={formData.role}
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
             />
+            <datalist id="role-suggestions">
+              {roleSuggestions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
           </div>
 
           <div>
@@ -1007,6 +1019,10 @@ export default function PaySphereDashboard() {
             navigate('/reports');
           } else if (page === 'Flashcards') {
             navigate('/flashcards');
+          } else if (page === 'PYQs') {
+            navigate('/pyqs');
+          } else if (page === 'QuizBattle') {
+            navigate('/quiz-battle');
           } else {
             setActivePage(page);
           }
@@ -1059,53 +1075,55 @@ export default function PaySphereDashboard() {
         </header>
 
         {/* Dynamic Content */}
-        {activePage === 'Approvals' ? (
-          <Approvals />
-        ) : activePage === 'Settlements' ? (
-          <Settlements />
-        ) : activePage === 'Loans' ? (
-          <Loans />
-        ) : activePage === 'Payroll' ? (
-          <PayrollTable
-            payrolls={paginatedPayrolls}
-            loading={payrollLoading}
-            currentPage={payrollPage}
-            totalPages={payrollTotalPages}
-            totalCount={payrollTotalCount}
-            setCurrentPage={setPayrollPage}
-          />
-        ) : activePage === 'Dashboard' ? (
-          <DashboardOverview
-            search={search}
-            setSearch={setSearch}
-            filtered={filtered}
-            navigate={navigate}
-            onAddUpdate={() => navigate('/monthly-updates')}
-            onAddEmployee={() => navigate('/add-employee')}
-            totalPayout={totalPayout}
-            employeeCount={totalEmployees}
-            loading={loading}
-            payrolls={payrolls}
-            onEditEmployee={(emp) => setEmployeeToEdit(emp)}
-          />
-        ) : activePage === 'Archive' ? (
-          <Archive />
-        ) : (
-          <EmployeeManagement
-            search={search}
-            setSearch={setSearch}
-            employees={employees}
-            loading={loading}
-            onAddEmployee={() => navigate('/add-employee')}
-            onAddUpdate={() => navigate('/monthly-updates')}
-            payrolls={payrolls}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            setCurrentPage={setCurrentPage}
-            onDeleteEmployee={(emp) => setEmployeeToDelete(emp)}
-            onEditEmployee={(emp) => setEmployeeToEdit(emp)}
-          />
-        )}
+        <ErrorBoundary fallback={<ComponentFeedbackFallback />}>
+          {activePage === 'Approvals' ? (
+            <Approvals />
+          ) : activePage === 'Settlements' ? (
+            <Settlements />
+          ) : activePage === 'Loans' ? (
+            <Loans />
+          ) : activePage === 'Payroll' ? (
+            <PayrollTable
+              payrolls={paginatedPayrolls}
+              loading={payrollLoading}
+              currentPage={payrollPage}
+              totalPages={payrollTotalPages}
+              totalCount={payrollTotalCount}
+              setCurrentPage={setPayrollPage}
+            />
+          ) : activePage === 'Dashboard' ? (
+            <DashboardOverview
+              search={search}
+              setSearch={setSearch}
+              filtered={filtered}
+              navigate={navigate}
+              onAddUpdate={() => navigate('/monthly-updates')}
+              onAddEmployee={() => navigate('/add-employee')}
+              totalPayout={totalPayout}
+              employeeCount={totalEmployees}
+              loading={loading}
+              payrolls={payrolls}
+              onEditEmployee={(emp) => setEmployeeToEdit(emp)}
+            />
+          ) : activePage === 'Archive' ? (
+            <Archive />
+          ) : (
+            <EmployeeManagement
+              search={search}
+              setSearch={setSearch}
+              employees={employees}
+              loading={loading}
+              onAddEmployee={() => navigate('/add-employee')}
+              onAddUpdate={() => navigate('/monthly-updates')}
+              payrolls={payrolls}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              setCurrentPage={setCurrentPage}
+              onDeleteEmployee={(emp) => setEmployeeToDelete(emp)}
+              onEditEmployee={(emp) => setEmployeeToEdit(emp)}
+            />
+          )}
+        </ErrorBoundary>
 
         {/* Edit Form Modal (Steps 2-5) */}
         {employeeToEdit && (

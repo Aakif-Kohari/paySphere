@@ -1,6 +1,13 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import * as Sentry from '@sentry/react';
+import {
+  ThemeProvider,
+  createTheme,
+  CssBaseline,
+  Snackbar,
+  Alert,
+} from '@mui/material';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { logout } from './features/auth/authSlice';
 import Landing from './pages/Landing';
@@ -10,18 +17,53 @@ import MonthlyUpdates from './pages/MonthlyUpdates';
 import AddEmployee from './pages/AddEmployee';
 import ResetPassword from './pages/ResetPassword';
 import Settings from './pages/Settings';
-import ProfileSettings from './pages/ProfileSettings';
 import Reports from './pages/Reports';
 import EmployeePortal from './pages/EmployeePortal';
 import NotFound from './pages/NotFound';
 import ProtectedRoute from './components/ProtectedRoute';
 import ScrollToTop from './components/common/ScrollToTop';
 import CommandPalette from './components/common/CommandPalette';
+import OfflineSyncIndicator from './components/OfflineSyncIndicator';
 import SystemHealth from './pages/SystemHealth';
 import Flashcards from './pages/Flashcards';
+import PyqDashboard from './pages/PyqDashboard';
+import QuizBattle from './pages/QuizBattle';
+
 function App() {
   const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
+
+  // Sync user context to Sentry (#770)
+  useEffect(() => {
+    if (user) {
+      Sentry.setUser({
+        id: user.id || user._id,
+        email: user.email,
+        username: user.name,
+      });
+    } else {
+      Sentry.setUser(null);
+    }
+  }, [user]);
   const themeMode = useSelector((state) => state.ui.themeMode);
+  const [toast, setToast] = useState({
+    open: false,
+    message: '',
+    severity: 'info',
+  });
+
+  // Listen to global toast events (e.g. from axios interceptor background saves)
+  useEffect(() => {
+    const handleToastShow = (e) => {
+      setToast({
+        open: true,
+        message: e.detail?.message || 'Notification received',
+        severity: e.detail?.severity || 'info',
+      });
+    };
+    window.addEventListener('toast:show', handleToastShow);
+    return () => window.removeEventListener('toast:show', handleToastShow);
+  }, []);
 
   // Synchronize Redux auth state when API interceptor detects expired/invalid auth
   useEffect(() => {
@@ -106,14 +148,6 @@ function App() {
             }
           />
           <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <ProfileSettings />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/settings/system-health"
             element={
               <ProtectedRoute>
@@ -137,11 +171,43 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/pyqs"
+            element={
+              <ProtectedRoute>
+                <PyqDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/quiz-battle"
+            element={
+              <ProtectedRoute>
+                <QuizBattle />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<NotFound />} />
         </Routes>
         <ScrollToTop />
         <CommandPalette />
+        {/* Global Offline Sync Indicator (Issue #815) */}
+        <OfflineSyncIndicator />
       </BrowserRouter>
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={6000}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          severity={toast.severity}
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          sx={{ width: '100%' }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </ThemeProvider>
   );
 }

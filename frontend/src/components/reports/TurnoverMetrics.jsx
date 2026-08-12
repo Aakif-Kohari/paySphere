@@ -11,7 +11,6 @@ import {
   YAxis,
 } from 'recharts';
 import api from '../../services/api';
-import TurnoverMetricSkeleton from '../common/skeleton/TurnoverMetricSkeleton';
 import { createChartTooltip } from './chartTooltip';
 const TurnoverMetrics = () => {
   const [data, setData] = useState(null);
@@ -36,7 +35,7 @@ const TurnoverMetrics = () => {
   }, []);
 
   if (loading) {
-    return <TurnoverMetricSkeleton />;
+    return <TurnoverMetricsSkeleton />;
   }
 
   if (error || !data) {

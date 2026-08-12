@@ -309,6 +309,16 @@ exports.createSalaryRevision = async (req, res, next) => {
       throw error;
     }
 
+    // Trigger Retroactive Arrears Engine (Issue #931)
+    // If the effective date is in the past, calculate deltas for missed months
+    try {
+      const { processRetroactiveArrears } = require('../utils/arrearsCalculator');
+      await processRetroactiveArrears(created, previous, req.tenantId);
+    } catch (arrearsError) {
+      logger.error('Failed to process retroactive arrears', { error: arrearsError.message });
+      // Don't fail the revision creation if arrears calculation fails
+    }
+
     // Keep the denormalised figure in step, but only when this revision is the
     // one actually in force — a future-dated raise must not change today's pay.
     const isCurrent = effectiveFrom <= new Date();

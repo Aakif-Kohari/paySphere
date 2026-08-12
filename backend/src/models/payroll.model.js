@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const softDeletePlugin = require('../utils/softDelete.plugin');
+const auditTrailPlugin = require('../middlewares/auditTrail.middleware');
 const {
   ALL_STATUSES,
   PAYROLL_STATUS,
@@ -13,25 +14,45 @@ const payrollUpdateSchema = new mongoose.Schema(
       ref: 'Employee',
       required: true,
     },
-    employeeName: {
+employeeName: {
       type: String,
       required: true,
-    },
-    month: {
+      maxlength: [100, 'Employee name cannot exceed 100 characters'],
+    },    month: {
       type: Number, // 1-12
       required: true,
+      min: [1, 'Month must be between 1 and 12'],
+      max: [12, 'Month must be between 1 and 12'],
     },
     currency: {
       type: String,
       default: 'INR',
     },
-    year: {
-      type: Number,
-      required: true,
+    baseCurrency: {
+      type: String,
+      default: 'USD',
     },
-    baseSalary: {
+    disbursementCurrency: {
+      type: String,
+      default: 'USD',
+    },
+    fxRate: {
+      type: Number,
+      default: 1.0,
+    },
+    convertedNetSalary: {
+      type: Number,
+      default: null,
+    },
+year: {
       type: Number,
       required: true,
+      min: [2000, 'Year must be 2000 or later'],
+      max: [2100, 'Year must be 2100 or earlier'],
+    },    baseSalary: {
+      type: Number,
+      required: true,
+      min: [0, 'Base salary cannot be negative'],
     },
     overtimeRate: {
       type: Number,
@@ -53,13 +74,12 @@ const payrollUpdateSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    customDeductions: [
+customDeductions: [
       {
-        name: String,
-        amount: Number,
+        name: { type: String, maxlength: [100, 'Deduction name cannot exceed 100 characters'] },
+        amount: { type: Number, min: [0, 'Deduction amount cannot be negative'] },
       },
-    ],
-    leaveDeduction: {
+    ],    leaveDeduction: {
       type: Number,
       default: 0,
     },
@@ -109,139 +129,6 @@ const payrollUpdateSchema = new mongoose.Schema(
     blockchainTxHash: { type: String },
     merkleRoot: { type: String },
     status: {
-  /**
-   * Which company this row belongs to — the field every read filters on.
-   *
-   * Separate from `createdBy` because a company can have more than one admin,
-   * and a row created by one of them has to stay visible to the others.
-   */
-  tenantId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Tenant',
-    required: true,
-  },
-  // The approval workflow added in #438 writes "PENDING_APPROVAL"/"APPROVED"/
-  // "REJECTED", none of which were in this enum — so every save() path threw a
-  // ValidationError and the workflow only appeared to work because it went
-  // through updateMany, which skips validators by default (#458).
-  //
-  // The vocabulary now comes from config/payrollStatus.js, shared with every
-  // controller that compares against it. `set` folds the legacy "finalized" and
-  // the screaming-snake spellings onto the canonical values so documents
-  // written by either older revision keep validating.
-  blockchainTxHash: { type: String },
-  merkleRoot: { type: String },
-  status: {
-    type: String,
-    enum: ALL_STATUSES,
-    default: PAYROLL_STATUS.PENDING_APPROVAL,
-    set: (value) => normalizeStatus(value) || value,
-    index: true,
-  },
-  /**
-   * The maker–checker trail (#559).
-   *
-   * #458 mounted the approval routes and wired the controller to write these
-   * six fields, but none of them were ever declared here. Two consequences,
-   * both silent:
-   *
-   *   - `getPendingApprovals` calls `.populate("submittedBy", …)`, and mongoose
-   *     has had `strictPopulate` on by default since v6 — populating a path
-   *     that is not in the schema throws, so the checker queue answered 500.
-   *   - Strict mode drops `$set` keys that are not in the schema, so every
-   *     approver, timestamp and rejection reason the controller wrote was
-   *     discarded before the query left the process.
-   *
-   * Without `submittedBy` on disk there is also nothing to compare an approver
-   * against, so the separation of WRITE_PAYROLL from APPROVE_PAYROLL that
-   * config/permissions.js sets up cannot actually be enforced.
-   */
-  submittedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  },
-  submittedAt: {
-    type: Date,
-  },
-  approvedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  },
-  approvedAt: {
-    type: Date,
-  },
-  rejectedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  },
-  rejectedAt: {
-    type: Date,
-  },
-  // Capped here as well as in the controller: the controller's slice only
-  // guards the HTTP path, and this field is also written by the migration and
-  // by anything that talks to the model directly.
-  rejectionReason: {
-    type: String,
-    maxlength: [500, "Rejection reason cannot exceed 500 characters"],
-  },
-  /**
-   * Where leaveDays and overtimeHours came from.
-   *
-   * "ledger"  — derived from the validated Attendance document for the month
-   * "manual"  — parsed out of the activity tag strings, the pre-#459 path
-   *
-   * Recorded so an audit of "why was this employee docked three days?" can tell
-   * whether the answer is a day-by-day record or a regex over a display label.
-   */
-  attendanceSource: {
-    type: String,
-    enum: ["ledger", "manual"],
-    default: "manual",
-  },
-  /**
-   * Instalments collected against this payroll row (#460).
-   *
-   * Stored on the row rather than only on the loan so a payslip regenerated
-   * later reproduces the recovery line exactly as it was paid, and so the
-   * deduction can be traced back to the loan it serviced.
-   */
-  loanRecoveries: [{
-    loanId: { type: mongoose.Schema.Types.ObjectId, ref: "Loan" },
-    amount: { type: Number, default: 0 },
-    principalComponent: { type: Number, default: 0 },
-    interestComponent: { type: Number, default: 0 },
-    scheduledAmount: { type: Number, default: 0 },
-    shortfall: { type: Number, default: 0 },
-  }],
-  loanRecoveryTotal: {
-    type: Number,
-    default: 0,
-  },
-  // Issue #719: Tax-free expense reimbursements bundled into this payroll run
-  reimbursements: {
-    type: Number,
-    default: 0,
-    min: 0,
-  },
-  // Array of expense claim IDs that were paid out in this run (for audit trail)
-  reimbursedExpenseIds: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'ExpenseClaim',
-  }],
-  /**
-   * The salary component split in force when this row was calculated (#461).
-   *
-   * Snapshotted rather than looked up at render time, so a payslip regenerated
-   * a year later still shows the breakdown that was actually paid instead of
-   * the employee's current package.
-   */
-  salarySnapshot: {
-    effectiveGross: { type: Number },
-    isProrated: { type: Boolean, default: false },
-    segmentCount: { type: Number, default: 1 },
-    components: [{
-      code: String,
-      label: String,
       type: String,
       enum: ALL_STATUSES,
       default: PAYROLL_STATUS.PENDING_APPROVAL,
@@ -328,6 +215,36 @@ const payrollUpdateSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    /**
+     * Tax-free expense reimbursements bundled into this run (#719).
+     *
+     * Carried as its own column rather than folded into `bonus`, because the
+     * two are taxed differently and a payslip has to show them on separate
+     * lines: a bonus is earnings, a reimbursement is the employee being made
+     * whole for money they already spent.
+     */
+    reimbursements: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    /**
+     * The claims this row paid out, for the audit trail.
+     *
+     * The claim documents carry a `payrollId` pointing back here, so the link
+     * is stored from both ends: the reimbursement line on a regenerated payslip
+     * resolves without a second query, and an auditor asking "which run paid
+     * this receipt?" starts from the claim.
+     */
+    reimbursedExpenseIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'ExpenseClaim',
+      },
+    ],
+
     /**
      * The salary component split in force when this row was calculated (#461).
      *
@@ -387,4 +304,5 @@ payrollUpdateSchema.index({ tenantId: 1, year: -1, month: -1, status: 1 });
 payrollUpdateSchema.index({ tenantId: 1, submittedBy: 1, status: 1 });
 
 payrollUpdateSchema.plugin(softDeletePlugin);
+payrollUpdateSchema.plugin(auditTrailPlugin);
 module.exports = mongoose.model('PayrollUpdate', payrollUpdateSchema);
