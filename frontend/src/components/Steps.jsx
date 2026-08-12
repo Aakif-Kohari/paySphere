@@ -1,6 +1,7 @@
+import styles from './Steps.module.css';
 export default function Steps() {
   return (
-    <section id="process" className="py-16 sm:py-20 md:py-24 bg-gray-50/50 dark:bg-slate-900/10 border-y border-gray-100 dark:border-slate-800 px-4 sm:px-6 transition-colors duration-200">
+    <section id="process" className={styles.container}>
       <div className="max-w-5xl mx-auto text-center">
 
         {/* Heading */}

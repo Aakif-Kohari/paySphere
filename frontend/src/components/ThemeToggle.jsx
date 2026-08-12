@@ -1,3 +1,4 @@
+import styles from './ThemeToggle.module.css';
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import { useDispatch, useSelector } from "react-redux";
@@ -13,7 +14,7 @@ export default function ThemeToggle({ showLabel = false, className = "" }) {
       <label
         className={`flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 transition-colors dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 ${className}`}
       >
-        <span className="flex items-center gap-2">
+        <span className={styles.container}>
           {isDark ? (
             <DarkModeOutlinedIcon style={{ fontSize: 18, color: "#f59e0b" }} />
           ) : (

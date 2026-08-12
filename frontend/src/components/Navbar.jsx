@@ -1,3 +1,8 @@
+import styles from './Navbar.module.css';
+import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
+import ThemeToggle from "./ThemeToggle";
+import api from "../services/api";
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
@@ -104,7 +109,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-900/85 backdrop-blur-md border-b border-gray-100 dark:border-slate-800 transition-colors duration-200">
+    <nav className={styles.container}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-20 flex justify-between items-center">
         {/* Logo */}
         <div className="flex items-center gap-6">

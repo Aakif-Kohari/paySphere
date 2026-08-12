@@ -1,3 +1,13 @@
+import styles from './Sidebar.module.css';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
+import GridViewIcon from '@mui/icons-material/GridView';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
+import LogoutIcon from '@mui/icons-material/Logout';
+import PeopleIcon from '@mui/icons-material/People';
+import SchoolIcon from '@mui/icons-material/School';
+import ArchiveIcon from '@mui/icons-material/Archive';
 import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import ThemeToggle from './ThemeToggle';
@@ -105,7 +115,7 @@ const Sidebar = ({
           role="button"
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className={styles.container}
           onClick={onClose}
         />
       )}
