@@ -13,8 +13,7 @@ const { generatePayrollCSV } = require('../utils/csvExport');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const cacheService = require('../services/cache.service');
-const AnomalyService = require('../services/anomaly.service');
-const FXService = require('../services/fx.service');
+const BlockchainService = require('../services/blockchain.service');
 // `webhookService` was imported for the stray `triggerEvent` call #543 left in
 // the middle of submitPayrollForReview. That call is gone (see below) and the
 // service has never exported `triggerEvent` anyway — payroll webhooks are
@@ -1997,29 +1996,38 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
 };
 
 /**
- * GET /api/payroll/anomalies
- * Analyze active or past payroll records for statistical and fraud anomalies.
+ * GET /api/payroll/:id/merkle-proof
+ * Generate and verify cryptographic Merkle proof for an individual payroll record.
  */
-exports.inspectAnomalies = async (req, res, next) => {
+exports.getMerkleProofHandler = async (req, res, next) => {
   try {
     const tenantId = requireTenant(req, res);
     if (!tenantId) return;
 
-    const month = parseInt(req.query.month, 10) || new Date().getMonth() + 1;
-    const year = parseInt(req.query.year, 10) || new Date().getFullYear();
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid payroll ID format' });
+    }
 
-    const [currentPayrolls, historicalPayrolls] = await Promise.all([
-      PayrollUpdate.find({ tenantId, month, year }).lean(),
-      PayrollUpdate.find({ tenantId, createdAt: { $gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) } }).lean(),
-    ]);
+    const targetPayroll = await PayrollUpdate.findOne({ _id: id, tenantId }).lean();
+    if (!targetPayroll) {
+      return res.status(404).json({ message: 'Payroll record not found' });
+    }
 
-    const report = AnomalyService.detectAnomalies(currentPayrolls, historicalPayrolls);
+    const batch = await PayrollUpdate.find({
+      tenantId,
+      month: targetPayroll.month,
+      year: targetPayroll.year,
+    }).lean();
+
+    const proofData = BlockchainService.getMerkleProof(batch, id);
+    const anchorData = await BlockchainService.anchorToEthereum(proofData.root);
 
     return res.status(200).json({
       success: true,
-      month,
-      year,
-      report,
+      payrollId: id,
+      ...proofData,
+      anchor: anchorData,
     });
   } catch (error) {
     next(error);
