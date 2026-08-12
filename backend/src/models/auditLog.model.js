@@ -95,6 +95,10 @@ const AUDIT_RESOURCE_TYPES = [
   'WorkflowInstance',
   'Webhook',
   'MonthlyUpdate',
+  // An HRMS connection (#954) can read and write the employee directory under
+  // credentials an admin installs, so configuring, syncing and removing one are
+  // audited like the webhook mutations above.
+  'IntegrationConfig',
 ];
 
 const auditLogSchema = new mongoose.Schema(

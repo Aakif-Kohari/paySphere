@@ -2,7 +2,8 @@ const cron = require('node-cron');
 const PayrollUpdate = require('../models/payroll.model');
 const Employee = require('../models/employee.model');
 const CronLock = require('../models/cronlock.model');
-const { enqueueEmail } = require('../jobs/email.queue');const { emailableStatusFilter } = require('../config/payrollStatus');
+const { enqueueEmail } = require('../jobs/email.queue');
+const { emailableStatusFilter } = require('../config/payrollStatus');
 const { processMonthlyAccrual } = require('./leaveAccrual.job');
 const logger = require('../utils/logger');
 
@@ -157,8 +158,9 @@ async function runMonthlyPayslipJob({ now = new Date() } = {}) {
           continue;
         }
 
-await enqueueEmail('payslip', { employee, payroll });
-        sent += 1;      } catch (error) {
+        await enqueueEmail('payslip', { employee, payroll });
+        sent += 1;
+      } catch (error) {
         // One bad address or SMTP hiccup must not cost everyone else their
         // payslip, so the loop carries on and the failure is counted.
         failed += 1;
@@ -243,12 +245,13 @@ async function runDailyGreetingsJob({ now = new Date() } = {}) {
         if (employee.dateOfBirth) {
           const dob = new Date(employee.dateOfBirth);
           if (dob.getMonth() + 1 === month && dob.getDate() === day) {
-await enqueueEmail('generic', {
+            await enqueueEmail('generic', {
               to: employee.email,
               subject: `Happy Birthday, ${employee.fullName}!`,
               text: `Dear ${employee.fullName},\n\nWishing you a very Happy Birthday from everyone at ${employee.companyName}!\n\nBest Regards,\nThe Team`,
             });
-            sent += 1;          }
+            sent += 1;
+          }
         }
 
         if (employee.joiningDate) {
@@ -256,12 +259,13 @@ await enqueueEmail('generic', {
           if (joined.getMonth() + 1 === month && joined.getDate() === day) {
             const years = now.getFullYear() - joined.getFullYear();
             if (years > 0) {
-await enqueueEmail('generic', {
+              await enqueueEmail('generic', {
                 to: employee.email,
                 subject: `Happy ${years} Year Work Anniversary, ${employee.fullName}!`,
                 text: `Dear ${employee.fullName},\n\nCongratulations on reaching your ${years} year anniversary at ${employee.companyName}! We appreciate all your hard work.\n\nBest Regards,\nThe Team`,
               });
-              sent += 1;            }
+              sent += 1;
+            }
           }
         }
       } catch (error) {
@@ -319,12 +323,65 @@ const startCronJobs = () => {
     );
   });
   logger.info('Monthly leave accrual cron job registered.');
+
+  // 02:00 daily — the hour `IntegrationConfig.syncSchedule` defaults to.
+  //
+  // One scheduled run that walks every active integration, rather than a cron
+  // registration per tenant: the set of tenants changes while the process is
+  // running, and a schedule built at boot would never know about a company
+  // that connected an HRMS afterwards (#954).
+  cron.schedule('0 2 * * *', () => {
+    runHrmsSyncJob().catch((error) =>
+      logger.error('HRMS sync job threw', { error: error.message }),
+    );
+  });
+  logger.info('HRMS integration sync cron job registered.');
 };
+
+/**
+ * Sync every active HRMS integration (#954).
+ *
+ * Locked like the jobs above: two instances syncing the same tenant would race
+ * each other's upserts. Never throws — a cron callback that rejects is an
+ * unhandled rejection with nothing to catch it.
+ *
+ * @returns {Promise<{ran: boolean, reason?: string, tenants?: number}>}
+ */
+async function runHrmsSyncJob() {
+  const now = new Date();
+  const lockId = `hrms-sync-${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+
+  const lock = await acquireLock(lockId);
+  if (!lock.acquired) {
+    logger.info('HRMS sync job skipped', { reason: lock.reason });
+    return { ran: false, reason: lock.reason };
+  }
+
+  try {
+    const { syncAllTenants } = require('../services/integrationSync.service');
+    const summary = await syncAllTenants();
+
+    logger.info('HRMS sync job complete', summary);
+
+    // Released rather than left to expire, for the reason `releaseLock` gives:
+    // a run that failed would otherwise block a corrected deployment on the
+    // same day without a word.
+    await releaseLock(lockId);
+
+    return { ran: true, ...summary };
+  } catch (error) {
+    logger.error('HRMS sync job failed', { error: error.message });
+    await releaseLock(lockId);
+
+    return { ran: false, reason: 'error' };
+  }
+}
 
 module.exports = {
   startCronJobs,
   runMonthlyPayslipJob,
   runDailyGreetingsJob,
+  runHrmsSyncJob,
   previousPeriod,
   acquireLock,
   releaseLock,

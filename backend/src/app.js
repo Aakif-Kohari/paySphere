@@ -45,6 +45,7 @@ const salaryHistoryRoutes = require('./routes/salaryHistory.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const flashcardRoutes = require('./routes/flashcard.routes');
 const webhookRoutes = require('./routes/webhook.routes');
+const integrationRoutes = require('./routes/integration.routes');
 const archiveRoutes = require('./routes/archive.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
@@ -260,6 +261,12 @@ app.use('/api/email', emailRoutes);
 // payroll and employee events. The controller and models were written in #645
 // but never mounted here, so the whole feature was a 404.
 app.use('/api/webhooks', webhookRoutes);
+
+// HRMS integrations (#954). `src/integrations/` has held a working adapter
+// layer — BambooHR, Workday, a registry that validates them — with no
+// controller, no router and no mount, so `registry.getAdapter()` was reachable
+// from no request and `IntegrationConfig` had no writer.
+app.use('/api/integrations', integrationRoutes);
 
 // Custom role management (#475) — the owner role manages the permission sets
 // that decide what every other account can do. Mounted once, after the security
