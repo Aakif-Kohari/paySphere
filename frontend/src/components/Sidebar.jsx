@@ -1,3 +1,4 @@
+import styles from './Sidebar.module.css';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import FactCheckIcon from '@mui/icons-material/FactCheck';
@@ -72,7 +73,7 @@ const Sidebar = ({
           role="button"
           tabIndex={0}
           onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className={styles.container}
           onClick={onClose}
         />
       )}
