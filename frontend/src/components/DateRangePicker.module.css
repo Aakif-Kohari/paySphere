@@ -1,0 +1,6 @@
+.container { display: flex; flex-direction: column; padding: 20px; border: 1px solid #ccc; border-radius: 8px; }
+.header { display: flex; justify-content: space-between; align-items: center; }
+.grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.day { padding: 10px; text-align: center; cursor: pointer; }
+.selected { background-color: #007bff; color: white; }
+.inRange { background-color: #e9ecef; }
