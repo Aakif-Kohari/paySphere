@@ -2,9 +2,7 @@ const cron = require('node-cron');
 const PayrollUpdate = require('../models/payroll.model');
 const Employee = require('../models/employee.model');
 const CronLock = require('../models/cronlock.model');
-const { sendPayslipEmail } = require('../services/email.service');
-const { sendEmail } = require('../utils/email');
-const { emailableStatusFilter } = require('../config/payrollStatus');
+const { enqueueEmail } = require('../jobs/email.queue');const { emailableStatusFilter } = require('../config/payrollStatus');
 const { processMonthlyAccrual } = require('./leaveAccrual.job');
 const logger = require('../utils/logger');
 
@@ -159,13 +157,8 @@ async function runMonthlyPayslipJob({ now = new Date() } = {}) {
           continue;
         }
 
-        await sendPayslipEmail(employee, payroll);
-        await PayrollUpdate.updateOne(
-          { _id: payroll._id },
-          { $set: { payslipEmailed: true } },
-        );
-        sent += 1;
-      } catch (error) {
+await enqueueEmail('payslip', { employee, payroll });
+        sent += 1;      } catch (error) {
         // One bad address or SMTP hiccup must not cost everyone else their
         // payslip, so the loop carries on and the failure is counted.
         failed += 1;
@@ -250,13 +243,12 @@ async function runDailyGreetingsJob({ now = new Date() } = {}) {
         if (employee.dateOfBirth) {
           const dob = new Date(employee.dateOfBirth);
           if (dob.getMonth() + 1 === month && dob.getDate() === day) {
-            await sendEmail({
+await enqueueEmail('generic', {
               to: employee.email,
               subject: `Happy Birthday, ${employee.fullName}!`,
               text: `Dear ${employee.fullName},\n\nWishing you a very Happy Birthday from everyone at ${employee.companyName}!\n\nBest Regards,\nThe Team`,
             });
-            sent += 1;
-          }
+            sent += 1;          }
         }
 
         if (employee.joiningDate) {
@@ -264,13 +256,12 @@ async function runDailyGreetingsJob({ now = new Date() } = {}) {
           if (joined.getMonth() + 1 === month && joined.getDate() === day) {
             const years = now.getFullYear() - joined.getFullYear();
             if (years > 0) {
-              await sendEmail({
+await enqueueEmail('generic', {
                 to: employee.email,
                 subject: `Happy ${years} Year Work Anniversary, ${employee.fullName}!`,
                 text: `Dear ${employee.fullName},\n\nCongratulations on reaching your ${years} year anniversary at ${employee.companyName}! We appreciate all your hard work.\n\nBest Regards,\nThe Team`,
               });
-              sent += 1;
-            }
+              sent += 1;            }
           }
         }
       } catch (error) {

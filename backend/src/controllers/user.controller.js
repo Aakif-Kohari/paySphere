@@ -8,8 +8,7 @@ const crypto = require('crypto');
 const User = require('../models/user.model');
 const Employee = require('../models/employee.model');
 const PayrollUpdate = require('../models/payroll.model');
-const { sendEmail } = require('../utils/email');
-const { authenticator } = require('otplib');
+const { enqueueEmail } = require('../jobs/email.queue');const { authenticator } = require('otplib');
 const QRCode = require('qrcode');
 const {
   isNonEmptyString,
@@ -796,13 +795,12 @@ exports.forgotPassword = async (req, res, next) => {
       `<hr/>` +
       `<p>If you did not request this, please ignore this email and your password will remain unchanged.</p>`;
 
-    await sendEmail({
+await enqueueEmail('generic', {
       to: user.email,
       subject: 'PaySphere Password Reset Link',
       text,
       html,
     });
-
     res.status(200).json({
       message:
         'If an account with that email exists, a password reset link has been sent.',

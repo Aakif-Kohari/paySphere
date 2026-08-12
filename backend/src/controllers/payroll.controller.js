@@ -1768,8 +1768,7 @@ exports.exportPayrollCSV = async (req, res, next) => {
   }
 };
 
-const { sendPayslipEmail } = require('../services/email.service');
-
+const { enqueueEmail } = require('../jobs/email.queue');
 // SEND PAYSLIP EMAIL manually
 exports.sendPayslipEmailHandler = async (req, res, next) => {
   try {
@@ -1817,14 +1816,9 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
       });
     }
 
-    await sendPayslipEmail(employee, payroll);
-    await PayrollUpdate.updateOne(
-      { _id: payroll._id },
-      { payslipEmailed: true },
-    );
+await enqueueEmail('payslip', { employee, payroll });
 
-    eventBus.emit('AUDIT_LOG', {
-      userId: req.userId,
+    eventBus.emit('AUDIT_LOG', {      userId: req.userId,
       action: 'PAYSLIP_EMAIL',
       resourceType: 'Payroll',
       resourceIds: [payroll._id],
@@ -1926,20 +1920,15 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
         continue;
       }
 
-      try {
-        await sendPayslipEmail(employee, payroll);
-        await PayrollUpdate.updateOne(
-          { _id: payroll._id },
-          { payslipEmailed: true },
-        );
+try {
+        await enqueueEmail('payslip', { employee, payroll });
         results.push({
           payrollId: payroll._id,
           employeeName: employee.fullName,
           email: employee.email,
-          status: 'sent',
+          status: 'queued',
         });
-        sentCount++;
-      } catch (err) {
+        sentCount++;      } catch (err) {
         logger.error(`Failed to send email to ${employee.fullName}`, {
           error: err.message,
           payrollId: payroll._id,
