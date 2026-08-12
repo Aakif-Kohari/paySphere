@@ -35,6 +35,11 @@ const PERMISSIONS = {
   // owner role — deliberately not something every admin of the workspace can do
   // (#474).
   MANAGE_WEBHOOKS: 'MANAGE_WEBHOOKS',
+  // Connecting an HRMS (#954) points an external system at the whole employee
+  // directory and lets it write into it, under credentials this account
+  // installs. Same class of authority as MANAGE_WEBHOOKS above, and kept with
+  // the owner for the same reason.
+  MANAGE_INTEGRATIONS: 'MANAGE_INTEGRATIONS',
   // Expense claims (#719). routes/expense.routes.js has asked for these since
   // it was written and none of them existed here, so the seeder never created
   // them, no role held them, and every expense endpoint answered 403 for every
@@ -110,6 +115,11 @@ const PERMISSION_DEFINITIONS = [
       'Create, update and delete webhook endpoints, which receive company data when payroll or employee events fire',
   },
   {
+    name: PERMISSIONS.MANAGE_INTEGRATIONS,
+    description:
+      'Connect, configure and sync an external HRMS, which can read and write the employee directory',
+  },
+  {
     name: PERMISSIONS.READ_EXPENSE,
     description: 'View expense claims and the categories they are filed under',
   },
@@ -176,6 +186,7 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_REPORT,
       PERMISSIONS.MANAGE_REPORT_SCHEDULE,
       PERMISSIONS.MANAGE_WEBHOOKS,
+      PERMISSIONS.MANAGE_INTEGRATIONS,
       PERMISSIONS.READ_EXPENSE,
       PERMISSIONS.WRITE_EXPENSE,
       PERMISSIONS.APPROVE_EXPENSE,
