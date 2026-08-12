@@ -2,9 +2,9 @@
   "name": "backend",
   "version": "1.0.0",
   "main": "index.js",
-  "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
+"scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node src/index.js",    "dev": "nodemon src/index.js",
     "seed": "node src/seeds/index.js",
     "seed:dev": "node src/seeds/devSeeder.js",
     "test": "jest",
@@ -12,9 +12,14 @@
     "test:mutate": "stryker run",
     "lint": "eslint ."
   },
-  "author": "",
-  "license": "ISC",
-  "description": "",
+"author": "",
+"license": "ISC",
+"devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.10.1",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/express": "^5.0.0"
+},  "description": "",
   "dependencies": {
     "@apollo/server": "^5.5.1",
     "@as-integrations/express5": "^1.1.2",
