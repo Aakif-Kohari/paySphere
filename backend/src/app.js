@@ -52,6 +52,7 @@ const expenseRoutes = require('./routes/expense.routes');
 const varianceReportRoutes = require('./routes/varianceReport.routes');
 const searchRoutes = require('./routes/search.routes');
 const emailRoutes = require('./routes/email.routes');
+const complianceRoutes = require('./routes/compliance.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -303,6 +304,12 @@ app.use('/api/reports', varianceReportRoutes);
 // Full-text search via Elasticsearch (#771). Returns ranked results across
 // employees, payroll, and audit-log indices without exposing raw Mongo regex.
 app.use('/api/search', searchRoutes);
+
+// Statutory compliance: Form 16 certificates and Form 24Q returns (#933).
+// The controller has been in the tree since #933 with no router and no mount,
+// so there was no URL that reached it — and consequently nobody noticed that
+// neither of the two models it requires had been committed (#951).
+app.use('/api/compliance', complianceRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
