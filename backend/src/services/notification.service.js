@@ -3,6 +3,12 @@ const Notification = require('../models/notification.model');
 const { ACCOUNT_TYPE } = require('../config/accountTypes');
 const { isUsableTenantId } = require('../utils/tenantScope');
 const logger = require('../utils/logger');
+const {
+  resolveChannels,
+  deliver,
+} = require('./notificationDispatcher.service');
+const { emitToUser } = require('../notifications/registry');
+const { NOTIFICATION_CHANNELS } = require('../config/notificationEvents');
 
 /**
  * Turning something that happened into something a person is told (#898).
@@ -316,16 +322,76 @@ async function notifyFromAuditEvent(payload) {
 
     const message = template.message(payload);
 
-    return await createNotifications(
-      recipients.map((user) => ({
-        userId: user._id,
-        tenantId,
-        title: template.title,
-        message,
-        type: template.type,
-        link: template.link,
-      })),
+    // What each recipient asked for (#952). Until this, every notifiable event
+    // went to every eligible admin's bell with no way to turn any of it off,
+    // and the email and Slack providers `notifications/registry.js` registers
+    // were unreachable from any path in the product.
+    //
+    // One query for the whole set, and it never throws: a preference lookup
+    // that fails falls back to the default for everybody, because losing the
+    // notification is a worse outcome than ignoring a preference once.
+    const channelsByUser = await resolveChannels(
+      recipients.map((user) => user._id),
+      payload.action,
     );
+
+    const inAppRows = [];
+    const externalDeliveries = [];
+
+    for (const user of recipients) {
+      const channels = channelsByUser.get(String(user._id)) || [];
+
+      for (const channel of channels) {
+        if (channel === NOTIFICATION_CHANNELS.IN_APP) {
+          inAppRows.push({
+            userId: user._id,
+            tenantId,
+            title: template.title,
+            message,
+            type: template.type,
+            link: template.link,
+          });
+          continue;
+        }
+
+        externalDeliveries.push(
+          deliver(channel, {
+            to: user._id,
+            subject: template.title,
+            body: message,
+            metadata: {
+              tenantId,
+              type: template.type,
+              link: template.link,
+              action: payload.action,
+            },
+          }),
+        );
+      }
+    }
+
+    // The bell stays a single batched write, as #898 built it: one round trip
+    // for a company's admins rather than one per person. Email and Slack go
+    // through their providers, which report their own failures and resolve
+    // rather than reject.
+    const [written] = await Promise.all([
+      createNotifications(inAppRows),
+      Promise.all(externalDeliveries),
+    ]);
+
+    // Everyone who is due a bell row gets a live push, if a socket server has
+    // been handed to the registry. Without `registry.setIO(io)` — which nothing
+    // called until #952 — the client only found out at its next poll.
+    for (const row of inAppRows) {
+      emitToUser(row.userId, 'notification:new', {
+        title: row.title,
+        message: row.message,
+        type: row.type,
+        link: row.link,
+      });
+    }
+
+    return written;
   } catch (error) {
     logger.error('Failed to turn an audit event into notifications', {
       action: payload?.action,

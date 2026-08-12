@@ -64,8 +64,11 @@ class FXService {
     const rate = Number((toRateUSD / fromRateUSD).toFixed(6));
 
     try {
-      // Cache rate for 24 hours (86400 seconds)
-      await cacheService.set(cacheKey, rate, 86400);
+      // Cache rate for 24 hours. `setEx(key, ttl, value)` — the call this
+      // replaces was `set(key, value, ttl)`, which the cache service does not
+      // export, so every rate lookup logged "cacheService.set is not a
+      // function" and nothing was ever cached (#952).
+      await cacheService.setEx(cacheKey, 86400, rate);
     } catch (err) {
       logger.warn('Redis write failed in FXService', { error: err.message });
     }
