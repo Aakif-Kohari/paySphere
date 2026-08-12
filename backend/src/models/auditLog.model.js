@@ -95,6 +95,10 @@ const AUDIT_RESOURCE_TYPES = [
   'WorkflowInstance',
   'Webhook',
   'MonthlyUpdate',
+  // Where staff are allowed to clock in from (#930, reachable since #953).
+  // Editing a fence changes whose attendance is recorded as field duty, so it
+  // is audited like the settings change it is.
+  'OfficeLocation',
 ];
 
 const auditLogSchema = new mongoose.Schema(
