@@ -50,6 +50,14 @@ const {
   resolveDepartmentEmployeeIds,
   applyEmployeeFilter,
 } = require('../utils/departmentFilter');
+// Arrears owed for months already paid at an older rate (#931). Required here
+// rather than inside the per-employee loop it is used from: that require named
+// a module that does not exist, and being inside the loop meant nothing found
+// out until a real payroll run hit it and every submission answered 500 (#950).
+const {
+  bundleUnreleasedArrears,
+  markArrearsReleased,
+} = require('../utils/arrearsCalculator');
 
 // Also dropped by the #464 merge alongside the payrollStatus import: both are
 // referenced by parsePayrollIdBatch and rejectPayroll (#458).
@@ -1140,13 +1148,18 @@ exports.submitPayrollForReview = async (req, res, next) => {
       // A tax-free reimbursement is not earnings — it is the employee being made
       // whole for money they already spent — so it lands after tax and after
       // loan recovery. Recovering a loan instalment out of somebody's train
-      // fare would be taking the same money twice. 
-      // Bundle Unreleased Arrears (Issue #931)
-      const { bundleUnreleasedArrears, markArrearsReleased } = require('../utils/arrearsCalculator');
-      const { totalArrears, arrearsBreakdown, ledgerIds } = await bundleUnreleasedArrears(employee._id, req.tenantId);
+      // fare would be taking the same money twice.
+      //
+      // Arrears from a backdated revision land in the same place, and for a
+      // related reason: they are money already earned in a month that has been
+      // paid, released here rather than recalculated into it (#931).
+      const { totalArrears, arrearsBreakdown, ledgerIds } =
+        await bundleUnreleasedArrears(employee._id, req.tenantId);
 
-      // Add arrears to net salary (Arrears are typically taxed in the month of receipt)
-      const finalNetSalary = (Math.round((netAfterRecovery + empExpenses.nonTaxable) * 100) / 100) + totalArrears;
+      const finalNetSalary =
+        Math.round(
+          (netAfterRecovery + empExpenses.nonTaxable + totalArrears) * 100,
+        ) / 100;
 
       preparedItems.push({
         employee,
@@ -1274,6 +1287,15 @@ exports.submitPayrollForReview = async (req, res, next) => {
         // linking a run to the claims it paid ran in one direction only (#794).
         reimbursements: item.reimbursements,
         reimbursedExpenseIds: item.reimbursedExpenseIds,
+        // #931 worked these out and wrote them into this object against a
+        // schema that declared none of them, so Mongoose's strict mode dropped
+        // all three on the way to the database. The payslip then showed a net
+        // figure larger than base + bonus − deductions with nothing on the row
+        // to explain the difference, which is the one thing a payslip must
+        // never do (#950).
+        arrearsPayout: item.arrearsPayout,
+        arrearsBreakdown: item.arrearsBreakdown,
+        arrearsLedgerIds: item.arrearsLedgerIds,
         // Recorded so a later audit can tell whether the leave figure came
         // from the validated ledger or from a parsed display string (#459).
         attendanceSource: item.attendanceSource,
@@ -1308,14 +1330,6 @@ exports.submitPayrollForReview = async (req, res, next) => {
 
     const bulkWriteOptions = session ? { session } : {};
     await PayrollUpdate.bulkWrite(bulkOps, bulkWriteOptions);
-
-    // Mark Arrears as Released (Issue #931)
-    for (const item of preparedItems) {
-      if (item.arrearsLedgerIds && item.arrearsLedgerIds.length > 0) {
-        const payrollId = payrollMap[item.employee._id.toString()];
-        await markArrearsReleased(item.arrearsLedgerIds, payrollId);
-      }
-    }
 
     // Issue #719: Mark expense claims as reimbursed and link to payroll
     const allReimbursedIds = preparedItems.flatMap(
@@ -1387,6 +1401,31 @@ exports.submitPayrollForReview = async (req, res, next) => {
       payrollMap[p.employeeId.toString()] = p._id;
     });
 
+    // Retire the arrears rows this run pays out (#931).
+    //
+    // Here, and not next to the bulkWrite where #931 put it, for two reasons.
+    // The ledger row has to point at the payroll row that paid it, and the ids
+    // only exist after the fetch above — `payrollMap` was read forty lines
+    // before its own `const`, which is a ReferenceError on any run with arrears
+    // to release. And the update has to be part of this transaction: released
+    // outside it, a later abort leaves the rows flagged paid against a payroll
+    // row that no longer exists, and nobody ever gets the money (#950).
+    for (const item of preparedItems) {
+      if (!item.arrearsLedgerIds || item.arrearsLedgerIds.length === 0) continue;
+
+      const payrollId = payrollMap[item.employee._id.toString()];
+
+      // No payroll row means nothing paid these arrears. Same reasoning as the
+      // expense claims above: leaving them unreleased is recoverable, marking
+      // them released is not.
+      if (!payrollId) continue;
+
+      await markArrearsReleased(item.arrearsLedgerIds, payrollId, {
+        tenantId: req.tenantId,
+        session,
+      });
+    }
+
     const results = preparedItems.map((item) => ({
       employeeName: item.employee.fullName,
       currency: item.employee.currency || 'INR',
@@ -1400,6 +1439,10 @@ exports.submitPayrollForReview = async (req, res, next) => {
       netSalary: item.netSalary,
       loanRecoveryTotal: item.loanRecoveryTotal,
       loanRecoveries: item.loanRecoveries,
+      // Reported back so the review screen can account for the difference
+      // between the salary figures above and the net actually paid.
+      arrearsPayout: item.arrearsPayout,
+      arrearsBreakdown: item.arrearsBreakdown,
       attendanceSource: item.attendanceSource,
       payrollId: payrollMap[item.employee._id.toString()],
     }));

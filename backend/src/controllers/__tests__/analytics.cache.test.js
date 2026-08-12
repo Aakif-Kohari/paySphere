@@ -7,6 +7,18 @@ const mongoose = require("mongoose");
 jest.mock("../../models/employee.model");
 jest.mock("../../models/payroll.model");
 jest.mock("../../models/user.model");
+// Read once per employee in a run, to bundle anything owed from a backdated
+// salary revision (#931). Mocked as a factory rather than automocked so the
+// query never reaches Mongoose: unmocked, it buffers against a database this
+// suite never connects to and every test in the file times out (#950).
+jest.mock('../../models/arrearsLedger.model', () => ({
+  find: jest.fn(() => ({
+    sort: jest.fn().mockReturnThis(),
+    lean: jest.fn().mockResolvedValue([]),
+  })),
+  updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
+  insertMany: jest.fn().mockResolvedValue([]),
+}));
 jest.mock("../../services/event.service", () => ({
   emit: jest.fn(),
   emitAuditLog: jest.fn(),

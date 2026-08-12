@@ -16,6 +16,11 @@ const {
   diffStructures,
 } = require('../utils/salaryStructure');
 const { REVISION_REASON } = require('../config/salaryComponents');
+// Required at the top rather than inside the handler. The lazy require this
+// replaces resolved a path that does not exist, and because its call site
+// catches and logs, every backdated revision since #931 merged produced a log
+// line and no ledger rows — invisibly (#950).
+const { processRetroactiveArrears } = require('../utils/arrearsCalculator');
 
 /**
  * Load an employee, asserting the caller owns it.
@@ -309,14 +314,22 @@ exports.createSalaryRevision = async (req, res, next) => {
       throw error;
     }
 
-    // Trigger Retroactive Arrears Engine (Issue #931)
-    // If the effective date is in the past, calculate deltas for missed months
+    // A revision effective in the past means the months since then were paid at
+    // the old rate, and the difference is owed (#931).
+    //
+    // Still deliberately non-fatal: the revision itself is saved and correct,
+    // and refusing to record a raise because the arrears arithmetic failed
+    // would be the worse outcome. But it now logs enough to act on — the
+    // message before this carried no revision or employee id, so nobody reading
+    // the log could tell who had been missed.
     try {
-      const { processRetroactiveArrears } = require('../utils/arrearsCalculator');
       await processRetroactiveArrears(created, previous, req.tenantId);
     } catch (arrearsError) {
-      logger.error('Failed to process retroactive arrears', { error: arrearsError.message });
-      // Don't fail the revision creation if arrears calculation fails
+      logger.error('Failed to process retroactive arrears', {
+        error: arrearsError.message,
+        revisionId: String(created._id),
+        employeeId: String(employee._id),
+      });
     }
 
     // Keep the denormalised figure in step, but only when this revision is the

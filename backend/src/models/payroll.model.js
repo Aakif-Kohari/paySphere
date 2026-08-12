@@ -246,6 +246,49 @@ customDeductions: [
     ],
 
     /**
+     * Back pay released by this run for months already paid at an older rate
+     * (#931, declared here in #950).
+     *
+     * Its own column for the same reason `reimbursements` is: it is not this
+     * month's earnings. Folding it into `bonus` would misstate both the payslip
+     * and every month-over-month comparison built on top of these rows.
+     *
+     * The controller has been computing all three of these since #931 and
+     * writing them into a document whose schema declared none of them, so
+     * Mongoose dropped them silently and the payslip showed an unexplained net.
+     */
+    arrearsPayout: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    /**
+     * Which months the payout is made of, so a payslip can itemise it.
+     *
+     * Denormalised out of the ledger deliberately: the ledger rows can be
+     * corrected or superseded later, and a payslip has to keep showing what was
+     * actually paid at the time it was issued.
+     */
+    arrearsBreakdown: [
+      {
+        month: { type: Number, min: 1, max: 12 },
+        year: { type: Number },
+        amount: { type: Number, default: 0 },
+        isProRated: { type: Boolean, default: false },
+        days: { type: Number, default: 0 },
+      },
+    ],
+
+    /** The ledger rows this run retired, for the audit trail back. */
+    arrearsLedgerIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'ArrearsLedger',
+      },
+    ],
+
+    /**
      * The salary component split in force when this row was calculated (#461).
      *
      * Snapshotted rather than looked up at render time, so a payslip regenerated
