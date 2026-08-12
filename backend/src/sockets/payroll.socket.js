@@ -8,6 +8,7 @@ const {
   LockRegistry,
   normalizeAdjustment,
 } = require('./payrollSession');
+const notificationRegistry = require('../notifications/registry');
 
 /**
  * The collaborative payroll session (#589), made tenant-safe (#615).
@@ -137,10 +138,20 @@ exports.init = (server) => {
     return next();
   });
 
+  // Hand the socket server to the notification registry (#952). Nothing called
+  // `setIO` before, so the in-app provider's `_io` was null for the life of the
+  // process and a notification only reached the client at its next poll.
+  notificationRegistry.setIO(io);
+
   io.on('connection', (socket) => {
     const { userId, tenantId, name } = socket.identity;
 
     logger.info('Payroll session socket connected', { userId, tenantId });
+
+    // The room a notification is pushed to. Keyed off `socket.identity`, which
+    // comes from the verified token — never from a payload, for the same reason
+    // the payroll room below is not (#615).
+    socket.join('user:' + userId);
 
     socket.on('join_payroll_session', ({ month, year } = {}) => {
       // Built from `socket.identity.tenantId`, never from the payload.
