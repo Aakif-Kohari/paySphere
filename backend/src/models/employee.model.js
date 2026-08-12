@@ -5,8 +5,8 @@ const {
   MONTHLY_SALARY_MAX,
   OVERTIME_RATE_MAX,
   PHONE_REGEX,
-} = require('../utils/validators');
-const { EMPLOYMENT_STATUS, EXIT_TYPE } = require('../config/employment');
+  EMAIL_REGEX,
+} = require('../utils/validators');const { EMPLOYMENT_STATUS, EXIT_TYPE } = require('../config/employment');
 
 const employeeSchema = new mongoose.Schema(
   {
@@ -15,11 +15,13 @@ const employeeSchema = new mongoose.Schema(
       required: true,
       maxlength: [100, 'Full name cannot exceed 100 characters'],
     },
-    email: {
+email: {
       type: String,
       required: false,
-    },
-    /**
+      trim: true,
+      lowercase: true,
+      match: [EMAIL_REGEX, 'Please provide a valid email address'],
+    },    /**
      * Employee contact number, validated as an international phone number
      * with an optional leading "+" and a national number of 7-15 digits.
      * Optional on creation, same as `email`.
@@ -102,10 +104,13 @@ const employeeSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    dateOfBirth: {
+dateOfBirth: {
       type: Date,
-    },
-    joiningDate: {
+      validate: {
+        validator: (value) => !value || value <= new Date(),
+        message: 'Date of birth cannot be in the future',
+      },
+    },    joiningDate: {
       type: Date,
     },
     currency: {
