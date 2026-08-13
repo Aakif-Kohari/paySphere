@@ -572,6 +572,70 @@ exports.getLeaveBalance = async (req, res, next) => {
   }
 };
 
+/**
+ * POST /api/attendance/biometric-sync
+ * Synchronize raw biometric clock-in/out logs and update attendance grid with shift overtime multipliers.
+ */
+exports.syncBiometricAttendance = async (req, res, next) => {
+  try {
+    const { employeeId, year, month, logs } = req.body || {};
+
+    const period = parsePeriod(year, month);
+    if (!period.ok) {
+      return res.status(400).json({ message: period.message });
+    }
+
+    const owned = await loadOwnedEmployee(employeeId, req.tenantId);
+    if (!owned.ok) {
+      return res.status(owned.status).json({ message: owned.message });
+    }
+
+    const { parseBiometricLogs, validateGrid, computeTotals } = require('../utils/attendanceGrid');
+    const parsedDays = parseBiometricLogs(logs, period.year, period.month);
+    const validated = validateGrid(parsedDays, period.year, period.month);
+
+    if (!validated.ok) {
+      return res.status(400).json({ message: 'Invalid biometric attendance data', errors: validated.errors });
+    }
+
+    const totals = computeTotals(validated.days);
+
+    let attendanceRecord = await Attendance.findOne({
+      employeeId: owned.employee._id,
+      tenantId: req.tenantId,
+      year: period.year,
+      month: period.month,
+    });
+
+    if (!attendanceRecord) {
+      attendanceRecord = new Attendance({
+        employeeId: owned.employee._id,
+        tenantId: req.tenantId,
+        year: period.year,
+        month: period.month,
+        days: validated.days,
+        summary: totals,
+      });
+    } else {
+      attendanceRecord.days = validated.days;
+      attendanceRecord.summary = totals;
+    }
+
+    await attendanceRecord.save();
+
+    return res.status(200).json({
+      message: 'Biometric attendance synced successfully',
+      employeeId: String(owned.employee._id),
+      year: period.year,
+      month: period.month,
+      totals,
+      record: attendanceRecord,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Exported for the payroll integration and the tests.
 exports._internals = {
   parsePeriod,
