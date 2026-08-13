@@ -13,8 +13,7 @@ const { generatePayrollCSV } = require('../utils/csvExport');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const cacheService = require('../services/cache.service');
-const AnomalyService = require('../services/anomaly.service');
-const FXService = require('../services/fx.service');
+const BlockchainService = require('../services/blockchain.service');
 // `webhookService` was imported for the stray `triggerEvent` call #543 left in
 // the middle of submitPayrollForReview. That call is gone (see below) and the
 // service has never exported `triggerEvent` anyway — payroll webhooks are
@@ -51,6 +50,14 @@ const {
   resolveDepartmentEmployeeIds,
   applyEmployeeFilter,
 } = require('../utils/departmentFilter');
+// Arrears owed for months already paid at an older rate (#931). Required here
+// rather than inside the per-employee loop it is used from: that require named
+// a module that does not exist, and being inside the loop meant nothing found
+// out until a real payroll run hit it and every submission answered 500 (#950).
+const {
+  bundleUnreleasedArrears,
+  markArrearsReleased,
+} = require('../utils/arrearsCalculator');
 
 // Also dropped by the #464 merge alongside the payrollStatus import: both are
 // referenced by parsePayrollIdBatch and rejectPayroll (#458).
@@ -1002,8 +1009,8 @@ exports.submitPayrollForReview = async (req, res, next) => {
           : leaveDays;
       overtimeHours =
         isNaN(overtimeHours) ||
-        !Number.isFinite(overtimeHours) ||
-        overtimeHours < 0
+          !Number.isFinite(overtimeHours) ||
+          overtimeHours < 0
           ? 0
           : overtimeHours;
       bonus = isNaN(bonus) || !Number.isFinite(bonus) || bonus < 0 ? 0 : bonus;
@@ -1142,8 +1149,17 @@ exports.submitPayrollForReview = async (req, res, next) => {
       // whole for money they already spent — so it lands after tax and after
       // loan recovery. Recovering a loan instalment out of somebody's train
       // fare would be taking the same money twice.
+      //
+      // Arrears from a backdated revision land in the same place, and for a
+      // related reason: they are money already earned in a month that has been
+      // paid, released here rather than recalculated into it (#931).
+      const { totalArrears, arrearsBreakdown, ledgerIds } =
+        await bundleUnreleasedArrears(employee._id, req.tenantId);
+
       const finalNetSalary =
-        Math.round((netAfterRecovery + empExpenses.nonTaxable) * 100) / 100;
+        Math.round(
+          (netAfterRecovery + empExpenses.nonTaxable + totalArrears) * 100,
+        ) / 100;
 
       preparedItems.push({
         employee,
@@ -1162,6 +1178,9 @@ exports.submitPayrollForReview = async (req, res, next) => {
         loanRecoveryTotal: recovery.totalRecovered,
         attendanceSource,
         salarySnapshot,
+        arrearsPayout: totalArrears,
+        arrearsBreakdown: arrearsBreakdown,
+        arrearsLedgerIds: ledgerIds,
       });
     }
 
@@ -1268,6 +1287,15 @@ exports.submitPayrollForReview = async (req, res, next) => {
         // linking a run to the claims it paid ran in one direction only (#794).
         reimbursements: item.reimbursements,
         reimbursedExpenseIds: item.reimbursedExpenseIds,
+        // #931 worked these out and wrote them into this object against a
+        // schema that declared none of them, so Mongoose's strict mode dropped
+        // all three on the way to the database. The payslip then showed a net
+        // figure larger than base + bonus − deductions with nothing on the row
+        // to explain the difference, which is the one thing a payslip must
+        // never do (#950).
+        arrearsPayout: item.arrearsPayout,
+        arrearsBreakdown: item.arrearsBreakdown,
+        arrearsLedgerIds: item.arrearsLedgerIds,
         // Recorded so a later audit can tell whether the leave figure came
         // from the validated ledger or from a parsed display string (#459).
         attendanceSource: item.attendanceSource,
@@ -1373,6 +1401,31 @@ exports.submitPayrollForReview = async (req, res, next) => {
       payrollMap[p.employeeId.toString()] = p._id;
     });
 
+    // Retire the arrears rows this run pays out (#931).
+    //
+    // Here, and not next to the bulkWrite where #931 put it, for two reasons.
+    // The ledger row has to point at the payroll row that paid it, and the ids
+    // only exist after the fetch above — `payrollMap` was read forty lines
+    // before its own `const`, which is a ReferenceError on any run with arrears
+    // to release. And the update has to be part of this transaction: released
+    // outside it, a later abort leaves the rows flagged paid against a payroll
+    // row that no longer exists, and nobody ever gets the money (#950).
+    for (const item of preparedItems) {
+      if (!item.arrearsLedgerIds || item.arrearsLedgerIds.length === 0) continue;
+
+      const payrollId = payrollMap[item.employee._id.toString()];
+
+      // No payroll row means nothing paid these arrears. Same reasoning as the
+      // expense claims above: leaving them unreleased is recoverable, marking
+      // them released is not.
+      if (!payrollId) continue;
+
+      await markArrearsReleased(item.arrearsLedgerIds, payrollId, {
+        tenantId: req.tenantId,
+        session,
+      });
+    }
+
     const results = preparedItems.map((item) => ({
       employeeName: item.employee.fullName,
       currency: item.employee.currency || 'INR',
@@ -1386,6 +1439,10 @@ exports.submitPayrollForReview = async (req, res, next) => {
       netSalary: item.netSalary,
       loanRecoveryTotal: item.loanRecoveryTotal,
       loanRecoveries: item.loanRecoveries,
+      // Reported back so the review screen can account for the difference
+      // between the salary figures above and the net actually paid.
+      arrearsPayout: item.arrearsPayout,
+      arrearsBreakdown: item.arrearsBreakdown,
       attendanceSource: item.attendanceSource,
       payrollId: payrollMap[item.employee._id.toString()],
     }));
@@ -1588,9 +1645,9 @@ exports.getPayrollSummary = async (req, res, next) => {
       PayrollUpdate.countDocuments(baseQuery),
       limit > 0
         ? PayrollUpdate.find(baseQuery)
-            .sort({ employeeName: 1 })
-            .skip(skip)
-            .limit(limit)
+          .sort({ employeeName: 1 })
+          .skip(skip)
+          .limit(limit)
         : PayrollUpdate.find(baseQuery).sort({ employeeName: 1 }),
     ]);
 
@@ -1753,8 +1810,7 @@ exports.exportPayrollCSV = async (req, res, next) => {
   }
 };
 
-const { sendPayslipEmail } = require('../services/email.service');
-
+const { enqueueEmail } = require('../jobs/email.queue');
 // SEND PAYSLIP EMAIL manually
 exports.sendPayslipEmailHandler = async (req, res, next) => {
   try {
@@ -1802,14 +1858,9 @@ exports.sendPayslipEmailHandler = async (req, res, next) => {
       });
     }
 
-    await sendPayslipEmail(employee, payroll);
-    await PayrollUpdate.updateOne(
-      { _id: payroll._id },
-      { payslipEmailed: true },
-    );
+await enqueueEmail('payslip', { employee, payroll });
 
-    eventBus.emit('AUDIT_LOG', {
-      userId: req.userId,
+    eventBus.emit('AUDIT_LOG', {      userId: req.userId,
       action: 'PAYSLIP_EMAIL',
       resourceType: 'Payroll',
       resourceIds: [payroll._id],
@@ -1911,20 +1962,15 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
         continue;
       }
 
-      try {
-        await sendPayslipEmail(employee, payroll);
-        await PayrollUpdate.updateOne(
-          { _id: payroll._id },
-          { payslipEmailed: true },
-        );
+try {
+        await enqueueEmail('payslip', { employee, payroll });
         results.push({
           payrollId: payroll._id,
           employeeName: employee.fullName,
           email: employee.email,
-          status: 'sent',
+          status: 'queued',
         });
-        sentCount++;
-      } catch (err) {
+        sentCount++;      } catch (err) {
         logger.error(`Failed to send email to ${employee.fullName}`, {
           error: err.message,
           payrollId: payroll._id,
@@ -1982,29 +2028,38 @@ exports.sendAllPayslipsEmailHandler = async (req, res, next) => {
 };
 
 /**
- * GET /api/payroll/anomalies
- * Analyze active or past payroll records for statistical and fraud anomalies.
+ * GET /api/payroll/:id/merkle-proof
+ * Generate and verify cryptographic Merkle proof for an individual payroll record.
  */
-exports.inspectAnomalies = async (req, res, next) => {
+exports.getMerkleProofHandler = async (req, res, next) => {
   try {
     const tenantId = requireTenant(req, res);
     if (!tenantId) return;
 
-    const month = parseInt(req.query.month, 10) || new Date().getMonth() + 1;
-    const year = parseInt(req.query.year, 10) || new Date().getFullYear();
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid payroll ID format' });
+    }
 
-    const [currentPayrolls, historicalPayrolls] = await Promise.all([
-      PayrollUpdate.find({ tenantId, month, year }).lean(),
-      PayrollUpdate.find({ tenantId, createdAt: { $gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) } }).lean(),
-    ]);
+    const targetPayroll = await PayrollUpdate.findOne({ _id: id, tenantId }).lean();
+    if (!targetPayroll) {
+      return res.status(404).json({ message: 'Payroll record not found' });
+    }
 
-    const report = AnomalyService.detectAnomalies(currentPayrolls, historicalPayrolls);
+    const batch = await PayrollUpdate.find({
+      tenantId,
+      month: targetPayroll.month,
+      year: targetPayroll.year,
+    }).lean();
+
+    const proofData = BlockchainService.getMerkleProof(batch, id);
+    const anchorData = await BlockchainService.anchorToEthereum(proofData.root);
 
     return res.status(200).json({
       success: true,
-      month,
-      year,
-      report,
+      payrollId: id,
+      ...proofData,
+      anchor: anchorData,
     });
   } catch (error) {
     next(error);

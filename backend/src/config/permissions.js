@@ -35,6 +35,11 @@ const PERMISSIONS = {
   // owner role — deliberately not something every admin of the workspace can do
   // (#474).
   MANAGE_WEBHOOKS: 'MANAGE_WEBHOOKS',
+  // Connecting an HRMS (#954) points an external system at the whole employee
+  // directory and lets it write into it, under credentials this account
+  // installs. Same class of authority as MANAGE_WEBHOOKS above, and kept with
+  // the owner for the same reason.
+  MANAGE_INTEGRATIONS: 'MANAGE_INTEGRATIONS',
   // Expense claims (#719). routes/expense.routes.js has asked for these since
   // it was written and none of them existed here, so the seeder never created
   // them, no role held them, and every expense endpoint answered 403 for every
@@ -50,6 +55,23 @@ const PERMISSIONS = {
   // paid as taxable earnings or as a tax-free reimbursement. That is a tax
   // decision rather than day-to-day expense admin, so it stays with the owner.
   MANAGE_EXPENSE_CATEGORY: 'MANAGE_EXPENSE_CATEGORY',
+  // Statutory compliance (#933, reachable since #951). Deliberately not
+  // READ_REPORT: a Form 16 is one person's complete tax position and a Form 24Q
+  // export is every employee's PAN, salary and tax in one file, while
+  // READ_REPORT is held by every role including Employee.
+  // Declared here because `routes/role.routes.js` gates all four of its routes
+  // on it and `PERMISSION_DEFINITIONS` below already has an entry for it — but
+  // the name itself was never added to this object, so every one of those
+  // routes called `requirePermission(undefined)` and the definition was written
+  // to the database with `name: undefined`. Found while adding the compliance
+  // permissions below, because the invariant tests in `permissions.expense.test`
+  // and `rbac.seed.test` fail on it.
+  MANAGE_ROLES: 'MANAGE_ROLES',
+  READ_COMPLIANCE: 'READ_COMPLIANCE',
+  // Writing the company's TAN, or marking a tax declaration verified, decides
+  // what gets filed with the tax department under the employer's name. Kept
+  // with the owner for the same reason MANAGE_EXPENSE_CATEGORY is.
+  MANAGE_COMPLIANCE: 'MANAGE_COMPLIANCE',
 };
 
 const PERMISSION_DEFINITIONS = [
@@ -93,6 +115,11 @@ const PERMISSION_DEFINITIONS = [
       'Create, update and delete webhook endpoints, which receive company data when payroll or employee events fire',
   },
   {
+    name: PERMISSIONS.MANAGE_INTEGRATIONS,
+    description:
+      'Connect, configure and sync an external HRMS, which can read and write the employee directory',
+  },
+  {
     name: PERMISSIONS.READ_EXPENSE,
     description: 'View expense claims and the categories they are filed under',
   },
@@ -111,9 +138,19 @@ const PERMISSION_DEFINITIONS = [
       'Create and edit expense categories, including whether a category is taxable',
   },
   {
+    name: PERMISSIONS.READ_COMPLIANCE,
+    description:
+      'View compliance settings and download Form 16 certificates and Form 24Q returns',
+  },
+  {
+    name: PERMISSIONS.MANAGE_COMPLIANCE,
+    description:
+      "Set the company's TAN and PAN and record or verify employee tax declarations",
+  },
+  {
     name: PERMISSIONS.MANAGE_ROLES,
     description:
-      "Create, update and delete custom roles and their permission sets",
+      'Create, update and delete custom roles and their permission sets',
   },
 ];
 
@@ -149,10 +186,16 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_REPORT,
       PERMISSIONS.MANAGE_REPORT_SCHEDULE,
       PERMISSIONS.MANAGE_WEBHOOKS,
+      PERMISSIONS.MANAGE_INTEGRATIONS,
       PERMISSIONS.READ_EXPENSE,
       PERMISSIONS.WRITE_EXPENSE,
       PERMISSIONS.APPROVE_EXPENSE,
       PERMISSIONS.MANAGE_EXPENSE_CATEGORY,
+      PERMISSIONS.READ_COMPLIANCE,
+      PERMISSIONS.MANAGE_COMPLIANCE,
+      // Held by the owner alone: a role edit changes what every other account
+      // in the company can do.
+      PERMISSIONS.MANAGE_ROLES,
     ],
   },
   {
@@ -172,6 +215,9 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_EXPENSE,
       PERMISSIONS.WRITE_EXPENSE,
       PERMISSIONS.APPROVE_EXPENSE,
+      // Issuing Form 16 at year end is HR's job. Setting the TAN the return is
+      // filed under is not — that stays with the owner.
+      PERMISSIONS.READ_COMPLIANCE,
     ],
   },
   {

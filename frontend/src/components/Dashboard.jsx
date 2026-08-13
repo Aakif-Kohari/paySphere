@@ -1,3 +1,4 @@
+import styles from './Dashboard.module.css';
 import { useEffect, useMemo, useState } from "react"
 import {
   DndContext,
@@ -46,7 +47,7 @@ function SortableCard({ id, title, value, subtitle }) {
     <div
       ref={setNodeRef}
       style={style}
-      className="rounded-3xl border border-gray-200 dark:border-slate-800 bg-white/90 dark:bg-slate-950/90 p-5 shadow-xl"
+      className={styles.container}
       {...attributes}
       {...listeners}
     >

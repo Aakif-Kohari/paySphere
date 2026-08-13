@@ -13,6 +13,7 @@ const ExpenseCategory = require('../models/expenseCategory.model');
 const Employee = require('../models/employee.model');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
+const OCRService = require('../services/ocr.service');
 const { ACCOUNT_TYPE } = require('../config/accountTypes');
 const { sanitizeText } = require('../utils/validators');
 
@@ -465,3 +466,25 @@ exports.updateCategory = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * POST /api/expenses/parse-receipt
+ * Parse receipt text/file using OCR parsing engine and auto-convert currency.
+ */
+exports.parseReceipt = async (req, res, next) => {
+  try {
+    const rawText = req.body?.rawText || (req.file ? req.file.buffer.toString('utf8') : '');
+    const targetCurrency = req.body?.targetCurrency || 'USD';
+
+    if (!rawText || rawText.trim() === '') {
+      return res.status(400).json({ message: 'No receipt text or image file provided' });
+    }
+
+    const ocrResult = await OCRService.processReceipt(rawText, targetCurrency);
+    return res.status(200).json(ocrResult);
+  } catch (error) {
+    logger.error('Failed to parse receipt via OCR', { error: error.message });
+    next(error);
+  }
+};
+

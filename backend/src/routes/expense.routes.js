@@ -23,6 +23,7 @@ const {
   getCategories,
   createCategory,
   updateCategory,
+  parseReceipt,
 } = require('../controllers/expense.controller');
 
 const router = express.Router();
@@ -79,6 +80,14 @@ router.patch(
   requirePermission(PERMISSIONS.APPROVE_EXPENSE),
   writeRateLimiter,
   updateExpenseStatus,
+);
+
+router.post(
+  '/parse-receipt',
+  auth,
+  requirePermission(PERMISSIONS.WRITE_EXPENSE),
+  receiptUpload.single('receipt'),
+  parseReceipt,
 );
 
 module.exports = router;

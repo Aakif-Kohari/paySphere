@@ -7,6 +7,18 @@ const mongoose = require("mongoose");
 jest.mock("../../models/employee.model");
 jest.mock("../../models/payroll.model");
 jest.mock("../../models/user.model");
+// Read once per employee in a run, to bundle anything owed from a backdated
+// salary revision (#931). Mocked as a factory rather than automocked so the
+// query never reaches Mongoose: unmocked, it buffers against a database this
+// suite never connects to and every test in the file times out (#950).
+jest.mock('../../models/arrearsLedger.model', () => ({
+  find: jest.fn(() => ({
+    sort: jest.fn().mockReturnThis(),
+    lean: jest.fn().mockResolvedValue([]),
+  })),
+  updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
+  insertMany: jest.fn().mockResolvedValue([]),
+}));
 jest.mock("../../services/event.service", () => ({
   emit: jest.fn(),
   emitAuditLog: jest.fn(),
@@ -17,6 +29,7 @@ jest.mock("../../services/email.service", () => ({
 }));
 jest.mock("../../services/cache.service", () => ({
   invalidateAnalytics: jest.fn().mockResolvedValue(true),
+  invalidateDashboardSummary: jest.fn().mockResolvedValue(true),
   invalidatePattern: jest.fn().mockResolvedValue(undefined),
   get: jest.fn(),
   setEx: jest.fn(),
@@ -55,6 +68,15 @@ jest.mock("../../models/loan.model", () => ({
 // resolution is covered in salaryStructure.test.js.
 jest.mock("../../models/salaryStructure.model", () => ({
   find: jest.fn(() => ({ sort: jest.fn().mockResolvedValue([]) })),
+}));
+
+// submitPayrollForReview now reimburses approved expense claims (#719).
+jest.mock("../../models/expenseClaim.model", () => ({
+  find: jest.fn(() => ({
+    populate: jest.fn(() => ({
+      lean: jest.fn().mockResolvedValue([]),
+    })),
+  })),
 }));
 
 const { submitPayrollForReview } = require("../payroll.controller");
@@ -125,7 +147,7 @@ describe("analytics cache invalidation (#415)", () => {
       PayrollUpdate.bulkWrite.mockResolvedValue({});
       PayrollUpdate.find
         .mockImplementationOnce(() => createQueryMock([]))
-        .mockImplementationOnce(() =>
+        .mockImplementation(() =>
           createQueryMock([{ _id: "payroll-1", employeeId: "emp-1" }]),
         );
     });
