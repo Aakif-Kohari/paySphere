@@ -1,55 +1,69 @@
-import { useEffect, useMemo, useState } from "react"
-import { useSelector, useDispatch } from "react-redux"
-import { ThemeProvider, createTheme, CssBaseline, Snackbar, Alert } from "@mui/material"
-import { BrowserRouter, Routes, Route } from "react-router-dom"
-import { logout } from "./features/auth/authSlice"
-import Landing from "./pages/Landing"
-import LoginSignUp from "./pages/LoginSignUp"
-import Dashboard from "./pages/Dashboard"
-import MonthlyUpdates from "./pages/MonthlyUpdates"
-import AddEmployee from "./pages/AddEmployee"
-import ResetPassword from "./pages/ResetPassword"
-import Settings from "./pages/Settings"
-import Reports from "./pages/Reports"
-import EmployeePortal from "./pages/EmployeePortal"
-import NotFound from "./pages/NotFound"
-import ProtectedRoute from "./components/ProtectedRoute"
-import ScrollToTop from "./components/common/ScrollToTop"
-import CommandPalette from "./components/common/CommandPalette"
+import {
+  createTheme,
+  CssBaseline,
+  ThemeProvider,
+} from '@mui/material';
+import * as Sentry from '@sentry/react';
+import { useEffect, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+
+import CommandPalette from './components/common/CommandPalette';
+import ScrollToTop from './components/common/ScrollToTop';
 import OfflineSyncIndicator from './components/OfflineSyncIndicator';
-import SystemHealth from "./pages/SystemHealth"
-import Flashcards from "./pages/Flashcards"
-import PyqDashboard from "./pages/PyqDashboard"
-import QuizBattle from "./pages/QuizBattle"
+import ProtectedRoute from './components/ProtectedRoute';
+import { ToastProvider } from './context/ToastContext';
+import { logout } from './features/auth/authSlice';
+
+import AddEmployee from './pages/AddEmployee';
+import Dashboard from './pages/Dashboard';
+import EmployeePortal from './pages/EmployeePortal';
+import Flashcards from './pages/Flashcards';
+import Landing from './pages/Landing';
+import LoginSignUp from './pages/LoginSignUp';
+import MonthlyUpdates from './pages/MonthlyUpdates';
+import NotFound from './pages/NotFound';
+import PyqDashboard from './pages/PyqDashboard';
+import QuizBattle from './pages/QuizBattle';
+import Reports from './pages/Reports';
+import ResetPassword from './pages/ResetPassword';
+import Settings from './pages/Settings';
+import SystemHealth from './pages/SystemHealth';
 
 function App() {
   const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
   const themeMode = useSelector((state) => state.ui.themeMode);
-  const [toast, setToast] = useState({ open: false, message: "", severity: "info" });
 
-  // Listen to global toast events (e.g. from axios interceptor background saves)
+  // Sync user context to Sentry (#770)
   useEffect(() => {
-    const handleToastShow = (e) => {
-      setToast({
-        open: true,
-        message: e.detail?.message || "Notification received",
-        severity: e.detail?.severity || "info",
+    if (user) {
+      Sentry.setUser({
+        id: user.id || user._id,
+        email: user.email,
+        username: user.name,
       });
-    };
-    window.addEventListener("toast:show", handleToastShow);
-    return () => window.removeEventListener("toast:show", handleToastShow);
-  }, []);
+    } else {
+      Sentry.setUser(null);
+    }
+  }, [user]);
 
-  // Synchronize Redux auth state when API interceptor detects expired/invalid auth
+  // Synchronize Redux auth state when API interceptor
+  // detects expired/invalid authentication
   useEffect(() => {
     const handleAuthLogout = () => {
       dispatch(logout());
     };
+
     window.addEventListener('auth:logout', handleAuthLogout);
-    return () => window.removeEventListener('auth:logout', handleAuthLogout);
+
+    return () => {
+      window.removeEventListener('auth:logout', handleAuthLogout);
+    };
   }, [dispatch]);
 
-  // Sync dark class on html document element for Tailwind v4 custom dark variant
+  // Sync dark class on html document element
+  // for Tailwind v4 custom dark variant
   useEffect(() => {
     if (themeMode === 'dark') {
       document.documentElement.classList.add('dark');
@@ -77,70 +91,118 @@ function App() {
   return (
     <ThemeProvider theme={muiTheme}>
       <CssBaseline />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/auth" element={<LoginSignUp />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/employee-portal"
-            element={
-              <ProtectedRoute>
-                <EmployeePortal />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/monthly-updates"
-            element={
-              <ProtectedRoute>
-                <MonthlyUpdates />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/add-employee"
-            element={
-              <ProtectedRoute>
-                <AddEmployee />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/reset-password/:token" element={<ResetPassword />} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="/settings/system-health" element={<ProtectedRoute><SystemHealth /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-          <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
-          <Route path="/pyqs" element={<ProtectedRoute><PyqDashboard /></ProtectedRoute>} />
-          <Route path="/quiz-battle" element={<ProtectedRoute><QuizBattle /></ProtectedRoute>} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        <ScrollToTop />
-        <CommandPalette />
-        {/* Global Offline Sync Indicator (Issue #815) */}
-        <OfflineSyncIndicator />
-      </BrowserRouter>
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={6000}
-        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert
-          severity={toast.severity}
-          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
-          sx={{ width: '100%' }}
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
+
+      <ToastProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/auth" element={<LoginSignUp />} />
+
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/employee-portal"
+              element={
+                <ProtectedRoute>
+                  <EmployeePortal />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/monthly-updates"
+              element={
+                <ProtectedRoute>
+                  <MonthlyUpdates />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/add-employee"
+              element={
+                <ProtectedRoute>
+                  <AddEmployee />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/reset-password/:token"
+              element={<ResetPassword />}
+            />
+
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/settings/system-health"
+              element={
+                <ProtectedRoute>
+                  <SystemHealth />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute>
+                  <Reports />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/flashcards"
+              element={
+                <ProtectedRoute>
+                  <Flashcards />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/pyqs"
+              element={
+                <ProtectedRoute>
+                  <PyqDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/quiz-battle"
+              element={
+                <ProtectedRoute>
+                  <QuizBattle />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+
+          <ScrollToTop />
+          <CommandPalette />
+
+          {/* Global Offline Sync Indicator (Issue #815) */}
+          <OfflineSyncIndicator />
+        </BrowserRouter>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

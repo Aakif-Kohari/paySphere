@@ -1,7 +1,11 @@
 'use strict';
 const Policy = require('../models/policy.model');
 const cacheService = require('./cache.service');
-const logger = require('./logger');
+// `../utils/logger`, not `./logger`: there is no services/logger.js, so
+// requiring this module threw MODULE_NOT_FOUND and the row-level-security
+// policy engine could never load — the same one-character mistake that kept
+// notificationDispatcher.service.js from ever running (#952).
+const logger = require('../utils/logger');
 const CACHE_TTL = 60;
 function interpolate(value, user) {
   if (typeof value !== 'string') return value;
@@ -21,7 +25,9 @@ async function fetchPolicies(tenantId, resource, action) {
   const cached = await cacheService.get(key);
   if (cached) return cached;
   const policies = await Policy.find({ tenantId, resource, isActive: true, action: { $in: [action, '*'] } }).lean();
-  await cacheService.set(key, policies, CACHE_TTL);
+  // `setEx(key, ttl, value)`. There is no `set` on the cache service, and the
+  // argument order is not the one this call assumed either (#952).
+  await cacheService.setEx(key, CACHE_TTL, policies);
   return policies;
 }
 async function buildQuery(resource, action, req) {

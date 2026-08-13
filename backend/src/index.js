@@ -1,4 +1,12 @@
 require('dotenv').config();
+const Sentry = require('@sentry/node');
+
+// Initialize Sentry for production error tracking (#770)
+Sentry.init({
+  dsn: process.env.SENTRY_DSN || 'https://public@o0.ingest.sentry.io/0',
+  tracesSampleRate: 1.0,
+  environment: process.env.NODE_ENV || 'production',
+});
 
 const app = require('./app');
 const connectDB = require('./config/db');
@@ -17,7 +25,7 @@ const {
 } = require('./listeners/notification.listener');
 const { initializeWebhookService } = require('./services/webhook.service');
 const { startWebhookWorker } = require('./workers/webhook.worker');
-const { isRedisAvailable } = require('./config/redis');
+const { startEmailWorker } = require('./workers/email.worker');const { isRedisAvailable } = require('./config/redis');
 const { attachGraphQL } = require('./graphql');
 const logger = require('./utils/logger');
 const TelemetryService = require('./config/telemetry');
@@ -87,14 +95,17 @@ const startServer = async () => {
   // PaySphere (cache.service.js falls back to in-memory), so without REDIS_URL
   // the worker is not started at all — the dispatch service logs a warning on
   // each event instead of enqueueing into a queue nothing is draining.
-  if (process.env.REDIS_URL) {
+if (process.env.REDIS_URL) {
     startWebhookWorker();
+    startEmailWorker();
   } else if (!isRedisAvailable()) {
     logger.warn(
       'Webhook worker not started: REDIS_URL is not set. Webhook deliveries require Redis.',
     );
-  }
-  // Mount /graphql, if the packages for it are installed.
+    logger.warn(
+      'Email worker not started: REDIS_URL is not set. Emails will not be sent until Redis is available.',
+    );
+  }  // Mount /graphql, if the packages for it are installed.
   //
   // This used to live in app.js as a top-level `await`, which is a syntax error
   // in CommonJS and left the whole file unparseable (#792). `ApolloServer.start()`

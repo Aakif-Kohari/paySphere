@@ -59,9 +59,12 @@ const makeSocket = (id = 'socket-1') => {
     on: jest.fn(function (event, fn) {
       handlers[event] = fn;
     }),
-    emit: jest.fn((event, payload) => mockEmissions.push({ to: id, event, payload })),
+    emit: jest.fn((event, payload) =>
+      mockEmissions.push({ to: id, event, payload }),
+    ),
     to: jest.fn((room) => ({
-      emit: (event, payload) => mockEmissions.push({ room, event, payload, excluding: id }),
+      emit: (event, payload) =>
+        mockEmissions.push({ room, event, payload, excluding: id }),
     })),
     fire: (event, payload) => handlers[event] && handlers[event](payload),
     has: (event) => Boolean(handlers[event]),
@@ -146,7 +149,10 @@ describe('handshake (#615)', () => {
   test('rejects a token signed with the wrong secret', async () => {
     const { io } = boot();
     const socket = makeSocket();
-    socket.handshake.auth.token = jwt.sign({ id: USER_A }, 'someone-elses-secret');
+    socket.handshake.auth.token = jwt.sign(
+      { id: USER_A },
+      'someone-elses-secret',
+    );
 
     expect(await shakeHands(io, socket)).toBeInstanceOf(Error);
   });
@@ -190,7 +196,11 @@ describe('handshake (#615)', () => {
   test('refuses a deactivated account', async () => {
     User.findById.mockReturnValue({
       select: () => ({
-        lean: async () => ({ _id: USER_A, isActive: false, tenantId: TENANT_A }),
+        lean: async () => ({
+          _id: USER_A,
+          isActive: false,
+          tenantId: TENANT_A,
+        }),
       }),
     });
     const { io } = boot();
@@ -204,7 +214,10 @@ describe('handshake (#615)', () => {
     const { io } = boot();
     const socket = makeSocket();
     // Forward-compatible with #557, whose fix stamps a type at signing time.
-    socket.handshake.auth.token = jwt.sign({ id: USER_A, type: 'refresh' }, SECRET);
+    socket.handshake.auth.token = jwt.sign(
+      { id: USER_A, type: 'refresh' },
+      SECRET,
+    );
 
     expect(await shakeHands(io, socket)).toBeInstanceOf(Error);
   });
@@ -231,24 +244,36 @@ describe('join_payroll_session — the room is per company (#615)', () => {
     return socket;
   };
 
+  /** The payroll session room, ignoring the per-user room joined at connect. */
+  const payrollRooms = () =>
+    mockRooms.filter((r) => !r.room.startsWith('user:'));
+
   test('joins a room keyed by the tenant resolved at handshake', async () => {
     const socket = await connect(TENANT_A, 's1');
 
     socket.fire('join_payroll_session', { month: 8, year: 2026 });
 
-    expect(mockRooms[0].room).toContain(TENANT_A);
+    expect(payrollRooms()[0].room).toContain(TENANT_A);
     // Under `#589` this was the bare string "8-2026".
-    expect(mockRooms[0].room).not.toBe('8-2026');
+    expect(payrollRooms()[0].room).not.toBe('8-2026');
+  });
+
+  test('every socket joins its own user room, for notification pushes (#952)', async () => {
+    const socket = await connect(TENANT_A, 's1');
+
+    // The room the notification registry publishes to. Keyed off the verified
+    // identity, never off a payload — the same rule as the payroll room below.
+    expect(socket.join).toHaveBeenCalledWith(`user:${USER_A}`);
   });
 
   test('two companies opening the same month land in different rooms', async () => {
     const a = await connect(TENANT_A, 's1');
     a.fire('join_payroll_session', { month: 8, year: 2026 });
-    const roomA = mockRooms.at(-1).room;
+    const roomA = payrollRooms().at(-1).room;
 
     const b = await connect(TENANT_B, 's2');
     b.fire('join_payroll_session', { month: 8, year: 2026 });
-    const roomB = mockRooms.at(-1).room;
+    const roomB = payrollRooms().at(-1).room;
 
     expect(roomA).not.toBe(roomB);
   });
@@ -257,10 +282,14 @@ describe('join_payroll_session — the room is per company (#615)', () => {
     const socket = await connect(TENANT_A, 's1');
 
     // A room key a client can influence is a room key a client can join.
-    socket.fire('join_payroll_session', { month: 8, year: 2026, tenantId: TENANT_B });
+    socket.fire('join_payroll_session', {
+      month: 8,
+      year: 2026,
+      tenantId: TENANT_B,
+    });
 
-    expect(mockRooms[0].room).toContain(TENANT_A);
-    expect(mockRooms[0].room).not.toContain(TENANT_B);
+    expect(payrollRooms()[0].room).toContain(TENANT_A);
+    expect(payrollRooms()[0].room).not.toContain(TENANT_B);
   });
 
   test('an invalid period joins nothing and tells the caller', async () => {
@@ -268,15 +297,18 @@ describe('join_payroll_session — the room is per company (#615)', () => {
 
     socket.fire('join_payroll_session', { month: '*', year: '*' });
 
-    expect(socket.join).not.toHaveBeenCalled();
-    expect(mockEmissions.some((e) => e.event === 'payroll_session_error')).toBe(true);
+    // The user room is joined at connection; no payroll room is.
+    expect(payrollRooms()).toHaveLength(0);
+    expect(mockEmissions.some((e) => e.event === 'payroll_session_error')).toBe(
+      true,
+    );
   });
 
   test('a missing payload does not throw', async () => {
     const socket = await connect(TENANT_A, 's1');
 
     expect(() => socket.fire('join_payroll_session', undefined)).not.toThrow();
-    expect(socket.join).not.toHaveBeenCalled();
+    expect(payrollRooms()).toHaveLength(0);
   });
 });
 
@@ -296,9 +328,15 @@ describe('payroll_adjustment_change (#615)', () => {
     const socket = await connectAndJoin();
     const empId = oid();
 
-    socket.fire('payroll_adjustment_change', { empId, field: 'bonus', value: 5000 });
+    socket.fire('payroll_adjustment_change', {
+      empId,
+      field: 'bonus',
+      value: 5000,
+    });
 
-    const sync = mockEmissions.find((e) => e.event === 'payroll_adjustment_sync');
+    const sync = mockEmissions.find(
+      (e) => e.event === 'payroll_adjustment_sync',
+    );
     expect(sync.room).toContain(TENANT_A);
     expect(sync.payload).toMatchObject({ empId, field: 'bonus', value: 5000 });
   });
@@ -314,7 +352,9 @@ describe('payroll_adjustment_change (#615)', () => {
       userName: 'Impersonated',
     });
 
-    const sync = mockEmissions.find((e) => e.event === 'payroll_adjustment_sync');
+    const sync = mockEmissions.find(
+      (e) => e.event === 'payroll_adjustment_sync',
+    );
     // `#589` spread the payload *after* setting these, so the client won.
     expect(sync.payload.userId).toBe(USER_A);
     expect(sync.payload.userName).toBe('Ada');
@@ -325,8 +365,12 @@ describe('payroll_adjustment_change (#615)', () => {
 
     socket.fire('payroll_adjustment_change', { empId: 'nope', field: 'bonus' });
 
-    expect(mockEmissions.some((e) => e.event === 'payroll_adjustment_sync')).toBe(false);
-    expect(mockEmissions.some((e) => e.event === 'payroll_session_error')).toBe(true);
+    expect(
+      mockEmissions.some((e) => e.event === 'payroll_adjustment_sync'),
+    ).toBe(false);
+    expect(mockEmissions.some((e) => e.event === 'payroll_session_error')).toBe(
+      true,
+    );
   });
 
   test('a socket that has not joined broadcasts nothing', async () => {
@@ -335,14 +379,22 @@ describe('payroll_adjustment_change (#615)', () => {
     socket.identity = { userId: USER_A, tenantId: TENANT_A, name: 'Ada' };
     io.connection(socket);
 
-    socket.fire('payroll_adjustment_change', { empId: oid(), field: 'bonus', value: 1 });
+    socket.fire('payroll_adjustment_change', {
+      empId: oid(),
+      field: 'bonus',
+      value: 1,
+    });
 
     expect(mockEmissions).toHaveLength(0);
   });
 });
 
 describe('payroll row locks (#813)', () => {
-  const customConnectAndJoin = async (socketId = 's1', userId = USER_A, userName = 'Ada') => {
+  const customConnectAndJoin = async (
+    socketId = 's1',
+    userId = USER_A,
+    userName = 'Ada',
+  ) => {
     const { io } = boot();
     const socket = makeSocket(socketId);
     socket.identity = { userId, tenantId: TENANT_A, name: userName };
@@ -369,7 +421,9 @@ describe('payroll row locks (#813)', () => {
     io.connection(socket);
     socket.fire('join_payroll_session', { month: 8, year: 2026 });
 
-    const activeLocksUpdate = mockEmissions.find((e) => e.event === 'active_locks_update');
+    const activeLocksUpdate = mockEmissions.find(
+      (e) => e.event === 'active_locks_update',
+    );
     expect(activeLocksUpdate).toBeDefined();
     expect(activeLocksUpdate.payload).toEqual([]);
   });
@@ -378,7 +432,9 @@ describe('payroll row locks (#813)', () => {
     const socket = await customConnectAndJoin();
     socket.fire('payroll_row_lock', { empId: employeeId });
 
-    const lockedEvent = mockEmissions.find((e) => e.event === 'payroll_row_locked');
+    const lockedEvent = mockEmissions.find(
+      (e) => e.event === 'payroll_row_locked',
+    );
     expect(lockedEvent).toBeDefined();
     expect(lockedEvent.payload).toMatchObject({
       userId: USER_A,
@@ -392,7 +448,9 @@ describe('payroll row locks (#813)', () => {
     socket.fire('payroll_row_lock', { empId: employeeId });
     socket.fire('payroll_row_unlock', { empId: employeeId });
 
-    const unlockedEvent = mockEmissions.find((e) => e.event === 'payroll_row_unlocked');
+    const unlockedEvent = mockEmissions.find(
+      (e) => e.event === 'payroll_row_unlocked',
+    );
     expect(unlockedEvent).toBeDefined();
     expect(unlockedEvent.payload).toMatchObject({
       userId: USER_A,
@@ -403,7 +461,7 @@ describe('payroll row locks (#813)', () => {
 
   test('should fail to lock if the row is already locked by someone else', async () => {
     const { io } = boot();
-    
+
     // First client socket
     const socket1 = makeSocket('s1');
     socket1.identity = { userId: USER_A, tenantId: TENANT_A, name: 'Ada' };
@@ -424,7 +482,9 @@ describe('payroll row locks (#813)', () => {
     // Socket 2 tries to acquire the same lock
     socket2.fire('payroll_row_lock', { empId: employeeId });
 
-    const errorEvent = mockEmissions.find((e) => e.to === 's2' && e.event === 'payroll_session_error');
+    const errorEvent = mockEmissions.find(
+      (e) => e.to === 's2' && e.event === 'payroll_session_error',
+    );
     expect(errorEvent).toBeDefined();
     expect(errorEvent.payload.message).toContain('Failed to acquire row lock');
   });
@@ -434,7 +494,9 @@ describe('payroll row locks (#813)', () => {
     socket.fire('payroll_row_lock', { empId: employeeId });
 
     socket.fire('disconnect');
-    const unlockedEvent = mockEmissions.find((e) => e.event === 'payroll_row_unlocked');
+    const unlockedEvent = mockEmissions.find(
+      (e) => e.event === 'payroll_row_unlocked',
+    );
     expect(unlockedEvent).toBeDefined();
     expect(unlockedEvent.payload.empId).toBe(employeeId);
   });

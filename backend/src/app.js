@@ -24,6 +24,7 @@
 
 const express = require('express');
 const cors = require('cors');
+const Sentry = require('@sentry/node');
 const helmet = require('helmet');
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
@@ -44,6 +45,7 @@ const salaryHistoryRoutes = require('./routes/salaryHistory.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const flashcardRoutes = require('./routes/flashcard.routes');
 const webhookRoutes = require('./routes/webhook.routes');
+const integrationRoutes = require('./routes/integration.routes');
 const archiveRoutes = require('./routes/archive.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
@@ -51,6 +53,7 @@ const expenseRoutes = require('./routes/expense.routes');
 const varianceReportRoutes = require('./routes/varianceReport.routes');
 const searchRoutes = require('./routes/search.routes');
 const emailRoutes = require('./routes/email.routes');
+const complianceRoutes = require('./routes/compliance.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -60,7 +63,6 @@ const emailRoutes = require('./routes/email.routes');
 // The header above explains that the file was reconstructed from two divergent
 // copies after #785 and that the mount list is the union of the two. The union
 // of the route tables was taken; the union of the *import* blocks was not.
-const roleRoutes = require('./routes/role.routes');
 
 const errorHandler = require('./middlewares/error.middleware');
 const { generalRateLimiter } = require('./middlewares/rateLimiter.middleware');
@@ -82,6 +84,18 @@ const app = express();
 app.disable('x-powered-by');
 
 app.use(auditContextMiddleware);
+
+// Sentry user context configuration (#770)
+app.use((req, res, next) => {
+  if (req.auditContext) {
+    Sentry.setUser({
+      id: req.auditContext.userId || undefined,
+      tenantId: req.auditContext.tenantId || undefined,
+      ip_address: req.ip,
+    });
+  }
+  next();
+});
 
 // ─── Middleware ────────────────────────────────────────────────────────────
 //
@@ -190,6 +204,29 @@ app.get('/metrics', metricsHandler);
 
 app.get('/', (req, res) => res.send('PaySphere API is running...'));
 
+// Swagger API documentation configuration (#767)
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'PaySphere REST API',
+      version: '1.0.0',
+      description:
+        'Interactive API documentation for PaySphere backend services.',
+    },
+    servers: [
+      {
+        url: 'http://localhost:5000',
+        description: 'Development Server',
+      },
+    ],
+  },
+  apis: ['./src/routes/*.js', './src/app.js', './backend/src/routes/*.js'],
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 // Health probes (#913) - outside /api so Kubernetes and Prometheus can reach without auth.
 const healthRoutes = require('./routes/health.routes');
 app.use(healthRoutes);
@@ -225,6 +262,12 @@ app.use('/api/email', emailRoutes);
 // payroll and employee events. The controller and models were written in #645
 // but never mounted here, so the whole feature was a 404.
 app.use('/api/webhooks', webhookRoutes);
+
+// HRMS integrations (#954). `src/integrations/` has held a working adapter
+// layer — BambooHR, Workday, a registry that validates them — with no
+// controller, no router and no mount, so `registry.getAdapter()` was reachable
+// from no request and `IntegrationConfig` had no writer.
+app.use('/api/integrations', integrationRoutes);
 
 // Custom role management (#475) — the owner role manages the permission sets
 // that decide what every other account can do. Mounted once, after the security
@@ -269,6 +312,12 @@ app.use('/api/reports', varianceReportRoutes);
 // employees, payroll, and audit-log indices without exposing raw Mongo regex.
 app.use('/api/search', searchRoutes);
 
+// Statutory compliance: Form 16 certificates and Form 24Q returns (#933).
+// The controller has been in the tree since #933 with no router and no mount,
+// so there was no URL that reached it — and consequently nobody noticed that
+// neither of the two models it requires had been committed (#951).
+app.use('/api/compliance', complianceRoutes);
+
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
 // Uses NotFoundError if available, otherwise falls back to a standard Error
@@ -309,6 +358,9 @@ app.use((err, req, res, next) => {
   }
   next(err);
 });
+
+// Sentry error handler — must be registered before general error handlers (#770)
+Sentry.setupExpressErrorHandler(app);
 
 // Centralized error handler
 app.use(errorHandler);

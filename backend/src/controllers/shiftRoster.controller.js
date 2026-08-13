@@ -1,0 +1,200 @@
+/**
+ * @fileoverview Shift Roster Controller
+ * @description Manages shift scheduling, conflict detection, and swap approvals.
+ * Issue: #956
+ */
+const mongoose = require('mongoose');
+const { ShiftTemplate, ShiftRoster, ShiftSwapRequest } = require('../models/shiftRoster.model');
+const { validateShiftAssignment } = require('../utils/shiftConflictDetector');
+const logger = require('../utils/logger');
+const eventBus = require('../services/event.service');
+
+/**
+ * POST /api/shifts/templates
+ * Create a new shift template (e.g., Morning, Night).
+ */
+exports.createTemplate = async (req, res, next) => {
+    try {
+        const { name, startTime, endTime, colorCode, breakDurationMins } = req.body;
+        const template = await ShiftTemplate.create({
+            tenantId: req.tenantId, name, startTime, endTime, colorCode, breakDurationMins
+        });
+        res.status(201).json({ message: 'Shift template created', template });
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ message: 'Template name already exists' });
+        next(error);
+    }
+};
+
+/**
+ * GET /api/shifts/roster?start=YYYY-MM-DD&end=YYYY-MM-DD
+ * Fetch roster for a specific date range.
+ */
+exports.getRoster = async (req, res, next) => {
+    try {
+        const { start, end } = req.query;
+        const query = { tenantId: req.tenantId };
+
+        if (start && end) {
+            query.date = { $gte: new Date(start), $lte: new Date(end) };
+        }
+
+        const roster = await ShiftRoster.find(query)
+            .populate('employeeId', 'fullName role')
+            .populate('shiftTemplateId', 'name startTime endTime colorCode')
+            .sort({ date: 1 });
+
+        res.status(200).json({ roster });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * POST /api/shifts/roster
+ * Assign a shift to an employee with automated conflict detection.
+ */
+exports.assignShift = async (req, res, next) => {
+    try {
+        const { employeeId, shiftTemplateId, date } = req.body;
+
+        const template = await ShiftTemplate.findOne({ _id: shiftTemplateId, tenantId: req.tenantId });
+        if (!template) return res.status(404).json({ message: 'Shift template not found' });
+
+        // Fetch surrounding 7 days of shifts for conflict checking
+        const targetDate = new Date(date);
+        const startDate = new Date(targetDate);
+        startDate.setDate(startDate.getDate() - 6);
+        const endDate = new Date(targetDate);
+        endDate.setDate(endDate.getDate() + 6);
+
+        const existingShifts = await ShiftRoster.find({
+            tenantId: req.tenantId,
+            employeeId,
+            date: { $gte: startDate, $lte: endDate }
+        }).lean();
+
+        const allTemplates = await ShiftTemplate.find({ tenantId: req.tenantId }).lean();
+        const templateMap = allTemplates.reduce((acc, t) => { acc[t._id.toString()] = t; return acc; }, {});
+
+        // Tenant config (could be fetched from a Settings model, hardcoded for now)
+        const tenantConfig = { minRestHours: 12, maxWeeklyHours: 48 };
+
+        const validation = validateShiftAssignment(
+            { employeeId, date, shiftTemplateId },
+            existingShifts,
+            template,
+            templateMap,
+            tenantConfig
+        );
+
+        if (!validation.isValid) {
+            return res.status(400).json({ message: 'Shift conflict detected', errors: validation.errors });
+        }
+
+        // If valid, create the roster entry
+        const rosterEntry = await ShiftRoster.create({
+            tenantId: req.tenantId,
+            employeeId,
+            shiftTemplateId,
+            date: targetDate,
+        });
+
+        eventBus.emit('AUDIT_LOG', {
+            userId: req.userId,
+            action: 'SHIFT_ASSIGNED',
+            resourceType: 'ShiftRoster',
+            resourceIds: [rosterEntry._id],
+            details: { employeeId, date: targetDate, shift: template.name },
+            req,
+        });
+
+        res.status(201).json({ message: 'Shift assigned successfully', roster: rosterEntry });
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ message: 'Employee already has a shift scheduled on this date.' });
+        next(error);
+    }
+};
+
+/**
+ * POST /api/shifts/swap/request
+ * Employee requests to swap their shift with a colleague.
+ */
+exports.requestSwap = async (req, res, next) => {
+    try {
+        const { originalRosterId, replacementId } = req.body;
+
+        const originalRoster = await ShiftRoster.findOne({ _id: originalRosterId, tenantId: req.tenantId });
+        if (!originalRoster) return res.status(404).json({ message: 'Original shift not found' });
+
+        // Create swap request
+        const request = await ShiftSwapRequest.create({
+            tenantId: req.tenantId,
+            originalRosterId,
+            requesterId: originalRoster.employeeId,
+            replacementId,
+        });
+
+        // In a real app, emit a notification/socket event to the replacement employee here
+        logger.info(`Shift swap requested by ${originalRoster.employeeId} to ${replacementId}`);
+
+        res.status(201).json({ message: 'Swap request sent to colleague', request });
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * POST /api/shifts/swap/:id/approve
+ * Manager approves a peer-accepted swap request. Atomically swaps the roster.
+ */
+exports.approveSwap = async (req, res, next) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const request = await ShiftSwapRequest.findById(req.params.id).session(session);
+        if (!request || request.status !== 'Pending Manager') {
+            await session.abortTransaction();
+            return res.status(400).json({ message: 'Invalid swap request or not pending manager approval' });
+        }
+
+        const originalRoster = await ShiftRoster.findById(request.originalRosterId).session(session);
+
+        // Find the replacement's shift on the same day to swap with
+        const targetRoster = await ShiftRoster.findOne({
+            tenantId: request.tenantId,
+            employeeId: request.replacementId,
+            date: originalRoster.date
+        }).session(session);
+
+        if (!targetRoster) {
+            await session.abortTransaction();
+            return res.status(400).json({ message: 'Replacement does not have a shift on this date to swap.' });
+        }
+
+        // Atomic Swap
+        const tempTemplateId = originalRoster.shiftTemplateId;
+        originalRoster.shiftTemplateId = targetRoster.shiftTemplateId;
+        targetRoster.shiftTemplateId = tempTemplateId;
+
+        // Update employee assignments
+        const tempEmpId = originalRoster.employeeId;
+        originalRoster.employeeId = targetRoster.employeeId;
+        targetRoster.employeeId = tempEmpId;
+
+        await originalRoster.save({ session });
+        await targetRoster.save({ session });
+
+        request.status = 'Approved';
+        request.targetRosterId = targetRoster._id;
+        await request.save({ session });
+
+        await session.commitTransaction();
+        res.status(200).json({ message: 'Shift swap approved and executed', request });
+    } catch (error) {
+        await session.abortTransaction();
+        next(error);
+    } finally {
+        session.endSession();
+    }
+};

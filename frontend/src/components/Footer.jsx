@@ -1,10 +1,11 @@
+import styles from './Footer.module.css';
 import { Link } from "react-router-dom";
 
 export default function Footer() {
   return (
     <>
       {/* CTA Section */}
-      <section id="pricing" className="px-4 sm:px-6 py-16 sm:py-20 md:py-24">
+      <section id="pricing" className={styles.container}>
         <div className="max-w-6xl mx-auto bg-blue-600 rounded-2xl sm:rounded-[2.5rem] md:rounded-[3rem] p-6 sm:p-10 md:p-16 lg:p-24 text-center text-white relative overflow-hidden shadow-2xl shadow-blue-200 dark:shadow-none">
           
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,rgba(255,255,255,0.1),transparent)]"></div>

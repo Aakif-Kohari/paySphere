@@ -5,6 +5,11 @@ const {
   markAllAsRead,
   deleteNotification,
 } = require('../controllers/notification.controller');
+const {
+  getPreferences,
+  updatePreferences,
+  resetPreference,
+} = require('../controllers/notificationPreference.controller');
 const auth = require('../middlewares/auth.middleware');
 const { requireTenantScope } = require('../utils/tenantScope');
 
@@ -26,6 +31,19 @@ const router = express.Router();
 // two — but the ordering is the convention everywhere else in the codebase and
 // it costs nothing to keep a future `/:id` from swallowing it.
 router.patch('/read-all', auth, requireTenantScope(), markAllAsRead);
+
+// Preferences (#440, reachable since #952). On this router rather than a new
+// mount point, for the reason `expense.routes.js` keeps categories on its own:
+// the whole feature stays behind one prefix. Declared above `/:id` for the same
+// ordering reason as `/read-all`.
+router.get('/preferences', auth, requireTenantScope(), getPreferences);
+router.put('/preferences', auth, requireTenantScope(), updatePreferences);
+router.delete(
+  '/preferences/:eventType',
+  auth,
+  requireTenantScope(),
+  resetPreference,
+);
 
 router.get('/', auth, requireTenantScope(), getNotifications);
 router.patch('/:id/read', auth, requireTenantScope(), markAsRead);

@@ -13,6 +13,19 @@ const { ACCOUNT_TYPE } = require('../../config/accountTypes');
 
 jest.mock('../../models/user.model');
 jest.mock('../../models/notification.model');
+// Preferences are consulted for every recipient since #952. Mocked at the
+// model rather than at the dispatcher, so this suite still exercises the real
+// preference resolution; unmocked it buffers against a database the suite
+// never connects to and every test here times out.
+jest.mock('../../models/notificationPreference.model', () => ({
+  find: jest.fn(() => ({ lean: jest.fn().mockResolvedValue([]) })),
+  findOne: jest.fn(() => ({ lean: jest.fn().mockResolvedValue(null) })),
+}));
+jest.mock('../../notifications/registry', () => ({
+  get: jest.fn(),
+  emitToUser: jest.fn(),
+  setIO: jest.fn(),
+}));
 jest.mock('../../utils/logger', () => ({
   info: jest.fn(),
   warn: jest.fn(),
@@ -361,5 +374,99 @@ describe('createNotifications', () => {
     expect(await createNotifications([])).toBe(0);
     expect(await createNotifications(null)).toBe(0);
     expect(Notification.insertMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('preferences decide who hears about it, and where (#952)', () => {
+  const NotificationPreference = require('../../models/notificationPreference.model');
+  const registry = require('../../notifications/registry');
+  const {
+    NOTIFICATION_EVENT_TYPES,
+  } = require('../../config/notificationEvents');
+
+  /** `NotificationPreference.find(...).lean()` resolving to `rows`. */
+  const preferencesAre = (rows) => {
+    NotificationPreference.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue(rows),
+    });
+  };
+
+  test('the preference vocabulary is exactly what the service can notify about', () => {
+    // #440's preference model enumerated seven event names, none of which
+    // anything in the codebase emits, so no preference it accepted could ever
+    // have matched a notification. This is the check that keeps the two lists
+    // from drifting apart again.
+    expect([...NOTIFICATION_EVENT_TYPES].sort()).toEqual(
+      Object.keys(NOTIFIABLE_ACTIONS).sort(),
+    );
+  });
+
+  test('a recipient who switched the event off gets no row', async () => {
+    preferencesAre([
+      { userId: ADMIN_A, eventType: 'PAYROLL_APPROVE', enabled: false },
+    ]);
+
+    const written = await notifyFromAuditEvent(auditEvent());
+
+    const [rows] = Notification.insertMany.mock.calls[0];
+
+    expect(rows).toHaveLength(1);
+    expect(String(rows[0].userId)).toBe(ADMIN_B);
+    expect(written).toBe(2); // what the mocked insertMany reports
+  });
+
+  test('a recipient on email gets a delivery and no bell row', async () => {
+    const send = jest.fn().mockResolvedValue(undefined);
+    registry.get.mockReturnValue({ send });
+
+    preferencesAre([
+      {
+        userId: ADMIN_A,
+        eventType: 'PAYROLL_APPROVE',
+        enabled: true,
+        channels: ['email'],
+      },
+    ]);
+
+    await notifyFromAuditEvent(auditEvent());
+
+    const [rows] = Notification.insertMany.mock.calls[0];
+
+    expect(rows.map((r) => String(r.userId))).toEqual([ADMIN_B]);
+    expect(registry.get).toHaveBeenCalledWith('email');
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: 'Payroll approved' }),
+    );
+  });
+
+  test('a provider that throws does not stop the bell rows being written', async () => {
+    registry.get.mockReturnValue({
+      send: jest.fn().mockRejectedValue(new Error('SMTP down')),
+    });
+
+    preferencesAre([
+      {
+        userId: ADMIN_A,
+        eventType: 'PAYROLL_APPROVE',
+        enabled: true,
+        channels: ['email', 'in_app'],
+      },
+    ]);
+
+    await expect(notifyFromAuditEvent(auditEvent())).resolves.toBe(2);
+    expect(Notification.insertMany).toHaveBeenCalled();
+  });
+
+  test('everyone due a bell row also gets a live push', async () => {
+    // `registry.setIO` was never called before #952, so `emitToUser` had no
+    // socket server and the client only found out at its next poll.
+    await notifyFromAuditEvent(auditEvent());
+
+    expect(registry.emitToUser).toHaveBeenCalledTimes(2);
+    expect(registry.emitToUser).toHaveBeenCalledWith(
+      expect.anything(),
+      'notification:new',
+      expect.objectContaining({ title: 'Payroll approved' }),
+    );
   });
 });
