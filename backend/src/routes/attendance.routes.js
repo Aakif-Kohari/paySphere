@@ -5,6 +5,7 @@ const {
   bulkMarkAttendance,
   getMonthSummary,
   getLeaveBalance,
+  syncBiometricAttendance,
 } = require('../controllers/attendance.controller');
 const {
   clockIn,
@@ -55,13 +56,15 @@ router.post(
   bulkMarkAttendance,
 );
 
+router.post(
+  '/biometric-sync',
+  auth,
+  requirePermission(PERMISSIONS.WRITE_EMPLOYEE),
+  writeRateLimiter,
+  syncBiometricAttendance,
+);
+
 // --- Clocking in and out (#930, reachable since #953) ---------------------
-//
-// Gated on READ_EMPLOYEE rather than WRITE_EMPLOYEE, which is the one place in
-// this router the two come apart. A punch is a statement about where somebody
-// is, made by that person; the grid edit above is a manager deciding what a day
-// is worth in payroll. Requiring the write permission would mean an employee
-// could not clock themselves in, which is the entire feature.
 
 router.post(
   '/clock-in',
@@ -87,9 +90,6 @@ router.get(
 );
 
 // --- Office locations -----------------------------------------------------
-//
-// Writing one takes WRITE_EMPLOYEE: deciding where staff may clock in from
-// decides whose attendance is recorded as field duty, which reaches payroll.
 
 router.get(
   '/office-locations',
@@ -122,7 +122,7 @@ router.delete(
   deleteOfficeLocation,
 );
 
-// Declared last: `/summary`, `/balances`, `/bulk`, `/clock-*` and
+// Declared last: `/summary`, `/balances`, `/bulk`, `/biometric-sync`, `/clock-*` and
 // `/office-locations` are literal segments that would otherwise be captured by
 // this route's `:employeeId` parameter.
 router.put(
