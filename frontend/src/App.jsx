@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo } from "react"
 import { useSelector, useDispatch } from "react-redux"
-import { ThemeProvider, createTheme, CssBaseline, Snackbar, Alert } from "@mui/material"
+import { ThemeProvider, createTheme, CssBaseline } from "@mui/material"
 import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { ToastProvider } from "./context/ToastContext"
 import { logout } from "./features/auth/authSlice"
 import Landing from "./pages/Landing"
 import LoginSignUp from "./pages/LoginSignUp"
@@ -20,23 +21,10 @@ import SystemHealth from "./pages/SystemHealth"
 import Flashcards from "./pages/Flashcards"
 import PyqDashboard from "./pages/PyqDashboard"
 import QuizBattle from "./pages/QuizBattle"
+
 function App() {
   const dispatch = useDispatch();
   const themeMode = useSelector((state) => state.ui.themeMode);
-  const [toast, setToast] = useState({ open: false, message: "", severity: "info" });
-
-  // Listen to global toast events (e.g. from axios interceptor background saves)
-  useEffect(() => {
-    const handleToastShow = (e) => {
-      setToast({
-        open: true,
-        message: e.detail?.message || "Notification received",
-        severity: e.detail?.severity || "info",
-      });
-    };
-    window.addEventListener("toast:show", handleToastShow);
-    return () => window.removeEventListener("toast:show", handleToastShow);
-  }, []);
 
   // Synchronize Redux auth state when API interceptor detects expired/invalid auth
   useEffect(() => {
@@ -75,68 +63,56 @@ function App() {
   return (
     <ThemeProvider theme={muiTheme}>
       <CssBaseline />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/auth" element={<LoginSignUp />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/employee-portal"
-            element={
-              <ProtectedRoute>
-                <EmployeePortal />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/monthly-updates"
-            element={
-              <ProtectedRoute>
-                <MonthlyUpdates />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/add-employee"
-            element={
-              <ProtectedRoute>
-                <AddEmployee />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/reset-password/:token" element={<ResetPassword />} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-          <Route path="/settings/system-health" element={<ProtectedRoute><SystemHealth /></ProtectedRoute>} />
-          <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-          <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
-          <Route path="/pyqs" element={<ProtectedRoute><PyqDashboard /></ProtectedRoute>} />
-          <Route path="/quiz-battle" element={<ProtectedRoute><QuizBattle /></ProtectedRoute>} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        <ScrollToTop />
-        <CommandPalette />
-      </BrowserRouter>
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={6000}
-        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert
-          severity={toast.severity}
-          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
-          sx={{ width: '100%' }}
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
+      <ToastProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/auth" element={<LoginSignUp />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/employee-portal"
+              element={
+                <ProtectedRoute>
+                  <EmployeePortal />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/monthly-updates"
+              element={
+                <ProtectedRoute>
+                  <MonthlyUpdates />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/add-employee"
+              element={
+                <ProtectedRoute>
+                  <AddEmployee />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/settings/system-health" element={<ProtectedRoute><SystemHealth /></ProtectedRoute>} />
+            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+            <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
+            <Route path="/pyqs" element={<ProtectedRoute><PyqDashboard /></ProtectedRoute>} />
+            <Route path="/quiz-battle" element={<ProtectedRoute><QuizBattle /></ProtectedRoute>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          <ScrollToTop />
+          <CommandPalette />
+        </BrowserRouter>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

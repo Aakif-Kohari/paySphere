@@ -8,11 +8,11 @@
 
 import { useState } from 'react';
 import { useSelector } from 'react-redux';
-import { Snackbar, Alert } from '@mui/material';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { exportEmployeesToPDF } from '../utils/pdfExport';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 /**
  * EmployeeExportActions Component
@@ -24,7 +24,7 @@ import api from '../services/api';
 export default function EmployeeExportActions({ employees }) {
     const [isExportingCSV, setIsExportingCSV] = useState(false);
     const [isExportingPDF, setIsExportingPDF] = useState(false);
-    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+    const { toast } = useToast();
 
     const companyName = useSelector((state) => state.auth.user?.companyName) || localStorage.getItem('companyName') || 'PaySphere';
     const currency = localStorage.getItem('currency') || 'INR';
@@ -34,7 +34,7 @@ export default function EmployeeExportActions({ employees }) {
      */
     const handleExportCSV = async () => {
         if (!employees || employees.length === 0) {
-            setSnackbar({ open: true, message: 'No employees to export.', severity: 'warning' });
+            toast.warning('No employees to export.');
             return;
         }
 
@@ -51,7 +51,7 @@ export default function EmployeeExportActions({ employees }) {
             document.body.removeChild(link);
             URL.revokeObjectURL(link.href);
 
-            setSnackbar({ open: true, message: 'CSV exported successfully!', severity: 'success' });
+            toast.success('CSV exported successfully!');
         } catch (err) {
             console.error('CSV Export failed:', err);
             let errorMessage = 'Failed to export CSV.';
@@ -66,7 +66,7 @@ export default function EmployeeExportActions({ employees }) {
             } else if (err.message) {
                 errorMessage = err.message;
             }
-            setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+            toast.error(errorMessage);
         } finally {
             setIsExportingCSV(false);
         }
@@ -77,83 +77,60 @@ export default function EmployeeExportActions({ employees }) {
      */
     const handleExportPDF = async () => {
         if (!employees || employees.length === 0) {
-            setSnackbar({ open: true, message: 'No employees to export.', severity: 'warning' });
+            toast.warning('No employees to export.');
             return;
         }
 
         setIsExportingPDF(true);
         try {
             await exportEmployeesToPDF(employees, { companyName, currency });
-            setSnackbar({ open: true, message: 'PDF exported successfully!', severity: 'success' });
+            toast.success('PDF exported successfully!');
         } catch (err) {
             console.error('PDF Export failed:', err);
-            setSnackbar({ open: true, message: err.message || 'Failed to export PDF.', severity: 'error' });
+            toast.error(err.message || 'Failed to export PDF.');
         } finally {
             setIsExportingPDF(false);
         }
     };
 
-    const handleCloseSnackbar = (event, reason) => {
-        if (reason === 'clickaway') return;
-        setSnackbar(prev => ({ ...prev, open: false }));
-    };
-
     return (
-        <>
-            <div className="flex flex-wrap gap-3">
-                {/* CSV Export Button */}
-                <button
-                    onClick={handleExportCSV}
-                    disabled={isExportingCSV || isExportingPDF}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm"
-                    aria-label="Export employees to CSV"
-                >
-                    {isExportingCSV ? (
-                        <svg className="animate-spin h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    ) : (
-                        <FileDownloadIcon fontSize="small" />
-                    )}
-                    {isExportingCSV ? 'Exporting...' : 'Export CSV'}
-                </button>
-
-                {/* PDF Export Button (Issue #511) */}
-                <button
-                    onClick={handleExportPDF}
-                    disabled={isExportingCSV || isExportingPDF}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg text-sm font-semibold transition shadow-sm shadow-indigo-200 dark:shadow-none"
-                    aria-label="Export employees to PDF"
-                >
-                    {isExportingPDF ? (
-                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    ) : (
-                        <PictureAsPdfIcon fontSize="small" />
-                    )}
-                    {isExportingPDF ? 'Generating...' : 'Export to PDF'}
-                </button>
-            </div>
-
-            {/* Notification Snackbar */}
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={4000}
-                onClose={handleCloseSnackbar}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        <div className="flex flex-wrap gap-3">
+            {/* CSV Export Button */}
+            <button
+                onClick={handleExportCSV}
+                disabled={isExportingCSV || isExportingPDF}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm"
+                aria-label="Export employees to CSV"
             >
-                <Alert
-                    onClose={handleCloseSnackbar}
-                    severity={snackbar.severity}
-                    sx={{ width: '100%' }}
-                    variant="filled"
-                >
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
-        </>
+                {isExportingCSV ? (
+                    <svg className="animate-spin h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                ) : (
+                    <FileDownloadIcon fontSize="small" />
+                )}
+                {isExportingCSV ? 'Exporting...' : 'Export CSV'}
+            </button>
+
+            {/* PDF Export Button (Issue #511) */}
+            <button
+                onClick={handleExportPDF}
+                disabled={isExportingCSV || isExportingPDF}
+                className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg text-sm font-semibold transition shadow-sm shadow-indigo-200 dark:shadow-none"
+                aria-label="Export employees to PDF"
+            >
+                {isExportingPDF ? (
+                    <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                ) : (
+                    <PictureAsPdfIcon fontSize="small" />
+                )}
+                {isExportingPDF ? 'Generating...' : 'Export to PDF'}
+            </button>
+        </div>
     );
 }
+

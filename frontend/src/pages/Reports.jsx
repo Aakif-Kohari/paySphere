@@ -1,5 +1,4 @@
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import { Alert, Snackbar } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useSelector } from 'react-redux';
@@ -9,6 +8,7 @@ import ReportsSkeleton from '../components/common/skeleton/ReportsSkeleton';
 import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 // --- Recharts Components ---
 import CustomReportBuilder from '../components/reports/CustomReportBuilder';
@@ -52,7 +52,7 @@ const MonthYearSelector = ({ month, year, onChange }) => (
 );
 
 // --- Download Helper ---
-const downloadFileWithProgress = async (url, filename, type, setExportingType, setSnackbar) => {
+const downloadFileWithProgress = async (url, filename, type, setExportingType, toast) => {
   setExportingType(type);
   try {
     const res = await api.get(url, { responseType: 'blob' });
@@ -64,7 +64,7 @@ const downloadFileWithProgress = async (url, filename, type, setExportingType, s
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(link.href);
-    setSnackbar({ open: true, message: 'Download completed successfully!', severity: 'success' });
+    toast.success('Download completed successfully!');
   } catch (err) {
     console.error('Export failed:', err);
     let errorMessage = 'Failed to download report. No data for the selected period.';
@@ -79,7 +79,7 @@ const downloadFileWithProgress = async (url, filename, type, setExportingType, s
     } else if (err.message) {
       errorMessage = err.message;
     }
-    setSnackbar({ open: true, message: errorMessage, severity: 'error' });
+    toast.error(errorMessage);
   } finally {
     setExportingType(null);
   }
@@ -88,6 +88,7 @@ const downloadFileWithProgress = async (url, filename, type, setExportingType, s
 export default function Reports() {
   const navigate = useNavigate();
   const token = useSelector((state) => state.auth.token);
+  const { toast } = useToast();
   const [activePage, setActivePage] = useState('Reports');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('analytics');
@@ -99,7 +100,6 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [exportingType, setExportingType] = useState(null);
   const [reportData, setReportData] = useState(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   // Multi-select department filter state
@@ -239,7 +239,7 @@ export default function Reports() {
       `payroll-report-${MONTH_NAMES[month - 1]}-${year}.pdf`,
       'pdf',
       setExportingType,
-      setSnackbar
+      toast
     );
   };
 
@@ -252,7 +252,7 @@ export default function Reports() {
       `payroll-export-${MONTH_NAMES[month - 1]}-${year}.csv`,
       'csv',
       setExportingType,
-      setSnackbar
+      toast
     );
   };
 
@@ -265,7 +265,7 @@ export default function Reports() {
       `payroll-summary-${MONTH_NAMES[month - 1]}-${year}.xlsx`,
       'xlsx',
       setExportingType,
-      setSnackbar
+      toast
     );
   };
 
@@ -278,13 +278,8 @@ export default function Reports() {
       `payslips-${MONTH_NAMES[month - 1]}-${year}.zip`,
       'zip',
       setExportingType,
-      setSnackbar
+      toast
     );
-  };
-
-  const handleCloseSnackbar = (event, reason) => {
-    if (reason === 'clickaway') return;
-    setSnackbar(prev => ({ ...prev, open: false }));
   };
 
   const getInitials = (name) => {
@@ -579,23 +574,8 @@ export default function Reports() {
         <ScheduleReportModal
           isOpen={isScheduleModalOpen}
           onClose={() => setIsScheduleModalOpen(false)}
-          onScheduled={() => setSnackbar({ open: true, message: 'Report scheduled successfully!', severity: 'success' })}
+          onScheduled={() => toast.success('Report scheduled successfully!')}
         />
-
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={6000}
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        >
-          <Alert
-            onClose={handleCloseSnackbar}
-            severity={snackbar.severity}
-            sx={{ width: '100%' }}
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
       </div>
     </>
   );

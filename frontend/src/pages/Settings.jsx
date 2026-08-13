@@ -12,6 +12,8 @@ import api from '../services/api';
 import { getCurrencySymbol } from '../utils/currency';
 import zxcvbn from '../utils/zxcvbn';
 
+import { useToast } from '../context/ToastContext';
+
 // ── Icons for Sidebar (Copied from AddEmployee for consistency) ──
 const GridIcon = () => (
   <svg
@@ -238,6 +240,7 @@ const ShieldIcon = () => (
 export default function Settings() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { toast } = useToast();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const localCompanyName = localStorage.getItem('companyName') || 'Acme Corp';
@@ -346,8 +349,6 @@ export default function Settings() {
       .finally(() => setLoading(false));
   }, [localCompanyName, dispatch]);
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
   const handleSaveSettings = async () => {
     // Client-side validation before making the API call (#356)
     const errors = { fullName: '', email: '' };
@@ -356,7 +357,7 @@ export default function Settings() {
       errors.fullName = 'Full name cannot be empty.';
     }
 
-    if (!userProfile.email || !emailRegex.test(userProfile.email.trim())) {
+    if (!userProfile.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userProfile.email.trim())) {
       errors.email = 'Please enter a valid email address.';
     }
 
@@ -379,10 +380,10 @@ export default function Settings() {
       if (settings?.payrollConfig?.currency) {
         localStorage.setItem('currency', settings.payrollConfig.currency);
       }
-      alert('Settings updated successfully!');
+      toast.success('Settings updated successfully!');
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || 'Error saving settings.');
+      toast.error(err.response?.data?.message || 'Error saving settings.');
     }
   };
 
@@ -394,13 +395,13 @@ export default function Settings() {
     if (!file) return;
 
     if (!ALLOWED_TYPES.includes(file.type)) {
-      alert('Please select an image file (JPEG, PNG, WebP, or GIF).');
+      toast.error('Please select an image file (JPEG, PNG, WebP, or GIF).');
       e.target.value = '';
       return;
     }
 
     if (file.size > MAX_AVATAR_SIZE) {
-      alert('File size must be less than 2 MB.');
+      toast.error('File size must be less than 2 MB.');
       e.target.value = '';
       return;
     }
@@ -415,27 +416,27 @@ export default function Settings() {
   const handlePasswordUpdate = async () => {
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
     if (!currentPassword || !newPassword) {
-      return alert('Both current and new password are required.');
+      return toast.error('Both current and new password are required.');
     }
     if (!passwordRegex.test(newPassword)) {
-      return alert(
+      return toast.error(
         'New password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character.',
       );
     }
     const strength = zxcvbn(newPassword);
     if (strength.score < 3) {
-      return alert(`Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`);
+      return toast.warning(`Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`);
     }
     try {
       await api.patch('/api/auth/security/password', {
         currentPassword,
         newPassword,
       });
-      alert('Password updated successfully!');
+      toast.success('Password updated successfully!');
       setCurrentPassword('');
       setNewPassword('');
     } catch (err) {
-      alert(err.response?.data?.message || 'Error updating password.');
+      toast.error(err.response?.data?.message || 'Error updating password.');
     }
   };
 
@@ -448,10 +449,10 @@ export default function Settings() {
       return;
     try {
       await api.patch('/api/auth/security/disconnect-google');
-      alert('Google account disconnected successfully!');
+      toast.success('Google account disconnected successfully!');
       setUserProfile((prev) => ({ ...prev, isGoogleLinked: false }));
     } catch (err) {
-      alert(
+      toast.error(
         err.response?.data?.message || 'Error disconnecting Google account.',
       );
     }
@@ -467,35 +468,35 @@ export default function Settings() {
       const res = await api.post('/api/auth/security/2fa/setup');
       setQrCodeData(res.data); // expects { qrCode, secret }
     } catch (err) {
-      alert(err.response?.data?.message || 'Error starting 2FA setup.');
+      toast.error(err.response?.data?.message || 'Error starting 2FA setup.');
     }
   };
 
   const handleConfirm2FA = async () => {
     if (!twoFactorCode || twoFactorCode.length !== 6) {
-      return alert('Enter the 6-digit code from your authenticator app.');
+      return toast.error('Enter the 6-digit code from your authenticator app.');
     }
     try {
       await api.post('/api/auth/security/2fa/verify', { code: twoFactorCode });
       setUserProfile((prev) => ({ ...prev, isTwoFactorEnabled: true }));
       setQrCodeData(null);
       setTwoFactorCode('');
-      alert('Two-factor authentication enabled!');
+      toast.success('Two-factor authentication enabled!');
     } catch (err) {
-      alert(err.response?.data?.message || 'Invalid code. Try again.');
+      toast.error(err.response?.data?.message || 'Invalid code. Try again.');
     }
   };
 
   const executeDeleteAccount = async () => {
     try {
       await api.delete('/api/auth/security/account');
-      alert('Account successfully deleted.');
+      toast.success('Account successfully deleted.');
       localStorage.removeItem('token');
       localStorage.removeItem('companyName');
       localStorage.removeItem('currency');
       navigate('/auth');
     } catch (err) {
-      alert(err.response?.data?.message || 'Error deleting account.');
+      toast.error(err.response?.data?.message || 'Error deleting account.');
     }
   };
 
@@ -847,7 +848,7 @@ export default function Settings() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={() =>
-                    alert('All other active sessions have been logged out.')
+                    toast.success('All other active sessions have been logged out.')
                   }
                   className="px-5 py-2.5 bg-white dark:bg-slate-800 text-gray-900 dark:text-white border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-bold transition hover:bg-gray-50 dark:hover:bg-slate-700"
                 >

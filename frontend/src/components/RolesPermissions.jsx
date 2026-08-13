@@ -1,6 +1,7 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
 import { useEffect, useState } from 'react';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const getErrorMessage = (err) =>
   err.response?.data?.message || 'Something went wrong. Please try again.';
@@ -35,6 +36,7 @@ const LockIcon = () => (
  * create/edit form.
  */
 export default function RolesPermissions() {
+  const { toast } = useToast();
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +56,7 @@ export default function RolesPermissions() {
         setRoles(res.data?.roles || []);
         setPermissions(res.data?.permissions || []);
       })
-      .catch((err) => alert(getErrorMessage(err)))
+      .catch((err) => toast.error(getErrorMessage(err)))
       .finally(() => setLoading(false));
   };
 
@@ -109,10 +111,10 @@ export default function RolesPermissions() {
       };
       if (editingRole) {
         await api.patch(`/api/roles/${editingRole._id}`, payload);
-        alert('Role updated successfully!');
+        toast.success('Role updated successfully!');
       } else {
         await api.post('/api/roles', payload);
-        alert('Role created successfully!');
+        toast.success('Role created successfully!');
       }
       closeForm();
       loadRoles();
@@ -133,7 +135,7 @@ export default function RolesPermissions() {
       await api.patch(`/api/roles/${role._id}`, { permissions: next });
       loadRoles();
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -143,9 +145,10 @@ export default function RolesPermissions() {
       return;
     try {
       await api.delete(`/api/roles/${role._id}`);
+      toast.success('Role deleted successfully.');
       loadRoles();
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
     }
   };
 
