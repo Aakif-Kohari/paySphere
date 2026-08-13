@@ -92,6 +92,9 @@ const downloadFile = (url, filename) => {
 const DashboardOverview = ({
   search,
   setSearch,
+  roleFilter,
+  setRoleFilter,
+  availableRoles = [],
   filtered,
   navigate,
   onAddUpdate,
@@ -142,16 +145,7 @@ const DashboardOverview = ({
           </h1>
         </div>
 
-        <div className="w-full sm:w-auto mt-4 md:mt-0">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('dashboard.searchEmployees', 'Search employees...')}
-            className="w-full sm:w-auto px-4 py-3 border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-sm focus:border-blue-500 outline-none transition-colors"
-          />
-        </div>
-
-        <div className="flex gap-3 w-full sm:w-auto">
+        <div className="flex gap-3 w-full sm:w-auto mt-4 md:mt-0">
           <button
             onClick={() => navigate('/reports')}
             className="flex-1 cursor-pointer sm:flex-none px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 transition-colors"
@@ -240,19 +234,60 @@ const DashboardOverview = ({
         </div>
       )}
 
-      {/* Search + Export Roster */}
+      {/* Search + Role Filter + Export Roster */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">
           Employee Directory
         </h2>
 
         <div className="flex flex-wrap gap-3 items-center w-full sm:w-auto">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search employees..."
-            className="flex-1 sm:flex-none sm:w-auto px-4 py-2 border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
-          />
+          <div className="relative flex-1 sm:flex-none sm:w-64">
+            <input
+              value={search || ''}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search employees..."
+              className="w-full pl-9 pr-8 py-2 border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
+            />
+            <svg
+              className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+                className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 text-xs font-bold"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {availableRoles.length > 0 && (
+            <select
+              value={roleFilter || ''}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              aria-label="Filter by role"
+              className="px-3 py-2 border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
+            >
+              <option value="">All Roles</option>
+              {availableRoles.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* New Export Actions Component (Issue #511) */}
           <EmployeeExportActions employees={filtered} />
@@ -261,7 +296,7 @@ const DashboardOverview = ({
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {filtered.length === 0 && !search ? (
+        {filtered.length === 0 && !search && !roleFilter ? (
           <EmptyState
             title="No employees yet"
             description="Add your first employee to get started with payroll."
@@ -274,10 +309,10 @@ const DashboardOverview = ({
               </button>
             }
           />
-        ) : filtered.length === 0 && search ? (
+        ) : filtered.length === 0 && (search || roleFilter) ? (
           <EmptyState
             title="No employees found"
-            description={`No employees match "${search}". Try a different name or role.`}
+            description={`No employees match "${search || roleFilter}". Try a different name or role.`}
           />
         ) : (
           filtered.map((emp) => (
@@ -292,7 +327,7 @@ const DashboardOverview = ({
           ))
         )}
 
-        {(filtered.length > 0 || search) && (
+        {(filtered.length > 0 || search || roleFilter) && (
           <div
             role="button"
             tabIndex={0}
@@ -312,6 +347,11 @@ const DashboardOverview = ({
 
 // --- Employee Management Component ---
 const EmployeeManagement = ({
+  search,
+  setSearch,
+  roleFilter,
+  setRoleFilter,
+  availableRoles = [],
   employees,
   loading,
   onAddEmployee,
@@ -385,9 +425,66 @@ const EmployeeManagement = ({
         </div>
       </div>
 
+      {/* Search & Filter Controls */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+          Employee Roster
+        </h2>
+
+        <div className="flex flex-wrap gap-3 items-center w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none sm:w-64">
+            <input
+              value={search || ''}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search employees..."
+              className="w-full pl-9 pr-8 py-2 border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
+            />
+            <svg
+              className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+                className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 text-xs font-bold"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {availableRoles.length > 0 && (
+            <select
+              value={roleFilter || ''}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              aria-label="Filter by role"
+              className="px-3 py-2 border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
+            >
+              <option value="">All Roles</option>
+              {availableRoles.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      </div>
+
       {/* Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {employees.length === 0 ? (
+        {employees.length === 0 && !search && !roleFilter ? (
           <EmptyState
             title="No employees yet"
             description="Add employees to see their salary breakdown here."
@@ -399,6 +496,11 @@ const EmployeeManagement = ({
                 + Add Employee
               </button>
             }
+          />
+        ) : employees.length === 0 && (search || roleFilter) ? (
+          <EmptyState
+            title="No employees found"
+            description={`No employees match "${search || roleFilter}". Try a different name or role.`}
           />
         ) : (
           employees.map((emp) => (
@@ -828,6 +930,7 @@ export default function PaySphereDashboard() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
   const [employees, setEmployees] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -847,6 +950,7 @@ export default function PaySphereDashboard() {
   const [employeeToEdit, setEmployeeToEdit] = useState(null);
   const [prevDebouncedSearch, setPrevDebouncedSearch] =
     useState(debouncedSearch);
+  const [prevRoleFilter, setPrevRoleFilter] = useState(roleFilter);
   const companyName = localStorage.getItem('companyName') || 'Acme Corp';
   const token = useSelector((state) => state.auth.token);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -883,24 +987,32 @@ export default function PaySphereDashboard() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Reset to page 1 when the search term changes (adjusted during render, not in an effect)
-  if (debouncedSearch !== prevDebouncedSearch) {
+  // Reset to page 1 when search term or role filter changes
+  if (debouncedSearch !== prevDebouncedSearch || roleFilter !== prevRoleFilter) {
     setPrevDebouncedSearch(debouncedSearch);
+    setPrevRoleFilter(roleFilter);
     setCurrentPage(1);
   }
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const searchParam = debouncedSearch
-          ? `&search=${encodeURIComponent(debouncedSearch)}`
-          : '';
+        const params = new URLSearchParams({
+          page: currentPage,
+          limit: 10,
+        });
+        if (debouncedSearch) {
+          params.append('search', debouncedSearch);
+        }
+        if (roleFilter) {
+          params.append('role', roleFilter);
+        }
         const [empRes, payRes] = await Promise.all([
-          api.get(`/api/employees?page=${currentPage}&limit=10${searchParam}`),
+          api.get(`/api/employees?${params.toString()}`),
           api.get(`/api/payroll/summary?limit=0`),
         ]);
 
-        setEmployees(empRes.data.employees);
-        setTotalPages(empRes.data.totalPages);
+        setEmployees(empRes.data.employees || []);
+        setTotalPages(empRes.data.totalPages || 1);
         setTotalEmployees(empRes.data.totalEmployees || 0);
         setPayrolls(payRes.data.payrolls || []);
       } catch (err) {
@@ -908,7 +1020,7 @@ export default function PaySphereDashboard() {
       }
     };
     if (token) fetchData();
-  }, [token, currentPage, debouncedSearch]);
+  }, [token, currentPage, debouncedSearch, roleFilter]);
 
   // Fetch paginated payroll records when viewing the Payroll tab
   useEffect(() => {
@@ -936,16 +1048,24 @@ export default function PaySphereDashboard() {
     payrollMap[p.employeeId] = p;
   });
 
+  const availableRoles = Array.from(
+    new Set(employees.map((e) => e.role).filter(Boolean)),
+  ).sort();
+
   const totalPayout = employees.reduce((sum, e) => {
     const p = payrollMap[e._id];
     return sum + (p ? p.netSalary : e.monthlySalary || 0);
   }, 0);
 
-  const filtered = employees.filter(
-    (e) =>
+  const filtered = employees.filter((e) => {
+    const matchesSearch =
+      !search ||
       e.fullName.toLowerCase().includes(search.toLowerCase()) ||
-      (e.role || '').toLowerCase().includes(search.toLowerCase()),
-  );
+      (e.role || '').toLowerCase().includes(search.toLowerCase());
+    const matchesRole =
+      !roleFilter || (e.role || '').toLowerCase() === roleFilter.toLowerCase();
+    return matchesSearch && matchesRole;
+  });
 
   const handleDeleteEmployee = async () => {
     if (!employeeToDelete) return;
@@ -1073,57 +1193,62 @@ export default function PaySphereDashboard() {
             </button>
           </div>
         </header>
-
-        {/* Dynamic Content */}
-        <ErrorBoundary fallback={<ComponentFeedbackFallback />}>
-          {activePage === 'Approvals' ? (
-            <Approvals />
-          ) : activePage === 'Settlements' ? (
-            <Settlements />
-          ) : activePage === 'Loans' ? (
-            <Loans />
-          ) : activePage === 'Payroll' ? (
-            <PayrollTable
-              payrolls={paginatedPayrolls}
-              loading={payrollLoading}
-              currentPage={payrollPage}
-              totalPages={payrollTotalPages}
-              totalCount={payrollTotalCount}
-              setCurrentPage={setPayrollPage}
-            />
-          ) : activePage === 'Dashboard' ? (
-            <DashboardOverview
-              search={search}
-              setSearch={setSearch}
-              filtered={filtered}
-              navigate={navigate}
-              onAddUpdate={() => navigate('/monthly-updates')}
-              onAddEmployee={() => navigate('/add-employee')}
-              totalPayout={totalPayout}
-              employeeCount={totalEmployees}
-              loading={loading}
-              payrolls={payrolls}
-              onEditEmployee={(emp) => setEmployeeToEdit(emp)}
-            />
-          ) : activePage === 'Archive' ? (
-            <Archive />
-          ) : (
-            <EmployeeManagement
-              search={search}
-              setSearch={setSearch}
-              employees={employees}
-              loading={loading}
-              onAddEmployee={() => navigate('/add-employee')}
-              onAddUpdate={() => navigate('/monthly-updates')}
-              payrolls={payrolls}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              setCurrentPage={setCurrentPage}
-              onDeleteEmployee={(emp) => setEmployeeToDelete(emp)}
-              onEditEmployee={(emp) => setEmployeeToEdit(emp)}
-            />
-          )}
-        </ErrorBoundary>
+{/* Dynamic Content */}
+<ErrorBoundary fallback={<ComponentFeedbackFallback />}>
+  {activePage === 'Approvals' ? (
+    <Approvals />
+  ) : activePage === 'Settlements' ? (
+    <Settlements />
+  ) : activePage === 'Loans' ? (
+    <Loans />
+  ) : activePage === 'Payroll' ? (
+    <PayrollTable
+      payrolls={paginatedPayrolls}
+      loading={payrollLoading}
+      currentPage={payrollPage}
+      totalPages={payrollTotalPages}
+      totalCount={payrollTotalCount}
+      setCurrentPage={setPayrollPage}
+    />
+  ) : activePage === 'Dashboard' ? (
+    <DashboardOverview
+      search={search}
+      setSearch={setSearch}
+      roleFilter={roleFilter}
+      setRoleFilter={setRoleFilter}
+      availableRoles={availableRoles}
+      filtered={filtered}
+      navigate={navigate}
+      onAddUpdate={() => navigate('/monthly-updates')}
+      onAddEmployee={() => navigate('/add-employee')}
+      totalPayout={totalPayout}
+      employeeCount={totalEmployees}
+      loading={loading}
+      payrolls={payrolls}
+      onEditEmployee={(emp) => setEmployeeToEdit(emp)}
+    />
+  ) : activePage === 'Archive' ? (
+    <Archive />
+  ) : (
+    <EmployeeManagement
+      search={search}
+      setSearch={setSearch}
+      roleFilter={roleFilter}
+      setRoleFilter={setRoleFilter}
+      availableRoles={availableRoles}
+      employees={filtered}
+      loading={loading}
+      onAddEmployee={() => navigate('/add-employee')}
+      onAddUpdate={() => navigate('/monthly-updates')}
+      payrolls={payrolls}
+      currentPage={currentPage}
+      totalPages={totalPages}
+      setCurrentPage={setCurrentPage}
+      onDeleteEmployee={(emp) => setEmployeeToDelete(emp)}
+      onEditEmployee={(emp) => setEmployeeToEdit(emp)}
+    />
+  )}
+</ErrorBoundary>
 
         {/* Edit Form Modal (Steps 2-5) */}
         {employeeToEdit && (

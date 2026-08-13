@@ -24,7 +24,6 @@ const router = express.Router();
 router.get(
   "/",
   auth,
-  requirePermission(PERMISSIONS.MANAGE_ROLES),
   getRoles,
 );
 

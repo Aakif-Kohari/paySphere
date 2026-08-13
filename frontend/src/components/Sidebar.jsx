@@ -7,8 +7,9 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PeopleIcon from '@mui/icons-material/People';
 import SchoolIcon from '@mui/icons-material/School';
-import ArchiveIcon from '@mui/icons-material/Archive';
+import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import { useEffect, useMemo, useRef } from 'react';
+import ArchiveIcon from '@mui/icons-material/Archive';
 import { useTranslation } from 'react-i18next';
 import ThemeToggle from './ThemeToggle';
 
