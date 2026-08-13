@@ -16,6 +16,7 @@ jest.mock("../../models/employee.model");
 jest.mock("../../models/user.model");
 jest.mock("../../services/cache.service", () => ({
   invalidateAnalytics: jest.fn().mockResolvedValue(undefined),
+  invalidateDashboardSummary: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock("../../services/email.service", () => ({
   sendPayslipEmail: jest.fn().mockResolvedValue(undefined),

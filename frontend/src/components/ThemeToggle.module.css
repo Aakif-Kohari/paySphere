@@ -1,0 +1,10 @@
+.container { display: flex; flex-direction: column; }
+.text { font-size: 1rem; }
+.wrapper { margin: 0 auto; }
+.box { padding: 10px; }
+.item { margin-bottom: 5px; }
+.active { font-weight: bold; }
+.hidden { display: none; }
+.visible { display: block; }
+.primary { color: blue; }
+.secondary { color: gray; }

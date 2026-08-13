@@ -5,6 +5,7 @@ const {
   MONTHLY_SALARY_MAX,
   OVERTIME_RATE_MAX,
   PHONE_REGEX,
+  EMAIL_REGEX,
 } = require('../utils/validators');
 const { EMPLOYMENT_STATUS, EXIT_TYPE } = require('../config/employment');
 
@@ -18,12 +19,14 @@ const employeeSchema = new mongoose.Schema(
     email: {
       type: String,
       required: false,
-    },
-    /**
+      trim: true,
+      lowercase: true,
+      match: [EMAIL_REGEX, 'Please provide a valid email address'],
+    } /**
      * Employee contact number, validated as an international phone number
      * with an optional leading "+" and a national number of 7-15 digits.
      * Optional on creation, same as `email`.
-     */
+     */,
     phone: {
       type: String,
       required: false,
@@ -46,6 +49,26 @@ const employeeSchema = new mongoose.Schema(
       trim: true,
       maxlength: [100, 'Department cannot exceed 100 characters'],
     },
+
+    /**
+     * Where this record came from, when it came from an external HRMS (#954).
+     *
+     * The adapters in `src/integrations/` have always returned an `externalId`
+     * and there was nowhere to put it, so a second sync could not recognise
+     * what the first one created and matching would have fallen back to email
+     * forever. An email address changes; an HRMS id does not.
+     */
+    externalId: {
+      type: String,
+      default: undefined,
+      trim: true,
+    },
+    externalProvider: {
+      type: String,
+      enum: ['bamboohr', 'workday', 'adp', 'sap', null, undefined],
+      default: undefined,
+    },
+
     /**
      * Derived mirror of `employmentStatus`, kept so every existing query that
      * filters on it keeps working untouched (#462).
@@ -104,6 +127,10 @@ const employeeSchema = new mongoose.Schema(
     },
     dateOfBirth: {
       type: Date,
+      validate: {
+        validator: (value) => !value || value <= new Date(),
+        message: 'Date of birth cannot be in the future',
+      },
     },
     joiningDate: {
       type: Date,
@@ -198,6 +225,23 @@ employeeSchema.index(
 
 // Index for efficient soft delete filtering
 employeeSchema.index({ tenantId: 1, isDeleted: 1, isActive: 1 });
+
+/**
+ * One record per external id, per provider, per company (#954).
+ *
+ * `partialFilterExpression` rather than `sparse`, for the reason spelled out
+ * above the email index: `sparse` on a compound index only skips a document
+ * when every indexed key is missing, and `tenantId` is required — so every
+ * employee added by hand would be indexed with a null external id and the
+ * second one would collide.
+ */
+employeeSchema.index(
+  { tenantId: 1, externalProvider: 1, externalId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { externalId: { $type: 'string' } },
+  },
+);
 
 employeeSchema.plugin(softDeletePlugin);
 employeeSchema.plugin(auditTrailPlugin);

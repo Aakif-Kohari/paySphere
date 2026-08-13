@@ -7,12 +7,14 @@ import * as Sentry from '@sentry/react';
 import { useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
+
 import CommandPalette from './components/common/CommandPalette';
 import ScrollToTop from './components/common/ScrollToTop';
 import OfflineSyncIndicator from './components/OfflineSyncIndicator';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ToastProvider } from './context/ToastContext';
 import { logout } from './features/auth/authSlice';
+
 import AddEmployee from './pages/AddEmployee';
 import Dashboard from './pages/Dashboard';
 import EmployeePortal from './pages/EmployeePortal';
@@ -31,6 +33,7 @@ import SystemHealth from './pages/SystemHealth';
 function App() {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
+  const themeMode = useSelector((state) => state.ui.themeMode);
 
   // Sync user context to Sentry (#770)
   useEffect(() => {
@@ -45,9 +48,8 @@ function App() {
     }
   }, [user]);
 
-  const themeMode = useSelector((state) => state.ui.themeMode);
-
-  // Synchronize Redux auth state when API interceptor detects expired/invalid auth
+  // Synchronize Redux auth state when API interceptor
+  // detects expired/invalid authentication
   useEffect(() => {
     const handleAuthLogout = () => {
       dispatch(logout());
@@ -55,10 +57,13 @@ function App() {
 
     window.addEventListener('auth:logout', handleAuthLogout);
 
-    return () => window.removeEventListener('auth:logout', handleAuthLogout);
+    return () => {
+      window.removeEventListener('auth:logout', handleAuthLogout);
+    };
   }, [dispatch]);
 
-  // Sync dark class on html document element for Tailwind v4 custom dark variant
+  // Sync dark class on html document element
+  // for Tailwind v4 custom dark variant
   useEffect(() => {
     if (themeMode === 'dark') {
       document.documentElement.classList.add('dark');
@@ -129,7 +134,10 @@ function App() {
               }
             />
 
-            <Route path="/reset-password/:token" element={<ResetPassword />} />
+            <Route
+              path="/reset-password/:token"
+              element={<ResetPassword />}
+            />
 
             <Route
               path="/settings"

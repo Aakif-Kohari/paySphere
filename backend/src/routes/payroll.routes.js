@@ -10,8 +10,7 @@ const {
   approvePayroll,
   rejectPayroll,
   markPayrollPaid,
-  inspectAnomalies,
-  getExchangeRates,
+  getMerkleProofHandler,
 } = require('../controllers/payroll.controller');
 const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
@@ -115,10 +114,10 @@ router.post(
 );
 
 router.get(
-  '/fx-rates',
+  '/:id/merkle-proof',
   auth,
   requirePermission(PERMISSIONS.READ_PAYROLL),
-  getExchangeRates,
+  getMerkleProofHandler,
 );
 
 module.exports = router;

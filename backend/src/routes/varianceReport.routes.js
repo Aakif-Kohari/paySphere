@@ -1,0 +1,13 @@
+'use strict';
+const { Router }           = require('express');
+const { verifyToken }      = require('../middlewares/auth.middleware');
+const { requireTenantScope } = require('../utils/tenantScope');
+const { authorize }        = require('../middlewares/rbac.middleware');
+const { monthlyVariance, annualForecast, setBudget, listBudgets } = require('../controllers/varianceReport.controller');
+const router = Router();
+router.use(verifyToken, requireTenantScope());
+router.get('/variance', authorize('VIEW_REPORTS'),   monthlyVariance);
+router.get('/forecast', authorize('VIEW_REPORTS'),   annualForecast);
+router.get('/budget',   authorize('VIEW_REPORTS'),   listBudgets);
+router.post('/budget',  authorize('MANAGE_REPORTS'), setBudget);
+module.exports = router;
