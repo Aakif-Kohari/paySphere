@@ -1,37 +1,83 @@
-import { useEffect, useMemo } from "react"
-import { useSelector, useDispatch } from "react-redux"
-import { ThemeProvider, createTheme, CssBaseline } from "@mui/material"
-import { BrowserRouter, Routes, Route } from "react-router-dom"
-import { ToastProvider } from "./context/ToastContext"
-import { logout } from "./features/auth/authSlice"
-import Landing from "./pages/Landing"
-import LoginSignUp from "./pages/LoginSignUp"
-import Dashboard from "./pages/Dashboard"
-import MonthlyUpdates from "./pages/MonthlyUpdates"
-import AddEmployee from "./pages/AddEmployee"
-import ResetPassword from "./pages/ResetPassword"
-import Settings from "./pages/Settings"
-import Reports from "./pages/Reports"
-import EmployeePortal from "./pages/EmployeePortal"
-import NotFound from "./pages/NotFound"
-import ProtectedRoute from "./components/ProtectedRoute"
-import ScrollToTop from "./components/common/ScrollToTop"
-import CommandPalette from "./components/common/CommandPalette"
-import SystemHealth from "./pages/SystemHealth"
-import Flashcards from "./pages/Flashcards"
-import PyqDashboard from "./pages/PyqDashboard"
-import QuizBattle from "./pages/QuizBattle"
+import { useEffect, useMemo, useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import * as Sentry from '@sentry/react';
+import {
+  ThemeProvider,
+  createTheme,
+  CssBaseline,
+  Snackbar,
+  Alert,
+} from '@mui/material';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ToastProvider } from './context/ToastContext';
+import { logout } from './features/auth/authSlice';
+import Landing from './pages/Landing';
+import LoginSignUp from './pages/LoginSignUp';
+import Dashboard from './pages/Dashboard';
+import MonthlyUpdates from './pages/MonthlyUpdates';
+import AddEmployee from './pages/AddEmployee';
+import ResetPassword from './pages/ResetPassword';
+import Settings from './pages/Settings';
+import Reports from './pages/Reports';
+import EmployeePortal from './pages/EmployeePortal';
+import NotFound from './pages/NotFound';
+import ProtectedRoute from './components/ProtectedRoute';
+import ScrollToTop from './components/common/ScrollToTop';
+import CommandPalette from './components/common/CommandPalette';
+import OfflineSyncIndicator from './components/OfflineSyncIndicator';
+import SystemHealth from './pages/SystemHealth';
+import Flashcards from './pages/Flashcards';
+import PyqDashboard from './pages/PyqDashboard';
+import QuizBattle from './pages/QuizBattle';
 
 function App() {
   const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
+
+  // Sync user context to Sentry (#770)
+  useEffect(() => {
+    if (user) {
+      Sentry.setUser({
+        id: user.id || user._id,
+        email: user.email,
+        username: user.name,
+      });
+    } else {
+      Sentry.setUser(null);
+    }
+  }, [user]);
+
   const themeMode = useSelector((state) => state.ui.themeMode);
+
+  const [toast, setToast] = useState({
+    open: false,
+    message: '',
+    severity: 'info',
+  });
+
+  // Listen to global toast events (e.g. from axios interceptor background saves)
+  useEffect(() => {
+    const handleToastShow = (e) => {
+      setToast({
+        open: true,
+        message: e.detail?.message || 'Notification received',
+        severity: e.detail?.severity || 'info',
+      });
+    };
+
+    window.addEventListener('toast:show', handleToastShow);
+
+    return () => window.removeEventListener('toast:show', handleToastShow);
+  }, []);
 
   // Synchronize Redux auth state when API interceptor detects expired/invalid auth
   useEffect(() => {
     const handleAuthLogout = () => {
       dispatch(logout());
     };
+
     window.addEventListener('auth:logout', handleAuthLogout);
+
     return () => window.removeEventListener('auth:logout', handleAuthLogout);
   }, [dispatch]);
 
@@ -63,11 +109,13 @@ function App() {
   return (
     <ThemeProvider theme={muiTheme}>
       <CssBaseline />
+
       <ToastProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<LoginSignUp />} />
+
             <Route
               path="/dashboard"
               element={
@@ -76,6 +124,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/employee-portal"
               element={
@@ -84,6 +133,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/monthly-updates"
               element={
@@ -92,6 +142,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/add-employee"
               element={
@@ -100,19 +151,88 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route path="/reset-password/:token" element={<ResetPassword />} />
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="/settings/system-health" element={<ProtectedRoute><SystemHealth /></ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-            <Route path="/flashcards" element={<ProtectedRoute><Flashcards /></ProtectedRoute>} />
-            <Route path="/pyqs" element={<ProtectedRoute><PyqDashboard /></ProtectedRoute>} />
-            <Route path="/quiz-battle" element={<ProtectedRoute><QuizBattle /></ProtectedRoute>} />
+
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/settings/system-health"
+              element={
+                <ProtectedRoute>
+                  <SystemHealth />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute>
+                  <Reports />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/flashcards"
+              element={
+                <ProtectedRoute>
+                  <Flashcards />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/pyqs"
+              element={
+                <ProtectedRoute>
+                  <PyqDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/quiz-battle"
+              element={
+                <ProtectedRoute>
+                  <QuizBattle />
+                </ProtectedRoute>
+              }
+            />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
+
           <ScrollToTop />
           <CommandPalette />
+
+          {/* Global Offline Sync Indicator (Issue #815) */}
+          <OfflineSyncIndicator />
         </BrowserRouter>
       </ToastProvider>
+
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={6000}
+        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          severity={toast.severity}
+          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
+          sx={{ width: '100%' }}
+        >
+          {toast.message}
+        </Alert>
+      </Snackbar>
     </ThemeProvider>
   );
 }
