@@ -1,34 +1,32 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import * as Sentry from '@sentry/react';
 import {
-  ThemeProvider,
   createTheme,
   CssBaseline,
-  Snackbar,
-  Alert,
+  ThemeProvider,
 } from '@mui/material';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import * as Sentry from '@sentry/react';
+import { useEffect, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import CommandPalette from './components/common/CommandPalette';
+import ScrollToTop from './components/common/ScrollToTop';
+import OfflineSyncIndicator from './components/OfflineSyncIndicator';
+import ProtectedRoute from './components/ProtectedRoute';
 import { ToastProvider } from './context/ToastContext';
 import { logout } from './features/auth/authSlice';
+import AddEmployee from './pages/AddEmployee';
+import Dashboard from './pages/Dashboard';
+import EmployeePortal from './pages/EmployeePortal';
+import Flashcards from './pages/Flashcards';
 import Landing from './pages/Landing';
 import LoginSignUp from './pages/LoginSignUp';
-import Dashboard from './pages/Dashboard';
 import MonthlyUpdates from './pages/MonthlyUpdates';
-import AddEmployee from './pages/AddEmployee';
-import ResetPassword from './pages/ResetPassword';
-import Settings from './pages/Settings';
-import Reports from './pages/Reports';
-import EmployeePortal from './pages/EmployeePortal';
 import NotFound from './pages/NotFound';
-import ProtectedRoute from './components/ProtectedRoute';
-import ScrollToTop from './components/common/ScrollToTop';
-import CommandPalette from './components/common/CommandPalette';
-import OfflineSyncIndicator from './components/OfflineSyncIndicator';
-import SystemHealth from './pages/SystemHealth';
-import Flashcards from './pages/Flashcards';
 import PyqDashboard from './pages/PyqDashboard';
 import QuizBattle from './pages/QuizBattle';
+import Reports from './pages/Reports';
+import ResetPassword from './pages/ResetPassword';
+import Settings from './pages/Settings';
+import SystemHealth from './pages/SystemHealth';
 
 function App() {
   const dispatch = useDispatch();
@@ -48,27 +46,6 @@ function App() {
   }, [user]);
 
   const themeMode = useSelector((state) => state.ui.themeMode);
-
-  const [toast, setToast] = useState({
-    open: false,
-    message: '',
-    severity: 'info',
-  });
-
-  // Listen to global toast events (e.g. from axios interceptor background saves)
-  useEffect(() => {
-    const handleToastShow = (e) => {
-      setToast({
-        open: true,
-        message: e.detail?.message || 'Notification received',
-        severity: e.detail?.severity || 'info',
-      });
-    };
-
-    window.addEventListener('toast:show', handleToastShow);
-
-    return () => window.removeEventListener('toast:show', handleToastShow);
-  }, []);
 
   // Synchronize Redux auth state when API interceptor detects expired/invalid auth
   useEffect(() => {
@@ -218,21 +195,6 @@ function App() {
           <OfflineSyncIndicator />
         </BrowserRouter>
       </ToastProvider>
-
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={6000}
-        onClose={() => setToast((prev) => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert
-          severity={toast.severity}
-          onClose={() => setToast((prev) => ({ ...prev, open: false }))}
-          sx={{ width: '100%' }}
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </ThemeProvider>
   );
 }
