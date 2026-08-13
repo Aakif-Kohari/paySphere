@@ -157,6 +157,7 @@ exports.addEmployee = async (req, res, next) => {
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
       joiningDate: joiningDate ? new Date(joiningDate) : undefined,
       createdBy: req.userId,
+      tenantId: req.tenantId || user.tenantId,
       ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
       ...(normalizedPhone.value ? { phone: normalizedPhone.value } : {}),
     });
@@ -213,11 +214,19 @@ exports.getEmployees = async (req, res, next) => {
     if (typeof search !== 'string') search = '';
     search = sanitizeText(search);
 
+    let name = req.query.name;
+    if (typeof name !== 'string') name = '';
+    name = sanitizeText(name);
+
+    let role = req.query.role;
+    if (typeof role !== 'string') role = '';
+    role = sanitizeText(role);
+
     const skip = (page - 1) * limit;
 
-    const query = {
-      createdBy: req.userId,
-    };
+    const query = req.tenantId
+      ? { tenantId: req.tenantId }
+      : { createdBy: req.userId };
 
     if (!includeDeleted) {
       query.deletedAt = null;
@@ -227,12 +236,30 @@ exports.getEmployees = async (req, res, next) => {
       query.isActive = true;
     }
 
+    const conditions = [];
+
     if (search) {
       const safeSearch = escapeRegex(search);
-      query.$or = [
-        { fullName: { $regex: safeSearch, $options: 'i' } },
-        { role: { $regex: safeSearch, $options: 'i' } },
-      ];
+      conditions.push({
+        $or: [
+          { fullName: { $regex: safeSearch, $options: 'i' } },
+          { role: { $regex: safeSearch, $options: 'i' } },
+        ],
+      });
+    }
+
+    if (name) {
+      const safeName = escapeRegex(name);
+      conditions.push({ fullName: { $regex: safeName, $options: 'i' } });
+    }
+
+    if (role) {
+      const safeRole = escapeRegex(role);
+      conditions.push({ role: { $regex: safeRole, $options: 'i' } });
+    }
+
+    if (conditions.length > 0) {
+      query.$and = conditions;
     }
 
     const totalEmployees = await Employee.countDocuments(query);
@@ -460,6 +487,7 @@ exports.importEmployees = async (req, res, next) => {
               overtimeRate,
               companyName: sanitizeText(user.companyName),
               createdBy: req.userId,
+              tenantId: req.tenantId || user.tenantId,
               // The address was validated above and then dropped on the floor,
               // so imported employees never had an email either (#414, #236).
               ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),

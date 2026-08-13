@@ -7,7 +7,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import PeopleIcon from '@mui/icons-material/People';
 import SchoolIcon from '@mui/icons-material/School';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import ThemeToggle from './ThemeToggle';
 
 const Sidebar = ({

@@ -207,6 +207,18 @@ describe("PaySphere dashboard", () => {
     expect(screen.getByText("No employees found")).toBeInTheDocument();
   });
 
+  test("filters the directory when the user selects a role filter", async () => {
+    const user = userEvent.setup();
+    renderDashboard();
+    await screen.findByText("Rahul Sharma — Payroll Manager");
+
+    const roleSelect = screen.getByLabelText("Filter by role");
+    await user.selectOptions(roleSelect, "Software Engineer");
+
+    expect(screen.queryByText("Rahul Sharma — Payroll Manager")).not.toBeInTheDocument();
+    expect(screen.getByText("Anita Verma — Software Engineer")).toBeInTheDocument();
+  });
+
   test("shows the empty state and offers to add an employee when the roster is empty", async () => {
     const user = userEvent.setup();
     stubApi({ employees: [] });
