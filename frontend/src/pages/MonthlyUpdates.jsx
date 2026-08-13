@@ -7,8 +7,8 @@ import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
 import { getCurrencySymbol, formatCurrency } from "../utils/currency";
 import AttendanceCalendarModal from "../components/AttendanceCalendarModal";
-import { Snackbar, Alert } from '@mui/material';
 import PayrollWizard from "../components/PayrollWizard";
+import { useToast } from "../context/ToastContext";
 import "./MonthlyUpdates.css";
 
 
@@ -209,7 +209,7 @@ export default function MonthlyUpdates() {
 
   // Copy Payroll Summary state (#184)
   const [copiedSummary, setCopiedSummary] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
+  const { toast } = useToast();
 
   // Disambiguation state for first-name collision (#274)
   const [disambiguationMatches, setDisambiguationMatches] = useState([]);
@@ -420,12 +420,8 @@ export default function MonthlyUpdates() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 } catch {
-      setSnackbar({ open: true, message: 'No data to export', severity: 'error' });
-    }  };
-
-  const handleCloseSnackbar = (event, reason) => {
-    if (reason === 'clickaway') return;
-    setSnackbar(prev => ({ ...prev, open: false }));
+      toast.error('No data to export');
+    }
   };
 
   return (
@@ -1130,12 +1126,6 @@ export default function MonthlyUpdates() {
         </main>
         )}
       </div>
-
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%', variant: 'filled' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
 import { logout } from '../features/auth/authSlice';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const UserIcon = () => (
   <svg
@@ -57,6 +58,7 @@ const BellIcon = () => (
 export default function ProfileSettings() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(true);
@@ -101,8 +103,7 @@ export default function ProfileSettings() {
     api
       .get('/api/auth/settings')
       .then((res) => {
-        setUserProfile((prev) => ({
-          ...prev,
+        setUserProfile({
           fullName: res.data.fullName || '',
           email: res.data.email || '',
           companyName: res.data.companyName || localCompanyName,
@@ -110,34 +111,33 @@ export default function ProfileSettings() {
           isGoogleLinked: res.data.isGoogleLinked || false,
           isTwoFactorEnabled: res.data.isTwoFactorEnabled || false,
           payrollId: res.data.payrollId || '',
-        }));
-
-        if (res.data.settings) {
+        });
+        if (res.data.settings?.notifications) {
           setSettings((prev) => ({
             ...prev,
-            notifications:
-              res.data.settings.notifications || prev.notifications,
+            notifications: res.data.settings.notifications,
           }));
         }
       })
-      .catch((err) => console.error('Failed to fetch settings', err))
+      .catch((err) => console.error(err))
       .finally(() => setLoading(false));
   }, [localCompanyName]);
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
   const handleSaveSettings = async () => {
+    let hasError = false;
     const errors = { fullName: '', email: '' };
 
     if (!userProfile.fullName || !userProfile.fullName.trim()) {
-      errors.fullName = 'Full name cannot be empty.';
+      errors.fullName = 'Full Name is required';
+      hasError = true;
     }
 
-    if (!userProfile.email || !emailRegex.test(userProfile.email.trim())) {
+    if (!userProfile.email || !/\S+@\S+\.\S+/.test(userProfile.email.trim())) {
       errors.email = 'Please enter a valid email address.';
+      hasError = true;
     }
 
-    if (errors.fullName || errors.email) {
+    if (hasError) {
       setProfileErrors(errors);
       return;
     }
@@ -151,10 +151,10 @@ export default function ProfileSettings() {
         email: userProfile.email.trim(),
         avatar: userProfile.avatar,
       });
-      alert('Profile updated successfully!');
+      toast.success('Profile updated successfully!');
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || 'Error saving profile.');
+      toast.error(err.response?.data?.message || 'Error saving profile.');
     }
   };
 
@@ -166,13 +166,13 @@ export default function ProfileSettings() {
     if (!file) return;
 
     if (!ALLOWED_TYPES.includes(file.type)) {
-      alert('Please select an image file (JPEG, PNG, WebP, or GIF).');
+      toast.error('Please select an image file (JPEG, PNG, WebP, or GIF).');
       e.target.value = '';
       return;
     }
 
     if (file.size > MAX_AVATAR_SIZE) {
-      alert('File size must be less than 2 MB.');
+      toast.error('File size must be less than 2 MB.');
       e.target.value = '';
       return;
     }
@@ -187,10 +187,10 @@ export default function ProfileSettings() {
   const handlePasswordUpdate = async () => {
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
     if (!currentPassword || !newPassword) {
-      return alert('Both current and new password are required.');
+      return toast.error('Both current and new password are required.');
     }
     if (!passwordRegex.test(newPassword)) {
-      return alert(
+      return toast.error(
         'New password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character.',
       );
     }
@@ -199,11 +199,11 @@ export default function ProfileSettings() {
         currentPassword,
         newPassword,
       });
-      alert('Password updated successfully!');
+      toast.success('Password updated successfully!');
       setCurrentPassword('');
       setNewPassword('');
     } catch (err) {
-      alert(err.response?.data?.message || 'Error updating password.');
+      toast.error(err.response?.data?.message || 'Error updating password.');
     }
   };
 
@@ -216,10 +216,10 @@ export default function ProfileSettings() {
       return;
     try {
       await api.patch('/api/auth/security/disconnect-google');
-      alert('Google account disconnected successfully!');
+      toast.success('Google account disconnected successfully!');
       setUserProfile((prev) => ({ ...prev, isGoogleLinked: false }));
     } catch (err) {
-      alert(
+      toast.error(
         err.response?.data?.message || 'Error disconnecting Google account.',
       );
     }
@@ -230,22 +230,22 @@ export default function ProfileSettings() {
       const res = await api.post('/api/auth/security/2fa/setup');
       setQrCodeData(res.data);
     } catch (err) {
-      alert(err.response?.data?.message || 'Error starting 2FA setup.');
+      toast.error(err.response?.data?.message || 'Error starting 2FA setup.');
     }
   };
 
   const handleConfirm2FA = async () => {
     if (!twoFactorCode || twoFactorCode.length !== 6) {
-      return alert('Enter the 6-digit code from your authenticator app.');
+      return toast.error('Enter the 6-digit code from your authenticator app.');
     }
     try {
       await api.post('/api/auth/security/2fa/verify', { code: twoFactorCode });
       setUserProfile((prev) => ({ ...prev, isTwoFactorEnabled: true }));
       setQrCodeData(null);
       setTwoFactorCode('');
-      alert('Two-factor authentication enabled!');
+      toast.success('Two-factor authentication enabled!');
     } catch (err) {
-      alert(err.response?.data?.message || 'Invalid code. Try again.');
+      toast.error(err.response?.data?.message || 'Invalid code. Try again.');
     }
   };
 

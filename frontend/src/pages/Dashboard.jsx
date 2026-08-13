@@ -18,6 +18,7 @@ import { logout } from '../features/auth/authSlice';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 import api from '../services/api';
 import { formatCurrency, getCurrencySymbol } from '../utils/currency';
+import { useToast } from '../context/ToastContext';
 import Approvals from './Approvals';
 import Loans from './Loans';
 import Settlements from './Settlements';
@@ -82,8 +83,14 @@ const downloadFile = (url, filename) => {
     })
     .catch((err) => {
       console.error('Export failed:', err);
-      alert(
-        'No payroll data found for the current month. Finalize payroll first.',
+      window.dispatchEvent(
+        new CustomEvent('toast:show', {
+          detail: {
+            message:
+              'No payroll data found for the current month. Finalize payroll first.',
+            type: 'warning',
+          },
+        }),
       );
     });
 };
@@ -363,6 +370,7 @@ const EmployeeManagement = ({
   onDeleteEmployee,
   onEditEmployee,
 }) => {
+  const { toast } = useToast();
   const currency = localStorage.getItem('currency') || 'INR';
   const payrollMap = {};
   (payrolls || []).forEach((p) => {
@@ -416,8 +424,12 @@ const EmployeeManagement = ({
                   month: new Date().getMonth() + 1,
                   year: new Date().getFullYear(),
                 })
-                .then(() => alert('Submitted!'))
-                .catch(console.error)
+                .then(() => toast.success('Payroll submitted for review!'))
+                .catch((err) =>
+                  toast.error(
+                    err.response?.data?.message || 'Failed to submit payroll',
+                  ),
+                )
             }
           >
             Submit for Review
@@ -1084,9 +1096,10 @@ export default function PaySphereDashboard() {
       );
 
       setEmployeeToDelete(null);
+      toast.success('Employee deleted successfully.');
     } catch (error) {
       console.error('Delete failed:', error);
-      alert(error.response?.data?.message || 'Failed to delete employee');
+      toast.error(error.response?.data?.message || 'Failed to delete employee');
     } finally {
       setDeleting(false);
     }
@@ -1099,10 +1112,11 @@ export default function PaySphereDashboard() {
       setEmployees((prev) =>
         prev.map((emp) => (emp._id === id ? { ...emp, ...updatedData } : emp)),
       );
+      toast.success('Employee updated successfully.');
       setEmployeeToEdit(null);
     } catch (error) {
       console.error('Failed to update employee:', error);
-      alert('Failed to update employee. Please try again.');
+      toast.error('Failed to update employee. Please try again.');
     }
   };
 
