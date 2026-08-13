@@ -3,44 +3,13 @@ const Notification = require('../models/notification.model');
 const { ACCOUNT_TYPE } = require('../config/accountTypes');
 const { isUsableTenantId } = require('../utils/tenantScope');
 const logger = require('../utils/logger');
+const emailService = require('./email.service');
 const {
   resolveChannels,
   deliver,
 } = require('./notificationDispatcher.service');
 const { emitToUser } = require('../notifications/registry');
 const { NOTIFICATION_CHANNELS } = require('../config/notificationEvents');
-
-/**
- * Turning something that happened into something a person is told (#898).
- *
- * There was a `Notification` model, three controller handlers, a mounted router
- * and a bell in the navbar that polls, renders an unread badge and offers "mark
- * all as read". And nothing, anywhere, created a notification:
- *
- *     $ grep -rn "Notification.create\|new Notification(" backend/src
- *     $
- *
- * So `GET /api/notifications` answered `{ notifications: [], unreadCount: 0 }`
- * for every user forever. #440 shipped the plumbing on both sides and no source
- * of events.
- *
- * That matters more than an empty dropdown. A payroll run submitted for review,
- * an expense claim approved, a loan disbursed, an approval step landing on
- * someone — none of them told anyone. #664 made the audit log record them, but
- * an audit log is something you go and look at, not something that tells you
- * there is work waiting.
- *
- * The events already exist. `services/event.service.js` is a shared emitter and
- * `listeners/audit.listener.js` is the pattern: an exported registration
- * function called from the boot sequence, deliberately not a side-effect
- * import. This is its counterpart, and `listeners/notification.listener.js`
- * subscribes it.
- *
- * The contract here is the one `emitAuditLog` has: never throw. This runs
- * detached from the request that triggered it, after that request's mutation
- * has committed, so an exception escaping is an unhandled rejection and a 500
- * for an operation that actually succeeded.
- */
 
 /** How a notification is categorised for the client. */
 const NOTIFICATION_TYPE = {
@@ -54,24 +23,9 @@ const NOTIFICATION_TYPE = {
 
 /** Who should hear about an event. */
 const AUDIENCE = {
-  /** Every admin console in the company, except whoever did it. */
   COMPANY_ADMINS: 'COMPANY_ADMINS',
 };
 
-/**
- * The audit actions worth interrupting somebody for, and what to say.
- *
- * Deliberately a short list rather than "every audit action". An audit log is
- * exhaustive because its job is answering questions afterwards; a notification
- * centre that is exhaustive is a notification centre nobody reads. The test for
- * inclusion is whether a person has to do something, or would want to know
- * within the hour — not whether it was recorded.
- *
- * `EMPLOYEE_UPDATE`, `REPORT_DOWNLOAD`, `SETTINGS_UPDATE` and the rest are
- * absent on purpose.
- *
- * @type {Record<string, {type: string, title: string, message: (payload: object) => string, audience: string, link?: string}>}
- */
 const NOTIFIABLE_ACTIONS = {
   PAYROLL_APPROVE: {
     type: NOTIFICATION_TYPE.PAYROLL,
@@ -161,43 +115,19 @@ const NOTIFIABLE_ACTIONS = {
   },
 };
 
-/** " (3 records)" when the payload names several, otherwise "". */
 function countSuffix(payload) {
   const count = Array.isArray(payload?.resourceIds)
     ? payload.resourceIds.length
     : 0;
 
   if (count > 1) return ` (${count} records)`;
-
   return '';
 }
 
-/**
- * Is this an action anybody is told about?
- *
- * @param {string} action
- * @returns {boolean}
- */
 function isNotifiable(action) {
   return Object.prototype.hasOwnProperty.call(NOTIFIABLE_ACTIONS, action);
 }
 
-/**
- * The accounts that should receive a notification for an event.
- *
- * Excludes the actor: telling someone what they have just done themselves is
- * the fastest way to train a person to ignore a bell.
- *
- * Excludes EMPLOYEE-type accounts: everything on the notifiable list above is
- * an admin-console concern, and a self-service portal login has no page to be
- * sent to. When there is something an employee genuinely needs to hear — their
- * own payslip, their own claim — it wants its own audience and its own
- * per-employee resolution rather than a broadcast.
- *
- * @param {object} payload the audit payload
- * @param {string|object} tenantId
- * @returns {Promise<object[]>} lean user documents
- */
 async function resolveRecipients(payload, tenantId) {
   const query = {
     tenantId,
@@ -206,27 +136,10 @@ async function resolveRecipients(payload, tenantId) {
   };
 
   const recipients = await User.find(query).select('_id').lean();
-
   const actorId = payload?.userId ? String(payload.userId) : null;
-
   return recipients.filter((u) => String(u._id) !== actorId);
 }
 
-/**
- * Write one notification.
- *
- * Never throws. See the header: this runs detached from a request that has
- * already succeeded.
- *
- * @param {object} notification
- * @param {string} notification.userId recipient
- * @param {string} notification.tenantId
- * @param {string} notification.title
- * @param {string} notification.message
- * @param {string} [notification.type]
- * @param {string} [notification.link]
- * @returns {Promise<boolean>} whether it was written
- */
 async function createNotification({
   userId,
   tenantId,
@@ -257,16 +170,6 @@ async function createNotification({
   }
 }
 
-/**
- * Write one notification per recipient, in a single round trip.
- *
- * `insertMany` with `ordered: false` so one bad document does not discard the
- * rest of the batch — a notification that cannot be written for one person is
- * not a reason to leave the other five uninformed.
- *
- * @param {object[]} notifications
- * @returns {Promise<number>} how many were written
- */
 async function createNotifications(notifications) {
   const rows = (Array.isArray(notifications) ? notifications : []).filter(
     (n) => n?.userId && isUsableTenantId(n?.tenantId) && n?.title && n?.message,
@@ -278,8 +181,6 @@ async function createNotifications(notifications) {
     const written = await Notification.insertMany(rows, { ordered: false });
     return Array.isArray(written) ? written.length : 0;
   } catch (error) {
-    // With `ordered: false` some documents may have been written before the
-    // error, so this is "the batch was not fully written", not "nothing was".
     logger.error('Failed to write a batch of notifications', {
       attempted: rows.length,
       error: error.message,
@@ -288,29 +189,16 @@ async function createNotifications(notifications) {
   }
 }
 
-/**
- * Turn one audit event into notifications for whoever should hear about it.
- *
- * Never throws.
- *
- * @param {object} payload the AUDIT_LOG payload
- * @returns {Promise<number>} how many notifications were written
- */
 async function notifyFromAuditEvent(payload) {
   try {
     const template = NOTIFIABLE_ACTIONS[payload?.action];
     if (!template) return 0;
 
-    // Same resolution as audit.service.js: an explicit tenant wins, and every
-    // emit site already passes `req`, which auth.middleware has stamped.
     const tenantId = isUsableTenantId(payload?.tenantId)
       ? payload.tenantId
       : payload?.req?.tenantId;
 
     if (!isUsableTenantId(tenantId)) {
-      // Not an error worth shouting about — the audit layer has already logged
-      // the same event being dropped for the same reason, and duplicating it
-      // would double every line in an incident.
       logger.warn('Notification skipped: no tenant on the event', {
         action: payload?.action,
       });
@@ -321,15 +209,6 @@ async function notifyFromAuditEvent(payload) {
     if (recipients.length === 0) return 0;
 
     const message = template.message(payload);
-
-    // What each recipient asked for (#952). Until this, every notifiable event
-    // went to every eligible admin's bell with no way to turn any of it off,
-    // and the email and Slack providers `notifications/registry.js` registers
-    // were unreachable from any path in the product.
-    //
-    // One query for the whole set, and it never throws: a preference lookup
-    // that fails falls back to the default for everybody, because losing the
-    // notification is a worse outcome than ignoring a preference once.
     const channelsByUser = await resolveChannels(
       recipients.map((user) => user._id),
       payload.action,
@@ -370,18 +249,11 @@ async function notifyFromAuditEvent(payload) {
       }
     }
 
-    // The bell stays a single batched write, as #898 built it: one round trip
-    // for a company's admins rather than one per person. Email and Slack go
-    // through their providers, which report their own failures and resolve
-    // rather than reject.
     const [written] = await Promise.all([
       createNotifications(inAppRows),
       Promise.all(externalDeliveries),
     ]);
 
-    // Everyone who is due a bell row gets a live push, if a socket server has
-    // been handed to the registry. Without `registry.setIO(io)` — which nothing
-    // called until #952 — the client only found out at its next poll.
     for (const row of inAppRows) {
       emitToUser(row.userId, 'notification:new', {
         title: row.title,
@@ -401,13 +273,74 @@ async function notifyFromAuditEvent(payload) {
   }
 }
 
-module.exports = {
-  NOTIFICATION_TYPE,
-  AUDIENCE,
-  NOTIFIABLE_ACTIONS,
-  isNotifiable,
-  resolveRecipients,
-  createNotification,
-  createNotifications,
-  notifyFromAuditEvent,
-};
+class NotificationService {
+  static renderTemplate(template = '', data = {}) {
+    if (typeof template !== 'string') return '';
+    return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key) => {
+      return data[key] !== undefined ? String(data[key]) : '';
+    });
+  }
+
+  static async sendNotification(userId, payload = {}) {
+    const {
+      title = 'Notification',
+      message = '',
+      category = 'SYSTEM',
+      channel = 'IN_APP',
+      data = {},
+      emailRecipient,
+    } = payload;
+
+    const renderedTitle = this.renderTemplate(title, data);
+    const renderedMessage = this.renderTemplate(message, data);
+
+    logger.info('Dispatching notification', { userId, category, channel });
+    let notificationRecord = null;
+
+    if (channel === 'IN_APP' || channel === 'ALL') {
+      try {
+        notificationRecord = await Notification.create({
+          userId,
+          title: renderedTitle,
+          message: renderedMessage,
+          category,
+          isRead: false,
+          data,
+        });
+      } catch (err) {
+        logger.warn('Failed to save in-app notification', { userId, error: err.message });
+      }
+    }
+
+    if ((channel === 'EMAIL' || channel === 'ALL') && emailRecipient) {
+      try {
+        await emailService.sendEmail({
+          to: emailRecipient,
+          subject: renderedTitle,
+          text: renderedMessage,
+        });
+      } catch (err) {
+        logger.warn('Failed to send notification email', { emailRecipient, error: err.message });
+      }
+    }
+
+    return {
+      success: true,
+      userId,
+      channel,
+      title: renderedTitle,
+      message: renderedMessage,
+      notificationId: notificationRecord?._id || null,
+    };
+  }
+}
+
+module.exports = NotificationService;
+module.exports.NOTIFICATION_TYPE = NOTIFICATION_TYPE;
+module.exports.AUDIENCE = AUDIENCE;
+module.exports.NOTIFIABLE_ACTIONS = NOTIFIABLE_ACTIONS;
+module.exports.isNotifiable = isNotifiable;
+module.exports.resolveRecipients = resolveRecipients;
+module.exports.createNotification = createNotification;
+module.exports.createNotifications = createNotifications;
+module.exports.notifyFromAuditEvent = notifyFromAuditEvent;
