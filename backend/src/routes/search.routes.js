@@ -27,9 +27,11 @@
 const express = require('express');
 const auth = require('../middlewares/auth.middleware');
 const { globalSearch } = require('../controllers/search.controller');
+const employeeController = require('../controllers/employee.controller');
 
 const router = express.Router();
 
 router.get('/', auth, globalSearch);
+router.get('/', auth, employeeController.searchEmployees);
 
 module.exports = router;
