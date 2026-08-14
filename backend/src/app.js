@@ -29,6 +29,21 @@ const helmet = require('helmet');
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
 
+// #1008. Both of these are called further down — `swaggerJsdoc(swaggerOptions)`
+// and `swaggerUi.serve` / `swaggerUi.setup(…)` in the /api-docs block — and
+// neither was ever imported, so evaluating this module threw
+// `ReferenceError: swaggerJsdoc is not defined`.
+//
+// This is exactly the failure #896 documents for `roleRoutes` a few lines
+// below: the packages were in package.json the whole time, the usage was in
+// this file the whole time, and the one line joining them was missing. Worth
+// naming plainly because it is the third instance — a require block and the
+// code depending on it get edited in different places, and nothing fails until
+// boot. `__tests__/appBoot.test.js` now loads this module for real, so a
+// fourth cannot reach main.
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
+
 const roleRoutes = require('./routes/role.routes');
 const userRoutes = require('./routes/user.routes');
 const employeeRoutes = require('./routes/employee.routes');

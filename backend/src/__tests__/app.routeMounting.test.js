@@ -42,6 +42,26 @@ jest.mock('otplib', () => ({
   },
 }));
 
+// The same class of problem one layer out, and the reason this suite has never
+// actually run (#1008):
+//
+//     sanitize.middleware → utils/sanitizers → jsdom → parse5 / entities /
+//     @asamuzakjp/css-color …
+//
+// all pure ESM, none of it covered by `transformIgnorePatterns`. The suite died
+// on `Unexpected token 'export'` before its first assertion, which reads as a
+// broken environment rather than as a failing test — so the route-mounting
+// guard #792 added to stop routers going missing was itself missing, and two
+// unrelated boot failures sat behind it undetected.
+//
+// `app.security.test.js` already carries this stub with the same reasoning.
+// Pass-through, so it cannot weaken what is asserted below: sanitisation has no
+// say in whether a route is mounted.
+jest.mock(
+  '../middlewares/sanitize.middleware',
+  () => (req, res, next) => next(),
+);
+
 const app = require('../app');
 
 /**
