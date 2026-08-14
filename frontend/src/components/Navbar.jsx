@@ -1,8 +1,17 @@
 import styles from './Navbar.module.css';
-import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
-import ThemeToggle from "./ThemeToggle";
-import api from "../services/api";
+// Every one of these was imported twice — once with double quotes and once
+// with single — and `npm run build` failed outright on it:
+//
+//     The symbol "api" has already been declared
+//
+// so the frontend has not been buildable at all. The two copies were not
+// identical: only the second imports `useCallback`, which this file uses, so
+// the surviving block is that one. Same shape as the merge that left the
+// backend's `app.js` with two copies of its require block (#792), and the same
+// fix — keep the superset, delete the stale half.
+//
+// Folded into #1012 deliberately: adding seventeen routes to an application
+// that cannot be built is not worth much, and this is four lines.
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
