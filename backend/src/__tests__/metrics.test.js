@@ -29,6 +29,27 @@ jest.mock('otplib', () => ({
   },
 }));
 
+// The otplib stub above covers one ESM chain into `app.js`; this is the other,
+// and without it this suite has never run (#1008).
+//
+//     sanitize.middleware → utils/sanitizers → jsdom → parse5 / entities /
+//     @asamuzakjp/css-color …
+//
+// all of which are pure ESM, none of which `transformIgnorePatterns` covers.
+// The suite died on `Unexpected token 'export'` before reaching an assertion,
+// so its failure looked like a broken environment rather than a missing stub —
+// which is how it stayed red long enough for two unrelated boot failures to
+// hide behind it.
+//
+// `app.security.test.js` already carries this exact stub with the same
+// reasoning; copied here rather than shared because jest.mock is hoisted per
+// module and a helper would not be. Pass-through, so nothing asserted below is
+// weakened: sanitisation has no bearing on the metrics endpoint.
+jest.mock(
+  '../middlewares/sanitize.middleware',
+  () => (req, res, next) => next(),
+);
+
 const app = require('../app');
 
 describe('GET /metrics (#765)', () => {
