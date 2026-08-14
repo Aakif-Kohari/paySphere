@@ -10,6 +10,8 @@ const {
   assignAsset,
   returnAsset,
   runMonthlyDepreciation,
+  getDepreciationSchedule,
+  disposeAsset,
 } = require('../controllers/asset.controller');
 
 const router = express.Router();
@@ -33,7 +35,13 @@ router.post(
 );
 router.get('/', auth, requirePermission(PERMISSIONS.READ_ASSET), getAssets);
 
-// Workflows
+// Workflows & Schedules
+router.get(
+  '/:id/schedule',
+  auth,
+  requirePermission(PERMISSIONS.READ_ASSET),
+  getDepreciationSchedule,
+);
 router.post(
   '/:id/assign',
   auth,
@@ -47,6 +55,13 @@ router.post(
   requirePermission(PERMISSIONS.MANAGE_ASSET),
   writeRateLimiter,
   returnAsset,
+);
+router.post(
+  '/:id/dispose',
+  auth,
+  requirePermission(PERMISSIONS.MANAGE_ASSET),
+  writeRateLimiter,
+  disposeAsset,
 );
 
 // System / Cron
