@@ -18,6 +18,11 @@ const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const cacheService = require('../services/cache.service');
 const Settlement = require('../models/settlement.model');
+const { Client } = require('@elastic/elasticsearch');
+
+const esClient = new Client({ 
+    node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200' 
+});
 /**
  * Normalize an employee email for storage.
  *
@@ -1130,3 +1135,74 @@ exports.exportEmployeesCSV = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.searchEmployees = async (req, res) => {
+    try {
+        // Extract query parameters
+        const { q, department, role } = req.query;
+        
+        // Security: ALWAYS isolate by the requesting user's tenantId!
+        const tenantId = req.tenantId; 
+
+        // Build the Elasticsearch query body
+        const searchBody = {
+            query: {
+                bool: {
+                    // "must" acts like an AND operator
+                    must: [
+                        { term: { tenantId: tenantId } } // Strict tenant isolation
+                    ]
+                }
+            }
+        };
+
+        // Fuzzy Text Search (Name or Email)
+        if (q) {
+            searchBody.query.bool.must.push({
+                multi_match: {
+                    query: q,
+                    fields: ['fullName^2', 'email'], // ^2 boosts the score of name matches over email
+                    fuzziness: 'AUTO' // Allows for typos (e.g., "Jhon" finds "John")
+                }
+            });
+        }
+
+        // Facet Filtering (Department)
+        if (department) {
+            searchBody.query.bool.must.push({
+                term: { department: department }
+            });
+        }
+
+        // Facet Filtering (Role)
+        if (role) {
+            searchBody.query.bool.must.push({
+                term: { role: role }
+            });
+        }
+
+        // Execute the search
+        const result = await esClient.search({
+            index: 'employees',
+            body: searchBody
+        });
+
+        // Format the response to strip out Elasticsearch metadata
+        const hits = result.hits.hits.map(hit => ({
+            _id: hit._id,
+            ...hit._source,
+            score: hit._score // Optional: shows how relevant the result is
+        }));
+
+        res.status(200).json({
+            success: true,
+            total: result.hits.total.value,
+            data: hits
+        });
+
+    } catch (error) {
+        console.error('Elasticsearch query failed:', error);
+        res.status(500).json({ success: false, message: 'Search engine error' });
+    }
+};
+

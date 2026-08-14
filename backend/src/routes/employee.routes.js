@@ -10,6 +10,7 @@ const {
   deleteEmployee,
   toggleEmployeeStatus,
   restoreEmployee,
+  searchEmployees,
 } = require("../controllers/employee.controller");
 
 const auth = require("../middlewares/auth.middleware");
