@@ -72,6 +72,69 @@ const PERMISSIONS = {
   // what gets filed with the tax department under the employer's name. Kept
   // with the owner for the same reason MANAGE_EXPENSE_CATEGORY is.
   MANAGE_COMPLIANCE: 'MANAGE_COMPLIANCE',
+
+  // --- Feature areas that had no vocabulary of their own (#1011) -----------
+  //
+  // Eight areas shipped between #955 and #993 and every one reused
+  // WRITE_EMPLOYEE and READ_EMPLOYEE as a catch-all, so those two guarded 36
+  // of the 52 gated routes in the product. WRITE_EMPLOYEE is what you give an
+  // HR coordinator so they can add a joiner; it also authorised running
+  // depreciation across the fixed-asset register, setting the TDS withheld on
+  // a vendor invoice, issuing employment contracts and writing anybody's
+  // performance rating.
+  //
+  // That matters more than tidiness because #475's custom-role feature is
+  // live. An owner composing a least-privilege role at /api/roles is shown
+  // WRITE_EMPLOYEE described as employee-record editing, and the description
+  // was false.
+
+  READ_ASSET: 'READ_ASSET',
+  MANAGE_ASSET: 'MANAGE_ASSET',
+  // Separate from MANAGE_ASSET, and deliberately not held by HR. Depreciation
+  // writes book values across the whole register in one call — an accounting
+  // period action, closer to MANAGE_COMPLIANCE than to assigning a laptop.
+  RUN_DEPRECIATION: 'RUN_DEPRECIATION',
+
+  READ_VENDOR: 'READ_VENDOR',
+  // Recording a vendor invoice sets the 194C/194J TDS withheld, and therefore
+  // what the company remits on that contractor's behalf. Same class of
+  // authority as MANAGE_COMPLIANCE.
+  MANAGE_VENDOR: 'MANAGE_VENDOR',
+
+  READ_ROSTER: 'READ_ROSTER',
+  MANAGE_ROSTER: 'MANAGE_ROSTER',
+
+  READ_CONTRACT: 'READ_CONTRACT',
+  // Issuing an offer letter commits the company to a salary. Kept apart from
+  // WRITE_EMPLOYEE for the same reason APPROVE_PAYROLL is kept apart from
+  // WRITE_PAYROLL.
+  MANAGE_CONTRACT: 'MANAGE_CONTRACT',
+
+  READ_APPRAISAL: 'READ_APPRAISAL',
+  MANAGE_APPRAISAL: 'MANAGE_APPRAISAL',
+  // Self-service. An employee reading their own review is not the same act as
+  // an HR manager reading everyone's, and gating the first on READ_EMPLOYEE —
+  // which the Employee role does hold — happened to work while describing the
+  // wrong thing.
+  READ_OWN_APPRAISAL: 'READ_OWN_APPRAISAL',
+
+  READ_INVOICE: 'READ_INVOICE',
+  MANAGE_INVOICE: 'MANAGE_INVOICE',
+
+  // Self-service, and the reverse mistake: `POST /api/tax-proofs` is an
+  // employee uploading their own investment proof, and it was gated on
+  // WRITE_EMPLOYEE — which a rank-and-file employee does not hold and should
+  // not. TaxProofPortal.jsx therefore 403s for every user it was built for.
+  SUBMIT_TAX_PROOF: 'SUBMIT_TAX_PROOF',
+  // The HR side of the same feature: approving a proof changes the TDS
+  // deducted from somebody's salary.
+  VERIFY_TAX_PROOF: 'VERIFY_TAX_PROOF',
+
+  READ_PYQ: 'READ_PYQ',
+  // `pyq.routes.js` applied `auth` and nothing else, so any authenticated
+  // account in any tenant could bulk-upload questions and trigger forecast
+  // generation.
+  MANAGE_PYQ: 'MANAGE_PYQ',
 };
 
 const PERMISSION_DEFINITIONS = [
@@ -152,6 +215,90 @@ const PERMISSION_DEFINITIONS = [
     description:
       'Create, update and delete custom roles and their permission sets',
   },
+
+  // #1011.
+  {
+    name: PERMISSIONS.READ_ASSET,
+    description:
+      'View the fixed-asset register and who is currently holding each asset',
+  },
+  {
+    name: PERMISSIONS.MANAGE_ASSET,
+    description:
+      'Register assets, and check them out to and back in from employees',
+  },
+  {
+    name: PERMISSIONS.RUN_DEPRECIATION,
+    description:
+      'Run the monthly depreciation schedule, which rewrites the book value of every asset',
+  },
+  {
+    name: PERMISSIONS.READ_VENDOR,
+    description: 'View contractors, their invoices and their payment ledger',
+  },
+  {
+    name: PERMISSIONS.MANAGE_VENDOR,
+    description:
+      'Register contractors and record invoices, which sets the 194C/194J TDS withheld on their behalf',
+  },
+  {
+    name: PERMISSIONS.READ_ROSTER,
+    description: 'View published shift rosters',
+  },
+  {
+    name: PERMISSIONS.MANAGE_ROSTER,
+    description:
+      'Create shift templates, assign shifts, and approve shift swaps',
+  },
+  {
+    name: PERMISSIONS.READ_CONTRACT,
+    description: 'View issued offer letters and employment contracts',
+  },
+  {
+    name: PERMISSIONS.MANAGE_CONTRACT,
+    description:
+      'Issue offer letters and employment contracts, which commit the company to a salary',
+  },
+  {
+    name: PERMISSIONS.READ_APPRAISAL,
+    description: "View appraisal cycles, goals and any employee's review",
+  },
+  {
+    name: PERMISSIONS.MANAGE_APPRAISAL,
+    description:
+      'Open appraisal cycles, set goals, and record manager ratings and increment recommendations',
+  },
+  {
+    name: PERMISSIONS.READ_OWN_APPRAISAL,
+    description: 'View and self-rate your own performance review',
+  },
+  {
+    name: PERMISSIONS.READ_INVOICE,
+    description: 'View client invoices, the receivables dashboard and ageing',
+  },
+  {
+    name: PERMISSIONS.MANAGE_INVOICE,
+    description: 'Raise client invoices and record payments against them',
+  },
+  {
+    name: PERMISSIONS.SUBMIT_TAX_PROOF,
+    description:
+      'Submit your own investment proofs and view the ones you have submitted',
+  },
+  {
+    name: PERMISSIONS.VERIFY_TAX_PROOF,
+    description:
+      'Approve or reject submitted investment proofs, which changes the TDS deducted from that salary',
+  },
+  {
+    name: PERMISSIONS.READ_PYQ,
+    description: 'View the previous-year question bank and trend forecasts',
+  },
+  {
+    name: PERMISSIONS.MANAGE_PYQ,
+    description:
+      'Add and bulk-upload previous-year questions, and generate trend forecasts',
+  },
 ];
 
 // --- Roles -----------------------------------------------------------------
@@ -196,6 +343,28 @@ const ROLE_DEFINITIONS = [
       // Held by the owner alone: a role edit changes what every other account
       // in the company can do.
       PERMISSIONS.MANAGE_ROLES,
+
+      // #1011. The owner holds everything, including the three that stop at
+      // the owner on purpose — RUN_DEPRECIATION, MANAGE_VENDOR and
+      // MANAGE_CONTRACT all move money or commit the company.
+      PERMISSIONS.READ_ASSET,
+      PERMISSIONS.MANAGE_ASSET,
+      PERMISSIONS.RUN_DEPRECIATION,
+      PERMISSIONS.READ_VENDOR,
+      PERMISSIONS.MANAGE_VENDOR,
+      PERMISSIONS.READ_ROSTER,
+      PERMISSIONS.MANAGE_ROSTER,
+      PERMISSIONS.READ_CONTRACT,
+      PERMISSIONS.MANAGE_CONTRACT,
+      PERMISSIONS.READ_APPRAISAL,
+      PERMISSIONS.MANAGE_APPRAISAL,
+      PERMISSIONS.READ_OWN_APPRAISAL,
+      PERMISSIONS.READ_INVOICE,
+      PERMISSIONS.MANAGE_INVOICE,
+      PERMISSIONS.SUBMIT_TAX_PROOF,
+      PERMISSIONS.VERIFY_TAX_PROOF,
+      PERMISSIONS.READ_PYQ,
+      PERMISSIONS.MANAGE_PYQ,
     ],
   },
   {
@@ -218,6 +387,31 @@ const ROLE_DEFINITIONS = [
       // Issuing Form 16 at year end is HR's job. Setting the TAN the return is
       // filed under is not — that stays with the owner.
       PERMISSIONS.READ_COMPLIANCE,
+
+      // #1011. The day-to-day half of each new area, and not the half that
+      // moves money.
+      //
+      // HR issues laptops and takes them back; it does not run the
+      // depreciation schedule, which rewrites book values across the whole
+      // register in a single call. It reads the contractor ledger but does not
+      // set the TDS withheld on an invoice. It publishes rosters, runs
+      // appraisals and verifies investment proofs — all squarely HR — but
+      // MANAGE_CONTRACT stays with the owner because issuing an offer letter
+      // commits the company to a salary, which is the same reason
+      // APPROVE_PAYROLL is not here either.
+      PERMISSIONS.READ_ASSET,
+      PERMISSIONS.MANAGE_ASSET,
+      PERMISSIONS.READ_VENDOR,
+      PERMISSIONS.READ_ROSTER,
+      PERMISSIONS.MANAGE_ROSTER,
+      PERMISSIONS.READ_CONTRACT,
+      PERMISSIONS.READ_APPRAISAL,
+      PERMISSIONS.MANAGE_APPRAISAL,
+      PERMISSIONS.READ_OWN_APPRAISAL,
+      PERMISSIONS.READ_INVOICE,
+      PERMISSIONS.SUBMIT_TAX_PROOF,
+      PERMISSIONS.VERIFY_TAX_PROOF,
+      PERMISSIONS.READ_PYQ,
     ],
   },
   {
@@ -231,6 +425,26 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_PAYROLL,
       PERMISSIONS.READ_EXPENSE,
       PERMISSIONS.WRITE_EXPENSE,
+
+      // #1011. The self-service half, and the reason this role needed any new
+      // permissions at all.
+      //
+      // Three pages were built for exactly this population and were gated on
+      // permissions it does not hold: TaxProofPortal.jsx posts to
+      // `/api/tax-proofs`, which asked for WRITE_EMPLOYEE, and
+      // AppraisalDashboard.jsx reads `/api/appraisals/my-review`. Both would
+      // have 403'd for every employee in the company.
+      //
+      // Each of these is bounded by the handler as well as by the permission:
+      // `getMyReview` resolves the review from `req.userId`, and `submitProof`
+      // files against the caller's own employee record, so holding them does
+      // not let one employee read a colleague's review or file a proof in
+      // their name.
+      PERMISSIONS.SUBMIT_TAX_PROOF,
+      PERMISSIONS.READ_OWN_APPRAISAL,
+      // Employees see the roster they are on.
+      PERMISSIONS.READ_ROSTER,
+      PERMISSIONS.READ_PYQ,
     ],
   },
 ];

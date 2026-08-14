@@ -1,6 +1,7 @@
 const express = require('express');
 const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
+const { PERMISSIONS } = require('../config/permissions');
 const { writeRateLimiter } = require('../middlewares/rateLimiter.middleware');
 const {
   createInvoice,
@@ -11,9 +12,31 @@ const {
 
 const router = express.Router();
 
-router.post('/invoices', auth, requirePermission('WRITE_EMPLOYEE'), writeRateLimiter, createInvoice);
-router.post('/invoices/:id/payment', auth, requirePermission('WRITE_EMPLOYEE'), writeRateLimiter, recordPayment);
-router.get('/invoices/dashboard', auth, requirePermission('READ_EMPLOYEE'), getDashboard);
-router.get('/invoices/aging-report', auth, requirePermission('READ_EMPLOYEE'), getAgingReport);
+router.post(
+  '/invoices',
+  auth,
+  requirePermission(PERMISSIONS.MANAGE_INVOICE),
+  writeRateLimiter,
+  createInvoice,
+);
+router.post(
+  '/invoices/:id/payment',
+  auth,
+  requirePermission(PERMISSIONS.MANAGE_INVOICE),
+  writeRateLimiter,
+  recordPayment,
+);
+router.get(
+  '/invoices/dashboard',
+  auth,
+  requirePermission(PERMISSIONS.READ_INVOICE),
+  getDashboard,
+);
+router.get(
+  '/invoices/aging-report',
+  auth,
+  requirePermission(PERMISSIONS.READ_INVOICE),
+  getAgingReport,
+);
 
 module.exports = router;
