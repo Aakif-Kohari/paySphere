@@ -83,7 +83,7 @@ beforeEach(() => {
 describe('deleteEmployee sets both markers (#897)', () => {
   test('marks the record deleted, not just timestamped', async () => {
     const employee = liveEmployee();
-    Employee.findById.mockResolvedValue(employee);
+    Employee.findOne.mockResolvedValue(employee);
 
     await deleteEmployee(makeReq(), makeRes());
 
@@ -94,7 +94,7 @@ describe('deleteEmployee sets both markers (#897)', () => {
 
   test('still deactivates, as before', async () => {
     const employee = liveEmployee();
-    Employee.findById.mockResolvedValue(employee);
+    Employee.findOne.mockResolvedValue(employee);
 
     await deleteEmployee(makeReq(), makeRes());
 
@@ -106,7 +106,7 @@ describe('deleteEmployee sets both markers (#897)', () => {
     // the product, and a record where they disagree is a record that is deleted
     // according to one query and live according to the next.
     const employee = liveEmployee();
-    Employee.findById.mockResolvedValue(employee);
+    Employee.findOne.mockResolvedValue(employee);
 
     await deleteEmployee(makeReq(), makeRes());
 
@@ -118,7 +118,7 @@ describe('deleteEmployee sets both markers (#897)', () => {
     // half-delete the record.
     PayrollUpdate.exists.mockResolvedValue({ _id: oid() });
     const employee = liveEmployee();
-    Employee.findById.mockResolvedValue(employee);
+    Employee.findOne.mockResolvedValue(employee);
     const res = makeRes();
 
     await deleteEmployee(makeReq(), res);
