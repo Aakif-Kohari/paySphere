@@ -1,10 +1,6 @@
-import {
-  createTheme,
-  CssBaseline,
-  ThemeProvider,
-} from '@mui/material';
+import { createTheme, CssBaseline, ThemeProvider } from '@mui/material';
 import * as Sentry from '@sentry/react';
-import { useEffect, useMemo } from 'react';
+import { Suspense, useEffect, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
@@ -14,21 +10,8 @@ import OfflineSyncIndicator from './components/OfflineSyncIndicator';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ToastProvider } from './context/ToastContext';
 import { logout } from './features/auth/authSlice';
-
-import AddEmployee from './pages/AddEmployee';
-import Dashboard from './pages/Dashboard';
-import EmployeePortal from './pages/EmployeePortal';
-import Flashcards from './pages/Flashcards';
-import Landing from './pages/Landing';
-import LoginSignUp from './pages/LoginSignUp';
-import MonthlyUpdates from './pages/MonthlyUpdates';
-import NotFound from './pages/NotFound';
-import PyqDashboard from './pages/PyqDashboard';
-import QuizBattle from './pages/QuizBattle';
-import Reports from './pages/Reports';
-import ResetPassword from './pages/ResetPassword';
-import Settings from './pages/Settings';
-import SystemHealth from './pages/SystemHealth';
+import { NotFound, ROUTABLE } from './config/navigation';
+import RouteFallback from './components/common/RouteFallback';
 
 function App() {
   const dispatch = useDispatch();
@@ -94,107 +77,42 @@ function App() {
 
       <ToastProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/auth" element={<LoginSignUp />} />
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              {/* Built from `config/navigation.js` rather than written out
+                  here, so the router and the sidebar cannot disagree about
+                  which pages exist — which is how seventeen finished pages
+                  ended up with no route at all (#1012).
 
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
+                  `Page` is a local const rather than a destructured parameter
+                  on purpose: this project does not enable eslint-plugin-react,
+                  so `no-unused-vars` cannot tell that a name is used in JSX.
+                  The config exempts capitalised *variables* through
+                  `varsIgnorePattern`, and that exemption does not reach
+                  function arguments. */}
+              {ROUTABLE.map((route) => {
+                const Page = route.component;
 
-            <Route
-              path="/employee-portal"
-              element={
-                <ProtectedRoute>
-                  <EmployeePortal />
-                </ProtectedRoute>
-              }
-            />
+                return (
+                  <Route
+                    key={route.path}
+                    path={route.path}
+                    element={
+                      route.isProtected === false ? (
+                        <Page />
+                      ) : (
+                        <ProtectedRoute>
+                          <Page />
+                        </ProtectedRoute>
+                      )
+                    }
+                  />
+                );
+              })}
 
-            <Route
-              path="/monthly-updates"
-              element={
-                <ProtectedRoute>
-                  <MonthlyUpdates />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/add-employee"
-              element={
-                <ProtectedRoute>
-                  <AddEmployee />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/reset-password/:token"
-              element={<ResetPassword />}
-            />
-
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/settings/system-health"
-              element={
-                <ProtectedRoute>
-                  <SystemHealth />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/reports"
-              element={
-                <ProtectedRoute>
-                  <Reports />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/flashcards"
-              element={
-                <ProtectedRoute>
-                  <Flashcards />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/pyqs"
-              element={
-                <ProtectedRoute>
-                  <PyqDashboard />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/quiz-battle"
-              element={
-                <ProtectedRoute>
-                  <QuizBattle />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
 
           <ScrollToTop />
           <CommandPalette />
