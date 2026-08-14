@@ -70,6 +70,25 @@ const searchRoutes = require('./routes/search.routes');
 const emailRoutes = require('./routes/email.routes');
 const complianceRoutes = require('./routes/compliance.routes');
 
+// The eleven routers #1009 found unmounted. Each one had a router, a
+// controller, its models and — for most of them — a finished frontend page, and
+// no line anywhere in this file, so every endpoint they define answered 404.
+// Roughly 1,600 lines of controller that no request could reach.
+//
+// The mount paths are below, next to the mounts themselves, because two of them
+// are not the obvious choice and the reason belongs where someone would look.
+const assetRoutes = require('./routes/asset.routes');
+const vendorRoutes = require('./routes/vendor.routes');
+const grievanceRoutes = require('./routes/grievance.routes');
+const taxProofRoutes = require('./routes/taxProof.routes');
+const appraisalRoutes = require('./routes/appraisal.routes');
+const contractRoutes = require('./routes/contract.routes');
+const forecastRoutes = require('./routes/forecast.routes');
+const accountingRoutes = require('./routes/accounting.routes');
+const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
+const shiftRosterRoutes = require('./routes/shiftRoster.routes');
+const pyqRoutes = require('./routes/pyq.routes');
+
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
 // module threw `ReferenceError: roleRoutes is not defined`. Same damage as
@@ -332,6 +351,52 @@ app.use('/api/search', searchRoutes);
 // so there was no URL that reached it — and consequently nobody noticed that
 // neither of the two models it requires had been committed (#951).
 app.use('/api/compliance', complianceRoutes);
+
+// ─── Feature routers that were never mounted (#1009) ───────────────────────
+//
+// Eleven of them, each shipped complete — router, controller, models, utils,
+// and in most cases a frontend page calling it — and never added to this table.
+// This is the fifth time: #614 (workflows), #474 (webhooks), #954
+// (integrations), #509 (monthly updates) and #719 (expenses) are all the same
+// omission, and all documented above. `app.routeMounting.test.js` now derives
+// its expectations by walking `routes/` instead of from a hand-written list, so
+// the next router to arrive without a mount fails CI rather than going quiet
+// for a few months.
+//
+// The paths are not a free choice. Each router defines its own sub-paths and
+// the frontend pages already call specific URLs, so the mount is whatever makes
+// the two line up. Most are unsurprising; the two that are not are called out.
+
+app.use('/api/assets', assetRoutes);
+app.use('/api/vendors', vendorRoutes);
+
+// POSH grievances (#958). Gated by `requireICC` rather than `requirePermission`
+// — the committee is deliberately not the same population as "HR", and admins
+// are locked out on purpose for anti-retaliation reasons.
+app.use('/api/grievances', grievanceRoutes);
+
+app.use('/api/tax-proofs', taxProofRoutes);
+app.use('/api/appraisals', appraisalRoutes);
+app.use('/api/contracts', contractRoutes);
+
+// Plural. `BudgetPlanner.jsx` posts to `/api/forecasts/generate` and the router
+// defines `/generate`, so `/api/forecast` would leave the page on a 404.
+app.use('/api/forecasts', forecastRoutes);
+
+app.use('/api/accounting', accountingRoutes);
+
+// Not `/api/client-invoices`. This router defines `/invoices`,
+// `/invoices/:id/payment`, `/invoices/dashboard` and `/invoices/aging-report`
+// internally, and `ClientInvoices.jsx` calls
+// `/api/clients/invoices/dashboard` — so the mount is the `/api/clients` half
+// of that path and the router supplies the rest.
+app.use('/api/clients', clientInvoiceRoutes);
+
+// Same shape: the router defines `/roster`, `/templates` and `/swap/...`, and
+// `Roster.jsx` calls `/api/shifts/roster`.
+app.use('/api/shifts', shiftRosterRoutes);
+
+app.use('/api/pyqs', pyqRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
