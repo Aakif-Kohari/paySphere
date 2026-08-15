@@ -17,6 +17,27 @@ const { LOAN_STATUS, buildAmortizationSchedule } = require('../../utils/loanSche
 jest.mock('../../models/employee.model');
 jest.mock('../../models/payroll.model');
 jest.mock('../../models/user.model');
+// Read once per employee in a run, to bundle anything owed from a backdated
+// salary revision (#931). Mocked as a factory rather than automocked so the
+// query never reaches Mongoose: unmocked, it buffers against a database this
+// suite never connects to and every test in the file times out (#950).
+jest.mock('../../models/arrearsLedger.model', () => ({
+  find: jest.fn(() => ({
+    sort: jest.fn().mockReturnThis(),
+    lean: jest.fn().mockResolvedValue([]),
+  })),
+  updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
+  insertMany: jest.fn().mockResolvedValue([]),
+}));
+// Expense claims are read for every employee in a run since #719. Same reason
+// as the mock above: unmocked it buffers and the whole suite times out.
+jest.mock('../../models/expenseClaim.model', () => ({
+  find: jest.fn(() => ({
+    populate: jest.fn().mockReturnThis(),
+    lean: jest.fn().mockResolvedValue([]),
+  })),
+  bulkWrite: jest.fn().mockResolvedValue({}),
+}));
 jest.mock('../../models/loan.model');
 // Payroll also consults the attendance ledger (#459); stubbed so this suite
 // stays focused on loan recovery.
@@ -30,9 +51,13 @@ jest.mock('../../models/salaryStructure.model', () => ({
 }));
 jest.mock('../../services/cache.service', () => ({
   invalidateAnalytics: jest.fn().mockResolvedValue(undefined),
+  invalidateDashboardSummary: jest.fn().mockResolvedValue(undefined),
 }));
 
 const OWNER = '507f1f77bcf86cd799439011';
+// The company. A different id from OWNER on purpose: since #613 the scope is
+// the tenant, not the account that created the row.
+const TENANT = '507f1f77bcf86cd799439099';
 const EMP_A = '607f1f77bcf86cd7994390a1';
 const LOAN_ID = '707f1f77bcf86cd7994390b1';
 
@@ -73,6 +98,7 @@ const activeLoan = (overrides = {}) => {
     _id: oid(LOAN_ID),
     employeeId: oid(EMP_A),
     createdBy: oid(OWNER),
+    tenantId: oid(TENANT),
     status: LOAN_STATUS.ACTIVE,
     principal: 12000,
     totalPayable: 12000,
@@ -108,6 +134,7 @@ const unaffordableLoan = () => {
     _id: oid(LOAN_ID),
     employeeId: oid(EMP_A),
     createdBy: oid(OWNER),
+    tenantId: oid(TENANT),
     status: LOAN_STATUS.ACTIVE,
     principal: 60000,
     totalPayable: 60000,
@@ -136,6 +163,7 @@ beforeEach(() => {
 
   req = {
     userId: OWNER,
+    tenantId: TENANT,
     body: {
       month: 3,
       year: 2026,
@@ -194,7 +222,7 @@ describe('loan recovery during payroll', () => {
 
     expect(Loan.updateOne).toHaveBeenCalledTimes(1);
     const [filter, update] = Loan.updateOne.mock.calls[0];
-    expect(filter.createdBy).toBe(OWNER);
+    expect(filter.tenantId).toBe(TENANT);
     expect(update.$set.totalRepaid).toBe(1000);
     expect(update.$set.outstanding).toBe(11000);
     expect(update.$set.repayments).toHaveLength(1);
@@ -284,11 +312,11 @@ describe('loan recovery during payroll', () => {
     expect(update.completedAt).toBeInstanceOf(Date);
   });
 
-  test('the loan query is scoped to the caller and to active loans only', async () => {
+  test("the loan query is scoped to the caller's company and to active loans only", async () => {
     await submitPayrollForReview(req, res, next);
 
     expect(Loan.find).toHaveBeenCalledWith({
-      createdBy: OWNER,
+      tenantId: TENANT,
       status: LOAN_STATUS.ACTIVE,
     });
   });

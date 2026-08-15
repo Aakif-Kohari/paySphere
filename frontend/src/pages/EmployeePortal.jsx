@@ -96,13 +96,18 @@ export default function EmployeePortal() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       <Helmet>
         <title>Employee Self-Service Portal | PaySphere</title>
-        <meta name="description" content="View your profile, payslips, and attendance history." />
+        <meta
+          name="description"
+          content="View your profile, payslips, and attendance history."
+        />
       </Helmet>
 
       {/* Top Bar */}
       <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 flex items-center justify-between sticky top-0 z-30 transition-colors">
         <div className="flex items-center gap-3">
-          <span className="font-bold text-xl text-blue-600 dark:text-blue-400">PaySphere</span>
+          <span className="font-bold text-xl text-blue-600 dark:text-blue-400">
+            PaySphere
+          </span>
           <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-semibold uppercase tracking-wider">
             Employee Portal
           </span>
@@ -110,6 +115,12 @@ export default function EmployeePortal() {
 
         <div className="flex items-center gap-4">
           <ThemeToggle />
+          <button
+            onClick={() => navigate('/profile')}
+            className="px-3.5 py-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition"
+          >
+            Profile Settings
+          </button>
           <button
             onClick={handleSignOut}
             className="px-3.5 py-1.5 text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"
@@ -122,10 +133,7 @@ export default function EmployeePortal() {
       {/* Main Content */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-8">
         {loading ? (
-          <div className="animate-pulse space-y-6">
-            <div className="h-32 bg-gray-200 dark:bg-slate-800 rounded-2xl"></div>
-            <div className="h-64 bg-gray-200 dark:bg-slate-800 rounded-2xl"></div>
-          </div>
+          <EmployeePortalSkeleton />
         ) : (
           <>
             {/* Header Card */}
@@ -145,13 +153,17 @@ export default function EmployeePortal() {
               {employee && (
                 <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-gray-100 dark:border-slate-800 flex gap-6">
                   <div>
-                    <p className="text-xs uppercase text-gray-400 font-bold">Base Monthly Salary</p>
+                    <p className="text-xs uppercase text-gray-400 font-bold">
+                      Base Monthly Salary
+                    </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
                       ,1{employee.monthlySalary?.toLocaleString('en-IN') || 0}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase text-gray-400 font-bold">Overtime Rate</p>
+                    <p className="text-xs uppercase text-gray-400 font-bold">
+                      Overtime Rate
+                    </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
                       ,1{employee.overtimeRate || 0}/hr
                     </p>

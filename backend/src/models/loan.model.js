@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 const {
   INTEREST_METHOD,
   LOAN_TYPE,
@@ -63,9 +64,30 @@ const loanSchema = new mongoose.Schema(
       required: true,
     },
     employeeName: { type: String, required: true },
+    /**
+     * Who created this row. An audit fact, not a scoping key.
+     *
+     * #585's codemod rewrote every `createdBy: req.userId` in the controllers
+     * to `tenantId: req.tenantId` while leaving this field `required: true`, so
+     * every insert omitted a field the schema demanded and `create()` threw
+     * before reaching Mongo (#613). Both fields are written now: this one
+     * records the actor, `tenantId` below decides who can see the row.
+     */
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      required: true,
+    },
+
+    /**
+     * Which company this row belongs to — the field every read filters on.
+     *
+     * Separate from `createdBy` because a company can have more than one admin,
+     * and a row created by one of them has to stay visible to the others.
+     */
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
       required: true,
     },
 
@@ -100,7 +122,10 @@ const loanSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: [1, 'Tenure must be at least one month'],
-      max: [MAX_TENURE_MONTHS, `Tenure cannot exceed ${MAX_TENURE_MONTHS} months`],
+      max: [
+        MAX_TENURE_MONTHS,
+        `Tenure cannot exceed ${MAX_TENURE_MONTHS} months`,
+      ],
     },
     installmentAmount: { type: Number, required: true, min: 0 },
     totalPayable: { type: Number, required: true, min: 0 },
@@ -142,8 +167,12 @@ const loanSchema = new mongoose.Schema(
 
 // The recovery step asks "which loans are active for this employee?" on every
 // payroll run, and the dashboard asks "what is outstanding across the company?".
-loanSchema.index({ createdBy: 1, employeeId: 1, status: 1 });
-loanSchema.index({ createdBy: 1, status: 1, createdAt: -1 });
+//
+// Both lead with `tenantId` because that is what the queries filter on since
+// #585. They led with `createdBy` until #613, so the rewritten queries had no
+// index behind them (#613).
+loanSchema.index({ tenantId: 1, employeeId: 1, status: 1 });
+loanSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
 
 /**
  * @returns {boolean} whether the loan can still be collected against
@@ -152,4 +181,5 @@ loanSchema.methods.isCollectible = function isCollectible() {
   return this.status === LOAN_STATUS.ACTIVE && this.outstanding > 0;
 };
 
+loanSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('Loan', loanSchema);

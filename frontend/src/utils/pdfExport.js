@@ -1,0 +1,284 @@
+/**
+ * @fileoverview PDF Export Utility for PaySphere
+ * @description Generates professional, paginated PDF documents for employee directories
+ * and payroll reports using jsPDF and jspdf-autotable. Supports dark/light mode
+ * theming, custom headers/footers, and robust error handling.
+ * 
+ * Issue: #511
+ */
+
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
+/**
+ * Configuration constants for PDF generation
+ * @constant {Object} PDF_CONFIG
+ */
+const PDF_CONFIG = {
+    PAGE_MARGIN: 14,
+    HEADER_HEIGHT: 20,
+    FOOTER_HEIGHT: 15,
+    FONT_FAMILY: 'helvetica',
+    TITLE_FONT_SIZE: 18,
+    SUBTITLE_FONT_SIZE: 12,
+    TABLE_FONT_SIZE: 10,
+    COLORS: {
+        light: {
+            background: [255, 255, 255],
+            text: [30, 41, 59],       // slate-800
+            headerBg: [241, 245, 249], // slate-100
+            headerText: [15, 23, 42],  // slate-900
+            rowEven: [255, 255, 255],
+            rowOdd: [248, 250, 252],   // slate-50
+            border: [226, 232, 240],   // slate-200
+            accent: [99, 102, 241],    // indigo-500
+        },
+        dark: {
+            background: [15, 23, 42],  // slate-900
+            text: [226, 232, 240],     // slate-200
+            headerBg: [30, 41, 59],    // slate-800
+            headerText: [248, 250, 252],// slate-50
+            rowEven: [15, 23, 42],
+            rowOdd: [30, 41, 59],      // slate-800
+            border: [51, 65, 85],      // slate-700
+            accent: [129, 140, 248],   // indigo-400
+        }
+    }
+};
+
+/**
+ * Detects the current theme mode from the DOM
+ * @returns {'light'|'dark'} The current theme mode
+ */
+const getThemeMode = () => {
+    if (typeof document !== 'undefined') {
+        return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+    }
+    return 'light';
+};
+
+/**
+ * Formats currency values for display in the PDF
+ * @param {number} value - The numeric value to format
+ * @param {string} currency - The currency code (e.g., 'INR', 'USD')
+ * @returns {string} Formatted currency string
+ */
+const formatCurrencyForPDF = (value, currency = 'INR') => {
+    if (value === null || value === undefined || isNaN(value)) return '-';
+
+    const symbols = {
+        'INR': '₹',
+        'USD': '$',
+        'EUR': '€',
+        'GBP': '£'
+    };
+
+    const symbol = symbols[currency] || currency + ' ';
+    return `${symbol}${Number(value).toLocaleString('en-IN', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2
+    })}`;
+};
+
+/**
+ * Adds a custom header to the PDF document
+ * @param {jsPDF} doc - The jsPDF document instance
+ * @param {Object} options - Header options
+ */
+const addDocumentHeader = (doc, options) => {
+    const { title, subtitle, companyName, theme } = options;
+    const colors = PDF_CONFIG.COLORS[theme];
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Draw accent line at the very top
+    doc.setDrawColor(...colors.accent);
+    doc.setLineWidth(1.5);
+    doc.line(PDF_CONFIG.PAGE_MARGIN, 8, pageWidth - PDF_CONFIG.PAGE_MARGIN, 8);
+
+    // Company Name / Logo text
+    doc.setFont(PDF_CONFIG.FONT_FAMILY, 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...colors.accent);
+    doc.text(companyName || 'PaySphere', PDF_CONFIG.PAGE_MARGIN, 16);
+
+    // Document Title
+    doc.setFontSize(PDF_CONFIG.TITLE_FONT_SIZE);
+    doc.setTextColor(...colors.text);
+    doc.text(title, PDF_CONFIG.PAGE_MARGIN, 32);
+
+    // Subtitle / Date
+    if (subtitle) {
+        doc.setFont(PDF_CONFIG.FONT_FAMILY, 'normal');
+        doc.setFontSize(PDF_CONFIG.SUBTITLE_FONT_SIZE);
+        doc.setTextColor(...colors.text);
+        doc.text(subtitle, PDF_CONFIG.PAGE_MARGIN, 42);
+    }
+
+    // Horizontal separator line
+    doc.setDrawColor(...colors.border);
+    doc.setLineWidth(0.5);
+    doc.line(PDF_CONFIG.PAGE_MARGIN, 48, pageWidth - PDF_CONFIG.PAGE_MARGIN, 48);
+};
+
+/**
+ * Adds a custom footer with page numbers to the PDF document
+ * @param {jsPDF} doc - The jsPDF document instance
+ * @param {string} theme - The current theme mode
+ */
+const addDocumentFooter = (doc, theme) => {
+    const colors = PDF_CONFIG.COLORS[theme];
+    const pageCount = doc.internal.getNumberOfPages();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+
+        // Footer separator line
+        doc.setDrawColor(...colors.border);
+        doc.setLineWidth(0.5);
+        doc.line(
+            PDF_CONFIG.PAGE_MARGIN,
+            pageHeight - PDF_CONFIG.FOOTER_HEIGHT,
+            pageWidth - PDF_CONFIG.PAGE_MARGIN,
+            pageHeight - PDF_CONFIG.FOOTER_HEIGHT
+        );
+
+        // Footer text
+        doc.setFont(PDF_CONFIG.FONT_FAMILY, 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139); // slate-500
+
+        const generatedText = `Generated by PaySphere on ${new Date().toLocaleDateString()}`;
+        doc.text(generatedText, PDF_CONFIG.PAGE_MARGIN, pageHeight - 8);
+
+        const pageText = `Page ${i} of ${pageCount}`;
+        doc.text(pageText, pageWidth - PDF_CONFIG.PAGE_MARGIN, pageHeight - 8, { align: 'right' });
+    }
+};
+
+/**
+ * Main function to generate and download the Employee Directory PDF
+ * 
+ * @param {Array<Object>} employees - Array of employee objects
+ * @param {Object} options - Export options
+ * @param {string} options.companyName - The company name for the header
+ * @param {string} options.currency - The currency code for salary formatting
+ * @returns {Promise<void>} Resolves when the PDF is downloaded
+ */
+export const exportEmployeesToPDF = async (employees, options = {}) => {
+    try {
+        if (!employees || employees.length === 0) {
+            throw new Error('No employee data available to export.');
+        }
+
+        const theme = getThemeMode();
+        const colors = PDF_CONFIG.COLORS[theme];
+        const { companyName = 'PaySphere', currency = 'INR' } = options;
+
+        // Initialize jsPDF document (A4 size, portrait)
+        const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4',
+            compress: true
+        });
+
+        // Set document properties
+        doc.setProperties({
+            title: 'Employee Directory',
+            subject: 'PaySphere Employee Export',
+            author: companyName,
+            creator: 'PaySphere Application'
+        });
+
+        // Add custom header
+        addDocumentHeader(doc, {
+            title: 'Employee Directory',
+            subtitle: `Total Employees: ${employees.length} | Export Date: ${new Date().toLocaleDateString()}`,
+            companyName,
+            theme
+        });
+
+        // Prepare table data
+        const headers = [['Name', 'Role / Designation', 'Department', 'Monthly Salary', 'Status']];
+
+        const rows = employees.map(emp => [
+            emp.fullName || 'N/A',
+            emp.role || 'N/A',
+            emp.department || 'Unassigned',
+            formatCurrencyForPDF(emp.monthlySalary, currency),
+            emp.isActive ? 'Active' : 'Inactive'
+        ]);
+
+        // Generate the table using jspdf-autotable
+        doc.autoTable({
+            head: headers,
+            body: rows,
+            startY: 55, // Start below the header
+            margin: {
+                left: PDF_CONFIG.PAGE_MARGIN,
+                right: PDF_CONFIG.PAGE_MARGIN
+            },
+            theme: 'grid',
+            styles: {
+                font: PDF_CONFIG.FONT_FAMILY,
+                fontSize: PDF_CONFIG.TABLE_FONT_SIZE,
+                cellPadding: 4,
+                textColor: colors.text,
+                lineColor: colors.border,
+                lineWidth: 0.1,
+                overflow: 'linebreak',
+                halign: 'left'
+            },
+            headStyles: {
+                fillColor: colors.headerBg,
+                textColor: colors.headerText,
+                fontStyle: 'bold',
+                fontSize: 11,
+                halign: 'center'
+            },
+            alternateRowStyles: {
+                fillColor: colors.rowOdd
+            },
+            bodyStyles: {
+                fillColor: colors.rowEven
+            },
+            columnStyles: {
+                0: { cellWidth: 45 }, // Name
+                1: { cellWidth: 40 }, // Role
+                2: { cellWidth: 35 }, // Department
+                3: { cellWidth: 35, halign: 'right' }, // Salary
+                4: { cellWidth: 25, halign: 'center' }  // Status
+            },
+            didParseCell: function (data) {
+                // Color code the status column
+                if (data.section === 'body' && data.column.index === 4) {
+                    const status = data.cell.raw;
+                    if (status === 'Active') {
+                        data.cell.styles.textColor = [22, 163, 74]; // green-600
+                        data.cell.styles.fontStyle = 'bold';
+                    } else {
+                        data.cell.styles.textColor = [220, 38, 38]; // red-600
+                        data.cell.styles.fontStyle = 'bold';
+                    }
+                }
+            }
+        });
+
+        // Add custom footer with page numbers
+        addDocumentFooter(doc, theme);
+
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().split('T')[0];
+        const filename = `employee-directory-${timestamp}.pdf`;
+
+        // Save the PDF
+        doc.save(filename);
+
+        return Promise.resolve();
+    } catch (error) {
+        console.error('PDF Export Error:', error);
+        throw new Error(error.message || 'Failed to generate PDF document.');
+    }
+};

@@ -2,9 +2,9 @@
  * Build a CSV string from an array of employee objects and trigger a
  * browser download. Pure client-side — no network call, no dependency.
  *
- * CSV columns (per issue #37): Name, Role, Base Pay
+ * CSV columns (per issue #37, extended in #8): Name, Role, Phone, Base Pay
  *
- * @param {Array<{ fullName: string, role?: string, monthlySalary?: number }>} employees
+ * @param {Array<{ fullName: string, role?: string, phone?: string, monthlySalary?: number }>} employees
  * @param {object} [options]
  * @param {string} [options.filename]   Override the default filename.
  * @param {string} [options.companyName] Company name to include in the header row.
@@ -19,10 +19,11 @@ export function exportEmployeesToCsv(employees, options = {}) {
   const safe = Array.isArray(employees) ? employees : [];
 
   // ---- 1. Build CSV rows ------------------------------------------------
-  const header = ['Name', 'Role', 'Base Pay'];
+  const header = ['Name', 'Role', 'Phone', 'Base Pay'];
   const rows = safe.map((emp) => [
     emp?.fullName ?? '',
     emp?.role ?? 'Employee',
+    emp?.phone ?? '',
     emp?.monthlySalary ?? 0,
   ]);
 
@@ -52,7 +53,7 @@ export function exportEmployeesToCsv(employees, options = {}) {
     0,
   );
   csvLines.push('');
-  csvLines.push(`"Total","${safe.length} employees","${totalBasePay}"`);
+  csvLines.push(`"Total","${safe.length} employees","","${totalBasePay}"`);
 
   const csv = csvLines.join('\r\n');
 

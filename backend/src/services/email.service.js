@@ -1,6 +1,14 @@
 const { sendEmail } = require('../utils/email');
+const { createCircuitBreaker } = require('../utils/circuitBreaker');
 const logger = require('../utils/logger');
 const User = require('../models/user.model');
+
+// Wrap sendEmail in circuit breaker (Issue #685)
+const emailBreaker = createCircuitBreaker(sendEmail, 'smtp-email-service', {
+  timeout: 15000, // Email can take a bit longer
+  errorThresholdPercentage: 60,
+  resetTimeout: 60000, // Wait 1 minute before retrying SMTP
+});
 
 exports.sendPayslipEmail = async (employee, payroll) => {
   if (!employee.email) {
@@ -64,7 +72,7 @@ exports.sendPayslipEmail = async (employee, payroll) => {
               ],
             };
 
-            const info = await sendEmail(mailOptions);
+            const info = await emailBreaker.fire(mailOptions);
             if (!info.success) {
               throw new Error(info.error || 'Email delivery failed');
             }
@@ -74,7 +82,7 @@ exports.sendPayslipEmail = async (employee, payroll) => {
             settle(reject)(new Error('PDF Generation failed: ' + result.error));
           }
         } catch (err) {
-          logger.error('Error sending email', {
+          logger.error('Error sending email (Circuit Breaker)', {
             error: err.message,
             employee: employee.email,
           });

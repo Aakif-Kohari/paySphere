@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
-import { logout } from "../features/auth/authSlice";
+import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
-import api from "../services/api";
-<<<<<<< Updated upstream
+import EmployeeForm from "../components/EmployeeForm";
+import { logout } from "../features/auth/authSlice";
 import useCtrlEnterSubmit from "../hooks/useCtrlEnterSubmit";
-=======
+import api from "../services/api";
 import { getCurrencySymbol } from "../utils/currency";
->>>>>>> Stashed changes
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const GridIcon = () => (
@@ -48,12 +46,6 @@ const SupportIcon = () => (
     <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
   </svg>
 );
-const CheckCircleIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-    <polyline points="22 4 12 14.01 9 11.01" />
-  </svg>
-);
 const ArrowRightIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <line x1="5" y1="12" x2="19" y2="12" />
@@ -63,6 +55,15 @@ const ArrowRightIcon = () => (
 
 // ── Avatar ─────────────────────────────────────────────────────────────────
 const AVATAR_COLORS = ["#6366F1", "#EC4899", "#F59E0B", "#10B981", "#3B82F6", "#8B5CF6", "#EF4444", "#14B8A6"];
+
+const COUNTRY_CODE_OPTIONS = [
+  { label: "+91 (India)", value: "+91" },
+  { label: "+1 (USA/Canada)", value: "+1" },
+  { label: "+44 (UK)", value: "+44" },
+  { label: "+61 (Australia)", value: "+61" },
+  { label: "+65 (Singapore)", value: "+65" },
+  { label: "+971 (UAE)", value: "+971" },
+];
 
 const Avatar = ({ name, size = 36 }) => {
   const initials = name
@@ -86,33 +87,27 @@ const Avatar = ({ name, size = 36 }) => {
   );
 };
 
+const PHONE_REGEX = /^\+?[1-9]\d{6,14}$/;
+
+const normalizePhoneValue = (value) =>
+  value.trim().replace(/[()\s-]/g, "");
+
 export default function AddEmployee() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
+  const [currency] = useState("INR"); // Kept for sidebar currency symbol display
 
-  // Form state
-  const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState("");
-  const [monthlySalary, setMonthlySalary] = useState("");
-  const [department, setDepartment] = useState("");
-  const [overtimeRate, setOvertimeRate] = useState("");
-  const [currency, setCurrency] = useState("INR");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-  const [joiningDate, setJoiningDate] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
+  // CSV Upload State (Preserved as not instructed to remove)
   const [csvFile, setCsvFile] = useState(null);
   const [uploadingCsv, setUploadingCsv] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const fileInputRef = useRef(null);
-  const formRef = useRef(null);
-  useCtrlEnterSubmit(formRef);
-  // Recently added employees
+
+  // Recently added employees (Preserved as not instructed to remove)
   const [recentEmployees, setRecentEmployees] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
 
@@ -138,7 +133,17 @@ export default function AddEmployee() {
     }
   }, [token]);
 
-
+  // New Form Submission Handler
+  const handleFormSubmit = async (values) => {
+    try {
+      await api.post('/api/employees', values);
+      // Refresh recent list after successful add
+      fetchRecent();
+      navigate('/dashboard?tab=employees');
+    } catch (error) {
+      throw error; // Let Formik/EmployeeForm catch and map errors
+    }
+  };
 
   const handleCsvUpload = async () => {
     if (!csvFile) {
@@ -165,11 +170,10 @@ export default function AddEmployee() {
       );
 
       setSuccess(`${res.data.imported} employees imported successfully.`);
-
       setCsvFile(null);
 
       const recent = await api.get("/api/employees/recent");
-      setRecentEmployees(recent.data.employees);
+      setRecentEmployees(recent.data.employees || []);
 
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -180,6 +184,26 @@ export default function AddEmployee() {
       setUploadingCsv(false);
     }
   };
+
+  const validatePhone = (countryCode, localNumber) => {
+    const trimmedCountryCode = (countryCode || "+91").trim();
+    const trimmedLocalNumber = normalizePhoneValue(localNumber || "");
+
+    if (!trimmedLocalNumber) {
+      setPhoneError("");
+      return true;
+    }
+
+    const normalized = normalizePhoneValue(`${trimmedCountryCode}${trimmedLocalNumber}`);
+    if (!PHONE_REGEX.test(normalized)) {
+      setPhoneError("Enter a valid international phone number, e.g. +91 98765 43210.");
+      return false;
+    }
+
+    setPhoneError("");
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -195,35 +219,61 @@ export default function AddEmployee() {
       return;
     }
 
+    if (!validatePhone(phoneCountryCode, phone)) {
+      setError("Please enter a valid international phone number.");
+      setLoading(false);
+      return;
+    }
+
+    const fullPhoneNumber = normalizePhoneValue(`${phoneCountryCode}${phone}`);
+
     try {
       const dobDate = dateOfBirth ? new Date(dateOfBirth + "T12:00:00.000Z") : undefined;
       const joiningDateDate = joiningDate ? new Date(joiningDate + "T12:00:00.000Z") : undefined;
-
-      await api.post(`/api/employees`, {
+      const response = await api.post(`/api/employees`, {
         fullName,
         role,
         department,
         monthlySalary: salaryNum,
         overtimeRate: otNum,
         currency,
+        phone: fullPhoneNumber || undefined,
         dateOfBirth: dobDate,
         joiningDate: joiningDateDate,
       });
-
-      setSuccess("Employee added successfully!");
-      setFullName("");
-      setRole("");
-      setDepartment("");
-      setMonthlySalary("");
-      setOvertimeRate("");
-      setDateOfBirth("");
-      setJoiningDate("");
-      fetchRecent(); // Refresh recent list
+      if (response.status === 201) {
+        setSuccess("Employee added successfully!");
+        setFullName("");
+        setRole("");
+        setDepartment("");
+        setMonthlySalary("");
+        setOvertimeRate("");
+        setCurrency("");
+        setPhoneCountryCode("+91");
+        setPhone("");
+        setPhoneError("");
+        setDateOfBirth("");
+        setJoiningDate("");
+        fetchRecent();
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Failed to add employee.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancel = () => {
+    setFullName("");
+    setRole("");
+    setDepartment("");
+    setMonthlySalary("");
+    setOvertimeRate("");
+    setDateOfBirth("");
+    setJoiningDate("");
+    setError("");
+    setSuccess("");
+    navigate("/dashboard");
   };
 
   const sidebarItems = [
@@ -351,140 +401,25 @@ export default function AddEmployee() {
 
             {/* ── LEFT: Form Section ── */}
             <div className="flex-1">
-              <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white mb-2">Add Employee</h1>
-              <p className="text-gray-500 dark:text-slate-500 text-sm mb-8">
-                Enter basic details to add someone to the next payroll run.
-              </p>
+              <div className="max-w-4xl mx-auto p-4 md:p-8">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Add New Employee</h1>
+                <EmployeeForm
+                  onSubmit={handleFormSubmit}
+                  onCancel={() => navigate(-1)}
+                  isEdit={false}
+                />
+              </div>
 
-              <form ref={formRef} onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 transition-colors duration-200">
-                {/* Full Name */}
-                <label className="block mb-5">
-                  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Full Name</span>
-                  <input
-                    id="employee-full-name"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Rahul Sharma"
-                    required
-                    className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
-                  />
-                </label>
+              {/* Bulk CSV Upload Card (Preserved) */}
+              <div className="mt-8 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 transition-colors duration-200">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                  Bulk Upload Employees
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-500 mb-4">
+                  Upload a CSV file to add multiple employees at once.
+                </p>
 
-                {/* Salary Row */}
-                <div className="flex flex-col sm:flex-col gap-4 mb-6">
-                  <label className="flex-1">
-                    <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Currency</span>
-                    <select
-                      value={currency}
-                      onChange={(e) => setCurrency(e.target.value)}
-                      className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white border border-transparent dark:border-slate-800 outline-none transition text-sm focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="INR">INR (₹)</option>
-                      <option value="USD">USD ($)</option>
-                      <option value="EUR">EUR (€)</option>
-                      <option value="GBP">GBP (£)</option>
-                    </select>
-                  </label>
-
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <label className="flex-1">
-                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Monthly Salary</span>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 font-semibold text-sm">{getCurrencySymbol(currency)}</span>
-                        <input
-                          id="employee-salary"
-                          type="text"
-                          value={monthlySalary}
-                          onChange={(e) => setMonthlySalary(e.target.value.replace(/[^0-9,]/g, ""))}
-                          placeholder="45,000"
-                          required
-                          className="w-full pl-8 pr-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
-                        />
-                      </div>
-                    </label>
-
-                    <label className="flex-1">
-                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Overtime Rate (Optional)</span>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 font-semibold text-sm">{getCurrencySymbol(currency)}</span>
-                        <input
-                          id="employee-overtime"
-                          type="text"
-                          value={overtimeRate}
-                          onChange={(e) => setOvertimeRate(e.target.value.replace(/[^0-9,]/g, ""))}
-                          placeholder="250 / hr"
-                          className="w-full pl-8 pr-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
-                        />
-                      </div>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Role */}
-                <label className="block mb-5">
-                  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Role</span>
-                  <input
-                    id="employee-role"
-                    type="text"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    placeholder="e.g. Software Engineer"
-                    required
-                    className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
-                  />
-                </label>
-
-                {/* Department Field */}
-                <label className="block mb-5">
-                  <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">
-                    Department
-                  </span>
-                  <input
-                    id="employee-department"
-                    type="text"
-                    list="department-suggestions"
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                    placeholder="e.g. Engineering, Sales, HR, Marketing"
-                    className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
-                  />
-                  <datalist id="department-suggestions">
-                    <option value="Engineering" />
-                    <option value="Sales" />
-                    <option value="Marketing" />
-                    <option value="Human Resources" />
-                    <option value="Finance" />
-                    <option value="Operations" />
-                    <option value="Design" />
-                  </datalist>
-                </label>
-
-                {/* Dates */}
-                <div className="mb-5">
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <label className="flex-1">
-                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Date of Birth (Optional)</span>
-                      <input
-                        type="date"
-                        value={dateOfBirth}
-                        onChange={(e) => setDateOfBirth(e.target.value)}
-                        className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
-                      />
-                    </label>
-                    <label className="flex-1">
-                      <span className="text-xs font-bold uppercase text-gray-500 dark:text-slate-500 tracking-wider mb-2 block">Joining Date (Optional)</span>
-                      <input
-                        type="date"
-                        value={joiningDate}
-                        onChange={(e) => setJoiningDate(e.target.value)}
-                        className="w-full px-4 py-3.5 rounded-xl bg-gray-100 dark:bg-slate-950 text-gray-900 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent dark:border-slate-800 outline-none transition text-sm"
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                {/* Messages */}
+                {/* CSV Messages */}
                 {error && (
                   <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm font-medium">
                     {error}
@@ -499,171 +434,124 @@ export default function AddEmployee() {
                   </div>
                 )}
 
-                {/* Submit */}
-                <button
-                  id="add-employee-btn"
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                <div
+                  className={`border-2 border-dashed rounded-xl p-5 text-center transition ${csvFile
+                    ? "border-green-400 bg-green-50 dark:bg-green-950/20"
+                    : "border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800/50"
+                    }`}
                 >
-                  <PersonPlusIcon />
-                  {loading ? "Adding..." : "Add Employee"}
-                </button>
-              </form>
-            </div>
-
-
-            <div className="border-t border-gray-200 pt-6">
-              <h3 className="text-sm font-bold text-gray-900 mb-2">
-                Bulk Upload Employees
-              </h3>
-
-              <p className="text-xs text-gray-500 mb-4">
-                Upload a CSV file to add multiple employees at once.
-              </p>
-
-              <div
-                className={`border-2 border-dashed rounded-xl p-5 text-center transition ${csvFile
-                  ? "border-green-400 bg-green-50"
-                  : "border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50"
-                  }`}
-              >
-                {!csvFile ? (
-                  <>
-                    <div className="text-3xl mb-2">📄</div>
-
-                    <p className="text-sm font-semibold text-gray-700">
-                      Choose CSV file
-                    </p>
-
-                    <p className="text-xs text-gray-500 mt-1 mb-3">
-                      Only .csv files are supported
-                    </p>
-
-                    <label className="inline-block cursor-pointer px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition">
-                      Browse File
-
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".csv"
-                        hidden
-                        onChange={(e) =>
-                          setCsvFile(e.target.files?.[0] || null)
-                        }
-                      />
-                    </label>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-between bg-white rounded-lg px-3 py-3 border border-green-200">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="text-2xl">
-                        📄
-                      </div>
-
-                      <div className="text-left min-w-0">
-                        <p className="text-sm font-semibold text-gray-800 truncate">
-                          {csvFile.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {(csvFile.size / 1024).toFixed(1)} KB
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCsvFile(null);
-
-                        if (fileInputRef.current) {
-                          fileInputRef.current.value = "";
-                        }
-                      }}
-                      className="ml-3 w-7 h-7 rounded-full bg-red-100 text-red-600 hover:bg-red-200 font-bold"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={handleCsvUpload}
-                disabled={!csvFile || uploadingCsv}
-                className="mt-4 w-full py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-              >
-                {uploadingCsv ? "Uploading..." : "Upload CSV"}
-              </button>
-            </div>
-            {/* ── RIGHT: Sidebar Cards ── */}
-            <div className="w-full lg:w-72 xl:w-80 flex flex-col gap-6">
-
-              {/* Recently Added */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-5 sm:p-6 transition-colors duration-200">
-                <div className="flex items-start gap-3 mb-4">
-                  <CheckCircleIcon />
-                  <div>
-                    <h3 className="font-bold text-gray-900 dark:text-white text-sm">Recently Added</h3>
-                    <p className="text-xs text-gray-500 dark:text-slate-450 mt-0.5 leading-relaxed">
-                      Employees added here will automatically appear in your {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} payroll worksheet.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-0">
-                  {loadingRecent ? (
-                    <div className="py-6 text-center text-sm text-gray-500">Loading...</div>
-                  ) : recentEmployees.length === 0 ? (
-                    <div className="py-6 text-center text-sm text-gray-500">No employees added yet.</div>
+                  {!csvFile ? (
+                    <>
+                      <div className="text-3xl mb-2">📄</div>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-slate-300">
+                        Choose CSV file
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-slate-500 mt-1 mb-3">
+                        Only .csv files are supported
+                      </p>
+                      <label className="inline-block cursor-pointer px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition">
+                        Browse File
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".csv"
+                          hidden
+                          onChange={(e) =>
+                            setCsvFile(e.target.files?.[0] || null)
+                          }
+                        />
+                      </label>
+                    </>
                   ) : (
-                    recentEmployees.slice(0, 3).map((emp) => (
-                      <div key={emp._id} className="flex items-center gap-3 py-3 border-b border-gray-100 dark:border-slate-800 last:border-0">
-                        <Avatar name={emp.fullName} size={36} />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">{emp.fullName}</p>
-                          <p className="text-xs text-gray-500 dark:text-slate-500 truncate">
-                            {emp.role || "Employee"} {emp.department ? `• ${emp.department}` : ""}
+                    <div className="flex items-center justify-between bg-white dark:bg-slate-900 rounded-lg px-4 py-3 border border-green-200 dark:border-green-900/50">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="text-2xl">📄</div>
+                        <div className="text-left min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                            {csvFile.name}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-slate-500">
+                            {(csvFile.size / 1024).toFixed(1)} KB
                           </p>
                         </div>
-                        <span className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
-                          {fmt(emp.monthlySalary, emp.currency)}
-                        </span>
                       </div>
-                    ))
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCsvUpload}
+                          disabled={uploadingCsv}
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50"
+                        >
+                          {uploadingCsv ? "Uploading..." : "Upload"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCsvFile(null)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 transition"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                <button
-                  onClick={() => navigate("/dashboard")}
-                  className="mt-3 text-blue-600 dark:text-blue-450 text-sm font-semibold hover:text-blue-700 dark:hover:text-blue-300 transition flex items-center gap-1"
-                >
-                  View Full Directory <ArrowRightIcon />
-                </button>
               </div>
+            </div>
 
-              {/* Speed Tip Card */}
-              <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-gray-800 via-gray-900 to-gray-950 p-6 text-white shadow-lg">
-                {/* Decorative circles */}
-                <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/5" />
-                <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-white/5" />
-                <div className="absolute top-12 right-10 w-16 h-16 rounded-full bg-blue-500/10" />
-
-                <div className="relative z-10">
-                  <h3 className="font-bold text-base mb-1.5">Speed Tip</h3>
-                  <p className="text-gray-300 text-sm leading-relaxed">
-                    You can bulk upload employees via CSV in the Settings menu for larger teams.
-                  </p>
-
+            {/* ── RIGHT: Recent Employees ── */}
+            <div className="w-full lg:w-80 flex flex-col gap-6">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-serif font-bold text-gray-900 dark:text-white">Recent Additions</h2>
+                  <button
+                    onClick={() => navigate("/dashboard?tab=employees")}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
+                  >
+                    View All <ArrowRightIcon />
+                  </button>
                 </div>
+
+                {loadingRecent ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="animate-pulse flex items-center gap-3 p-2">
+                        <div className="w-9 h-9 bg-gray-200 dark:bg-slate-800 rounded-full" />
+                        <div className="flex-1 space-y-1">
+                          <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded w-24" />
+                          <div className="h-2 bg-gray-100 dark:bg-slate-800/60 rounded w-16" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : recentEmployees.length === 0 ? (
+                  <p className="text-xs text-gray-500 dark:text-slate-500 text-center py-4">
+                    No employees added yet.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-gray-100 dark:divide-slate-800">
+                    {recentEmployees.map((emp) => (
+                      <div key={emp._id} className="py-3 flex items-center gap-3">
+                        <Avatar name={emp.fullName} size={36} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                            {emp.fullName}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-slate-500 truncate">
+                            {emp.role} {emp.department ? `• ${emp.department}` : ""}
+                          </p>
+                        </div>
+                        <p className="text-xs font-bold text-gray-900 dark:text-slate-200">
+                          {fmt(emp.monthlySalary, emp.currency)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
           </div>
         </main>
-
-
       </div>
     </div>
   );

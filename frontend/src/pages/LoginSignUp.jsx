@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import zxcvbn from '../utils/zxcvbn';
 
 import { Helmet } from 'react-helmet-async';
 import { useGoogleLogin } from '@react-oauth/google';
@@ -11,6 +12,16 @@ const GoogleIcon = () => (
     <path
       fill="#FFC107"
       d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+    />
+  </svg>
+);
+
+const GitHubIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.865 8.166 6.839 9.489.5.092.682-.217.682-.482 0-.237-.008-.866-.013-1.7-2.782.603-3.369-1.34-3.369-1.34-.454-1.156-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.03 1.531 1.03.892 1.529 2.341 1.087 2.91.831.092-.646.35-1.086.636-1.336-2.22-.253-4.555-1.11-4.555-4.943 0-1.091.39-1.984 1.029-2.683-.103-.253-.446-1.27.098-2.647 0 0 .84-.269 2.75 1.025A9.578 9.578 0 0112 6.836c.85.004 1.705.114 2.504.336 1.909-1.294 2.747-1.025 2.747-1.025.546 1.377.203 2.394.1 2.647.64.699 1.028 1.592 1.028 2.683 0 3.842-2.339 4.687-4.566 4.935.359.309.678.919.678 1.852 0 1.336-.012 2.415-.012 2.743 0 .267.18.578.688.48C19.138 20.161 22 16.416 22 12c0-5.523-4.477-10-10-10z"
     />
   </svg>
 );
@@ -41,16 +52,125 @@ export default function PaySphereLogin() {
   const [forgotEmail, setForgotEmail] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Pre-load reCAPTCHA v3 script in background if site key is present
+  useEffect(() => {
+    const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+    if (siteKey && !window.grecaptcha) {
+      const script = document.createElement('script');
+      script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  const executeRecaptcha = async (action) => {
+    const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+    if (!siteKey) {
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      const runTokenGen = () => {
+        window.grecaptcha.ready(async () => {
+          try {
+            const token = await window.grecaptcha.execute(siteKey, { action });
+            resolve(token);
+          } catch (e) {
+            console.error('reCAPTCHA execution error:', e);
+            resolve(null);
+          }
+        });
+      };
+
+      if (!window.grecaptcha) {
+        const script = document.createElement('script');
+        script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
+        script.async = true;
+        script.defer = true;
+        script.onload = runTokenGen;
+        document.body.appendChild(script);
+      } else {
+        runTokenGen();
+      }
+    });
+  };
+
+  const handleGitHubCallback = async (code) => {
+    setLoading(true);
+    setError('');
+
+    // Clear code from URL
+    const newUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, newUrl);
+
+    try {
+      const storedCompanyName = sessionStorage.getItem('github_signup_company');
+      const payload = { code };
+      if (storedCompanyName) {
+        payload.companyName = storedCompanyName;
+      }
+
+      const response = await api.post(`/api/auth/github`, payload);
+
+      if (response.status === 202 && response.data.needsCompanyName) {
+        setError(response.data.message);
+        setActiveTab('signup');
+      } else {
+        const { token, companyName: savedCompanyName } = response.data;
+        localStorage.setItem('token', token);
+        localStorage.setItem('companyName', savedCompanyName);
+        if (response.data.currency) {
+          localStorage.setItem('currency', response.data.currency);
+        }
+        sessionStorage.removeItem('github_signup_company');
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'GitHub Login failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle GitHub Callback
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (code) {
+      handleGitHubCallback(code);
+    }
+  }, [searchParams]);
+
   const handleAuth = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
+    if (activeTab === 'signup') {
+      const strength = zxcvbn(password);
+      if (strength.score < 3) {
+        setError(`Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`);
+        setLoading(false);
+        return;
+      }
+    }
+
+    const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+    let recaptchaToken = null;
+    if (siteKey) {
+      recaptchaToken = await executeRecaptcha(activeTab === 'signup' ? 'signup' : 'login');
+      if (!recaptchaToken) {
+        setError('Failed to generate security verification. Please try again.');
+        setLoading(false);
+        return;
+      }
+    }
+
     const endpoint = activeTab === 'signup' ? '/signup' : '/login';
     const payload =
       activeTab === 'signup'
-        ? { fullName, email, companyName, password }
-        : { email, password };
+        ? { fullName, email, companyName, password, recaptchaToken }
+        : { email, password, recaptchaToken };
 
     try {
       const response = await api.post(`/api/auth${endpoint}`, payload);
@@ -60,8 +180,8 @@ export default function PaySphereLogin() {
       // Save to localStorage
       localStorage.setItem('token', token);
       localStorage.setItem('companyName', savedCompanyName);
-      if (data.currency) {
-        localStorage.setItem('currency', data.currency);
+      if (response.data.currency) {
+        localStorage.setItem('currency', response.data.currency);
       }
 
       // Navigate to dashboard
@@ -122,8 +242,8 @@ export default function PaySphereLogin() {
           const { token, companyName: savedCompanyName } = response.data;
           localStorage.setItem('token', token);
           localStorage.setItem('companyName', savedCompanyName);
-          if (data.currency) {
-            localStorage.setItem('currency', data.currency);
+          if (response.data.currency) {
+            localStorage.setItem('currency', response.data.currency);
           }
           navigate('/dashboard');
         }
@@ -142,6 +262,24 @@ export default function PaySphereLogin() {
       return;
     }
     handleGoogleLogin();
+  };
+
+  const onGitHubClick = () => {
+    if (activeTab === 'signup') {
+      if (!companyName) {
+        setError('Please enter your Company Name to sign up with GitHub.');
+        return;
+      }
+      sessionStorage.setItem('github_signup_company', companyName);
+    } else {
+      sessionStorage.removeItem('github_signup_company');
+    }
+    const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
+    if (!clientId) {
+      setError('GitHub Client ID is not configured.');
+      return;
+    }
+    window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=user:email`;
   };
 
   return (
@@ -250,6 +388,9 @@ export default function PaySphereLogin() {
                     <form onSubmit={handleForgotPassword}>
                       <input
                         type="email"
+                        id="forgot-email"
+                        name="forgotEmail"
+                        aria-label="Email address for password reset"
                         placeholder="name@company.com"
                         value={forgotEmail}
                         onChange={(e) => setForgotEmail(e.target.value)}
@@ -268,8 +409,7 @@ export default function PaySphereLogin() {
 
                       <button
                         type="submit"
-                        disabled={loading}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition mb-5 text-center disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                        className="w-full py-3 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold rounded-lg transition shadow-lg shadow-brand-500/30"
                       >
                         {loading ? 'Sending...' : 'Send Reset Link'}
                       </button>
@@ -301,6 +441,9 @@ export default function PaySphereLogin() {
                     <form onSubmit={handleAuth}>
                       <input
                         type="email"
+                        id="login-email"
+                        name="email"
+                        aria-label="Email address"
                         placeholder="name@company.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -310,6 +453,9 @@ export default function PaySphereLogin() {
 
                       <input
                         type="password"
+                        id="login-password"
+                        name="password"
+                        aria-label="Password"
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
@@ -354,14 +500,42 @@ export default function PaySphereLogin() {
                   <div className="flex-1 h-px bg-gray-200 dark:bg-slate-800" />
                 </div>
 
-                <button
-                  onClick={onGoogleClick}
-                  disabled={loading}
-                  className="w-full border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-                >
-                  <GoogleIcon />
-                  Sign in with Google
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={onGoogleClick}
+                    disabled={loading}
+                    className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                  >
+                    <GoogleIcon />
+                    Google
+                  </button>
+
+                  <button
+                    onClick={onGitHubClick}
+                    disabled={loading}
+                    className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                  >
+                    <GitHubIcon />
+                    GitHub
+                  </button>
+                </div>
+
+                <p className="text-center text-sm text-gray-600 dark:text-slate-400 mt-6">
+                  {activeTab === 'login'
+                    ? "Don't have an account?"
+                    : 'Already have an account?'}
+                  {/* Fixed: Replaced anchor with button for valid semantics (Issue #660) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(activeTab === 'login' ? 'signup' : 'login');
+                      resetFormState();
+                    }}
+                    className="ml-1 font-bold text-brand-600 dark:text-brand-400 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500 rounded"
+                  >
+                    {activeTab === 'login' ? 'Sign Up' : 'Login'}
+                  </button>
+                </p>
               </>
             ) : (
               <>
@@ -375,6 +549,9 @@ export default function PaySphereLogin() {
                 <form onSubmit={handleAuth}>
                   <input
                     type="text"
+                    id="signup-fullname"
+                    name="fullName"
+                    aria-label="Full name"
                     placeholder="Full Name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
@@ -384,6 +561,9 @@ export default function PaySphereLogin() {
 
                   <input
                     type="email"
+                    id="signup-email"
+                    name="email"
+                    aria-label="Email address"
                     placeholder="Email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -393,6 +573,9 @@ export default function PaySphereLogin() {
 
                   <input
                     type="text"
+                    id="signup-company"
+                    name="companyName"
+                    aria-label="Company name"
                     placeholder="Company Name"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
@@ -402,12 +585,49 @@ export default function PaySphereLogin() {
 
                   <input
                     type="password"
+                    id="signup-password"
+                    name="password"
+                    aria-label="Password"
                     placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     className="w-full mb-4 px-4 py-3 rounded-lg bg-gray-100 dark:bg-slate-950 text-gray-950 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 border border-transparent dark:border-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:border-blue-500 dark:focus:border-blue-500 outline-none transition-colors"
                   />
+
+                  {password && (
+                    <div className="mb-4 text-left">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-gray-500 dark:text-slate-450">Password Strength:</span>
+                        <span className={`text-xs font-bold ${
+                          zxcvbn(password).score < 2 ? 'text-red-500' :
+                          zxcvbn(password).score === 2 ? 'text-yellow-500' :
+                          zxcvbn(password).score === 3 ? 'text-blue-500' : 'text-green-500'
+                        }`}>
+                          {zxcvbn(password).score === 0 && 'Very Weak'}
+                          {zxcvbn(password).score === 1 && 'Weak'}
+                          {zxcvbn(password).score === 2 && 'Fair'}
+                          {zxcvbn(password).score === 3 && 'Good'}
+                          {zxcvbn(password).score === 4 && 'Strong'}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            zxcvbn(password).score < 2 ? 'bg-red-500' :
+                            zxcvbn(password).score === 2 ? 'bg-yellow-500' :
+                            zxcvbn(password).score === 3 ? 'bg-blue-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${(zxcvbn(password).score + 1) * 20}%` }}
+                        />
+                      </div>
+                      {zxcvbn(password).feedback.suggestions.length > 0 && (
+                        <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1 leading-normal">
+                          💡 {zxcvbn(password).feedback.suggestions[0]}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {error && (
                     <p className="text-red-500 text-xs mb-4">{error}</p>
@@ -430,14 +650,42 @@ export default function PaySphereLogin() {
                   <div className="flex-1 h-px bg-gray-200 dark:bg-slate-800" />
                 </div>
 
-                <button
-                  onClick={onGoogleClick}
-                  disabled={loading}
-                  className="w-full border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-                >
-                  <GoogleIcon />
-                  Sign Up with Google
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={onGoogleClick}
+                    disabled={loading}
+                    className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                  >
+                    <GoogleIcon />
+                    Google
+                  </button>
+
+                  <button
+                    onClick={onGitHubClick}
+                    disabled={loading}
+                    className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                  >
+                    <GitHubIcon />
+                    GitHub
+                  </button>
+                </div>
+
+                <p className="text-center text-sm text-gray-600 dark:text-slate-400 mt-6">
+                  {activeTab === 'login'
+                    ? "Don't have an account?"
+                    : 'Already have an account?'}
+                  {/* Fixed: Replaced anchor with button for valid semantics (Issue #660) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(activeTab === 'login' ? 'signup' : 'login');
+                      resetFormState();
+                    }}
+                    className="ml-1 font-bold text-brand-600 dark:text-brand-400 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500 rounded"
+                  >
+                    {activeTab === 'login' ? 'Sign Up' : 'Login'}
+                  </button>
+                </p>
               </>
             )}
           </div>

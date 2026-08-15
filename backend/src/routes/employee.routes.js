@@ -10,6 +10,7 @@ const {
   deleteEmployee,
   toggleEmployeeStatus,
   restoreEmployee,
+  searchEmployees,
 } = require("../controllers/employee.controller");
 
 const auth = require("../middlewares/auth.middleware");
@@ -31,6 +32,8 @@ router.post("/import", auth, requirePermission("WRITE_EMPLOYEE"), writeRateLimit
 router.get("/export-csv", auth, requirePermission("READ_EMPLOYEE"), exportEmployeesCSV);
 router.get("/", auth, requirePermission("READ_EMPLOYEE"), getEmployees);
 router.get("/recent", auth, requirePermission("READ_EMPLOYEE"), getRecentEmployees);
+
+
 router.delete("/:id", auth, requirePermission("DELETE_EMPLOYEE"), writeRateLimiter, deleteEmployee);
 router.put("/:id", auth, requirePermission("WRITE_EMPLOYEE"), writeRateLimiter, updateEmployee);
 router.put("/:id/restore", auth, requirePermission("WRITE_EMPLOYEE"), writeRateLimiter, restoreEmployee);

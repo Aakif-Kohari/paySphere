@@ -1,11 +1,12 @@
-const cron = require("node-cron");
-const PayrollUpdate = require("../models/payroll.model");
-const Employee = require("../models/employee.model");
-const CronLock = require("../models/cronlock.model");
-const { sendPayslipEmail } = require("../services/email.service");
-const { sendEmail } = require("../utils/email");
-const { emailableStatusFilter } = require("../config/payrollStatus");
-const logger = require("../utils/logger");
+const cron = require('node-cron');
+const PayrollUpdate = require('../models/payroll.model');
+const Employee = require('../models/employee.model');
+const CronLock = require('../models/cronlock.model');
+const { enqueueEmail } = require('../jobs/email.queue');
+const { emailableStatusFilter } = require('../config/payrollStatus');
+const { processMonthlyAccrual } = require('./leaveAccrual.job');
+const logger = require('../utils/logger');
+const { runDatabaseBackupJob } = require('./backup.job');
 
 const LOCK_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -30,14 +31,14 @@ async function acquireLock(lockId) {
     return { acquired: true };
   } catch (error) {
     if (error.code === 11000) {
-      return { acquired: false, reason: "held" };
+      return { acquired: false, reason: 'held' };
     }
 
-    logger.error("Failed to acquire cron lock", {
+    logger.error('Failed to acquire cron lock', {
       lockId,
       error: error.message,
     });
-    return { acquired: false, reason: "error" };
+    return { acquired: false, reason: 'error' };
   }
 }
 
@@ -57,7 +58,10 @@ async function releaseLock(lockId) {
     await CronLock.deleteOne({ _id: lockId });
   } catch (error) {
     // Not fatal: the TTL index clears it within the day regardless.
-    logger.warn("Failed to release cron lock", { lockId, error: error.message });
+    logger.warn('Failed to release cron lock', {
+      lockId,
+      error: error.message,
+    });
   }
 }
 
@@ -108,12 +112,21 @@ async function runMonthlyPayslipJob({ now = new Date() } = {}) {
 
   const lock = await acquireLock(lockId);
   if (!lock.acquired) {
-    logger.info("Monthly payslip job skipped: lock is held elsewhere", {
+    logger.info('Monthly payslip job skipped: lock is held elsewhere', {
       lockId,
       month,
       year,
     });
-    return { ran: false, reason: lock.reason, month, year, found, sent, skipped, failed };
+    return {
+      ran: false,
+      reason: lock.reason,
+      month,
+      year,
+      found,
+      sent,
+      skipped,
+      failed,
+    };
   }
 
   try {
@@ -146,17 +159,13 @@ async function runMonthlyPayslipJob({ now = new Date() } = {}) {
           continue;
         }
 
-        await sendPayslipEmail(employee, payroll);
-        await PayrollUpdate.updateOne(
-          { _id: payroll._id },
-          { $set: { payslipEmailed: true } },
-        );
+        await enqueueEmail('payslip', { employee, payroll });
         sent += 1;
       } catch (error) {
         // One bad address or SMTP hiccup must not cost everyone else their
         // payslip, so the loop carries on and the failure is counted.
         failed += 1;
-        logger.error("Failed to send a payslip", {
+        logger.error('Failed to send a payslip', {
           payrollId: String(payroll._id),
           month,
           year,
@@ -165,7 +174,7 @@ async function runMonthlyPayslipJob({ now = new Date() } = {}) {
       }
     }
 
-    logger.info("Monthly payslip job complete", {
+    logger.info('Monthly payslip job complete', {
       month,
       year,
       found,
@@ -181,14 +190,23 @@ async function runMonthlyPayslipJob({ now = new Date() } = {}) {
 
     return { ran: true, month, year, found, sent, skipped, failed };
   } catch (error) {
-    logger.error("Monthly payslip job failed", {
+    logger.error('Monthly payslip job failed', {
       month,
       year,
       error: error.message,
     });
     await releaseLock(lockId);
 
-    return { ran: false, reason: "error", month, year, found, sent, skipped, failed };
+    return {
+      ran: false,
+      reason: 'error',
+      month,
+      year,
+      found,
+      sent,
+      skipped,
+      failed,
+    };
   }
 }
 
@@ -211,7 +229,7 @@ async function runDailyGreetingsJob({ now = new Date() } = {}) {
 
   const lock = await acquireLock(lockId);
   if (!lock.acquired) {
-    logger.info("Daily greetings job skipped: lock is held elsewhere", {
+    logger.info('Daily greetings job skipped: lock is held elsewhere', {
       lockId,
     });
     return { ran: false, reason: lock.reason, sent, failed };
@@ -220,7 +238,7 @@ async function runDailyGreetingsJob({ now = new Date() } = {}) {
   try {
     const employees = await Employee.find({
       isActive: true,
-      email: { $exists: true, $ne: "" },
+      email: { $exists: true, $ne: '' },
     });
 
     for (const employee of employees) {
@@ -228,7 +246,7 @@ async function runDailyGreetingsJob({ now = new Date() } = {}) {
         if (employee.dateOfBirth) {
           const dob = new Date(employee.dateOfBirth);
           if (dob.getMonth() + 1 === month && dob.getDate() === day) {
-            await sendEmail({
+            await enqueueEmail('generic', {
               to: employee.email,
               subject: `Happy Birthday, ${employee.fullName}!`,
               text: `Dear ${employee.fullName},\n\nWishing you a very Happy Birthday from everyone at ${employee.companyName}!\n\nBest Regards,\nThe Team`,
@@ -242,7 +260,7 @@ async function runDailyGreetingsJob({ now = new Date() } = {}) {
           if (joined.getMonth() + 1 === month && joined.getDate() === day) {
             const years = now.getFullYear() - joined.getFullYear();
             if (years > 0) {
-              await sendEmail({
+              await enqueueEmail('generic', {
                 to: employee.email,
                 subject: `Happy ${years} Year Work Anniversary, ${employee.fullName}!`,
                 text: `Dear ${employee.fullName},\n\nCongratulations on reaching your ${years} year anniversary at ${employee.companyName}! We appreciate all your hard work.\n\nBest Regards,\nThe Team`,
@@ -255,46 +273,125 @@ async function runDailyGreetingsJob({ now = new Date() } = {}) {
         // Same reasoning as the payslip loop: one bad address is not a reason
         // for everybody else to go without.
         failed += 1;
-        logger.error("Failed to send a greeting", {
+        logger.error('Failed to send a greeting', {
           employeeId: String(employee._id),
           error: error.message,
         });
       }
     }
 
-    logger.info("Daily greetings job complete", { sent, failed });
+    logger.info('Daily greetings job complete', { sent, failed });
 
     return { ran: true, sent, failed };
   } catch (error) {
-    logger.error("Daily greetings job failed", { error: error.message });
+    logger.error('Daily greetings job failed', { error: error.message });
     await releaseLock(lockId);
 
-    return { ran: false, reason: "error", sent, failed };
+    return { ran: false, reason: 'error', sent, failed };
   }
 }
 
 const startCronJobs = () => {
   // 09:00 on the 1st of every month.
-  cron.schedule("0 9 1 * *", () => {
+  cron.schedule('0 9 1 * *', () => {
     runMonthlyPayslipJob().catch((error) =>
-      logger.error("Monthly payslip job threw", { error: error.message }),
+      logger.error('Monthly payslip job threw', { error: error.message }),
     );
   });
-  logger.info("Payslip cron job registered.");
+  logger.info('Payslip cron job registered.');
 
   // 08:00 daily.
-  cron.schedule("0 8 * * *", () => {
+  cron.schedule('0 8 * * *', () => {
     runDailyGreetingsJob().catch((error) =>
-      logger.error("Daily greetings job threw", { error: error.message }),
+      logger.error('Daily greetings job threw', { error: error.message }),
     );
   });
-  logger.info("Daily greetings cron job registered.");
+  logger.info('Daily greetings cron job registered.');
+
+  // 00:30 on the 1st of every month.
+  //
+  // #646 wrote this job and never scheduled it. Its own header says "Runs on
+  // the 1st of every month at 00:00 UTC" and there was no `cron.schedule` for
+  // it anywhere in the tree, so `LeaveBalance` was never written and every
+  // balance in the product read 0 (#796).
+  //
+  // Half an hour past midnight rather than on it: a run that starts a few
+  // seconds early would compute the period from the previous month and credit
+  // it a second time.
+  cron.schedule('30 0 1 * *', () => {
+    processMonthlyAccrual().catch((error) =>
+      logger.error('Monthly leave accrual job threw', { error: error.message }),
+    );
+  });
+  logger.info('Monthly leave accrual cron job registered.');
+
+  // 02:00 daily — the hour `IntegrationConfig.syncSchedule` defaults to.
+  //
+  // One scheduled run that walks every active integration, rather than a cron
+  // registration per tenant: the set of tenants changes while the process is
+  // running, and a schedule built at boot would never know about a company
+  // that connected an HRMS afterwards (#954).
+  cron.schedule('0 2 * * *', () => {
+    runHrmsSyncJob().catch((error) =>
+      logger.error('HRMS sync job threw', { error: error.message }),
+    );
+  });
+  logger.info('HRMS integration sync cron job registered.');
+
+  // 03:00 daily — Database backup to S3/local.
+  cron.schedule('0 3 * * *', () => {
+    runDatabaseBackupJob().catch((error) =>
+      logger.error('Database backup job threw', { error: error.message }),
+    );
+  });
+  logger.info('Daily database backup cron job registered.');
 };
+
+/**
+ * Sync every active HRMS integration (#954).
+ *
+ * Locked like the jobs above: two instances syncing the same tenant would race
+ * each other's upserts. Never throws — a cron callback that rejects is an
+ * unhandled rejection with nothing to catch it.
+ *
+ * @returns {Promise<{ran: boolean, reason?: string, tenants?: number}>}
+ */
+async function runHrmsSyncJob() {
+  const now = new Date();
+  const lockId = `hrms-sync-${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+
+  const lock = await acquireLock(lockId);
+  if (!lock.acquired) {
+    logger.info('HRMS sync job skipped', { reason: lock.reason });
+    return { ran: false, reason: lock.reason };
+  }
+
+  try {
+    const { syncAllTenants } = require('../services/integrationSync.service');
+    const summary = await syncAllTenants();
+
+    logger.info('HRMS sync job complete', summary);
+
+    // Released rather than left to expire, for the reason `releaseLock` gives:
+    // a run that failed would otherwise block a corrected deployment on the
+    // same day without a word.
+    await releaseLock(lockId);
+
+    return { ran: true, ...summary };
+  } catch (error) {
+    logger.error('HRMS sync job failed', { error: error.message });
+    await releaseLock(lockId);
+
+    return { ran: false, reason: 'error' };
+  }
+}
 
 module.exports = {
   startCronJobs,
   runMonthlyPayslipJob,
   runDailyGreetingsJob,
+  runHrmsSyncJob,
+  runDatabaseBackupJob,
   previousPeriod,
   acquireLock,
   releaseLock,

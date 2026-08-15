@@ -10,7 +10,7 @@ const mongoose = require('mongoose');
  * @param {number} monthsBack - Number of past months to aggregate (default: 12)
  * @returns {Promise<Object>} Aggregated turnover metrics including departuresByReason and monthly trends
  */
-async function getTurnoverMetrics(userId, monthsBack = 12) {
+async function getTurnoverMetrics(userId) {
   const userObjectId = new mongoose.Types.ObjectId(userId);
 
   // Aggregation pipeline on Employee model for departure reasons & voluntary vs involuntary counts
@@ -54,7 +54,7 @@ async function getTurnoverMetrics(userId, monthsBack = 12) {
   departureAggregation.forEach(item => {
     const reason = item._id || 'other';
     const count = item.count || 0;
-    if (departuresByReason.hasOwnProperty(reason)) {
+    if (Object.prototype.hasOwnProperty.call(departuresByReason, reason)) {
       departuresByReason[reason] = count;
     } else {
       departuresByReason.other += count;

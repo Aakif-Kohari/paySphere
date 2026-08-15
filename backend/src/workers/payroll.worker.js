@@ -27,6 +27,19 @@ const payrollWorker = new Worker(
 
       const { activities, currentMonth, currentYear, userId } = job.data;
 
+      // ── Idempotency Guard ────────────────────────────────────────────────
+      // Prevent double-processing the same payroll period if two BullMQ workers
+      // pick up the same job, or the job is retried after a crash mid-run.
+      const lockName = `payroll_${userId}_${currentYear}_${String(currentMonth).padStart(2, '0')}`;
+      const lock = await acquireLock(lockName, 10 * 60 * 1000);
+      if (!lock) {
+        logger.warn('Payroll job skipped — period already locked or processing', {
+          userId, currentMonth, currentYear,
+        });
+        return { skipped: true, reason: 'lock_held' };
+      }
+      // ────────────────────────────────────────────────────────────────────
+
       const employees = await Employee.find({ createdBy: userId, deletedAt: null });
       const user = await User.findById(userId);
 

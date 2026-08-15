@@ -1,12 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
-import api from '../services/api';
+/* eslint-disable jsx-a11y/label-has-associated-control, jsx-a11y/anchor-is-valid */
+import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import ThemeToggle from '../components/ThemeToggle';
+import WebhooksSection from '../components/WebhooksSection';
+import RolesPermissions from '../components/RolesPermissions';
 import { logout } from '../features/auth/authSlice';
 import { setThemeMode } from '../features/ui/uiSlice';
-import ThemeToggle from '../components/ThemeToggle';
+import api from '../services/api';
 import { getCurrencySymbol } from '../utils/currency';
+import zxcvbn from '../utils/zxcvbn';
+import EmailTemplateEditor from '../components/common/EmailTemplateEditor';
+
+import { useToast } from '../context/ToastContext';
 
 // ── Icons for Sidebar (Copied from AddEmployee for consistency) ──
 const GridIcon = () => (
@@ -180,6 +187,26 @@ const WalletIcon = () => (
     <path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path>
   </svg>
 );
+const WebhookIcon = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="4" cy="4" r="2"></circle>
+    <circle cx="20" cy="4" r="2"></circle>
+    <circle cx="12" cy="20" r="2"></circle>
+    <path d="M6 5.4a4 4 0 0 1 12 0"></path>
+    <path d="M4 6v6a4 4 0 0 0 2 3.46"></path>
+    <path d="M20 6v6a4 4 0 0 1-2 3.46"></path>
+    <path d="M12 8v8"></path>
+  </svg>
+);
 const InfoIcon = () => (
   <svg
     width="18"
@@ -196,14 +223,70 @@ const InfoIcon = () => (
     <line x1="12" y1="8" x2="12.01" y2="8"></line>
   </svg>
 );
+const ShieldIcon = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+  </svg>
+);
+
+function EmailTemplatesManager() {
+  const [templateHtml, setTemplateHtml] = useState('<p>Dear {{employeeName}},</p><p>Your payslip for {{month}} {{year}} is ready.</p>');
+  const [subject, setSubject] = useState('Payslip for {{month}} {{year}}');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.post('/api/email-templates', { name: 'Monthly Payslip', subject, htmlContent: templateHtml });
+      alert('Template saved successfully!');
+    } catch (err) {
+      alert('Failed to save template');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold text-gray-900 dark:text-white">Email Templates</h2>
+      <p className="text-sm text-gray-500 dark:text-slate-400">Customize the HTML content for automated notifications. Use the "Insert Variable" button to add dynamic data.</p>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Email Subject</label>
+          <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500" />
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Email Body (HTML)</label>
+          <EmailTemplateEditor initialContent={templateHtml} onChange={setTemplateHtml} />
+        </div>
+
+        <button onClick={handleSave} disabled={saving} className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg shadow-md transition-colors disabled:opacity-50">
+          {saving ? 'Saving...' : 'Save Template'}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Settings() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { toast } = useToast();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const localCompanyName = localStorage.getItem('companyName') || 'Acme Corp';
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState('preferences');
 
   const [loading, setLoading] = useState(true);
 
@@ -214,6 +297,7 @@ export default function Settings() {
     companyLogoUrl: '',
     avatar: '',
     isGoogleLinked: false,
+    isTwoFactorEnabled: false,
     payrollId: '',
     organizationId: '',
     employeeCount: 0,
@@ -249,6 +333,10 @@ export default function Settings() {
 
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
 
+  // ── 2FA state ──
+  const [qrCodeData, setQrCodeData] = useState(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+
   useEffect(() => {
     api
       .get('/api/auth/settings')
@@ -260,6 +348,7 @@ export default function Settings() {
           companyLogoUrl: res.data.companyLogoData || '',
           avatar: res.data.avatar || '',
           isGoogleLinked: res.data.isGoogleLinked || false,
+          isTwoFactorEnabled: res.data.isTwoFactorEnabled || false,
           payrollId: res.data.payrollId || '',
           organizationId: res.data.organizationId || '',
           employeeCount: res.data.employeeCount || 0,
@@ -302,8 +391,6 @@ export default function Settings() {
       .finally(() => setLoading(false));
   }, [localCompanyName, dispatch]);
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
   const handleSaveSettings = async () => {
     // Client-side validation before making the API call (#356)
     const errors = { fullName: '', email: '' };
@@ -312,7 +399,7 @@ export default function Settings() {
       errors.fullName = 'Full name cannot be empty.';
     }
 
-    if (!userProfile.email || !emailRegex.test(userProfile.email.trim())) {
+    if (!userProfile.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userProfile.email.trim())) {
       errors.email = 'Please enter a valid email address.';
     }
 
@@ -335,10 +422,10 @@ export default function Settings() {
       if (settings?.payrollConfig?.currency) {
         localStorage.setItem('currency', settings.payrollConfig.currency);
       }
-      alert('Settings updated successfully!');
+      toast.success('Settings updated successfully!');
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || 'Error saving settings.');
+      toast.error(err.response?.data?.message || 'Error saving settings.');
     }
   };
 
@@ -350,13 +437,13 @@ export default function Settings() {
     if (!file) return;
 
     if (!ALLOWED_TYPES.includes(file.type)) {
-      alert('Please select an image file (JPEG, PNG, WebP, or GIF).');
+      toast.error('Please select an image file (JPEG, PNG, WebP, or GIF).');
       e.target.value = '';
       return;
     }
 
     if (file.size > MAX_AVATAR_SIZE) {
-      alert('File size must be less than 2 MB.');
+      toast.error('File size must be less than 2 MB.');
       e.target.value = '';
       return;
     }
@@ -371,23 +458,27 @@ export default function Settings() {
   const handlePasswordUpdate = async () => {
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
     if (!currentPassword || !newPassword) {
-      return alert('Both current and new password are required.');
+      return toast.error('Both current and new password are required.');
     }
     if (!passwordRegex.test(newPassword)) {
-      return alert(
+      return toast.error(
         'New password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character.',
       );
+    }
+    const strength = zxcvbn(newPassword);
+    if (strength.score < 3) {
+      return toast.warning(`Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`);
     }
     try {
       await api.patch('/api/auth/security/password', {
         currentPassword,
         newPassword,
       });
-      alert('Password updated successfully!');
+      toast.success('Password updated successfully!');
       setCurrentPassword('');
       setNewPassword('');
     } catch (err) {
-      alert(err.response?.data?.message || 'Error updating password.');
+      toast.error(err.response?.data?.message || 'Error updating password.');
     }
   };
 
@@ -400,25 +491,54 @@ export default function Settings() {
       return;
     try {
       await api.patch('/api/auth/security/disconnect-google');
-      alert('Google account disconnected successfully!');
+      toast.success('Google account disconnected successfully!');
       setUserProfile((prev) => ({ ...prev, isGoogleLinked: false }));
     } catch (err) {
-      alert(
+      toast.error(
         err.response?.data?.message || 'Error disconnecting Google account.',
       );
+    }
+  };
+
+  // ── 2FA handlers ──
+  // NOTE: endpoint paths are guessed to match the existing
+  // /api/auth/security/... pattern used elsewhere in this file.
+  // Double check these against your actual backend routes
+  // (user.routes.js / user.controller.js) and adjust if they differ.
+  const handleSetup2FA = async () => {
+    try {
+      const res = await api.post('/api/auth/security/2fa/setup');
+      setQrCodeData(res.data); // expects { qrCode, secret }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error starting 2FA setup.');
+    }
+  };
+
+  const handleConfirm2FA = async () => {
+    if (!twoFactorCode || twoFactorCode.length !== 6) {
+      return toast.error('Enter the 6-digit code from your authenticator app.');
+    }
+    try {
+      await api.post('/api/auth/security/2fa/verify', { code: twoFactorCode });
+      setUserProfile((prev) => ({ ...prev, isTwoFactorEnabled: true }));
+      setQrCodeData(null);
+      setTwoFactorCode('');
+      toast.success('Two-factor authentication enabled!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Invalid code. Try again.');
     }
   };
 
   const executeDeleteAccount = async () => {
     try {
       await api.delete('/api/auth/security/account');
-      alert('Account successfully deleted.');
+      toast.success('Account successfully deleted.');
       localStorage.removeItem('token');
       localStorage.removeItem('companyName');
       localStorage.removeItem('currency');
       navigate('/auth');
     } catch (err) {
-      alert(err.response?.data?.message || 'Error deleting account.');
+      toast.error(err.response?.data?.message || 'Error deleting account.');
     }
   };
 
@@ -456,6 +576,8 @@ export default function Settings() {
     { id: 'preferences', label: 'Preferences', icon: <PaletteIcon /> },
     { id: 'company', label: 'Company Info', icon: <BuildingIcon /> },
     { id: 'payroll', label: 'Payroll Config', icon: <WalletIcon /> },
+    { id: 'webhooks', label: 'Webhooks', icon: <WebhookIcon /> },
+    { id: 'emailTemplates', label: 'Email Templates', icon: <EmailIcon /> },
     { id: 'notifications', label: 'Notifications', icon: <BellIcon /> },
     { id: 'about', label: 'About PaySphere', icon: <InfoIcon /> },
   ];
@@ -538,11 +660,10 @@ export default function Settings() {
                   onChange={(e) =>
                     setUserProfile({ ...userProfile, fullName: e.target.value })
                   }
-                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
-                    profileErrors.fullName
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                      : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
-                  }`}
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.fullName
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                    : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
+                    }`}
                 />
                 {profileErrors.fullName && (
                   <p className="text-xs text-red-500 mt-1.5 font-medium">
@@ -560,11 +681,10 @@ export default function Settings() {
                   onChange={(e) =>
                     setUserProfile({ ...userProfile, email: e.target.value })
                   }
-                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
-                    profileErrors.email
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                      : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
-                  }`}
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.email
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                    : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
+                    }`}
                 />
                 {profileErrors.email && (
                   <p className="text-xs text-red-500 mt-1.5 font-medium">
@@ -646,6 +766,77 @@ export default function Settings() {
               </button>
             </div>
 
+            {/* 2FA Section in Account Security */}
+            <div className="p-5 border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-sm text-gray-900 dark:text-white">
+                    Two-Factor Authentication (2FA)
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                    Protect your admin account with TOTP apps like Google
+                    Authenticator or Authy.
+                  </p>
+                </div>
+                <span
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold ${userProfile.isTwoFactorEnabled
+                    ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400'
+                    : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                    }`}
+                >
+                  {userProfile.isTwoFactorEnabled ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+
+              {!userProfile.isTwoFactorEnabled ? (
+                <div>
+                  {!qrCodeData ? (
+                    <button
+                      onClick={handleSetup2FA}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition"
+                    >
+                      Setup Two-Factor Authentication
+                    </button>
+                  ) : (
+                    <div className="p-4 bg-gray-50 dark:bg-slate-950 rounded-xl space-y-3">
+                      <p className="text-xs text-gray-600 dark:text-slate-300 font-medium">
+                        1. Scan this QR code in Google Authenticator or Authy:
+                      </p>
+                      <img
+                        src={qrCodeData.qrCode}
+                        alt="2FA QR Code"
+                        className="w-36 h-36 bg-white p-2 rounded-lg border"
+                      />
+                      <p className="text-xs text-gray-500 font-mono">
+                        Secret Key: {qrCodeData.secret}
+                      </p>
+
+                      <div className="flex items-center gap-2 pt-2">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={twoFactorCode}
+                          onChange={(e) => setTwoFactorCode(e.target.value)}
+                          placeholder="6-digit code"
+                          className="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border text-xs text-center font-bold tracking-widest"
+                        />
+                        <button
+                          onClick={handleConfirm2FA}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold"
+                        >
+                          Verify & Enable
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                  ✓ Two-factor authentication is active on your account.
+                </p>
+              )}
+            </div>
+
             {userProfile.isGoogleLinked && (
               <div className="p-5 border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm">
                 <h3 className="font-bold text-sm text-gray-900 dark:text-white mb-4">
@@ -703,7 +894,7 @@ export default function Settings() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={() =>
-                    alert('All other active sessions have been logged out.')
+                    toast.success('All other active sessions have been logged out.')
                   }
                   className="px-5 py-2.5 bg-white dark:bg-slate-800 text-gray-900 dark:text-white border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-bold transition hover:bg-gray-50 dark:hover:bg-slate-700"
                 >
@@ -752,8 +943,8 @@ export default function Settings() {
                           const newMode =
                             t === 'system'
                               ? window.matchMedia(
-                                  '(prefers-color-scheme: dark)',
-                                ).matches
+                                '(prefers-color-scheme: dark)',
+                              ).matches
                                 ? 'dark'
                                 : 'light'
                               : t;
@@ -1054,6 +1245,9 @@ export default function Settings() {
           </div>
         );
 
+      case 'emailTemplates':
+        return <EmailTemplatesManager />; // Component defined below or imported
+
       case 'notifications':
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -1182,6 +1376,12 @@ export default function Settings() {
             </div>
           </div>
         );
+
+      case 'roles':
+        return <RolesPermissions />;
+
+      case 'webhooks':
+        return <WebhooksSection />;
 
       case 'about':
         return (
@@ -1348,11 +1548,10 @@ export default function Settings() {
                 navigate(item.path);
                 setIsSidebarOpen(false);
               }}
-              className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${
-                item.id === 'settings'
-                  ? 'bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold'
-                  : 'text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
-              }`}
+              className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${item.id === 'settings'
+                ? 'bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold'
+                : 'text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
+                }`}
             >
               {item.icon}
               {item.label}
@@ -1420,18 +1619,28 @@ export default function Settings() {
           <div className="w-full max-w-5xl flex flex-col md:flex-row gap-8">
             {/* ── Left Settings Menu ── */}
             <div className="w-full md:w-64 flex-shrink-0">
-              <div className="sticky top-24 space-y-1">
+              {/* Added role="tablist" and aria-label for screen readers (Issue #686) */}
+              <div
+                className="sticky top-24 space-y-1"
+                role="tablist"
+                aria-label="Settings Navigation"
+                aria-orientation="vertical"
+              >
                 {settingsTabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-200 ${
-                      activeTab === tab.id
-                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-100 dark:border-slate-800'
-                        : 'text-gray-500 dark:text-slate-500 hover:bg-white/60 dark:hover:bg-slate-900/50 hover:text-gray-900 dark:hover:text-white border border-transparent'
-                    }`}
+                    role="tab"
+                    aria-selected={activeTab === tab.id}
+                    aria-controls={`panel-${tab.id}`}
+                    id={`tab-${tab.id}`}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === tab.id
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-100 dark:border-slate-800'
+                      : 'text-gray-500 dark:text-slate-500 hover:bg-white/60 dark:hover:bg-slate-900/50 hover:text-gray-900 dark:hover:text-white border border-transparent'
+                      }`}
                   >
                     <span
+                      aria-hidden="true"
                       className={
                         activeTab === tab.id
                           ? 'text-blue-600 dark:text-blue-400'
@@ -1447,14 +1656,23 @@ export default function Settings() {
             </div>
 
             {/* ── Right Content Area ── */}
-            <div className="flex-1 pb-20">{renderContent()}</div>
+            {/* Added role="tabpanel" and aria-labelledby to associate with the active tab (Issue #686) */}
+            <div
+              className="flex-1 pb-20 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6 md:p-8 shadow-sm min-h-[500px]"
+              role="tabpanel"
+              id={`panel-${activeTab}`}
+              aria-labelledby={`tab-${activeTab}`}
+              tabIndex={0}
+            >
+              {renderContent()}
+            </div>
           </div>
         </main>
       </div>
 
       {/* ── Delete Account Modal ── */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-red-100 dark:border-red-900/30 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6">
               <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
@@ -1524,61 +1742,3 @@ export default function Settings() {
     </div>
   );
 }
-{/* 2FA Section in Account Security */}
-<div className="p-5 border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-xs space-y-4">
-  <div className="flex items-center justify-between">
-    <div>
-      <h3 className="font-bold text-sm text-gray-900 dark:text-white">
-        Two-Factor Authentication (2FA)
-      </h3>
-      <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-        Protect your admin account with TOTP apps like Google Authenticator or Authy.
-      </p>
-    </div>
-    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${userProfile.isTwoFactorEnabled ? "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400" : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"}`}>
-      {userProfile.isTwoFactorEnabled ? "Enabled" : "Disabled"}
-    </span>
-  </div>
-
-  {!userProfile.isTwoFactorEnabled ? (
-    <div>
-      {!qrCodeData ? (
-        <button
-          onClick={handleSetup2FA}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition"
-        >
-          Setup Two-Factor Authentication
-        </button>
-      ) : (
-        <div className="p-4 bg-gray-50 dark:bg-slate-950 rounded-xl space-y-3">
-          <p className="text-xs text-gray-600 dark:text-slate-300 font-medium">
-            1. Scan this QR code in Google Authenticator or Authy:
-          </p>
-          <img src={qrCodeData.qrCode} alt="2FA QR Code" className="w-36 h-36 bg-white p-2 rounded-lg border" />
-          <p className="text-xs text-gray-500 font-mono">Secret Key: {qrCodeData.secret}</p>
-          
-          <div className="flex items-center gap-2 pt-2">
-            <input
-              type="text"
-              maxLength={6}
-              value={twoFactorCode}
-              onChange={(e) => setTwoFactorCode(e.target.value)}
-              placeholder="6-digit code"
-              className="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border text-xs text-center font-bold tracking-widest"
-            />
-            <button
-              onClick={handleConfirm2FA}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold"
-            >
-              Verify & Enable
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  ) : (
-    <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-      ✓ Two-factor authentication is active on your account.
-    </p>
-  )}
-</div>

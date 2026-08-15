@@ -1,46 +1,78 @@
-import DownloadIcon from '@mui/icons-material/Download';
 import { useEffect, useRef, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import { Helmet } from 'react-helmet-async';
-import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { logout } from '../features/auth/authSlice';
-import ThemeToggle from '../components/ThemeToggle';
-import Sidebar from '../components/Sidebar';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useDashboardSummary, useRecentActivity, usePayrollTrend } from '../hooks/useDashboardData';
 import EmployeeCard from '../components/EmployeeCard';
-import Approvals from './Approvals';
-import Settlements from './Settlements';
-import Loans from './Loans';
+import EmployeeExportActions from '../components/EmployeeExportActions';
 import SettingsModal from '../components/SettingsModal';
+import Sidebar from '../components/Sidebar';
+import ThemeToggle from '../components/ThemeToggle';
 import EmptyState from '../components/common/EmptyState';
-import { getCurrencySymbol, formatCurrency } from '../utils/currency';
-import {
-  EmployeeBreakdownSkeleton,
-  EmployeeCardSkeleton,
-  StatCardSkeleton,
-} from '../components/common/Skeleton';
-import api from '../services/api';
-import { exportEmployeesToCsv } from '../utils/exportEmployeesToCsv';
+import DashboardSkeleton from '../components/common/skeleton/DashboardSkeleton';
+import EmployeeManagementSkeleton from '../components/common/skeleton/EmployeeManagementSkeleton';
+import PayrollTableSkeleton from '../components/common/skeleton/PayrollTableSkeleton';
+import DashboardGrid from '../components/dashboard/DashboardGrid';
+import { logout } from '../features/auth/authSlice';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
+import api from '../services/api';
+import { formatCurrency, getCurrencySymbol } from '../utils/currency';
+import { useToast } from '../context/ToastContext';
+import Approvals from './Approvals';
+import Loans from './Loans';
+import Settlements from './Settlements';
+import Archive from './Archive';
+import ErrorBoundary, { ComponentFeedbackFallback } from '../components/common/ErrorBoundary';
+
+
+// Accept international phone numbers with an optional leading "+" and
+// a national number of 7-15 digits. Mirrors backend validation behavior.
+const PHONE_REGEX = /^\+?[1-9]\d{6,14}$/;
+
+const normalizePhoneValue = (value) => value.trim().replace(/[()\s-]/g, '');
+
+// Country codes offered in the Edit Employee phone field. Extend this list
+// as needed — longer codes are checked first in getPhoneParts so a code like
+// "+91" isn't mistakenly matched by a shorter unrelated prefix.
+const COUNTRY_CODE_OPTIONS = [
+  { value: '+91', label: '+91 (India)' },
+  { value: '+1', label: '+1 (US/Canada)' },
+  { value: '+44', label: '+44 (UK)' },
+  { value: '+61', label: '+61 (Australia)' },
+  { value: '+971', label: '+971 (UAE)' },
+  { value: '+65', label: '+65 (Singapore)' },
+];
+
+// Split a stored, normalized phone number like "+919876543210" into its
+// country-code and local-number parts for the edit form's two inputs.
+// Falls back to +91 (the default used elsewhere in this file) when the
+// number is empty or its prefix doesn't match a known option.
+const getPhoneParts = (phone) => {
+  if (!phone) {
+    return { phoneCountryCode: '+91', phone: '' };
+  }
+
+  const sortedOptions = [...COUNTRY_CODE_OPTIONS].sort(
+    (a, b) => b.value.length - a.value.length,
+  );
+  const match = sortedOptions.find((option) => phone.startsWith(option.value));
+
+  if (match) {
+    return {
+      phoneCountryCode: match.value,
+      phone: phone.slice(match.value.length),
+    };
+  }
+
+  return { phoneCountryCode: '+91', phone: phone.replace(/^\+/, '') };
+};
 
 // Trigger a file download from the browser
 const downloadFile = (url, filename) => {
-  const token = localStorage.getItem('token');
-  const baseUrl =
-    import.meta.env.VITE_API_URL ||
-    (import.meta.env.PROD
-      ? typeof window !== 'undefined'
-        ? window.location.origin
-        : ''
-      : 'http://localhost:5000');
-  fetch(`${baseUrl}${url}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  api.get(url, { responseType: 'blob' })
     .then((res) => {
-      if (!res.ok) throw new Error('No data to export');
-      return res.blob();
-    })
-    .then((blob) => {
+      const blob = res.data;
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
       link.download = filename;
@@ -51,8 +83,14 @@ const downloadFile = (url, filename) => {
     })
     .catch((err) => {
       console.error('Export failed:', err);
-      alert(
-        'No payroll data found for the current month. Finalize payroll first.',
+      window.dispatchEvent(
+        new CustomEvent('toast:show', {
+          detail: {
+            message:
+              'No payroll data found for the current month. Finalize payroll first.',
+            type: 'warning',
+          },
+        }),
       );
     });
 };
@@ -61,6 +99,9 @@ const downloadFile = (url, filename) => {
 const DashboardOverview = ({
   search,
   setSearch,
+  roleFilter,
+  setRoleFilter,
+  availableRoles = [],
   filtered,
   navigate,
   onAddUpdate,
@@ -71,6 +112,8 @@ const DashboardOverview = ({
   payrolls,
   onEditEmployee,
 }) => {
+  const { t } = useTranslation();
+
   const currency = localStorage.getItem('currency') || 'INR';
   const payrollMap = {};
   (payrolls || []).forEach((p) => {
@@ -89,6 +132,10 @@ const DashboardOverview = ({
     setGettingStarted(false);
   }
 
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
+
   return (
     <>
       {/* Overview Header */}
@@ -105,16 +152,7 @@ const DashboardOverview = ({
           </h1>
         </div>
 
-        <div className="w-full sm:w-auto mt-4 md:mt-0">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('dashboard.searchEmployees', 'Search employees...')}
-            className="w-full sm:w-auto px-4 py-3 border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-xl text-sm focus:border-blue-500 outline-none transition-colors"
-          />
-        </div>
-
-        <div className="flex gap-3 w-full sm:w-auto">
+        <div className="flex gap-3 w-full sm:w-auto mt-4 md:mt-0">
           <button
             onClick={() => navigate('/reports')}
             className="flex-1 cursor-pointer sm:flex-none px-5 py-2.5 border border-gray-200 dark:border-slate-800 dark:text-slate-200 rounded-lg text-sm font-semibold hover:shadow dark:hover:bg-slate-800 transition-colors"
@@ -140,42 +178,36 @@ const DashboardOverview = ({
         </div>
       </div>
 
+      {/* Dynamic Dashboard Grid (Replaces manual SummaryCards/Charts) */}
+      <div className="space-y-6">
+        <DashboardGrid />
+      </div>
+
       {/* Stats */}
       <div className="flex flex-col sm:flex-row gap-4 mb-10">
-        {loading ? (
-          <>
-            <StatCardSkeleton />
-            <div className="w-full sm:w-64">
-              <StatCardSkeleton />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex-1 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
-              <p className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold mb-2">
-                Total Monthly Payout
-              </p>
-              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
-                {formatCurrency(totalPayout, currency)}
-              </h2>
-              <p className="text-gray-500 dark:text-slate-500 text-sm mt-2">
-                {employeeCount} employees on payroll
-              </p>
-            </div>
+        <div className="flex-1 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
+          <p className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold mb-2">
+            Total Monthly Payout
+          </p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
+            {formatCurrency(totalPayout, currency)}
+          </h2>
+          <p className="text-gray-500 dark:text-slate-500 text-sm mt-2">
+            {employeeCount} employees on payroll
+          </p>
+        </div>
 
-            <div className="w-full sm:w-64 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
-              <p className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold mb-2">
-                Employees
-              </p>
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white">
-                {employeeCount}
-              </h2>
-              <p className="text-gray-500 dark:text-slate-500 text-sm">
-                Active this month
-              </p>
-            </div>
-          </>
-        )}
+        <div className="w-full sm:w-64 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
+          <p className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold mb-2">
+            Employees
+          </p>
+          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white">
+            {employeeCount}
+          </h2>
+          <p className="text-gray-500 dark:text-slate-500 text-sm">
+            Active this month
+          </p>
+        </div>
       </div>
 
       {/* Getting Started */}
@@ -209,48 +241,69 @@ const DashboardOverview = ({
         </div>
       )}
 
-      {/* Search + Export Roster */}
+      {/* Search + Role Filter + Export Roster */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">
           Employee Directory
         </h2>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search employees..."
-            className="w-full sm:w-auto px-4 py-2 border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
-          />
+        <div className="flex flex-wrap gap-3 items-center w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none sm:w-64">
+            <input
+              value={search || ''}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search employees..."
+              className="w-full pl-9 pr-8 py-2 border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
+            />
+            <svg
+              className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+                className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 text-xs font-bold"
+              >
+                ✕
+              </button>
+            )}
+          </div>
 
-          <button
-            type="button"
-            disabled={loading || filtered.length === 0}
-            onClick={() =>
-              exportEmployeesToCsv(filtered, {
-                companyName: localStorage.getItem('companyName') || 'PaySphere',
-              })
-            }
-            title={
-              filtered.length === 0
-                ? 'No employees to export'
-                : `Export ${filtered.length} employee${filtered.length === 1 ? '' : 's'} to CSV`
-            }
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-blue-500 text-blue-600 dark:text-blue-400 dark:border-blue-500 rounded-lg text-sm font-semibold hover:bg-blue-50 dark:hover:bg-blue-950/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent transition-colors"
-          >
-            <DownloadIcon sx={{ fontSize: 18 }} />
-            Export Roster
-          </button>
+          {availableRoles.length > 0 && (
+            <select
+              value={roleFilter || ''}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              aria-label="Filter by role"
+              className="px-3 py-2 border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
+            >
+              <option value="">All Roles</option>
+              {availableRoles.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* New Export Actions Component (Issue #511) */}
+          <EmployeeExportActions employees={filtered} />
         </div>
       </div>
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {loading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <EmployeeCardSkeleton key={i} />
-          ))
-        ) : filtered.length === 0 && !search ? (
+        {filtered.length === 0 && !search && !roleFilter ? (
           <EmptyState
             title="No employees yet"
             description="Add your first employee to get started with payroll."
@@ -263,10 +316,10 @@ const DashboardOverview = ({
               </button>
             }
           />
-        ) : filtered.length === 0 && search ? (
+        ) : filtered.length === 0 && (search || roleFilter) ? (
           <EmptyState
             title="No employees found"
-            description={`No employees match "${search}". Try a different name or role.`}
+            description={`No employees match "${search || roleFilter}". Try a different name or role.`}
           />
         ) : (
           filtered.map((emp) => (
@@ -281,7 +334,7 @@ const DashboardOverview = ({
           ))
         )}
 
-        {!loading && (filtered.length > 0 || search) && (
+        {(filtered.length > 0 || search || roleFilter) && (
           <div
             role="button"
             tabIndex={0}
@@ -301,6 +354,11 @@ const DashboardOverview = ({
 
 // --- Employee Management Component ---
 const EmployeeManagement = ({
+  search,
+  setSearch,
+  roleFilter,
+  setRoleFilter,
+  availableRoles = [],
   employees,
   loading,
   onAddEmployee,
@@ -312,6 +370,7 @@ const EmployeeManagement = ({
   onDeleteEmployee,
   onEditEmployee,
 }) => {
+  const { toast } = useToast();
   const currency = localStorage.getItem('currency') || 'INR';
   const payrollMap = {};
   (payrolls || []).forEach((p) => {
@@ -322,6 +381,10 @@ const EmployeeManagement = ({
     const p = payrollMap[e._id];
     return s + (p ? p.netSalary : e.monthlySalary || 0);
   }, 0);
+
+  if (loading) {
+    return <EmployeeManagementSkeleton />;
+  }
 
   return (
     <main className="p-4 sm:p-8">
@@ -361,8 +424,12 @@ const EmployeeManagement = ({
                   month: new Date().getMonth() + 1,
                   year: new Date().getFullYear(),
                 })
-                .then(() => alert('Submitted!'))
-                .catch(console.error)
+                .then(() => toast.success('Payroll submitted for review!'))
+                .catch((err) =>
+                  toast.error(
+                    err.response?.data?.message || 'Failed to submit payroll',
+                  ),
+                )
             }
           >
             Submit for Review
@@ -370,13 +437,66 @@ const EmployeeManagement = ({
         </div>
       </div>
 
+      {/* Search & Filter Controls */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800">
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+          Employee Roster
+        </h2>
+
+        <div className="flex flex-wrap gap-3 items-center w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none sm:w-64">
+            <input
+              value={search || ''}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search employees..."
+              className="w-full pl-9 pr-8 py-2 border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
+            />
+            <svg
+              className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+                className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 text-xs font-bold"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {availableRoles.length > 0 && (
+            <select
+              value={roleFilter || ''}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              aria-label="Filter by role"
+              className="px-3 py-2 border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
+            >
+              <option value="">All Roles</option>
+              {availableRoles.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      </div>
+
       {/* Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {loading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <EmployeeBreakdownSkeleton key={i} />
-          ))
-        ) : employees.length === 0 ? (
+        {employees.length === 0 && !search && !roleFilter ? (
           <EmptyState
             title="No employees yet"
             description="Add employees to see their salary breakdown here."
@@ -388,6 +508,11 @@ const EmployeeManagement = ({
                 + Add Employee
               </button>
             }
+          />
+        ) : employees.length === 0 && (search || roleFilter) ? (
+          <EmptyState
+            title="No employees found"
+            description={`No employees match "${search || roleFilter}". Try a different name or role.`}
           />
         ) : (
           employees.map((emp) => (
@@ -402,7 +527,7 @@ const EmployeeManagement = ({
           ))
         )}
 
-        {!loading && employees.length > 0 && (
+        {employees.length > 0 && (
           <div
             role="button"
             tabIndex={0}
@@ -418,7 +543,7 @@ const EmployeeManagement = ({
       </div>
 
       {/* Pagination */}
-      {!loading && totalPages > 1 && (
+      {totalPages > 1 && (
         <div className="flex justify-center items-center gap-4 mt-8">
           <button
             disabled={currentPage === 1}
@@ -447,19 +572,38 @@ const EmployeeManagement = ({
 const EditEmployeeModal = ({ employee, onClose, onSave }) => {
   const formRef = useRef(null);
   useCtrlEnterSubmit(formRef);
+  const { phoneCountryCode: initialPhoneCountryCode, phone: initialPhone } =
+    getPhoneParts(employee?.phone);
   const currency = localStorage.getItem('currency') || 'INR';
+  // Custom role names from GET /api/roles for the Role datalist (#475)
+  const [roleSuggestions, setRoleSuggestions] = useState([]);
   const [formData, setFormData] = useState({
     fullName: employee?.fullName || '',
     role: employee?.role || '',
     monthlySalary: employee?.monthlySalary || '',
     overtimeRate: employee?.overtimeRate || '',
+    phoneCountryCode: initialPhoneCountryCode,
+    // Phone number (#8) — optional, editable after creation.
+    phone: initialPhone,
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    api
+      .get('/api/roles')
+      .then((res) =>
+        setRoleSuggestions((res.data?.roles || []).map((r) => r.name)),
+      )
+      .catch(() => setRoleSuggestions([]));
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === 'phone' ? value.replace(/\D/g, '') : value,
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -477,6 +621,17 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
       return setError('Overtime rate cannot be negative.');
     }
 
+    // Phone is optional, but if provided it must match a valid international
+    // phone-number format.
+    const trimmedPhone = formData.phone.trim();
+    const trimmedCountryCode = formData.phoneCountryCode?.trim() || '+91';
+    const normalizedPhone = normalizePhoneValue(
+      `${trimmedCountryCode}${trimmedPhone}`,
+    );
+    if (trimmedPhone && !PHONE_REGEX.test(normalizedPhone)) {
+      return setError('Enter a valid international phone number.');
+    }
+
     try {
       setSubmitting(true);
       await onSave(employee._id, {
@@ -484,6 +639,7 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
         role: formData.role,
         monthlySalary: salary,
         overtimeRate: otRate,
+        phone: normalizedPhone || undefined,
       });
     } catch {
       setError('Failed to update employee details.');
@@ -530,10 +686,45 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
               required
               type="text"
               name="role"
+              list="role-suggestions"
               value={formData.role}
               onChange={handleChange}
               className="w-full px-4 py-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
             />
+            <datalist id="role-suggestions">
+              {roleSuggestions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+              Phone Number
+            </label>
+            <div className="flex gap-2">
+              <select
+                name="phoneCountryCode"
+                value={formData.phoneCountryCode}
+                onChange={handleChange}
+                className="w-36 px-3 py-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+              >
+                {COUNTRY_CODE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="tel"
+                inputMode="numeric"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="9876543210"
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -602,28 +793,52 @@ const PayrollTable = ({
   const endIdx = Math.min(currentPage * PAYROLL_LIMIT, totalCount);
 
   const STATUS_STYLE = {
-    pending_approval: 'bg-yellow-50 text-yellow-700 border border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800/40',
-    approved: 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800/40',
+    pending_approval:
+      'bg-yellow-50 text-yellow-700 border border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800/40',
+    approved:
+      'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800/40',
     paid: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800/40',
-    rejected: 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/40',
-    finalized: 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800/40',
+    rejected:
+      'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/40',
+    finalized:
+      'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800/40',
   };
 
-  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MONTH_NAMES = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
 
   const formatStatus = (s) => {
     if (!s) return 'Unknown';
-    return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   };
+
+  if (loading) {
+    return <PayrollTableSkeleton />;
+  }
 
   return (
     <main className="p-4 sm:p-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-2">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Payroll History</h1>
-          {!loading && totalCount > 0 && (
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+            Payroll History
+          </h1>
+          {totalCount > 0 && (
             <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">
-              Showing {startIdx}–{endIdx} of {totalCount} record{totalCount !== 1 ? 's' : ''}
+              Showing {startIdx}–{endIdx} of {totalCount} record
+              {totalCount !== 1 ? 's' : ''}
             </p>
           )}
         </div>
@@ -638,23 +853,25 @@ const PayrollTable = ({
           <span className="text-center">Status</span>
         </div>
 
-        {loading ? (
-          Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="px-6 py-4 border-b border-gray-100 dark:border-slate-800 animate-pulse">
-              <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4 mb-2" />
-              <div className="h-3 bg-gray-100 dark:bg-slate-800 rounded w-1/2" />
-            </div>
-          ))
-        ) : payrolls.length === 0 ? (
+        {payrolls.length === 0 ? (
           <div className="px-6 py-16 text-center">
-            <p className="text-gray-500 dark:text-slate-500 text-sm">No payroll records found for this month.</p>
-            <p className="text-gray-400 dark:text-slate-600 text-xs mt-1">Run payroll from Monthly Updates to see records here.</p>
+            <p className="text-gray-500 dark:text-slate-500 text-sm">
+              No payroll records found for this month.
+            </p>
+            <p className="text-gray-400 dark:text-slate-600 text-xs mt-1">
+              Run payroll from Monthly Updates to see records here.
+            </p>
           </div>
         ) : (
           payrolls.map((p) => (
-            <div key={p._id} className="grid grid-cols-1 sm:grid-cols-5 px-6 py-4 border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors items-center gap-2">
+            <div
+              key={p._id}
+              className="grid grid-cols-1 sm:grid-cols-5 px-6 py-4 border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors items-center gap-2"
+            >
               <div>
-                <p className="font-semibold text-gray-900 dark:text-white text-sm">{p.employeeName}</p>
+                <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                  {p.employeeName}
+                </p>
               </div>
               <div className="text-center text-sm text-gray-600 dark:text-slate-400">
                 {MONTH_NAMES[(p.month || 1) - 1]} {p.year}
@@ -666,7 +883,9 @@ const PayrollTable = ({
                 ₹{(p.netSalary || 0).toLocaleString('en-IN')}
               </div>
               <div className="flex sm:justify-center">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[p.status] || STATUS_STYLE['finalized']}`}>
+                <span
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[p.status] || STATUS_STYLE['finalized']}`}
+                >
                   {formatStatus(p.status)}
                 </span>
               </div>
@@ -675,7 +894,7 @@ const PayrollTable = ({
         )}
       </div>
 
-      {!loading && totalPages > 1 && (
+      {totalPages > 1 && (
         <div className="flex justify-center items-center gap-4 mt-6">
           <button
             disabled={currentPage === 1}
@@ -703,13 +922,28 @@ const PayrollTable = ({
 export default function PaySphereDashboard() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  
+  // Replaced useState/useEffect with TanStack Query hooks (Issue #684)
+  const { 
+    data: summary, 
+    isLoading: loading, 
+    error: queryError, 
+    refetch: refetchSummary 
+  } = useDashboardSummary();
+
+  const { data: recentActivity, isLoading: activityLoading } = useRecentActivity(5);
+  const { data: trendData, isLoading: trendLoading } = usePayrollTrend(6);
+
+  // Derived error state for backward compatibility with existing JSX
+  const error = queryError ? queryError.message : null;
+
   const [activePage, setActivePage] = useState('Dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
   const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalEmployees, setTotalEmployees] = useState(0);
@@ -719,7 +953,6 @@ export default function PaySphereDashboard() {
   const [payrollPage, setPayrollPage] = useState(1);
   const [payrollTotalPages, setPayrollTotalPages] = useState(1);
   const [payrollTotalCount, setPayrollTotalCount] = useState(0);
-  const [payrollTotalPayout, setPayrollTotalPayout] = useState(0);
   const [payrollLoading, setPayrollLoading] = useState(false);
   const [paginatedPayrolls, setPaginatedPayrolls] = useState([]);
 
@@ -729,6 +962,7 @@ export default function PaySphereDashboard() {
   const [employeeToEdit, setEmployeeToEdit] = useState(null);
   const [prevDebouncedSearch, setPrevDebouncedSearch] =
     useState(debouncedSearch);
+  const [prevRoleFilter, setPrevRoleFilter] = useState(roleFilter);
   const companyName = localStorage.getItem('companyName') || 'Acme Corp';
   const token = useSelector((state) => state.auth.token);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -765,36 +999,40 @@ export default function PaySphereDashboard() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Reset to page 1 when the search term changes (adjusted during render, not in an effect)
-  if (debouncedSearch !== prevDebouncedSearch) {
+  // Reset to page 1 when search term or role filter changes
+  if (debouncedSearch !== prevDebouncedSearch || roleFilter !== prevRoleFilter) {
     setPrevDebouncedSearch(debouncedSearch);
+    setPrevRoleFilter(roleFilter);
     setCurrentPage(1);
   }
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const searchParam = debouncedSearch
-          ? `&search=${encodeURIComponent(debouncedSearch)}`
-          : '';
+        const params = new URLSearchParams({
+          page: currentPage,
+          limit: 10,
+        });
+        if (debouncedSearch) {
+          params.append('search', debouncedSearch);
+        }
+        if (roleFilter) {
+          params.append('role', roleFilter);
+        }
         const [empRes, payRes] = await Promise.all([
-          api.get(`/api/employees?page=${currentPage}&limit=10${searchParam}`),
+          api.get(`/api/employees?${params.toString()}`),
           api.get(`/api/payroll/summary?limit=0`),
         ]);
 
-        setEmployees(empRes.data.employees);
-        setTotalPages(empRes.data.totalPages);
+        setEmployees(empRes.data.employees || []);
+        setTotalPages(empRes.data.totalPages || 1);
         setTotalEmployees(empRes.data.totalEmployees || 0);
         setPayrolls(payRes.data.payrolls || []);
-        setPayrollTotalPayout(payRes.data.totalPayout || 0);
       } catch (err) {
         console.error('Failed to fetch data:', err);
-      } finally {
-        setLoading(false);
       }
     };
     if (token) fetchData();
-    else setTimeout(() => setLoading(false), 0);
-  }, [token, currentPage, debouncedSearch]);
+  }, [token, currentPage, debouncedSearch, roleFilter]);
 
   // Fetch paginated payroll records when viewing the Payroll tab
   useEffect(() => {
@@ -802,7 +1040,9 @@ export default function PaySphereDashboard() {
     const fetchPayrollPage = async () => {
       setPayrollLoading(true);
       try {
-        const res = await api.get(`/api/payroll/summary?page=${payrollPage}&limit=10`);
+        const res = await api.get(
+          `/api/payroll/summary?page=${payrollPage}&limit=10`,
+        );
         setPaginatedPayrolls(res.data.payrolls || []);
         setPayrollTotalPages(res.data.totalPages || 1);
         setPayrollTotalCount(res.data.totalCount || 0);
@@ -820,16 +1060,24 @@ export default function PaySphereDashboard() {
     payrollMap[p.employeeId] = p;
   });
 
+  const availableRoles = Array.from(
+    new Set(employees.map((e) => e.role).filter(Boolean)),
+  ).sort();
+
   const totalPayout = employees.reduce((sum, e) => {
     const p = payrollMap[e._id];
     return sum + (p ? p.netSalary : e.monthlySalary || 0);
   }, 0);
 
-  const filtered = employees.filter(
-    (e) =>
+  const filtered = employees.filter((e) => {
+    const matchesSearch =
+      !search ||
       e.fullName.toLowerCase().includes(search.toLowerCase()) ||
-      (e.role || '').toLowerCase().includes(search.toLowerCase()),
-  );
+      (e.role || '').toLowerCase().includes(search.toLowerCase());
+    const matchesRole =
+      !roleFilter || (e.role || '').toLowerCase() === roleFilter.toLowerCase();
+    return matchesSearch && matchesRole;
+  });
 
   const handleDeleteEmployee = async () => {
     if (!employeeToDelete) return;
@@ -848,9 +1096,10 @@ export default function PaySphereDashboard() {
       );
 
       setEmployeeToDelete(null);
+      toast.success('Employee deleted successfully.');
     } catch (error) {
       console.error('Delete failed:', error);
-      alert(error.response?.data?.message || 'Failed to delete employee');
+      toast.error(error.response?.data?.message || 'Failed to delete employee');
     } finally {
       setDeleting(false);
     }
@@ -863,20 +1112,23 @@ export default function PaySphereDashboard() {
       setEmployees((prev) =>
         prev.map((emp) => (emp._id === id ? { ...emp, ...updatedData } : emp)),
       );
+      toast.success('Employee updated successfully.');
       setEmployeeToEdit(null);
     } catch (error) {
       console.error('Failed to update employee:', error);
-      alert('Failed to update employee. Please try again.');
+      toast.error('Failed to update employee. Please try again.');
     }
   };
 
-  const getInitials = (name) =>
-    name
+  const getInitials = (name) => {
+    if (!name) return '';
+    return name
       .split(' ')
       .map((w) => w[0])
       .join('')
       .slice(0, 2)
       .toUpperCase();
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-slate-950 flex font-sans text-slate-800 dark:text-slate-200 transition-colors duration-200">
@@ -899,6 +1151,12 @@ export default function PaySphereDashboard() {
         setActivePage={(page) => {
           if (page === 'Reports') {
             navigate('/reports');
+          } else if (page === 'Flashcards') {
+            navigate('/flashcards');
+          } else if (page === 'PYQs') {
+            navigate('/pyqs');
+          } else if (page === 'QuizBattle') {
+            navigate('/quiz-battle');
           } else {
             setActivePage(page);
           }
@@ -931,9 +1189,12 @@ export default function PaySphereDashboard() {
 
           <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
             <ThemeToggle />
-            <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+            <button
+              onClick={() => navigate('/profile')}
+              className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+            >
               {getInitials(companyName)}
-            </div>
+            </button>
             <button
               onClick={() => {
                 dispatch(logout());
@@ -946,53 +1207,62 @@ export default function PaySphereDashboard() {
             </button>
           </div>
         </header>
-
-        {/* Dynamic Content */}
-        {activePage === 'Approvals' ? (
-          <Approvals />
-        ) : activePage === 'Settlements' ? (
-          <Settlements />
-        ) : activePage === 'Loans' ? (
-          <Loans />
-        ) : activePage === 'Payroll' ? (
-          <PayrollTable
-            payrolls={paginatedPayrolls}
-            loading={payrollLoading}
-            currentPage={payrollPage}
-            totalPages={payrollTotalPages}
-            totalCount={payrollTotalCount}
-            setCurrentPage={setPayrollPage}
-          />
-        ) : activePage === 'Dashboard' ? (
-          <DashboardOverview
-            search={search}
-            setSearch={setSearch}
-            filtered={filtered}
-            navigate={navigate}
-            onAddUpdate={() => navigate('/monthly-updates')}
-            onAddEmployee={() => navigate('/add-employee')}
-            totalPayout={totalPayout}
-            employeeCount={totalEmployees}
-            loading={loading}
-            payrolls={payrolls}
-            onEditEmployee={(emp) => setEmployeeToEdit(emp)}
-          />
-        ) : (
-          <EmployeeManagement
-            search={search}
-            setSearch={setSearch}
-            employees={employees}
-            loading={loading}
-            onAddEmployee={() => navigate('/add-employee')}
-            onAddUpdate={() => navigate('/monthly-updates')}
-            payrolls={payrolls}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            setCurrentPage={setCurrentPage}
-            onDeleteEmployee={(emp) => setEmployeeToDelete(emp)}
-            onEditEmployee={(emp) => setEmployeeToEdit(emp)}
-          />
-        )}
+{/* Dynamic Content */}
+<ErrorBoundary fallback={<ComponentFeedbackFallback />}>
+  {activePage === 'Approvals' ? (
+    <Approvals />
+  ) : activePage === 'Settlements' ? (
+    <Settlements />
+  ) : activePage === 'Loans' ? (
+    <Loans />
+  ) : activePage === 'Payroll' ? (
+    <PayrollTable
+      payrolls={paginatedPayrolls}
+      loading={payrollLoading}
+      currentPage={payrollPage}
+      totalPages={payrollTotalPages}
+      totalCount={payrollTotalCount}
+      setCurrentPage={setPayrollPage}
+    />
+  ) : activePage === 'Dashboard' ? (
+    <DashboardOverview
+      search={search}
+      setSearch={setSearch}
+      roleFilter={roleFilter}
+      setRoleFilter={setRoleFilter}
+      availableRoles={availableRoles}
+      filtered={filtered}
+      navigate={navigate}
+      onAddUpdate={() => navigate('/monthly-updates')}
+      onAddEmployee={() => navigate('/add-employee')}
+      totalPayout={totalPayout}
+      employeeCount={totalEmployees}
+      loading={loading}
+      payrolls={payrolls}
+      onEditEmployee={(emp) => setEmployeeToEdit(emp)}
+    />
+  ) : activePage === 'Archive' ? (
+    <Archive />
+  ) : (
+    <EmployeeManagement
+      search={search}
+      setSearch={setSearch}
+      roleFilter={roleFilter}
+      setRoleFilter={setRoleFilter}
+      availableRoles={availableRoles}
+      employees={filtered}
+      loading={loading}
+      onAddEmployee={() => navigate('/add-employee')}
+      onAddUpdate={() => navigate('/monthly-updates')}
+      payrolls={payrolls}
+      currentPage={currentPage}
+      totalPages={totalPages}
+      setCurrentPage={setCurrentPage}
+      onDeleteEmployee={(emp) => setEmployeeToDelete(emp)}
+      onEditEmployee={(emp) => setEmployeeToEdit(emp)}
+    />
+  )}
+</ErrorBoundary>
 
         {/* Edit Form Modal (Steps 2-5) */}
         {employeeToEdit && (

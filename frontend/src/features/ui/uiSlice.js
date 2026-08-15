@@ -1,7 +1,15 @@
 import { createSlice } from '@reduxjs/toolkit';
 
+const getInitialThemeMode = () => {
+  if (typeof window === 'undefined') {
+    return 'light';
+  }
+
+  return window.localStorage.getItem('themeMode') || 'light';
+};
+
 const initialState = {
-  themeMode: localStorage.getItem('themeMode') || 'light',
+  themeMode: getInitialThemeMode(),
   isLoading: false,
   notification: {
     open: false,

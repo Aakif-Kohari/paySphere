@@ -39,3 +39,20 @@ export default function PayrollTable({ data }) {
     </div>
   );
 }
+
+PayrollTable.propTypes = {
+  data: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string,
+      name: PropTypes.string.isRequired,
+      department: PropTypes.string,
+      salary: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      overtime: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      deduction: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      net: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      status: PropTypes.string,
+      date: PropTypes.string,
+    }),
+  ),
+  currency: PropTypes.string,
+};

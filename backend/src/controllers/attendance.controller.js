@@ -52,19 +52,21 @@ function parsePeriod(rawYear, rawMonth) {
 /**
  * Load an employee, asserting the caller owns it.
  *
- * Every controller in this codebase scopes by `createdBy`; attendance carries
- * the same salary-adjacent data as payroll and gets the same treatment.
+ * Every controller in this codebase scopes by `tenantId`; attendance carries
+ * the same salary-adjacent data as payroll and gets the same treatment. This
+ * lookup was left on `createdBy` when #585 moved the writes over, so an
+ * employee added after it could never be found again (#613).
  *
  * @param {string} employeeId
- * @param {string} userId
+ * @param {string} tenantId
  * @returns {Promise<{ok: true, employee: object} | {ok: false, status: number, message: string}>}
  */
-async function loadOwnedEmployee(employeeId, userId) {
+async function loadOwnedEmployee(employeeId, tenantId) {
   if (!mongoose.Types.ObjectId.isValid(employeeId)) {
     return { ok: false, status: 400, message: 'Invalid employee id format' };
   }
 
-  const employee = await Employee.findOne({ _id: employeeId, createdBy: userId });
+  const employee = await Employee.findOne({ _id: employeeId, tenantId });
 
   if (!employee) {
     // Deliberately indistinguishable from "does not exist": the caller must not
@@ -85,15 +87,15 @@ async function loadOwnedEmployee(employeeId, userId) {
  * employee's inbox unreproducible.
  *
  * @param {string} employeeId
- * @param {string} userId
+ * @param {string} tenantId
  * @param {number} year
  * @param {number} month
  * @returns {Promise<object|null>} the paid payroll row, or null
  */
-async function findPaidPayroll(employeeId, userId, year, month) {
+async function findPaidPayroll(employeeId, tenantId, year, month) {
   return PayrollUpdate.findOne({
     employeeId,
-    createdBy: userId,
+    tenantId,
     year,
     month,
     status: 'paid',
@@ -123,7 +125,7 @@ async function loadLeavePolicy(userId) {
 async function buildBalance(employee, policy, year, month) {
   const history = await Attendance.find({
     employeeId: employee._id,
-    createdBy: employee.createdBy,
+    tenantId: employee.tenantId,
   }).select('year month totals');
 
   return computeLeaveBalance({
@@ -148,7 +150,7 @@ exports.getAttendance = async (req, res, next) => {
     const period = parsePeriod(req.query.year, req.query.month);
     if (!period.ok) return res.status(400).json({ message: period.message });
 
-    const owned = await loadOwnedEmployee(req.query.employeeId, req.userId);
+    const owned = await loadOwnedEmployee(req.query.employeeId, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -158,14 +160,14 @@ exports.getAttendance = async (req, res, next) => {
 
     const existing = await Attendance.findOne({
       employeeId: employee._id,
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       year,
       month,
     });
 
     const policy = await loadLeavePolicy(req.userId);
     const balance = await buildBalance(employee, policy, year, month);
-    const paidPayroll = await findPaidPayroll(employee._id, req.userId, year, month);
+    const paidPayroll = await findPaidPayroll(employee._id, req.tenantId, year, month);
 
     const days = existing ? existing.days : buildDefaultGrid(year, month);
     const totals = existing ? existing.totals : computeTotals(days);
@@ -199,7 +201,7 @@ exports.upsertAttendance = async (req, res, next) => {
     const period = parsePeriod(req.params.year, req.params.month);
     if (!period.ok) return res.status(400).json({ message: period.message });
 
-    const owned = await loadOwnedEmployee(req.params.employeeId, req.userId);
+    const owned = await loadOwnedEmployee(req.params.employeeId, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -209,13 +211,13 @@ exports.upsertAttendance = async (req, res, next) => {
 
     const existing = await Attendance.findOne({
       employeeId: employee._id,
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       year,
       month,
     });
 
     // A month whose payroll has been paid is settled.
-    const paidPayroll = await findPaidPayroll(employee._id, req.userId, year, month);
+    const paidPayroll = await findPaidPayroll(employee._id, req.tenantId, year, month);
 
     if (paidPayroll || (existing && existing.lockedAt)) {
       // Stamp the lock so subsequent reads can show the state without
@@ -253,7 +255,7 @@ exports.upsertAttendance = async (req, res, next) => {
     const leaveCheck = canTakePaidLeave(priorBalance, totals.paidLeave);
 
     const saved = await Attendance.findOneAndUpdate(
-      { employeeId: employee._id, createdBy: req.userId, year, month },
+      { employeeId: employee._id, tenantId: req.tenantId, year, month },
       {
         $set: {
           employeeName: employee.fullName,
@@ -263,7 +265,11 @@ exports.upsertAttendance = async (req, res, next) => {
         },
         $setOnInsert: {
           employeeId: employee._id,
+          // `createdBy` is required by the schema and is only written on
+          // insert, so it belongs in $setOnInsert alongside the tenant. #585
+          // dropped it, which made every upsert that had to insert throw (#613).
           createdBy: req.userId,
+          tenantId: req.tenantId,
           year,
           month,
         },
@@ -366,7 +372,7 @@ exports.bulkMarkAttendance = async (req, res, next) => {
     // Scoped: ids belonging to another account simply do not come back.
     const employees = await Employee.find({
       _id: { $in: ids },
-      createdBy: req.userId,
+      createdBy: req.userId, tenantId: req.tenantId,
     });
 
     if (employees.length === 0) {
@@ -375,7 +381,7 @@ exports.bulkMarkAttendance = async (req, res, next) => {
 
     const existingDocs = await Attendance.find({
       employeeId: { $in: employees.map((e) => e._id) },
-      createdBy: req.userId,
+      createdBy: req.userId, tenantId: req.tenantId,
       year,
       month,
     });
@@ -394,7 +400,7 @@ exports.bulkMarkAttendance = async (req, res, next) => {
 
       const locked =
         (existing && existing.lockedAt) ||
-        (await findPaidPayroll(employee._id, req.userId, year, month));
+        (await findPaidPayroll(employee._id, req.tenantId, year, month));
 
       if (locked) {
         skipped.push({
@@ -427,7 +433,7 @@ exports.bulkMarkAttendance = async (req, res, next) => {
       const totals = computeTotals(validation.days);
 
       await Attendance.findOneAndUpdate(
-        { employeeId: employee._id, createdBy: req.userId, year, month },
+        { employeeId: employee._id, tenantId: req.tenantId, year, month },
         {
           $set: {
             employeeName: employee.fullName,
@@ -435,7 +441,13 @@ exports.bulkMarkAttendance = async (req, res, next) => {
             totals,
             lastEditedBy: req.userId,
           },
-          $setOnInsert: { employeeId: employee._id, createdBy: req.userId, year, month },
+          $setOnInsert: {
+            employeeId: employee._id,
+            createdBy: req.userId,
+            tenantId: req.tenantId,
+            year,
+            month,
+          },
         },
         { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
       );
@@ -488,7 +500,7 @@ exports.getMonthSummary = async (req, res, next) => {
     const { year, month } = period;
 
     const records = await Attendance.find({
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       year,
       month,
     }).sort({ employeeName: 1 });
@@ -534,7 +546,7 @@ exports.getLeaveBalance = async (req, res, next) => {
     const period = parsePeriod(req.query.year, req.query.month);
     if (!period.ok) return res.status(400).json({ message: period.message });
 
-    const owned = await loadOwnedEmployee(req.query.employeeId, req.userId);
+    const owned = await loadOwnedEmployee(req.query.employeeId, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -554,6 +566,70 @@ exports.getLeaveBalance = async (req, res, next) => {
       year: period.year,
       month: period.month,
       balance,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/attendance/biometric-sync
+ * Synchronize raw biometric clock-in/out logs and update attendance grid with shift overtime multipliers.
+ */
+exports.syncBiometricAttendance = async (req, res, next) => {
+  try {
+    const { employeeId, year, month, logs } = req.body || {};
+
+    const period = parsePeriod(year, month);
+    if (!period.ok) {
+      return res.status(400).json({ message: period.message });
+    }
+
+    const owned = await loadOwnedEmployee(employeeId, req.tenantId);
+    if (!owned.ok) {
+      return res.status(owned.status).json({ message: owned.message });
+    }
+
+    const { parseBiometricLogs, validateGrid, computeTotals } = require('../utils/attendanceGrid');
+    const parsedDays = parseBiometricLogs(logs, period.year, period.month);
+    const validated = validateGrid(parsedDays, period.year, period.month);
+
+    if (!validated.ok) {
+      return res.status(400).json({ message: 'Invalid biometric attendance data', errors: validated.errors });
+    }
+
+    const totals = computeTotals(validated.days);
+
+    let attendanceRecord = await Attendance.findOne({
+      employeeId: owned.employee._id,
+      tenantId: req.tenantId,
+      year: period.year,
+      month: period.month,
+    });
+
+    if (!attendanceRecord) {
+      attendanceRecord = new Attendance({
+        employeeId: owned.employee._id,
+        tenantId: req.tenantId,
+        year: period.year,
+        month: period.month,
+        days: validated.days,
+        summary: totals,
+      });
+    } else {
+      attendanceRecord.days = validated.days;
+      attendanceRecord.summary = totals;
+    }
+
+    await attendanceRecord.save();
+
+    return res.status(200).json({
+      message: 'Biometric attendance synced successfully',
+      employeeId: String(owned.employee._id),
+      year: period.year,
+      month: period.month,
+      totals,
+      record: attendanceRecord,
     });
   } catch (error) {
     next(error);

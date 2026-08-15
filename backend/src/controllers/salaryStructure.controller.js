@@ -16,6 +16,11 @@ const {
   diffStructures,
 } = require('../utils/salaryStructure');
 const { REVISION_REASON } = require('../config/salaryComponents');
+// Required at the top rather than inside the handler. The lazy require this
+// replaces resolved a path that does not exist, and because its call site
+// catches and logs, every backdated revision since #931 merged produced a log
+// line and no ledger rows — invisibly (#950).
+const { processRetroactiveArrears } = require('../utils/arrearsCalculator');
 
 /**
  * Load an employee, asserting the caller owns it.
@@ -24,12 +29,15 @@ const { REVISION_REASON } = require('../config/salaryComponents');
  * @param {string} userId
  * @returns {Promise<{ok: true, employee: object} | {ok: false, status: number, message: string}>}
  */
-async function loadOwnedEmployee(employeeId, userId) {
+async function loadOwnedEmployee(employeeId, tenantId) {
   if (!mongoose.Types.ObjectId.isValid(employeeId)) {
     return { ok: false, status: 400, message: 'Invalid employee id format' };
   }
 
-  const employee = await Employee.findOne({ _id: employeeId, createdBy: userId });
+  // Scoped by tenant, not by creator. #585 moved the writes to `tenantId` but
+  // left this lookup on `createdBy`, so an employee added after it could never
+  // be found again (#613).
+  const employee = await Employee.findOne({ _id: employeeId, tenantId });
 
   if (!employee) {
     return { ok: false, status: 404, message: 'Employee not found' };
@@ -42,13 +50,13 @@ async function loadOwnedEmployee(employeeId, userId) {
  * Every revision for an employee, oldest first.
  *
  * @param {string} employeeId
- * @param {string} userId
+ * @param {string} tenantId
  * @returns {Promise<object[]>}
  */
-async function loadRevisions(employeeId, userId) {
+async function loadRevisions(employeeId, tenantId) {
   const revisions = await SalaryStructure.find({
     employeeId,
-    createdBy: userId,
+    tenantId,
   }).sort({ effectiveFrom: 1 });
 
   return revisions;
@@ -89,13 +97,13 @@ function resolveOrSynthesise(employee, revisions, onDate) {
  */
 exports.getSalaryStructure = async (req, res, next) => {
   try {
-    const owned = await loadOwnedEmployee(req.params.id, req.userId);
+    const owned = await loadOwnedEmployee(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
 
     const { employee } = owned;
-    const revisions = await loadRevisions(employee._id, req.userId);
+    const revisions = await loadRevisions(employee._id, req.tenantId);
 
     // A period query answers "what was this person on in March?" — the question
     // the single mutable field made unanswerable.
@@ -178,14 +186,14 @@ exports.getSalaryStructure = async (req, res, next) => {
  */
 exports.getSalaryHistory = async (req, res, next) => {
   try {
-    const owned = await loadOwnedEmployee(req.params.id, req.userId);
+    const owned = await loadOwnedEmployee(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
 
     const { employee } = owned;
     const revisions = sortByEffectiveDate(
-      await loadRevisions(employee._id, req.userId),
+      await loadRevisions(employee._id, req.tenantId),
     );
 
     const timeline = revisions.map((revision, index) => {
@@ -223,7 +231,7 @@ exports.getSalaryHistory = async (req, res, next) => {
  */
 exports.createSalaryRevision = async (req, res, next) => {
   try {
-    const owned = await loadOwnedEmployee(req.params.id, req.userId);
+    const owned = await loadOwnedEmployee(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -255,7 +263,7 @@ exports.createSalaryRevision = async (req, res, next) => {
     // stored payroll row unreproducible.
     const paidInPeriod = await PayrollUpdate.findOne({
       employeeId: employee._id,
-      createdBy: req.userId,
+      tenantId: req.tenantId,
       status: 'paid',
       $or: [
         { year: { $gt: effectiveFrom.getFullYear() } },
@@ -276,14 +284,18 @@ exports.createSalaryRevision = async (req, res, next) => {
       });
     }
 
-    const revisions = await loadRevisions(employee._id, req.userId);
+    const revisions = await loadRevisions(employee._id, req.tenantId);
     const previous = resolveStructureOnDate(revisions, effectiveFrom);
 
     let created;
     try {
       created = await SalaryStructure.create({
-        employeeId: employee._id,
+        // Both: `createdBy` records who filed the revision, `tenantId` decides
+        // who can see it. #585 dropped the first while the schema still
+        // required it, so this create() threw on every call (#613).
         createdBy: req.userId,
+        employeeId: employee._id,
+        tenantId: req.tenantId,
         effectiveFrom,
         components: validation.value.components,
         grossMonthly: validation.value.grossMonthly,
@@ -302,13 +314,31 @@ exports.createSalaryRevision = async (req, res, next) => {
       throw error;
     }
 
+    // A revision effective in the past means the months since then were paid at
+    // the old rate, and the difference is owed (#931).
+    //
+    // Still deliberately non-fatal: the revision itself is saved and correct,
+    // and refusing to record a raise because the arrears arithmetic failed
+    // would be the worse outcome. But it now logs enough to act on — the
+    // message before this carried no revision or employee id, so nobody reading
+    // the log could tell who had been missed.
+    try {
+      await processRetroactiveArrears(created, previous, req.tenantId);
+    } catch (arrearsError) {
+      logger.error('Failed to process retroactive arrears', {
+        error: arrearsError.message,
+        revisionId: String(created._id),
+        employeeId: String(employee._id),
+      });
+    }
+
     // Keep the denormalised figure in step, but only when this revision is the
     // one actually in force — a future-dated raise must not change today's pay.
     const isCurrent = effectiveFrom <= new Date();
 
     if (isCurrent) {
       await Employee.updateOne(
-        { _id: employee._id, createdBy: req.userId },
+        { _id: employee._id, tenantId: req.tenantId },
         { $set: { monthlySalary: validation.value.grossMonthly } },
       );
 
@@ -372,7 +402,7 @@ exports.createSalaryRevision = async (req, res, next) => {
  */
 exports.previewSalaryStructure = async (req, res, next) => {
   try {
-    const owned = await loadOwnedEmployee(req.params.id, req.userId);
+    const owned = await loadOwnedEmployee(req.params.id, req.tenantId);
     if (!owned.ok) {
       return res.status(owned.status).json({ message: owned.message });
     }
@@ -396,7 +426,7 @@ exports.previewSalaryStructure = async (req, res, next) => {
         .json({ message: 'Invalid salary structure', errors: validation.errors });
     }
 
-    const revisions = await loadRevisions(employee._id, req.userId);
+    const revisions = await loadRevisions(employee._id, req.tenantId);
     const current = resolveOrSynthesise(employee, revisions, new Date()).structure;
 
     res.status(200).json({

@@ -1,16 +1,24 @@
-import React from 'react';
+import { useSelector } from 'react-redux';
 import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
 } from "recharts";
-import { getCurrencySymbol, formatCurrency } from '../../utils/currency';
+import { formatCurrency } from '../../utils/currency';
+import { createChartTooltip } from './chartTooltip';
 
 export default function DepartmentChart({ data }) {
+  const themeMode = useSelector((state) => state.ui.themeMode);
+  const isDark = themeMode === 'dark';
+  const tooltipContent = createChartTooltip({
+    isDark,
+    formatValue: (value) => formatCurrency(Number(value), localStorage.getItem('currency') || 'INR'),
+  });
+
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm p-6">
       <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-5">
@@ -26,9 +34,9 @@ export default function DepartmentChart({ data }) {
 
             <YAxis />
 
-            <Tooltip 
-              formatter={(value) => formatCurrency(Number(value), localStorage.getItem('currency') || 'INR')}
-              labelStyle={{ color: '#64748b' }}
+            <Tooltip
+              cursor={{ fill: isDark ? 'rgba(30, 41, 59, 0.12)' : 'rgba(148, 163, 184, 0.16)' }}
+              content={tooltipContent}
             />
 
             <Bar

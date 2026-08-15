@@ -1,162 +1,314 @@
-let Redis;
-try {
-  Redis = require("ioredis");
-} catch {
-  Redis = null;
-}
-const logger = require("../utils/logger");
+/**
+ * @fileoverview Advanced Redis Cache Service
+ * @description Provides a comprehensive caching layer for PaySphere. Supports 
+ * complex MongoDB aggregation caching, tag-based invalidation, pattern matching, 
+ * safe JSON serialization/deserialization, and an in-memory fallback for 
+ * environments without Redis.
+ * 
+ * Issues: #722 (Reports Caching), #519 (Dashboard Caching)
+ */
 
-// Use a mock cache if REDIS_URL is not provided so it doesn't crash environments without Redis
-class CacheService {
+const { createClient } = require('redis');
+const crypto = require('crypto');
+const logger = require('../utils/logger');
+
+/**
+ * In-Memory Fallback Cache
+ * Used when REDIS_URI is not provided or connection fails.
+ */
+class MemoryCache {
   constructor() {
-    this.isRedisEnabled = !!process.env.REDIS_URL && !!Redis;
-    
-    if (this.isRedisEnabled) {
-      this.client = new Redis(process.env.REDIS_URL, {
-        maxRetriesPerRequest: 3,
-        retryStrategy(times) {
-          if (times > 3) return null;
-          return Math.min(times * 50, 2000);
+    this.store = new Map();
+    // Prevent memory leak by periodically cleaning up expired keys
+    this.cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      for (const [key, item] of this.store.entries()) {
+        if (now > item.expiresAt) {
+          this.store.delete(key);
         }
-      });
-      
-      this.client.on("error", (err) => {
-        logger.error("Redis connection error:", err);
-      });
-      
-      this.client.on("connect", () => {
-        logger.info("Connected to Redis");
-      });
-    } else {
-      logger.info("Redis is disabled (no REDIS_URL). Using in-memory fallback.");
-      this.memoryCache = new Map();
-      
-      // Prevent memory leak by periodically cleaning up expired keys
-      this.cleanupInterval = setInterval(() => {
-        const now = Date.now();
-        for (const [key, item] of this.memoryCache.entries()) {
-          if (now > item.expiresAt) {
-            this.memoryCache.delete(key);
-          }
-        }
-      }, 60000); // Check every minute
-      this.cleanupInterval.unref(); // Don't block Node.js from exiting
+      }
+    }, 60000);
+    this.cleanupInterval.unref(); // Don't block Node.js from exiting
+    logger.info('Redis is disabled/unavailable. Using in-memory fallback cache.');
+  }
+
+  get(key) {
+    const item = this.store.get(key);
+    if (!item) return null;
+    if (Date.now() > item.expiresAt) {
+      this.store.delete(key);
+      return null;
+    }
+    return item.data;
+  }
+
+  setEx(key, ttlSeconds, data) {
+    this.store.set(key, {
+      data,
+      expiresAt: Date.now() + ttlSeconds * 1000
+    });
+  }
+
+  del(key) {
+    this.store.delete(key);
+  }
+
+  deleteByPattern(pattern) {
+    // Simple substring match for in-memory fallback
+    const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+    for (const key of this.store.keys()) {
+      if (regex.test(key)) {
+        this.store.delete(key);
+      }
     }
   }
 
   destroy() {
-    if (this.cleanupInterval) clearInterval(this.cleanupInterval);
-    if (this.isRedisEnabled && this.client) this.client.disconnect();
-  }
-
-  async get(key) {
-    try {
-      if (this.isRedisEnabled) {
-        const data = await this.client.get(key);
-        return data ? JSON.parse(data) : null;
-      } else {
-        const item = this.memoryCache.get(key);
-        if (!item) return null;
-        if (Date.now() > item.expiresAt) {
-          this.memoryCache.delete(key);
-          return null;
-        }
-        return item.data;
-      }
-    } catch (error) {
-      logger.error(`Cache GET error for key ${key}:`, error);
-      return null; // Fail silently so app continues
-    }
-  }
-
-  async setEx(key, ttlSeconds, data) {
-    try {
-      if (this.isRedisEnabled) {
-        await this.client.setex(key, ttlSeconds, JSON.stringify(data));
-      } else {
-        this.memoryCache.set(key, {
-          data,
-          expiresAt: Date.now() + ttlSeconds * 1000
-        });
-      }
-    } catch (error) {
-      logger.error(`Cache SETEX error for key ${key}:`, error);
-    }
-  }
-
-  async del(key) {
-    try {
-      if (this.isRedisEnabled) {
-        await this.client.del(key);
-      } else {
-        this.memoryCache.delete(key);
-      }
-    } catch (error) {
-      logger.error(`Cache DEL error for key ${key}:`, error);
-    }
-  }
-
-  /**
-   * Invalidate every cached analytics response for a user.
-   *
-   * `getAnalytics` caches under `analytics:<userId>:<monthsBack>` for an hour,
-   * so a single user has one entry per range they have viewed. This clears all
-   * of them.
-   *
-   * Call this from anything that changes payroll aggregates — finalizing
-   * payroll, deleting an employee, toggling one inactive. Before #415 only
-   * addEmployee and updateEmployee did, so running payroll left the Reports
-   * page showing stale figures for up to an hour.
-   *
-   * Never throws: a cache outage must not fail a payroll write.
-   *
-   * @param {string} userId
-   * @returns {Promise<boolean>} whether invalidation completed cleanly
-   */
-  async invalidateAnalytics(userId) {
-    if (!userId) return false;
-
-    try {
-      await this.invalidatePattern(`analytics:${userId}`);
-      return true;
-    } catch (error) {
-      logger.error(`Analytics cache invalidation failed for user ${userId}:`, error);
-      return false;
-    }
-  }
-
-  async invalidatePattern(pattern) {
-    // In production with real Redis, you'd use SCAN
-    // For this simple mock/fallback, we'll iterate
-    if (!this.isRedisEnabled) {
-      for (const k of this.memoryCache.keys()) {
-        if (k.includes(pattern)) {
-          this.memoryCache.delete(k);
-        }
-      }
-    } else {
-      // Basic SCAN implementation
-      try {
-        let cursor = "0";
-        do {
-          const res = await this.client.scan(cursor, "MATCH", `*${pattern}*`, "COUNT", "100");
-          cursor = res[0];
-          const keys = res[1];
-          if (keys.length > 0) {
-            const BATCH_SIZE = 500;
-            for (let i = 0; i < keys.length; i += BATCH_SIZE) {
-              const batch = keys.slice(i, i + BATCH_SIZE);
-              await this.client.del(batch);
-            }
-          }
-        } while (cursor !== "0");
-      } catch (error) {
-        logger.error(`Cache INVALIDATE error for pattern ${pattern}:`, error);
-      }
-    }
+    clearInterval(this.cleanupInterval);
+    this.store.clear();
   }
 }
 
-const instance = new CacheService();
-instance.CacheService = CacheService;
-module.exports = instance;
+/**
+ * Redis Client Configuration
+ */
+const redisUrl = process.env.REDIS_URI || process.env.REDIS_URL;
+let redisClient = null;
+let memoryCache = null;
+let isRedisEnabled = false;
+
+if (redisUrl) {
+  redisClient = createClient({
+    url: redisUrl,
+    socket: {
+      reconnectStrategy: (retries) => {
+        if (retries > 10) {
+          logger.error('Redis: Maximum reconnection attempts reached. Falling back to memory cache.');
+          return new Error('Redis max retries reached.');
+        }
+        // Exponential backoff with jitter
+        const delay = Math.min(retries * 50, 500) + Math.random() * 100;
+        logger.warn(`Redis: Reconnecting in ${Math.round(delay)}ms (Attempt ${retries})`);
+        return delay;
+      },
+    },
+  });
+
+  redisClient.on('error', (err) => logger.error('Redis Client Error:', err));
+  redisClient.on('connect', () => logger.info('Redis Client Connected'));
+  redisClient.on('reconnecting', () => logger.info('Redis Client Reconnecting'));
+} else {
+  memoryCache = new MemoryCache();
+}
+
+/**
+ * Connect to Redis on application startup
+ */
+async function connectRedis() {
+  if (!redisClient) return;
+  try {
+    if (!redisClient.isOpen) {
+      await redisClient.connect();
+      isRedisEnabled = true;
+    }
+  } catch (error) {
+    logger.error('Failed to connect to Redis, falling back to memory cache:', error.message);
+    memoryCache = new MemoryCache();
+    isRedisEnabled = false;
+  }
+}
+
+/**
+ * Generates a deterministic MD5 hash for cache keys
+ * @param {string} str - The string to hash
+ * @returns {string} MD5 hex digest
+ */
+function generateHash(str) {
+  return crypto.createHash('md5').update(str).digest('hex');
+}
+
+/**
+ * Retrieves a value from the cache
+ * @param {string} key - The cache key
+ * @returns {Promise<any>} The parsed JSON value or null
+ */
+async function get(key) {
+  try {
+    if (isRedisEnabled && redisClient?.isOpen) {
+      const data = await redisClient.get(key);
+      return data ? JSON.parse(data) : null;
+    } else if (memoryCache) {
+      return memoryCache.get(key);
+    }
+    return null;
+  } catch (error) {
+    logger.error(`Cache GET error for key ${key}:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Sets a value in the cache with a TTL
+ * @param {string} key - The cache key
+ * @param {number} ttl - Time to live in seconds
+ * @param {any} value - The value to cache (will be JSON stringified)
+ * @param {string[]} [tags=[]] - Optional tags for group invalidation
+ */
+async function setEx(key, ttl, value, tags = []) {
+  try {
+    if (isRedisEnabled && redisClient?.isOpen) {
+      const serialized = JSON.stringify(value);
+      await redisClient.setEx(key, ttl, serialized);
+
+      // Store tag associations for bulk invalidation
+      if (tags.length > 0) {
+        const pipeline = redisClient.multi();
+        tags.forEach(tag => pipeline.sAdd(`tag:${tag}`, key));
+        await pipeline.exec();
+      }
+    } else if (memoryCache) {
+      memoryCache.setEx(key, ttl, value);
+    }
+  } catch (error) {
+    logger.error(`Cache SETEX error for key ${key}:`, error.message);
+  }
+}
+
+/**
+ * Deletes a specific key from the cache
+ * @param {string} key - The cache key
+ */
+async function del(key) {
+  try {
+    if (isRedisEnabled && redisClient?.isOpen) {
+      await redisClient.del(key);
+    } else if (memoryCache) {
+      memoryCache.del(key);
+    }
+  } catch (error) {
+    logger.error(`Cache DEL error for key ${key}:`, error.message);
+  }
+}
+
+/**
+ * Invalidates all cache keys associated with a specific tag
+ * @param {string} tag - The tag to invalidate
+ */
+async function invalidateTag(tag) {
+  if (!isRedisEnabled || !redisClient?.isOpen) return;
+  try {
+    const tagKey = `tag:${tag}`;
+    const keys = await redisClient.sMembers(tagKey);
+
+    if (keys.length > 0) {
+      const pipeline = redisClient.multi();
+      keys.forEach(k => pipeline.del(k));
+      pipeline.del(tagKey);
+      await pipeline.exec();
+      logger.debug(`Invalidated ${keys.length} keys for tag: ${tag}`);
+    }
+  } catch (error) {
+    logger.error(`Redis Tag Invalidation error for tag ${tag}:`, error.message);
+  }
+}
+
+/**
+ * Deletes keys matching a specific pattern
+ * @param {string} pattern - The Redis SCAN pattern (e.g., `reports:*`)
+ */
+async function deleteByPattern(pattern) {
+  try {
+    if (isRedisEnabled && redisClient?.isOpen) {
+      let cursor = '0';
+      do {
+        const reply = await redisClient.scan(cursor, { MATCH: pattern, COUNT: 100 });
+        cursor = reply.cursor;
+        if (reply.keys.length > 0) {
+          await redisClient.del(reply.keys);
+        }
+      } while (cursor !== '0');
+    } else if (memoryCache) {
+      memoryCache.deleteByPattern(pattern);
+    }
+  } catch (error) {
+    logger.error(`Cache Pattern Delete error for pattern ${pattern}:`, error.message);
+  }
+}
+
+// ============================================================
+// Domain-Specific Invalidation Helpers
+// ============================================================
+
+/**
+ * Invalidates analytics cache for a user (Issue #415)
+ * @param {string} userId
+ */
+const invalidateAnalytics = (userId) => invalidateTag(`analytics:${userId}`);
+
+/**
+ * Invalidates reports cache for a user (Issue #722)
+ * @param {string} userId
+ */
+const invalidateReports = (userId) => invalidateTag(`reports:${userId}`);
+
+/**
+ * Invalidates the dashboard summary cache for a specific user (Issue #519)
+ * @param {string} userId
+ */
+async function invalidateDashboardSummary(userId) {
+  if (!userId) return;
+  try {
+    const cacheKey = `dashboard:summary:${userId}`;
+    await del(cacheKey);
+    logger.info(`Dashboard summary cache invalidated for user ${userId}`);
+  } catch (error) {
+    logger.error(`Failed to invalidate dashboard summary cache for user ${userId}:`, error.message);
+  }
+}
+
+/**
+ * Invalidates all dashboard-related caches for a user (Issue #519)
+ * @param {string} userId
+ */
+async function invalidateAllDashboardCaches(userId) {
+  if (!userId) return;
+  try {
+    await deleteByPattern(`dashboard:*:${userId}`);
+    logger.info(`All dashboard caches invalidated for user ${userId}`);
+  } catch (error) {
+    logger.error(`Failed to invalidate all dashboard caches for user ${userId}:`, error.message);
+  }
+}
+
+/**
+ * Backward-compatible alias for deleteByPattern
+ */
+const invalidatePattern = deleteByPattern;
+
+/**
+ * Gracefully shuts down the cache service
+ */
+async function destroy() {
+  if (memoryCache) memoryCache.destroy();
+  if (redisClient && redisClient.isOpen) {
+    await redisClient.quit();
+    logger.info('Redis Client Disconnected');
+  }
+}
+
+module.exports = {
+  redisClient,
+  connectRedis,
+  get,
+  setEx,
+  del,
+  invalidateTag,
+  deleteByPattern,
+  invalidatePattern,
+  generateHash,
+  invalidateAnalytics,
+  invalidateReports,
+  invalidateDashboardSummary,
+  invalidateAllDashboardCaches,
+  destroy,
+};

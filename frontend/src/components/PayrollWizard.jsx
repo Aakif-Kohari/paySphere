@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { io } from "socket.io-client";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import api from "../services/api";
@@ -79,7 +80,9 @@ export default function PayrollWizard() {
   // Email status state
   const [sendingEmails, setSendingEmails] = useState(false);
   const [emailMsg, setEmailMsg] = useState("");
-  const [emailStatus, setEmailStatus] = useState(""); // "success" | "error"
+  const [emailStatus, setEmailStatus] = useState("");
+  const [activeUsers, setActiveUsers] = useState([]);
+  const socketRef = useRef(null); // "success" | "error"
 
   // Fetch employees
   useEffect(() => {
@@ -620,6 +623,44 @@ export default function PayrollWizard() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "12px 14px",
+                    borderRadius: 14,
+                    background: isDark ? "#1E293B" : "#F3F4F6",
+                    border: isDark ? "1.5px solid #334155" : "1.5px solid #D1D5DB",
+                    cursor: "pointer",
+                    minHeight: 48,
+                    fontWeight: 600,
+                    fontSize: 14,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span>👥</span>
+                    <span>Select All Employees ({employees.length})</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={employees.length > 0 && employees.every((emp) => !!includedEmployees[emp._id])}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      const nextIncluded = { ...includedEmployees };
+                      employees.forEach((emp) => {
+                        nextIncluded[emp._id] = checked;
+                      });
+                      setIncludedEmployees(nextIncluded);
+                    }}
+                    style={{
+                      width: 24,
+                      height: 24,
+                      cursor: "pointer",
+                    }}
+                  />
+                </label>
+
                 {employees.map((emp) => (
                   <label
                     key={emp._id}

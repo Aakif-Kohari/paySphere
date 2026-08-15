@@ -7,6 +7,23 @@ const mongoose = require("mongoose");
 jest.mock("../../models/employee.model");
 jest.mock("../../models/payroll.model");
 jest.mock("../../models/user.model");
+// Read once per employee in a run, to bundle anything owed from a backdated
+// salary revision (#931). Mocked as a factory rather than automocked so the
+// query never reaches Mongoose: unmocked, it buffers against a database this
+// suite never connects to and every test in the file times out (#950).
+jest.mock('../../models/arrearsLedger.model', () => ({
+  // Plain functions rather than jest.fn: this suite calls jest.resetAllMocks()
+  // in every beforeEach, which strips implementations off factory mocks.
+  find: () => ({ sort: () => ({ lean: async () => [] }) }),
+  updateMany: async () => ({ modifiedCount: 0 }),
+  insertMany: async () => [],
+}));
+// Expense claims are read for every employee in a run since #719. Same reason
+// as the mock above: unmocked it buffers and the whole suite times out.
+jest.mock('../../models/expenseClaim.model', () => ({
+  find: () => ({ populate: () => ({ lean: async () => [] }) }),
+  bulkWrite: async () => ({}),
+}));
 // submitPayrollForReview now consults the attendance ledger (#459). Stubbed so
 // the payroll unit tests stay free of the attendance collection; the ledger's
 // own behaviour is covered in attendance.controller.test.js.
@@ -429,6 +446,10 @@ describe("getPayrollSummary floating-point precision unit test (#347)", () => {
     jest.resetAllMocks();
     req = {
       userId: "507f1f77bcf86cd799439011",
+      // getPayrollSummary asserts its scope with requireTenant now, instead of
+      // spreading a possibly-undefined `req.tenantId` into the filter and
+      // letting mongoose delete the key (#665). This fixture never set one.
+      tenantId: "507f1f77bcf86cd799439012",
       query: { month: "7", year: "2026" },
     };
     res = {
