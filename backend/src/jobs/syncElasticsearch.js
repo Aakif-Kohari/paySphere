@@ -1,6 +1,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const { Client } = require('@elastic/elasticsearch');
+const logger = require('../utils/logger');
 
 // Adjust this path to where your Employee model is actually located
 const Employee = require('../models/employee.model'); 
@@ -10,12 +11,12 @@ const esClient = new Client({
 });
 
 async function runSync() {
-    console.log('Starting Elasticsearch sync...');
+    logger.info('Starting Elasticsearch sync...');
 
     try {
         // 1. Connect to MongoDB
         await mongoose.connect(process.env.MONGO_URI);
-        console.log('Connected to MongoDB.');
+        logger.info('Connected to MongoDB.');
 
         // 2. Fetch all active employees
         // We exclude soft-deleted records to keep the search index clean
@@ -24,11 +25,11 @@ async function runSync() {
         }).lean();
 
         if (employees.length === 0) {
-            console.log('No active employees found to sync.');
+            logger.info('No active employees found to sync.');
             process.exit(0);
         }
 
-        console.log(`Found ${employees.length} employees. Preparing bulk payload...`);
+        logger.info(`Found ${employees.length} employees. Preparing bulk payload...`);
 
         // 3. Format the data for the Bulk API
         // The bulk API requires a flat array with action metadata followed by the document
@@ -51,19 +52,19 @@ async function runSync() {
         const bulkResponse = await esClient.bulk({ refresh: true, body: bulkPayload });
 
         if (bulkResponse.errors) {
-            console.error('Bulk sync completed with errors.');
+            logger.error('Bulk sync completed with errors.');
             // Elasticsearch bulk responses pack error details deeply; this extracts them
             const erroredDocuments = bulkResponse.items.filter(item => item.index && item.index.error);
-            console.error(JSON.stringify(erroredDocuments, null, 2));
+            logger.error('Elasticsearch sync errors detail', { errors: erroredDocuments });
         } else {
-            console.log(`Successfully synced ${employees.length} employees to Elasticsearch!`);
+            logger.info(`Successfully synced ${employees.length} employees to Elasticsearch!`);
         }
 
     } catch (error) {
-        console.error('Fatal error during sync:', error);
+        logger.error('Fatal error during sync', { error: error.message || error });
     } finally {
         await mongoose.disconnect();
-        console.log('MongoDB connection closed.');
+        logger.info('MongoDB connection closed.');
         process.exit(0);
     }
 }

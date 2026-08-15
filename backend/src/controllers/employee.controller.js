@@ -1248,7 +1248,7 @@ exports.searchEmployees = async (req, res) => {
       data: hits,
     });
   } catch (error) {
-    console.error('Elasticsearch query failed:', error);
+    logger.error('Elasticsearch query failed', { error: error.message || error });
     res.status(500).json({ success: false, message: 'Search engine error' });
   }
 };
