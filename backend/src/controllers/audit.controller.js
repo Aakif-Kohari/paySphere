@@ -1,4 +1,4 @@
-const AuditLog = require('../models/auditLog.model');
+const auditLogRepository = require('../repositories/auditLog.repository');
 const { AUDIT_ACTIONS } = require('../models/auditLog.model');
 const { tenantFilter } = require('../utils/tenantScope');
 
@@ -134,13 +134,8 @@ exports.getAuditLogs = async (req, res, next) => {
 
     // The count and the page in parallel: they are independent
     const [logs, totalLogs] = await Promise.all([
-      AuditLog.find(built.query)
-        .sort({ createdAt: -1 })
-        .populate('userId', 'fullName email')
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      AuditLog.countDocuments(built.query),
+      auditLogRepository.findPaginatedLogs(built.query, skip, limit),
+      auditLogRepository.countDocuments(built.query),
     ]);
 
     const processedLogs = logs.map((log) => ({
@@ -169,11 +164,7 @@ exports.exportAuditLogsCSV = async (req, res, next) => {
     const built = buildQuery(req);
     if (!built.ok) return res.status(400).json({ message: built.message });
 
-    const logs = await AuditLog.find(built.query)
-      .sort({ createdAt: -1 })
-      .limit(MAX_EXPORT_ROWS)
-      .populate('userId', 'fullName email')
-      .lean();
+    const logs = await auditLogRepository.findExportLogs(built.query, MAX_EXPORT_ROWS);
 
     const header = [
       'Timestamp',
