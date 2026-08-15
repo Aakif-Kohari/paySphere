@@ -81,9 +81,22 @@ const logger = winston.createLogger({
   ],
 });
 
-// Only enable console transport outside of production
-// Prevents double-logging in containerized/cloud environments
-if (process.env.NODE_ENV !== 'production') {
+/**
+ * Transport: Production Console (Structured JSON for ELK/Elasticsearch)
+ */
+const productionConsoleTransport = new winston.transports.Console({
+  format: winston.format.combine(
+    redactFormat,
+    winston.format.timestamp(),
+    winston.format.json(),
+  ),
+});
+
+// Enable structured JSON console logging in production for ELK/Elasticsearch,
+// and colorized console logging in other environments (development, test).
+if (process.env.NODE_ENV === 'production') {
+  logger.add(productionConsoleTransport);
+} else {
   logger.add(consoleTransport);
 }
 
