@@ -1,16 +1,17 @@
 /**
  * @fileoverview POSH Grievance Controller
- * @description Handles anonymous filing, ICC case management, and encrypted note logging.
- * Issue: #958
+ * @description Handles anonymous filing, ICC case management, encrypted note logging,
+ * multi-member committee voting, and statutory 90-day SLA dashboard monitoring.
  */
 const bcrypt = require('bcryptjs');
-const { Grievance, ICCCommittee } = require('../models/grievance.model');
+const { Grievance, CaseNote, ICCCommittee, ICCVote } = require('../models/grievance.model');
 const {
   encrypt,
   decrypt,
   generateCaseNumber,
 } = require('../utils/cryptoAnonymizer');
 const { tenantFilter } = require('../utils/tenantScope');
+const { evaluateGrievanceSLA, tallyICCVotes } = require('../utils/slaCalculator');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 
@@ -79,16 +80,21 @@ exports.getCases = async (req, res, next) => {
       .sort({ filedAt: -1 })
       .lean();
 
-    // Check for SLA breaches
+    // Check for SLA adherence
     const now = new Date();
-    const casesWithSLA = cases.map((c) => ({
-      ...c,
-      isSLABreached:
-        c.status !== 'Resolved' &&
-        c.status !== 'Dismissed' &&
-        now > c.slaDeadline,
-      daysRemaining: Math.ceil((c.slaDeadline - now) / (1000 * 60 * 60 * 24)),
-    }));
+    const casesWithSLA = cases.map((c) => {
+      const sla = evaluateGrievanceSLA(c.filedAt, c.slaDeadline, now);
+      return {
+        ...c,
+        isSLABreached:
+          c.status !== 'Resolved' &&
+          c.status !== 'Dismissed' &&
+          sla.isBreached,
+        isUrgentWarning: sla.isUrgentWarning,
+        daysRemaining: sla.daysRemaining,
+        slaStatus: sla.slaState,
+      };
+    });
 
     res.status(200).json({ cases: casesWithSLA });
   } catch (error) {
@@ -104,44 +110,17 @@ exports.decryptCase = async (req, res, next) => {
   try {
     const { pin } = req.body;
 
-    // Scoped, not `findById` (#1010).
-    //
-    // `requireICC` on the route already establishes that the caller is an
-    // active committee member *of their own tenant*, and it does that
-    // correctly. What it cannot do is constrain which case they then name:
-    // the id comes from the URL. So an ICC member at company A could pass
-    // the id of company B's case and this handler would fetch it, and —
-    // because `cryptoAnonymizer` derives its key from a single
-    // `POSH_MASTER_KEY` rather than per tenant — decrypt it cleanly.
-    //
-    // Putting the tenant in the query makes the row unfetchable rather
-    // than merely unreturned, and `tenantFilter` throws (403) rather than
-    // degrading to `{}` if the request somehow has no tenant.
     const grievance = await Grievance.findOne(
       tenantFilter(req, { _id: req.params.id }),
     );
 
     if (!grievance) return res.status(404).json({ message: 'Case not found' });
 
-    // The secondary PIN, which was never actually checked.
-    //
-    // The previous version fetched `iccMember` and then did nothing with
-    // it — the comparison lived in a comment reading "in a real app,
-    // compare `pin` against `iccMember.decryptionPinHash` using bcrypt".
-    // So the second factor this endpoint advertises did not exist, and a
-    // committee member's session token alone was enough to read every
-    // complaint in the company. For a statutory confidential-complaints
-    // mechanism that second factor is the point: it is what stops a
-    // borrowed or hijacked session from being enough.
     const iccMember = await ICCCommittee.findOne(
       tenantFilter(req, { userId: req.userId, isActive: true }),
     );
 
     if (!iccMember) {
-      // `requireICC` should have caught this already. Checked again
-      // because the cost is one indexed lookup we were making anyway,
-      // and the failure mode if the guard is ever dropped from the route
-      // is silent and total.
       logger.warn('POSH decryption attempted by a non-ICC account', {
         userId: req.userId,
         caseNumber: grievance.caseNumber,
@@ -159,10 +138,6 @@ exports.decryptCase = async (req, res, next) => {
       (await bcrypt.compare(pin, iccMember.decryptionPinHash));
 
     if (!pinAccepted) {
-      // A refused decryption is recorded as loudly as a successful one.
-      // Repeated failures against one case are the signal that somebody
-      // is guessing, and an audit trail that only records successes
-      // cannot show that.
       eventBus.emit('AUDIT_LOG', {
         userId: req.userId,
         action: 'POSH_CASE_DECRYPT_DENIED',
@@ -195,6 +170,126 @@ exports.decryptCase = async (req, res, next) => {
     res
       .status(200)
       .json({ caseNumber: grievance.caseNumber, description: decryptedText });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/grievances/:id/vote (ICC Members Only)
+ * Cast individual member inquiry vote (Upheld, Dismissed, Inconclusive).
+ */
+exports.recordICCVote = async (req, res, next) => {
+  try {
+    const { verdict, comments = '' } = req.body;
+    const grievance = await Grievance.findOne(
+      tenantFilter(req, { _id: req.params.id }),
+    );
+
+    if (!grievance) return res.status(404).json({ message: 'Grievance case not found' });
+    if (grievance.status === 'Resolved' || grievance.status === 'Dismissed') {
+      return res.status(400).json({ message: 'Cannot vote on an already closed grievance case' });
+    }
+
+    const vote = await ICCVote.findOneAndUpdate(
+      { tenantId: req.tenantId, grievanceId: grievance._id, voterId: req.userId },
+      { verdict, comments, votedAt: new Date() },
+      { upsert: true, new: true },
+    );
+
+    const allVotes = await ICCVote.find({ tenantId: req.tenantId, grievanceId: grievance._id }).lean();
+    const tally = tallyICCVotes(allVotes);
+
+    if (grievance.status === 'Filed') {
+      grievance.status = 'Under Inquiry';
+      await grievance.save();
+    }
+
+    res.status(200).json({
+      message: 'ICC vote recorded successfully',
+      vote,
+      voteTally: tally,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/grievances/:id/resolve (Presiding Officer Only)
+ * Finalizes inquiry report and closes the case.
+ */
+exports.resolveGrievance = async (req, res, next) => {
+  try {
+    const { finalVerdict, inquiryReport } = req.body;
+    const grievance = await Grievance.findOne(
+      tenantFilter(req, { _id: req.params.id }),
+    );
+
+    if (!grievance) return res.status(404).json({ message: 'Grievance case not found' });
+
+    grievance.finalVerdict = finalVerdict;
+    grievance.inquiryReport = inquiryReport || '';
+    grievance.status = finalVerdict === 'Dismissed' ? 'Dismissed' : 'Resolved';
+    grievance.resolutionDate = new Date();
+    await grievance.save();
+
+    eventBus.emit('AUDIT_LOG', {
+      userId: req.userId,
+      action: 'POSH_CASE_RESOLVED',
+      resourceType: 'Grievance',
+      resourceIds: [grievance._id],
+      details: { caseNumber: grievance.caseNumber, finalVerdict },
+      req,
+    });
+
+    res.status(200).json({
+      message: 'Grievance case finalized and closed',
+      grievance,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/grievances/sla-dashboard
+ * Fetch summary of cases with 90-day statutory SLA indicators and urgency flags.
+ */
+exports.getSLADashboard = async (req, res, next) => {
+  try {
+    const openCases = await Grievance.find(
+      tenantFilter(req, { status: { $in: ['Filed', 'Under Inquiry'] } }),
+    ).lean();
+
+    const now = new Date();
+    let compliantCount = 0;
+    let warningCount = 0;
+    let breachedCount = 0;
+
+    const monitoredCases = openCases.map((c) => {
+      const sla = evaluateGrievanceSLA(c.filedAt, c.slaDeadline, now);
+      if (sla.isBreached) breachedCount++;
+      else if (sla.isUrgentWarning) warningCount++;
+      else compliantCount++;
+
+      return {
+        id: c._id,
+        caseNumber: c.caseNumber,
+        status: c.status,
+        daysElapsed: sla.daysElapsed,
+        daysRemaining: sla.daysRemaining,
+        slaStatus: sla.slaState,
+      };
+    });
+
+    res.status(200).json({
+      totalOpenCases: openCases.length,
+      compliantCount,
+      warningCount,
+      breachedCount,
+      cases: monitoredCases,
+    });
   } catch (error) {
     next(error);
   }
