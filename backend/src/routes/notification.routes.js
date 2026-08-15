@@ -4,6 +4,9 @@ const {
   markAsRead,
   markAllAsRead,
   deleteNotification,
+  getVapidPublicKey,
+  subscribe,
+  unsubscribe,
 } = require('../controllers/notification.controller');
 const {
   getPreferences,
@@ -12,6 +15,7 @@ const {
 } = require('../controllers/notificationPreference.controller');
 const auth = require('../middlewares/auth.middleware');
 const { requireTenantScope } = require('../utils/tenantScope');
+const { writeRateLimiter } = require('../middlewares/rateLimiter.middleware');
 
 const router = express.Router();
 
@@ -25,6 +29,21 @@ const router = express.Router();
  * `requireTenantScope` is the guard that matters — it is what keeps an unscoped
  * request from querying on `userId` alone.
  */
+
+// ---------------------------------------------------------------------------
+// Push Subscription Endpoints (Issue #1027)
+// ---------------------------------------------------------------------------
+
+// Public endpoint (no auth required to fetch public key, but rate limited)
+router.get('/vapid-public-key', writeRateLimiter, getVapidPublicKey);
+
+// Protected endpoints
+router.post('/subscribe', auth, writeRateLimiter, subscribe);
+router.post('/unsubscribe', auth, writeRateLimiter, unsubscribe);
+
+// ---------------------------------------------------------------------------
+// In-App Notification Endpoints (#440, #898)
+// ---------------------------------------------------------------------------
 
 // Registered before `/:id/read` so the literal path is matched as a literal.
 // The two do not actually collide — one is a single segment and the other is

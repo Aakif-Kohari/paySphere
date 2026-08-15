@@ -8,6 +8,7 @@ import EmployeeCard from '../components/EmployeeCard';
 import EmployeeExportActions from '../components/EmployeeExportActions';
 import SettingsModal from '../components/SettingsModal';
 import Sidebar from '../components/Sidebar';
+import BottomNavBar from '../components/BottomNavBar'; // Added for #1025
 import ThemeToggle from '../components/ThemeToggle';
 import EmptyState from '../components/common/EmptyState';
 import DashboardSkeleton from '../components/common/skeleton/DashboardSkeleton';
@@ -908,13 +909,13 @@ const PayrollTable = ({
 export default function PaySphereDashboard() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  
+
   // Replaced useState/useEffect with TanStack Query hooks (Issue #684)
-  const { 
-    data: summary, 
-    isLoading: loading, 
-    error: queryError, 
-    refetch: refetchSummary 
+  const {
+    data: summary,
+    isLoading: loading,
+    error: queryError,
+    refetch: refetchSummary
   } = useDashboardSummary();
 
   const { data: recentActivity, isLoading: activityLoading } = useRecentActivity(5);
@@ -1259,43 +1260,115 @@ export default function PaySphereDashboard() {
           />
         )}
 
-        {/* Delete Confirmation Modal */}
-        {employeeToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity">
-            <div className="bg-white dark:bg-slate-900 rounded-xl p-6 w-96 shadow-xl border border-gray-200 dark:border-slate-800">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                Delete Employee?
-              </h2>
+        {/* Added BottomNavBar for mobile (Issue #1025) */}
+        <BottomNavBar />
 
-              <p className="mt-3 text-gray-600 dark:text-slate-500">
-                Are you sure you want to delete{' '}
-                <span className="font-semibold">
-                  {employeeToDelete.fullName}
-                </span>
-                ?
-                <br />
-                Payroll records will also be deleted.
-              </p>
+        {/* Added pb-20 on mobile to prevent content from hiding behind bottom nav */}
+        <div className="pb-20 md:pb-0 transition-all duration-300">
+          {/* Dynamic Content */}
+          <ErrorBoundary fallback={<ComponentFeedbackFallback />}>
+            {activePage === 'Approvals' ? (
+              <Approvals />
+            ) : activePage === 'Settlements' ? (
+              <Settlements />
+            ) : activePage === 'Loans' ? (
+              <Loans />
+            ) : activePage === 'Payroll' ? (
+              <PayrollTable
+                payrolls={paginatedPayrolls}
+                loading={payrollLoading}
+                currentPage={payrollPage}
+                totalPages={payrollTotalPages}
+                totalCount={payrollTotalCount}
+                setCurrentPage={setPayrollPage}
+              />
+            ) : activePage === 'Dashboard' ? (
+              <DashboardOverview
+                search={search}
+                setSearch={setSearch}
+                roleFilter={roleFilter}
+                setRoleFilter={setRoleFilter}
+                availableRoles={availableRoles}
+                filtered={filtered}
+                navigate={navigate}
+                onAddUpdate={() => navigate('/monthly-updates')}
+                onAddEmployee={() => navigate('/add-employee')}
+                totalPayout={totalPayout}
+                employeeCount={totalEmployees}
+                loading={loading}
+                payrolls={payrolls}
+                onEditEmployee={(emp) => setEmployeeToEdit(emp)}
+              />
+            ) : activePage === 'Archive' ? (
+              <Archive />
+            ) : (
+              <EmployeeManagement
+                search={search}
+                setSearch={setSearch}
+                roleFilter={roleFilter}
+                setRoleFilter={setRoleFilter}
+                availableRoles={availableRoles}
+                employees={filtered}
+                loading={loading}
+                onAddEmployee={() => navigate('/add-employee')}
+                onAddUpdate={() => navigate('/monthly-updates')}
+                payrolls={payrolls}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                setCurrentPage={setCurrentPage}
+                onDeleteEmployee={(emp) => setEmployeeToDelete(emp)}
+                onEditEmployee={(emp) => setEmployeeToEdit(emp)}
+              />
+            )}
+          </ErrorBoundary>
 
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={() => setEmployeeToDelete(null)}
-                  className="px-4 py-2 border border-gray-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
-                >
-                  Cancel
-                </button>
+          {/* Edit Form Modal (Steps 2-5) */}
+          {employeeToEdit && (
+            <EditEmployeeModal
+              employee={employeeToEdit}
+              onClose={() => setEmployeeToEdit(null)}
+              onSave={handleEditSubmit}
+            />
+          )}
 
-                <button
-                  disabled={deleting}
-                  onClick={handleDeleteEmployee}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm disabled:opacity-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-                >
-                  {deleting ? 'Deleting...' : 'Delete'}
-                </button>
+          {/* Delete Confirmation Modal */}
+          {employeeToDelete && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity">
+              <div className="bg-white dark:bg-slate-900 rounded-xl p-6 w-96 shadow-xl border border-gray-200 dark:border-slate-800">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Delete Employee?
+                </h2>
+
+                <p className="mt-3 text-gray-600 dark:text-slate-500">
+                  Are you sure you want to delete{' '}
+                  <span className="font-semibold">
+                    {employeeToDelete.fullName}
+                  </span>
+                  ?
+                  <br />
+                  Payroll records will also be deleted.
+                </p>
+
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    onClick={() => setEmployeeToDelete(null)}
+                    className="px-4 py-2 border border-gray-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    disabled={deleting}
+                    onClick={handleDeleteEmployee}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm disabled:opacity-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                  >
+                    {deleting ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Settings modal (extracted component).
