@@ -7,6 +7,7 @@ const {
   createVendor,
   createInvoice,
   getVendorLedger,
+  getForm16ASummary,
 } = require('../controllers/vendor.controller');
 
 const router = express.Router();
@@ -30,6 +31,12 @@ router.get(
   auth,
   requirePermission(PERMISSIONS.READ_VENDOR),
   getVendorLedger,
+);
+router.get(
+  '/:id/form-16a',
+  auth,
+  requirePermission(PERMISSIONS.READ_VENDOR),
+  getForm16ASummary,
 );
 
 module.exports = router;
