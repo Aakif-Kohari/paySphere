@@ -1,9 +1,9 @@
 /**
- * @fileoverview Custom Service Worker for Offline Caching
- * @description Implements caching strategies for static assets and API routes.
- * Provides a fallback offline page for navigation requests when the network is unavailable.
+ * @fileoverview Custom Service Worker for Offline Caching & Push Notifications
+ * @description Implements caching strategies for static assets, provides a fallback 
+ * offline page, and handles Web Push API events for payroll notifications.
  * 
- * Issue: #1022
+ * Issues: #1022, #1027
  */
 
 const CACHE_NAME = 'paysphere-cache-v1';
@@ -11,12 +11,12 @@ const OFFLINE_URL = '/offline.html';
 
 /**
  * Assets to precache during the install phase.
- * Includes the offline fallback page and core shell assets.
+ * Note: If offline.html doesn't exist yet, remove it from this array to prevent SW install failure.
  */
 const PRECACHE_ASSETS = [
-    OFFLINE_URL,
     '/manifest.json',
     '/favicon.ico'
+    // Add OFFLINE_URL here once you create frontend/public/offline.html
 ];
 
 /**
@@ -28,13 +28,10 @@ self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then((cache) => {
-                console.log('[ServiceWorker] Precaching app shell and offline page');
+                console.log('[ServiceWorker] Precaching app shell');
                 return cache.addAll(PRECACHE_ASSETS);
             })
-            .then(() => {
-                // Force the waiting service worker to become the active service worker
-                return self.skipWaiting();
-            })
+            .then(() => self.skipWaiting())
             .catch((error) => {
                 console.error('[ServiceWorker] Precaching failed:', error);
             })
@@ -58,10 +55,7 @@ self.addEventListener('activate', (event) => {
                     return null;
                 })
             );
-        }).then(() => {
-            // Take control of all open pages immediately
-            return self.clients.claim();
-        })
+        }).then(() => self.clients.claim())
     );
 });
 
@@ -71,7 +65,6 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const { request } = event;
 
-    // Only handle GET requests
     if (request.method !== 'GET') return;
 
     const url = new URL(request.url);
@@ -81,31 +74,20 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(request)
                 .then((response) => {
-                    // Clone the response because it's a stream and can only be consumed once
                     const responseToCache = response.clone();
-
-                    // Cache successful GET responses for offline access
                     if (response.status === 200) {
                         caches.open(CACHE_NAME).then((cache) => {
                             cache.put(request, responseToCache);
                         });
                     }
-
                     return response;
                 })
                 .catch(() => {
-                    // Network failed, try to serve from cache
                     return caches.match(request).then((cachedResponse) => {
-                        if (cachedResponse) {
-                            return cachedResponse;
-                        }
-                        // If not in cache and network is down, return a generic offline JSON response
+                        if (cachedResponse) return cachedResponse;
                         return new Response(
                             JSON.stringify({ message: 'You are offline and this data is not cached.' }),
-                            {
-                                headers: { 'Content-Type': 'application/json' },
-                                status: 503
-                            }
+                            { headers: { 'Content-Type': 'application/json' }, status: 503 }
                         );
                     });
                 })
@@ -113,15 +95,15 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Strategy 2: Navigation Requests (Network First, Fallback to Offline Page)
+    // Strategy 2: Navigation Requests (Network First, Fallback to basic offline response)
     if (request.mode === 'navigate') {
         event.respondWith(
             fetch(request)
                 .catch(() => {
+                    // Try to serve offline.html if it exists, otherwise return a basic fallback
                     return caches.match(OFFLINE_URL).then((offlineResponse) => {
-                        return offlineResponse || new Response('Offline - PaySphere', {
-                            headers: { 'Content-Type': 'text/html' },
-                            status: 503
+                        return offlineResponse || new Response('Offline - PaySphere. Please check your internet connection.', {
+                            headers: { 'Content-Type': 'text/html' }, status: 503
                         });
                     });
                 })
@@ -130,7 +112,6 @@ self.addEventListener('fetch', (event) => {
     }
 
     // Strategy 3: Static Assets (Stale While Revalidate)
-    // Serve from cache immediately, but update cache in background for next visit
     event.respondWith(
         caches.match(request).then((cachedResponse) => {
             const fetchPromise = fetch(request).then((networkResponse) => {
@@ -155,4 +136,62 @@ self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
     }
+});
+
+/**
+ * Push Event: Display notification when a push message is received.
+ * Issue: #1027
+ */
+self.addEventListener('push', (event) => {
+    if (!event.data) return;
+
+    let payload;
+    try {
+        payload = event.data.json();
+    } catch (e) {
+        payload = { title: 'PaySphere', body: event.data.text() };
+    }
+
+    const options = {
+        body: payload.body,
+        icon: payload.icon || '/favicon.ico',
+        badge: payload.badge || '/favicon.ico',
+        data: payload.data || {},
+        actions: payload.actions || [],
+        vibrate: [100, 50, 100],
+        tag: payload.data?.type || 'default' // Group notifications of the same type
+    };
+
+    event.waitUntil(
+        self.registration.showNotification(payload.title, options)
+    );
+});
+
+/**
+ * Notification Click: Handle user interaction with the notification.
+ * Issue: #1027
+ */
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+
+    const urlToOpen = event.notification.data?.url || '/dashboard';
+    const action = event.action;
+
+    if (action === 'dismiss') {
+        return; // User clicked dismiss
+    }
+
+    // Open the target URL in a new tab or focus existing tab
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            for (const client of windowClients) {
+                if (client.url.includes(urlToOpen) && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+            }
+        })
+    );
 });
