@@ -1,3 +1,4 @@
+import styles from './FAQS.module.css';
 import { useState } from "react";
 
 export default function FAQS() {
@@ -19,10 +20,10 @@ export default function FAQS() {
   ];
 
   return (
-    <section id="faq" className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 max-w-4xl mx-auto">
+    <section id="faq" className={styles.container}>
       
       {/* Heading */}
-      <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-10 sm:mb-14 md:mb-16 tracking-tight">
+      <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-10 sm:mb-14 md:mb-16 tracking-tight text-slate-900 dark:text-white">
         Frequently Asked Questions
       </h2>
 
@@ -34,10 +35,10 @@ export default function FAQS() {
           return (
             <div
               key={i}
-              className="border border-gray-100 rounded-xl sm:rounded-2xl px-4 sm:px-6 py-4 sm:py-5 bg-white shadow-sm hover:shadow-md transition-all"
+              className="border border-gray-100 dark:border-slate-800 rounded-xl sm:rounded-2xl px-4 sm:px-6 py-4 sm:py-5 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all"
             >
               <button
-                className="flex justify-between items-center w-full text-left font-semibold text-base sm:text-lg text-gray-900"
+                className="flex cursor-pointer justify-between items-center w-full text-left font-semibold text-base sm:text-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 onClick={() => setOpenIndex(isOpen ? null : i)}
               >
                 {f.q}
@@ -45,7 +46,7 @@ export default function FAQS() {
                 {/* Icon */}
                 <span
                   className={`text-xl sm:text-2xl transition-transform duration-300 ${
-                    isOpen ? "rotate-45 text-blue-600" : "text-gray-400"
+                    isOpen ? "rotate-45 text-blue-600 dark:text-blue-400" : "text-gray-500"
                   }`}
                 >
                   +
@@ -59,7 +60,7 @@ export default function FAQS() {
                 }`}
               >
                 <div className="overflow-hidden">
-                  <p className="text-gray-600 text-sm sm:text-base leading-relaxed max-w-2xl">
+                  <p className="text-gray-600 dark:text-slate-500 text-sm sm:text-base leading-relaxed max-w-2xl">
                     {f.a}
                   </p>
                 </div>

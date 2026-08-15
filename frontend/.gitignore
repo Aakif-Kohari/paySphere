@@ -25,3 +25,14 @@ dist-ssr
 
 
 .env
+.env.test
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+*storybook.log
+storybook-static
+
+# npm lockfile — project uses pnpm (pnpm-lock.yaml)
+package-lock.json

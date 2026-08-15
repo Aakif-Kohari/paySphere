@@ -1,5 +1,18 @@
+
 const express = require("express");
-const { addEmployee, getEmployees, getRecentEmployees } = require("../controllers/employee.controller");
+const {
+  addEmployee,
+  getEmployees,
+  getRecentEmployees,
+  importEmployees,
+  exportEmployeesCSV,
+  updateEmployee,
+  deleteEmployee,
+  toggleEmployeeStatus,
+  restoreEmployee,
+  searchEmployees,
+} = require("../controllers/employee.controller");
+
 const auth = require("../middlewares/auth.middleware");
 const { requireScope } = require("../middlewares/rbac.middleware");
 const router = express.Router();

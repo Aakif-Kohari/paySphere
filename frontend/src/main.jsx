@@ -1,36 +1,45 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { HelmetProvider } from 'react-helmet-async'
-import { GoogleOAuthProvider } from '@react-oauth/google'
-import { StyledEngineProvider, CssBaseline, ThemeProvider, createTheme } from '@mui/material'
-import { Provider } from 'react-redux'
-import store from './store/store'
-import './index.css'
-import App from './App.jsx'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import * as Sentry from '@sentry/react';
+import { Provider } from 'react-redux';
 
-const GOOGLE_CLIENT_ID = "250441239388-ldget7kv1v1hvf6vm1r6b0p48fassv43.apps.googleusercontent.com";
+// Initialize Sentry for production error tracking (#770)
+Sentry.init({
+  dsn:
+    import.meta.env.VITE_SENTRY_DSN || 'https://public@o0.ingest.sentry.io/0',
+  integrations: [
+    Sentry.browserTracingIntegration(),
+    Sentry.replayIntegration(),
+  ],
+  tracesSampleRate: 1.0,
+  replaysSessionSampleRate: 0.1,
+  replaysOnErrorSampleRate: 1.0,
+  environment: import.meta.env.MODE || 'production',
+});
+import { HelmetProvider } from 'react-helmet-async';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import store from './store/store';
+import App from './App';
+import './index.css';
+import './i18n'; // Initialize i18n before app renders (Issue #736)
 
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#3b82f6',
-    },
+import ErrorBoundary from './components/common/ErrorBoundary.jsx';
+
+// Configure QueryClient with default options (Issue #684)
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { refetchOnWindowFocus: false, retry: 1 },
   },
 });
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <StyledEngineProvider injectFirst>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-          <HelmetProvider>
-            <Provider store={store}>
-              <App />
-            </Provider>
-          </HelmetProvider>
-        </GoogleOAuthProvider>
-      </ThemeProvider>
-    </StyledEngineProvider>
-  </StrictMode>,
-)
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <Provider store={store}>
+      <HelmetProvider>
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </HelmetProvider>
+    </Provider>
+  </React.StrictMode>,
+);

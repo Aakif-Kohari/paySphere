@@ -1,61 +1,69 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
+import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import ThemeToggle from "../components/ThemeToggle";
+import EmployeeForm from "../components/EmployeeForm";
+import { logout } from "../features/auth/authSlice";
+import useCtrlEnterSubmit from "../hooks/useCtrlEnterSubmit";
 import api from "../services/api";
-
+import { getCurrencySymbol } from "../utils/currency";
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const GridIcon = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-    <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+    <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+    <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
   </svg>
 );
 const PeopleIcon = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-    <circle cx="9" cy="7" r="4"/>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
 const PersonPlusIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-    <circle cx="8.5" cy="7" r="4"/>
-    <line x1="20" y1="8" x2="20" y2="14"/>
-    <line x1="23" y1="11" x2="17" y2="11"/>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="8.5" cy="7" r="4" />
+    <line x1="20" y1="8" x2="20" y2="14" />
+    <line x1="23" y1="11" x2="17" y2="11" />
   </svg>
 );
 const BellIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
   </svg>
 );
 const HelpCircleIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
   </svg>
 );
 const SupportIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-  </svg>
-);
-const CheckCircleIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-    <polyline points="22 4 12 14.01 9 11.01"/>
+    <circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" y1="17" x2="12.01" y2="17" />
   </svg>
 );
 const ArrowRightIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="5" y1="12" x2="19" y2="12"/>
-    <polyline points="12 5 19 12 12 19"/>
+    <line x1="5" y1="12" x2="19" y2="12" />
+    <polyline points="12 5 19 12 12 19" />
   </svg>
 );
 
 // ── Avatar ─────────────────────────────────────────────────────────────────
 const AVATAR_COLORS = ["#6366F1", "#EC4899", "#F59E0B", "#10B981", "#3B82F6", "#8B5CF6", "#EF4444", "#14B8A6"];
+
+const COUNTRY_CODE_OPTIONS = [
+  { label: "+91 (India)", value: "+91" },
+  { label: "+1 (USA/Canada)", value: "+1" },
+  { label: "+44 (UK)", value: "+44" },
+  { label: "+61 (Australia)", value: "+61" },
+  { label: "+65 (Singapore)", value: "+65" },
+  { label: "+971 (UAE)", value: "+971" },
+];
 
 const Avatar = ({ name, size = 36 }) => {
   const initials = name
@@ -79,145 +87,240 @@ const Avatar = ({ name, size = 36 }) => {
   );
 };
 
+const PHONE_REGEX = /^\+?[1-9]\d{6,14}$/;
+
+const normalizePhoneValue = (value) =>
+  value.trim().replace(/[()\s-]/g, "");
+
 export default function AddEmployee() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
+  const [currency] = useState("INR"); // Kept for sidebar currency symbol display
 
-  // Form state
-  const [fullName, setFullName] = useState("");
-  const [monthlySalary, setMonthlySalary] = useState("");
-  const [overtimeRate, setOvertimeRate] = useState("");
-  const [loading, setLoading] = useState(false);
+  // CSV Upload State (Preserved as not instructed to remove)
+  const [csvFile, setCsvFile] = useState(null);
+  const [uploadingCsv, setUploadingCsv] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [showSettings, setShowSettings] = useState(false);
-  const [settings, setSettings] = useState({ defaultOvertimeRate: 0, defaultDailyRate: 0 });
-  const [updatingSettings, setUpdatingSettings] = useState(false);
+  const fileInputRef = useRef(null);
 
-  // Recently added employees
+  // Recently added employees (Preserved as not instructed to remove)
   const [recentEmployees, setRecentEmployees] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
 
-  const getInitials = (name) =>
-    name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-
   const token = localStorage.getItem("token");
 
-  // Fetch recently added employees
-  useEffect(() => {
-    const fetchRecent = async () => {
-      try {
-        const res = await api.get(`/api/employees/recent`);
-
-        setRecentEmployees(res.data.employees);
-      } catch {
-        // silently fail
-      } finally {
-        setLoadingRecent(false);
-      }
-    };
-    if (token) fetchRecent();
-    else setLoadingRecent(false);
-  }, [token]);
-
-  // Fetch settings
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const res = await api.get(`/api/auth/settings`);
-
-        setSettings(res.data);
-      } catch (err) {
-        console.error("Failed to fetch settings:", err);
-      }
-    };
-    if (token) fetchSettings();
-  }, [token]);
-
-  const saveSettings = async () => {
-    setUpdatingSettings(true);
+  // Fetch recent employees
+  const fetchRecent = async () => {
     try {
-      await api.put(`/api/auth/settings`, settings);
-
-      setShowSettings(false);
+      const res = await api.get(`/api/employees?page=1&limit=5`);
+      setRecentEmployees(res.data.employees || []);
     } catch (err) {
-      alert("Failed to save settings");
+      console.error("Failed to fetch recent employees:", err);
     } finally {
-      setUpdatingSettings(false);
+      setLoadingRecent(false);
     }
+  };
+
+  useEffect(() => {
+    if (token) {
+      setTimeout(() => { fetchRecent(); }, 0);
+    } else {
+      setTimeout(() => setLoadingRecent(false), 0);
+    }
+  }, [token]);
+
+  // New Form Submission Handler
+  const handleFormSubmit = async (values) => {
+    try {
+      await api.post('/api/employees', values);
+      // Refresh recent list after successful add
+      fetchRecent();
+      navigate('/dashboard?tab=employees');
+    } catch (error) {
+      throw error; // Let Formik/EmployeeForm catch and map errors
+    }
+  };
+
+  const handleCsvUpload = async () => {
+    if (!csvFile) {
+      setError("Please select a CSV file.");
+      return;
+    }
+
+    setUploadingCsv(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", csvFile);
+
+      const res = await api.post(
+        "/api/employees/import",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      setSuccess(`${res.data.imported} employees imported successfully.`);
+      setCsvFile(null);
+
+      const recent = await api.get("/api/employees/recent");
+      setRecentEmployees(recent.data.employees || []);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || "CSV import failed.");
+    } finally {
+      setUploadingCsv(false);
+    }
+  };
+
+  const validatePhone = (countryCode, localNumber) => {
+    const trimmedCountryCode = (countryCode || "+91").trim();
+    const trimmedLocalNumber = normalizePhoneValue(localNumber || "");
+
+    if (!trimmedLocalNumber) {
+      setPhoneError("");
+      return true;
+    }
+
+    const normalized = normalizePhoneValue(`${trimmedCountryCode}${trimmedLocalNumber}`);
+    if (!PHONE_REGEX.test(normalized)) {
+      setPhoneError("Enter a valid international phone number, e.g. +91 98765 43210.");
+      return false;
+    }
+
+    setPhoneError("");
+    return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
     setError("");
     setSuccess("");
-    setLoading(true);
+
+    const salaryNum = parseFloat(monthlySalary.replace(/,/g, ""));
+    const otNum = overtimeRate ? parseFloat(overtimeRate.replace(/,/g, "")) : undefined;
+
+    if (isNaN(salaryNum) || salaryNum <= 0) {
+      setError("Monthly salary must be a positive number.");
+      setLoading(false);
+      return;
+    }
+
+    if (!validatePhone(phoneCountryCode, phone)) {
+      setError("Please enter a valid international phone number.");
+      setLoading(false);
+      return;
+    }
+
+    const fullPhoneNumber = normalizePhoneValue(`${phoneCountryCode}${phone}`);
 
     try {
-      const res = await api.post(
-        `/api/employees`,
-        {
-          fullName,
-          monthlySalary: Number(monthlySalary.replace(/,/g, "")),
-          overtimeRate: overtimeRate ? Number(overtimeRate.replace(/,/g, "")) : 0,
-        }
-      );
-
-      setSuccess(`${res.data.employee.fullName} added successfully!`);
-      setRecentEmployees((prev) => [res.data.employee, ...prev].slice(0, 5));
-
-      // Reset form
-      setFullName("");
-      setMonthlySalary("");
-      setOvertimeRate("");
-
-      // Clear success after 3s
-      setTimeout(() => setSuccess(""), 3000);
+      const dobDate = dateOfBirth ? new Date(dateOfBirth + "T12:00:00.000Z") : undefined;
+      const joiningDateDate = joiningDate ? new Date(joiningDate + "T12:00:00.000Z") : undefined;
+      const response = await api.post(`/api/employees`, {
+        fullName,
+        role,
+        department,
+        monthlySalary: salaryNum,
+        overtimeRate: otNum,
+        currency,
+        phone: fullPhoneNumber || undefined,
+        dateOfBirth: dobDate,
+        joiningDate: joiningDateDate,
+      });
+      if (response.status === 201) {
+        setSuccess("Employee added successfully!");
+        setFullName("");
+        setRole("");
+        setDepartment("");
+        setMonthlySalary("");
+        setOvertimeRate("");
+        setCurrency("");
+        setPhoneCountryCode("+91");
+        setPhone("");
+        setPhoneError("");
+        setDateOfBirth("");
+        setJoiningDate("");
+        fetchRecent();
+      }
     } catch (err) {
-      setError(err.response?.data?.message || "Something went wrong.");
+      setError(err.response?.data?.message || "Failed to add employee.");
     } finally {
       setLoading(false);
     }
   };
 
-  const fmt = (n) => "₹" + Number(n).toLocaleString("en-IN");
+  const handleCancel = () => {
+    setFullName("");
+    setRole("");
+    setDepartment("");
+    setMonthlySalary("");
+    setOvertimeRate("");
+    setDateOfBirth("");
+    setJoiningDate("");
+    setError("");
+    setSuccess("");
+    navigate("/dashboard");
+  };
 
   const sidebarItems = [
-    { id: "dashboard", label: "Dashboard", icon: <GridIcon />, path: "/dashboard" },
-    { id: "employees", label: "Employees", icon: <PeopleIcon />, path: "/add-employee" },
-    { id: "settings", label: "Payroll Settings", icon: <SupportIcon />, path: "#" },
+    { id: "dashboard", label: "Dashboard", path: "/dashboard", icon: <GridIcon /> },
+    { id: "employees", label: "Employees", path: "/dashboard?tab=employees", icon: <PeopleIcon /> },
+    { id: "settings", label: "Settings", path: "/settings", icon: <SupportIcon /> },
   ];
 
+  const getInitials = (name) =>
+    name
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+
+  const fmt = (n, c = "INR") => new Intl.NumberFormat('en-IN', { style: 'currency', currency: c }).format(n);
+
   return (
-    <div className="min-h-screen bg-gray-100 flex font-sans">
+    <div className="min-h-screen bg-gray-100 dark:bg-slate-950 flex font-sans text-slate-800 dark:text-slate-200 transition-colors duration-200">
       <Helmet>
         <title>Add Employee | PaySphere</title>
-        <meta name="description" content="Add a new employee to your payroll. Enter basic details to include them in the next payroll run." />
+        <meta name="description" content="Add a new employee to your company roster." />
       </Helmet>
 
       {/* Sidebar Backdrop */}
       {isSidebarOpen && (
-        <div
+        <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* ── Sidebar ── */}
-      <aside className={`w-56 bg-white border-r border-gray-200 fixed inset-y-0 left-0 flex flex-col z-50 transition-transform duration-300 transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
-        <div className="p-5 border-b border-gray-200 flex items-center justify-between">
+      <aside className={`w-56 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 fixed inset-y-0 left-0 flex flex-col z-50 transition-transform duration-300 transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
+        <div className="p-5 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
-              ₹
+            <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md shadow-blue-200 dark:shadow-none">
+              {getCurrencySymbol(currency)}
             </div>
             <div>
-              <p className="font-bold text-sm text-gray-900">{companyName}</p>
-              <p className="text-xs text-gray-400">Payroll ID: 8821</p>
+              <p className="font-bold text-sm text-gray-900 dark:text-white">{companyName}</p>
+              <p className="text-xs text-gray-500 dark:text-slate-500">Payroll ID: 8821</p>
             </div>
           </div>
           <button
-            className="md:hidden p-2 text-gray-400 hover:text-gray-600"
+            className="md:hidden p-2 text-gray-500 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             onClick={() => setIsSidebarOpen(false)}
           >
             ✕
@@ -229,18 +332,13 @@ export default function AddEmployee() {
             <button
               key={item.id}
               onClick={() => {
-                if (item.id === "settings") {
-                  setShowSettings(true);
-                } else {
-                  navigate(item.path);
-                }
+                navigate(item.path);
                 setIsSidebarOpen(false);
               }}
-              className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${
-                item.id === "employees"
-                  ? "bg-indigo-50 text-blue-600 font-semibold"
-                  : "text-gray-500 hover:bg-gray-50"
-              }`}
+              className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${item.id === "employees"
+                ? "bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold"
+                : "text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50"
+                }`}
             >
               {item.icon}
               {item.label}
@@ -248,12 +346,12 @@ export default function AddEmployee() {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-gray-200 space-y-2">
-          <button className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 hover:bg-gray-50 transition">
+        <div className="p-3 border-t border-gray-200 dark:border-slate-800 space-y-2">
+          <button className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800 transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
             <SupportIcon />
             Help & Support
           </button>
-          <button className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition">
+          <button onClick={() => navigate("/monthly-updates")} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-200 dark:shadow-none transition">
             Run Payroll
           </button>
         </div>
@@ -263,33 +361,34 @@ export default function AddEmployee() {
       <div className="flex-1 flex flex-col md:ml-56 transition-all duration-300">
 
         {/* Topbar */}
-        <header className="h-16 bg-white border-b border-gray-200 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30">
+        <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 transition-colors">
           <div className="flex items-center gap-4 sm:gap-6">
             <button
-              className="md:hidden p-2 -ml-2 text-gray-500 hover:text-gray-700"
+              className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => setIsSidebarOpen(true)}
             >
               ☰
             </button>
-            <span className="font-bold text-blue-900 truncate">Ledger Payroll</span>
-            <button className="hidden sm:block text-blue-600 font-semibold border-b-2 border-blue-600 pb-0.5 whitespace-nowrap">
-              April 2026
+            <span className="font-bold text-blue-900 dark:text-blue-400 truncate">Ledger Payroll</span>
+            <button className="hidden sm:block text-blue-600 dark:text-blue-400 font-semibold border-b-2 border-blue-600 dark:border-blue-400 pb-0.5 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
+              {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
             </button>
           </div>
 
-          <div className="flex items-center gap-3 text-gray-500">
-            <button className="hidden sm:flex"><BellIcon /></button>
-            <button className="hidden sm:flex"><HelpCircleIcon /></button>
-            <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold">
+          <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
+            <ThemeToggle />
+            <button className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><BellIcon /></button>
+            <button className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><HelpCircleIcon /></button>
+            <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
               {getInitials(companyName)}
             </div>
             <button
               onClick={() => {
-                localStorage.removeItem("token");
+                dispatch(logout());
                 localStorage.removeItem("companyName");
                 navigate("/auth");
               }}
-              className="px-3 py-1.5 text-sm font-semibold text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition"
+              className="px-3 py-1.5 text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"
             >
               Sign Out
             </button>
@@ -302,192 +401,157 @@ export default function AddEmployee() {
 
             {/* ── LEFT: Form Section ── */}
             <div className="flex-1">
-              <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 mb-2">Add Employee</h1>
-              <p className="text-gray-500 text-sm mb-8">
-                Enter basic details to add someone to the next payroll run.
-              </p>
+              <div className="max-w-4xl mx-auto p-4 md:p-8">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Add New Employee</h1>
+                <EmployeeForm
+                  onSubmit={handleFormSubmit}
+                  onCancel={() => navigate(-1)}
+                  isEdit={false}
+                />
+              </div>
 
-              <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
-                {/* Full Name */}
-                <label className="block mb-5">
-                  <span className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-2 block">Full Name</span>
-                  <input
-                    id="employee-full-name"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Rahul Sharma"
-                    required
-                    className="w-full px-4 py-3.5 rounded-xl bg-gray-100 text-gray-900 placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent outline-none transition text-sm"
-                  />
-                </label>
+              {/* Bulk CSV Upload Card (Preserved) */}
+              <div className="mt-8 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 transition-colors duration-200">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                  Bulk Upload Employees
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-500 mb-4">
+                  Upload a CSV file to add multiple employees at once.
+                </p>
 
-                {/* Salary Row */}
-                <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                  <label className="flex-1">
-                    <span className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-2 block">Monthly Salary (₹)</span>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">₹</span>
-                      <input
-                        id="employee-salary"
-                        type="text"
-                        value={monthlySalary}
-                        onChange={(e) => setMonthlySalary(e.target.value.replace(/[^0-9,]/g, ""))}
-                        placeholder="45,000"
-                        required
-                        className="w-full pl-8 pr-4 py-3.5 rounded-xl bg-gray-100 text-gray-900 placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent outline-none transition text-sm"
-                      />
-                    </div>
-                  </label>
-
-                  <label className="flex-1">
-                    <span className="text-xs font-bold uppercase text-gray-500 tracking-wider mb-2 block">Overtime Rate (Optional)</span>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-sm">₹</span>
-                      <input
-                        id="employee-overtime"
-                        type="text"
-                        value={overtimeRate}
-                        onChange={(e) => setOvertimeRate(e.target.value.replace(/[^0-9,]/g, ""))}
-                        placeholder="250 / hr"
-                        className="w-full pl-8 pr-4 py-3.5 rounded-xl bg-gray-100 text-gray-900 placeholder-gray-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 border border-transparent outline-none transition text-sm"
-                      />
-                    </div>
-                  </label>
-                </div>
-
-                {/* Messages */}
+                {/* CSV Messages */}
                 {error && (
-                  <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm font-medium">
+                  <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm font-medium">
                     {error}
                   </div>
                 )}
                 {success && (
-                  <div className="mb-4 px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-600 text-sm font-medium flex items-center gap-2">
+                  <div className="mb-4 px-4 py-3 rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/50 text-green-600 dark:text-green-400 text-sm font-medium flex items-center gap-2">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12"/>
+                      <polyline points="20 6 9 17 4 12" />
                     </svg>
                     {success}
                   </div>
                 )}
 
-                {/* Submit */}
-                <button
-                  id="add-employee-btn"
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                <div
+                  className={`border-2 border-dashed rounded-xl p-5 text-center transition ${csvFile
+                    ? "border-green-400 bg-green-50 dark:bg-green-950/20"
+                    : "border-gray-300 dark:border-slate-800 bg-gray-50 dark:bg-slate-950 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800/50"
+                    }`}
                 >
-                  <PersonPlusIcon />
-                  {loading ? "Adding..." : "Add Employee"}
-                </button>
-              </form>
-            </div>
-
-            {/* ── RIGHT: Sidebar Cards ── */}
-            <div className="w-full lg:w-72 xl:w-80 flex flex-col gap-6">
-
-              {/* Recently Added */}
-              <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 sm:p-6">
-                <div className="flex items-start gap-3 mb-4">
-                  <CheckCircleIcon />
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-sm">Recently Added</h3>
-                    <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">
-                      Employees added here will automatically appear in your April 2026 payroll worksheet.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-0">
-                  {loadingRecent ? (
-                    <div className="py-6 text-center text-sm text-gray-400">Loading...</div>
-                  ) : recentEmployees.length === 0 ? (
-                    <div className="py-6 text-center text-sm text-gray-400">No employees added yet.</div>
+                  {!csvFile ? (
+                    <>
+                      <div className="text-3xl mb-2">📄</div>
+                      <p className="text-sm font-semibold text-gray-700 dark:text-slate-300">
+                        Choose CSV file
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-slate-500 mt-1 mb-3">
+                        Only .csv files are supported
+                      </p>
+                      <label className="inline-block cursor-pointer px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition">
+                        Browse File
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".csv"
+                          hidden
+                          onChange={(e) =>
+                            setCsvFile(e.target.files?.[0] || null)
+                          }
+                        />
+                      </label>
+                    </>
                   ) : (
-                    recentEmployees.slice(0, 3).map((emp) => (
-                      <div key={emp._id} className="flex items-center gap-3 py-3 border-b border-gray-100 last:border-0">
-                        <Avatar name={emp.fullName} size={36} />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-gray-900 truncate">{emp.fullName}</p>
-                          <p className="text-xs text-gray-400 truncate">{emp.role || "Employee"}</p>
+                    <div className="flex items-center justify-between bg-white dark:bg-slate-900 rounded-lg px-4 py-3 border border-green-200 dark:border-green-900/50">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="text-2xl">📄</div>
+                        <div className="text-left min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                            {csvFile.name}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-slate-500">
+                            {(csvFile.size / 1024).toFixed(1)} KB
+                          </p>
                         </div>
-                        <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
-                          {fmt(emp.monthlySalary)}
-                        </span>
                       </div>
-                    ))
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCsvUpload}
+                          disabled={uploadingCsv}
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50"
+                        >
+                          {uploadingCsv ? "Uploading..." : "Upload"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCsvFile(null)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 transition"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                <button
-                  onClick={() => navigate("/dashboard")}
-                  className="mt-3 text-blue-600 text-sm font-semibold hover:text-blue-700 transition flex items-center gap-1"
-                >
-                  View Full Directory <ArrowRightIcon />
-                </button>
               </div>
+            </div>
 
-              {/* Speed Tip Card */}
-              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-800 via-gray-900 to-gray-950 p-6 text-white shadow-lg">
-                {/* Decorative circles */}
-                <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-white/5" />
-                <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-white/5" />
-                <div className="absolute top-12 right-10 w-16 h-16 rounded-full bg-blue-500/10" />
-
-                <div className="relative z-10">
-                  <h3 className="font-bold text-base mb-1.5">Speed Tip</h3>
-                  <p className="text-gray-300 text-sm leading-relaxed">
-                    You can bulk upload employees via CSV in the Settings menu for larger teams.
-                  </p>
+            {/* ── RIGHT: Recent Employees ── */}
+            <div className="w-full lg:w-80 flex flex-col gap-6">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-serif font-bold text-gray-900 dark:text-white">Recent Additions</h2>
+                  <button
+                    onClick={() => navigate("/dashboard?tab=employees")}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
+                  >
+                    View All <ArrowRightIcon />
+                  </button>
                 </div>
+
+                {loadingRecent ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="animate-pulse flex items-center gap-3 p-2">
+                        <div className="w-9 h-9 bg-gray-200 dark:bg-slate-800 rounded-full" />
+                        <div className="flex-1 space-y-1">
+                          <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded w-24" />
+                          <div className="h-2 bg-gray-100 dark:bg-slate-800/60 rounded w-16" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : recentEmployees.length === 0 ? (
+                  <p className="text-xs text-gray-500 dark:text-slate-500 text-center py-4">
+                    No employees added yet.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-gray-100 dark:divide-slate-800">
+                    {recentEmployees.map((emp) => (
+                      <div key={emp._id} className="py-3 flex items-center gap-3">
+                        <Avatar name={emp.fullName} size={36} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                            {emp.fullName}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-slate-500 truncate">
+                            {emp.role} {emp.department ? `• ${emp.department}` : ""}
+                          </p>
+                        </div>
+                        <p className="text-xs font-bold text-gray-900 dark:text-slate-200">
+                          {fmt(emp.monthlySalary, emp.currency)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
           </div>
         </main>
-
-        {/* Settings Modal */}
-        {showSettings && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] backdrop-blur-sm" onClick={() => setShowSettings(false)}>
-            <div className="bg-white rounded-2xl w-[92%] max-w-[450px] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
-              <div className="p-7 border-b border-gray-100">
-                <h2 className="text-2xl font-bold text-gray-900">Payroll Settings</h2>
-                <p className="text-sm text-gray-500 mt-1">Set default rates for all employees.</p>
-              </div>
-              
-              <div className="p-7 space-y-6">
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Default Overtime Rate (₹ / hr)</span>
-                  <input 
-                    type="number"
-                    value={settings.defaultOvertimeRate}
-                    onChange={(e) => setSettings({ ...settings, defaultOvertimeRate: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-100 text-gray-900 font-semibold focus:bg-white focus:ring-2 focus:ring-blue-500/20 border border-transparent outline-none transition"
-                  />
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-gray-400 tracking-wider mb-2 block">Default Daily Deduction (₹ / day)</span>
-                  <input 
-                    type="number"
-                    value={settings.defaultDailyRate}
-                    onChange={(e) => setSettings({ ...settings, defaultDailyRate: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-3 rounded-xl bg-gray-100 text-gray-900 font-semibold focus:bg-white focus:ring-2 focus:ring-blue-500/20 border border-transparent outline-none transition"
-                  />
-                </div>
-              </div>
-
-              <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
-                <button onClick={() => setShowSettings(false)} className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">Cancel</button>
-                <button onClick={saveSettings} disabled={updatingSettings} className="px-6 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition disabled:opacity-50">
-                  {updatingSettings ? "Saving..." : "Save Settings"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
     </div>
   );

@@ -1,4 +1,14 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import api from '../../services/api';
+
+export const logoutUser = createAsyncThunk('auth/logoutUser', async (_, { dispatch }) => {
+  try {
+    await api.post('/api/auth/logout');
+} catch {
+    // ignore
+  } finally {    dispatch(logout());
+  }
+});
 
 const initialState = {
   user: null,
