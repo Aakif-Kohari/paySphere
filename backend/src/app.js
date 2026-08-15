@@ -223,6 +223,9 @@ app.use(cors(corsOptions));
 const redactionMiddleware = require('./middlewares/redaction.middleware');
 app.use(redactionMiddleware);
 
+const responseMiddleware = require('./middlewares/response.middleware');
+app.use(responseMiddleware);
+
 // Require request body for state-changing methods
 app.use('/api', requireBody);
 
