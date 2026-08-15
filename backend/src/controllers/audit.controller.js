@@ -118,7 +118,7 @@ function buildQuery(req) {
 exports.getAuditLogs = async (req, res, next) => {
   try {
     const built = buildQuery(req);
-    if (!built.ok) return res.status(400).json({ message: built.message });
+    if (!built.ok) return res.error(built.message, null, 'bad_request', 400);
 
     let page = parseInt(req.query.page, 10);
     if (isNaN(page) || page < 1) page = 1;
@@ -144,7 +144,7 @@ exports.getAuditLogs = async (req, res, next) => {
     }));
 
     // Return a metadata object containing totalRecords and totalPages
-    res.status(200).json({
+    res.success({
       logs: processedLogs,
       metadata: {
         totalRecords: totalLogs,
@@ -162,7 +162,7 @@ exports.getAuditLogs = async (req, res, next) => {
 exports.exportAuditLogsCSV = async (req, res, next) => {
   try {
     const built = buildQuery(req);
-    if (!built.ok) return res.status(400).json({ message: built.message });
+    if (!built.ok) return res.error(built.message, null, 'bad_request', 400);
 
     const logs = await auditLogRepository.findExportLogs(built.query, MAX_EXPORT_ROWS);
 
