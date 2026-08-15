@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import * as Sentry from '@sentry/react';
 import { Provider } from 'react-redux';
+import * as serviceWorkerRegistration from './serviceWorkerRegistration'; // Added for #1022
 
 // Initialize Sentry for production error tracking (#770)
 Sentry.init({
@@ -43,3 +44,22 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </Provider>
   </React.StrictMode>,
 );
+
+// Register Service Worker for offline caching (Issue #1022)
+if (import.meta.env.PROD) {
+  serviceWorkerRegistration.register({
+    onUpdate: (registration) => {
+      console.log('New content available; please refresh.');
+      // In a real app, show a toast notification prompting the user to reload
+      if (registration && registration.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        window.location.reload();
+      }
+    },
+    onSuccess: () => {
+      console.log('App is available offline.');
+    }
+  });
+} else {
+  serviceWorkerRegistration.unregister();
+}
