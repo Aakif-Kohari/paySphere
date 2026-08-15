@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import api from "../services/api";
+import { useJobProgress } from "../hooks/useJobProgress";
 
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -194,6 +195,7 @@ export default function MonthlyUpdates() {
   const [showResults, setShowResults] = useState(false);
   const [payrollResults, setPayrollResults] = useState(null);
   const [finalizeError, setFinalizeError] = useState("");
+  const { progress, startJob } = useJobProgress('payroll_finalize');
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState({ defaultOvertimeRate: 0, defaultDailyRate: 0 });
   const [updatingSettings, setUpdatingSettings] = useState(false);
@@ -273,7 +275,6 @@ export default function MonthlyUpdates() {
 
   const fmt = (n) => "₹" + Math.abs(n).toLocaleString("en-IN");
 
-  // Finalize payroll
   const handleFinalize = async () => {
     if (activity.length === 0) return;
     setFinalizing(true);
@@ -281,26 +282,33 @@ export default function MonthlyUpdates() {
 
     try {
       const now = new Date();
-      const res = await api.post(
-        `/api/payroll/finalize`,
-        {
-          activities: activity.map(a => ({ name: a.name, tags: a.tags })),
-          month: now.getMonth() + 1,
-          year: now.getFullYear(),
-        }
-      );
-
-      setPayrollResults(res.data);
-      setShowResults(true);
-
-      // Mark all activities as no longer pending
-      setActivity(prev => prev.map(a => ({ ...a, pending: false })));
+      // Use WebSocket job starting instead of regular API call
+      startJob({
+        activities: activity.map(a => ({ name: a.name, tags: a.tags })),
+        month: now.getMonth() + 1,
+        year: now.getFullYear(),
+      });
     } catch (err) {
-      setFinalizeError(err.response?.data?.message || "Failed to finalize payroll.");
-    } finally {
+      setFinalizeError(err.message || "Failed to start payroll process.");
       setFinalizing(false);
     }
   };
+
+  // Watch for job completion
+  useEffect(() => {
+    if (progress.status === 'completed' && progress.message) {
+      try {
+        const results = JSON.parse(progress.message);
+        setPayrollResults(results);
+        setShowResults(true);
+        setActivity(prev => prev.map(a => ({ ...a, pending: false })));
+        setFinalizing(false);
+      } catch (e) {}
+    } else if (progress.status === 'error') {
+      setFinalizeError(progress.message || "Error processing payroll");
+      setFinalizing(false);
+    }
+  }, [progress.status, progress.message]);
 
   return (
     <div style={{ minHeight: "100vh", background: "#F3F4F6", fontFamily: "'DM Sans','Segoe UI',sans-serif", display: "flex", overflowX: "hidden" }}>
@@ -679,7 +687,7 @@ export default function MonthlyUpdates() {
 
               <button
                 onClick={handleFinalize}
-                disabled={finalizing || activity.length === 0}
+                disabled={finalizing || activity.length === 0 || progress.status === 'starting' || progress.status === 'running'}
                 style={{
                   padding:"13px 28px",
                   background: activity.length === 0 ? "#9CA3AF" : finalizing ? "#6B7280" : "#1E3A8A",
@@ -693,7 +701,18 @@ export default function MonthlyUpdates() {
                 }}
                 onMouseEnter={e => { if (activity.length > 0 && !finalizing) { e.currentTarget.style.background="#1E40AF"; e.currentTarget.style.transform="translateY(-1px)"; }}}
                 onMouseLeave={e => { if (activity.length > 0 && !finalizing) { e.currentTarget.style.background="#1E3A8A"; e.currentTarget.style.transform="none"; }}}
-              >{finalizing ? "Processing..." : "Review & Finalize"}</button>
+              >
+                {finalizing 
+                  ? (progress.status === 'running' ? `Processing... ${progress.percent}%` : "Processing...") 
+                  : "Review & Finalize"}
+              </button>
+              
+              {/* Progress bar container */}
+              {finalizing && progress.status === 'running' && (
+                <div style={{ position: "absolute", top: 0, left: 0, height: 3, width: "100%", background: "#E5E7EB" }}>
+                  <div style={{ height: "100%", background: "#2563EB", width: `${progress.percent}%`, transition: "width 0.3s ease" }} />
+                </div>
+              )}
             </div>
           </div>
 
