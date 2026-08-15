@@ -347,11 +347,15 @@ const Sidebar = ({
       )}
 
       <aside
-        className={`w-56 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 fixed inset-y-0 left-0 flex flex-col z-50 transition-transform duration-300 transform ${
-          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } md:translate-x-0`}
-        ref={sidebarRef}
-        aria-label="Main navigation"
+        className={`
+          fixed inset-y-0 left-0 z-40 w-64 
+          bg-white dark:bg-slate-900 
+          border-r border-gray-200 dark:border-slate-800
+          transform transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0
+          hidden md:flex md:flex-col /* Added for #1025: Hide sidebar on mobile, show on md+ */
+        `}
       >
         <div className="p-5 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
