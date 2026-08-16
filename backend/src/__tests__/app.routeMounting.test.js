@@ -116,8 +116,8 @@ const MOUNTED_ROUTES = [
   ['/api/shifts', 'get', '/api/shifts/roster'],
   ['/api/pyqs', 'get', '/api/pyqs'],
 
-  // Mounted in #1076.
-  ['/api/training', 'get', '/api/training/courses'],
+  // Mounted in #1077.
+  ['/api/travel', 'get', '/api/travel/requests'],
 
   // Mounted in #1073. Restored along with the permissions and the app.js mount:
   // #1083's merge kept only its own side of the conflicts in
@@ -127,6 +127,9 @@ const MOUNTED_ROUTES = [
 
   // Mounted in #1074.
   ['/api/recruitment', 'get', '/api/recruitment/requisitions'],
+
+  // Mounted in #1075.
+  ['/api/disbursements', 'get', '/api/disbursements/batches'],
 ];
 
 /**
@@ -208,7 +211,7 @@ const ROUTER_MOUNTS = {
   settlement: '/api/settlements',
   shiftRoster: '/api/shifts',
   taxProof: '/api/tax-proofs',
-  training: '/api/training',
+  travel: '/api/travel',
   user: '/api/auth',
   varianceReport: '/api/reports',
   vendor: '/api/vendors',

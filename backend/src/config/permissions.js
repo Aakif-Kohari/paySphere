@@ -136,16 +136,20 @@ const PERMISSIONS = {
   // generation.
   MANAGE_PYQ: 'MANAGE_PYQ',
 
-  // --- Training and certification (#1076) ----------------------------------
-  READ_TRAINING: 'READ_TRAINING',
-  // Creating courses, assigning them, recording completions and waiving
-  // obligations. Stays with HR rather than moving to the owner: assigning
-  // fire-safety training commits no budget and moves no money. The one action
-  // with real weight is the waiver, and that is bounded by the endpoint
-  // requiring a written reason.
-  MANAGE_TRAINING: 'MANAGE_TRAINING',
-  // Self-service. `getMyTraining` resolves the employee from `req.userId`.
-  COMPLETE_OWN_TRAINING: 'COMPLETE_OWN_TRAINING',
+  // --- Business travel (#1077) ---------------------------------------------
+  READ_TRAVEL: 'READ_TRAVEL',
+  // Filing a trip you are about to take. Held by employees — that is the point
+  // of the feature.
+  SUBMIT_TRAVEL_REQUEST: 'SUBMIT_TRAVEL_REQUEST',
+  // Approving a trip, releasing an advance and settling it. Kept apart from
+  // submission for the same reason APPROVE_EXPENSE is kept apart from
+  // WRITE_EXPENSE: whoever asks for the money should not be the only person
+  // standing between it and a bank transfer.
+  APPROVE_TRAVEL: 'APPROVE_TRAVEL',
+  // The grade x city-class rate table decides what everybody in the company is
+  // entitled to, so editing it is not a per-trip decision. Same class of
+  // authority as MANAGE_EXPENSE_CATEGORY.
+  MANAGE_TRAVEL_POLICY: 'MANAGE_TRAVEL_POLICY',
 
   // --- Equity (#1073) ------------------------------------------------------
   //
@@ -175,6 +179,19 @@ const PERMISSIONS = {
   // Interviewers are not recruiters. This is held by whoever sits on a panel,
   // which is a different and much larger population than HR.
   SUBMIT_INTERVIEW_FEEDBACK: 'SUBMIT_INTERVIEW_FEEDBACK',
+
+  // --- Salary disbursement (#1075) -----------------------------------------
+  READ_DISBURSEMENT: 'READ_DISBURSEMENT',
+  // Building a batch, validating it and downloading the bank file. The download
+  // is the only response in the product that carries full bank account numbers,
+  // which is why it is not covered by the read permission.
+  MANAGE_DISBURSEMENT: 'MANAGE_DISBURSEMENT',
+  // The point of no return, and kept apart for the same maker-checker reason as
+  // APPROVE_PAYROLL (#458): whoever assembles a payment file should not be the
+  // only person standing between it and a bank transfer. This is the highest
+  // consequence write in the product — everything else changes a record, this
+  // one moves money out of the company account into several hundred others.
+  RELEASE_DISBURSEMENT: 'RELEASE_DISBURSEMENT',
 };
 
 const PERMISSION_DEFINITIONS = [
@@ -340,21 +357,25 @@ const PERMISSION_DEFINITIONS = [
       'Add and bulk-upload previous-year questions, and generate trend forecasts',
   },
 
-  // #1076.
+  // #1077.
   {
-    name: PERMISSIONS.READ_TRAINING,
+    name: PERMISSIONS.READ_TRAVEL,
     description:
-      'View the training catalogue and the certification compliance and expiry reports',
+      'View travel policies, trips, settlements and the outstanding travel-advance ledger',
   },
   {
-    name: PERMISSIONS.MANAGE_TRAINING,
-    description:
-      'Create training courses, assign them, record completions, and waive a mandatory training obligation',
+    name: PERMISSIONS.SUBMIT_TRAVEL_REQUEST,
+    description: 'Submit your own business travel requests and view your trips',
   },
   {
-    name: PERMISSIONS.COMPLETE_OWN_TRAINING,
+    name: PERMISSIONS.APPROVE_TRAVEL,
     description:
-      'View your own assigned training, certifications and renewal dates',
+      'Approve or reject a travel request, release a travel advance, and settle a trip against actuals',
+  },
+  {
+    name: PERMISSIONS.MANAGE_TRAVEL_POLICY,
+    description:
+      'Set the per-diem rates, lodging caps and travel-class entitlements every grade is paid under',
   },
 
   // #1073.
@@ -374,6 +395,28 @@ const PERMISSION_DEFINITIONS = [
   },
 
   // #1074.
+  {
+    name: PERMISSIONS.READ_REQUISITION,
+    description:
+      'View job requisitions, candidates, interview scorecards and hiring funnel analytics',
+  },
+  {
+    name: PERMISSIONS.MANAGE_REQUISITION,
+    description:
+      'Open, hold and close job requisitions, and set the approved CTC band every offer is checked against',
+  },
+  {
+    name: PERMISSIONS.MANAGE_CANDIDATE,
+    description:
+      'Add candidates and move them through the hiring pipeline, including making offers and recording hires',
+  },
+  {
+    name: PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
+    description:
+      'Submit an interview scorecard for a candidate you interviewed',
+  },
+
+  // #1075.
   {
     name: PERMISSIONS.READ_DISBURSEMENT,
     description:
@@ -456,10 +499,11 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_PYQ,
       PERMISSIONS.MANAGE_PYQ,
 
-      // #1076.
-      PERMISSIONS.READ_TRAINING,
-      PERMISSIONS.MANAGE_TRAINING,
-      PERMISSIONS.COMPLETE_OWN_TRAINING,
+      // #1077.
+      PERMISSIONS.READ_TRAVEL,
+      PERMISSIONS.SUBMIT_TRAVEL_REQUEST,
+      PERMISSIONS.APPROVE_TRAVEL,
+      PERMISSIONS.MANAGE_TRAVEL_POLICY,
 
       // #1073. MANAGE_ESOP stops here — it is the only permission in the
       // product that changes who owns the company.
@@ -472,6 +516,11 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_REQUISITION,
       PERMISSIONS.MANAGE_CANDIDATE,
       PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
+
+      // #1075.
+      PERMISSIONS.READ_DISBURSEMENT,
+      PERMISSIONS.MANAGE_DISBURSEMENT,
+      PERMISSIONS.RELEASE_DISBURSEMENT,
     ],
   },
   {
@@ -526,11 +575,14 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_ESOP,
       PERMISSIONS.READ_OWN_ESOP,
 
-      // #1076. Squarely HR: it is HR that has to produce "who was trained,
-      // when, and is it still current" during an audit.
-      PERMISSIONS.READ_TRAINING,
-      PERMISSIONS.MANAGE_TRAINING,
-      PERMISSIONS.COMPLETE_OWN_TRAINING,
+      // #1077. HR approves trips, releases advances and settles them — the same
+      // shape as APPROVE_EXPENSE, which it also holds. Not
+      // MANAGE_TRAVEL_POLICY: the rate table decides what everybody is entitled
+      // to, and that stays with the owner for the same reason
+      // MANAGE_EXPENSE_CATEGORY does.
+      PERMISSIONS.READ_TRAVEL,
+      PERMISSIONS.SUBMIT_TRAVEL_REQUEST,
+      PERMISSIONS.APPROVE_TRAVEL,
 
       // #1074. HR runs the pipeline and sits on panels. It does not open
       // requisitions or move the CTC band — that is headcount budget, and
@@ -538,6 +590,11 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_REQUISITION,
       PERMISSIONS.MANAGE_CANDIDATE,
       PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
+
+      // #1075. HR assembles the payment file; it does not release it. Same
+      // maker-checker split as APPROVE_PAYROLL, which HR also does not hold.
+      PERMISSIONS.READ_DISBURSEMENT,
+      PERMISSIONS.MANAGE_DISBURSEMENT,
     ],
   },
   {
@@ -572,10 +629,11 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.READ_PYQ,
 
-      // #1076. Their own training record and renewal dates. Deliberately not
-      // READ_TRAINING, which carries the company-wide compliance reports and
-      // names every colleague who is missing a mandatory certification.
-      PERMISSIONS.COMPLETE_OWN_TRAINING,
+      // #1077. Filing a trip and seeing your own. `createRequest` falls back to
+      // the caller's own employee record when no id is sent, and `getMyTrips`
+      // resolves from `req.userId`, so holding this does not let one employee
+      // file against a colleague.
+      PERMISSIONS.SUBMIT_TRAVEL_REQUEST,
 
       // #1073. Their own grants only. Deliberately not READ_ESOP, which is the
       // whole company's cap table.

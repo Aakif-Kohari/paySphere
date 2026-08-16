@@ -89,10 +89,11 @@ const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
 const pyqRoutes = require('./routes/pyq.routes');
 
-// Training and certification expiry (#1076). The frontend's "Learning" nav
-// group held only exam-prep content; there was no employment training record
-// anywhere, and no way to answer "who holds a current POSH certification".
-const trainingRoutes = require('./routes/training.routes');
+// Business travel, per-diem and advance settlement (#1077). `expenseClaim` is
+// for money already spent; a trip is pre-approved, funded in advance, and its
+// per-diem has no receipt at all — so an unspent advance was a receivable
+// nothing in the product tracked.
+const travelRoutes = require('./routes/travel.routes');
 
 // Stock option schemes, grants, vesting and exercises (#1073). Equity was the
 // one component of total compensation with no model, no route and no
@@ -105,6 +106,11 @@ const esopRoutes = require('./routes/esop.routes');
 // before it — `OfferLetterBuilder.jsx` types in a name and a salary by hand
 // because there was no candidate record to draw them from.
 const recruitmentRoutes = require('./routes/recruitment.routes');
+
+// Salary disbursement (#1075). Payroll was computed to the rupee and then
+// stopped: `payroll.model.js` has a `disbursed` status and nothing in the
+// product produced the bank file that actually moves the money.
+const disbursementRoutes = require('./routes/disbursement.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -418,9 +424,9 @@ app.use('/api/shifts', shiftRosterRoutes);
 
 app.use('/api/pyqs', pyqRoutes);
 
-// Training and certification (#1076). The router owns `/courses`,
-// `/enrollments`, `/compliance` and `/my-training`.
-app.use('/api/training', trainingRoutes);
+// Business travel (#1077). The router owns `/policies`, `/requests`,
+// `/advances` and `/my-trips`.
+app.use('/api/travel', travelRoutes);
 
 // Equity (#1073). The router owns `/schemes`, `/grants` and `/my-grants`, so
 // the prefix carries no noun of its own.
@@ -429,6 +435,9 @@ app.use('/api/esop', esopRoutes);
 // Recruitment (#1074). The router owns `/requisitions`, `/candidates` and
 // `/analytics`, so the prefix carries no noun of its own.
 app.use('/api/recruitment', recruitmentRoutes);
+
+// Salary disbursement (#1075). The router owns `/batches` and `/profiles`.
+app.use('/api/disbursements', disbursementRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
