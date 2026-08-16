@@ -7,6 +7,7 @@ const { emailableStatusFilter } = require('../config/payrollStatus');
 const { processMonthlyAccrual } = require('./leaveAccrual.job');
 const logger = require('../utils/logger');
 const { runDatabaseBackupJob } = require('./backup.job');
+const { runDatabaseArchivalJob } = require('./archival.job');
 
 const LOCK_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -345,6 +346,14 @@ const startCronJobs = () => {
     );
   });
   logger.info('Daily database backup cron job registered.');
+
+  // 00:00 on the 1st of every month — Database archival to S3 Glacier/local.
+  cron.schedule('0 0 1 * *', () => {
+    runDatabaseArchivalJob().catch((error) =>
+      logger.error('Database archival job threw', { error: error.message }),
+    );
+  });
+  logger.info('Monthly database archival cron job registered.');
 };
 
 /**
@@ -392,6 +401,7 @@ module.exports = {
   runDailyGreetingsJob,
   runHrmsSyncJob,
   runDatabaseBackupJob,
+  runDatabaseArchivalJob,
   previousPeriod,
   acquireLock,
   releaseLock,
