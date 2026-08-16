@@ -136,20 +136,18 @@ const PERMISSIONS = {
   // generation.
   MANAGE_PYQ: 'MANAGE_PYQ',
 
-  // --- Recruitment (#1074) -------------------------------------------------
-  READ_REQUISITION: 'READ_REQUISITION',
-  // Opening a role commits headcount budget, and the approved CTC band is what
-  // every offer is checked against — so being able to widen a band is being
-  // able to approve any offer. Owner only, for the same reason MANAGE_CONTRACT
-  // is.
-  MANAGE_REQUISITION: 'MANAGE_REQUISITION',
-  // Running the pipeline: adding applicants and moving them between stages.
-  // HR's day job, and deliberately not the same authority as setting the band
-  // those candidates are offered against.
-  MANAGE_CANDIDATE: 'MANAGE_CANDIDATE',
-  // Interviewers are not recruiters. This is held by whoever sits on a panel,
-  // which is a different and much larger population than HR.
-  SUBMIT_INTERVIEW_FEEDBACK: 'SUBMIT_INTERVIEW_FEEDBACK',
+  // --- Salary disbursement (#1075) -----------------------------------------
+  READ_DISBURSEMENT: 'READ_DISBURSEMENT',
+  // Building a batch, validating it and downloading the bank file. The download
+  // is the only response in the product that carries full bank account numbers,
+  // which is why it is not covered by the read permission.
+  MANAGE_DISBURSEMENT: 'MANAGE_DISBURSEMENT',
+  // The point of no return, and kept apart for the same maker-checker reason as
+  // APPROVE_PAYROLL (#458): whoever assembles a payment file should not be the
+  // only person standing between it and a bank transfer. This is the highest
+  // consequence write in the product — everything else changes a record, this
+  // one moves money out of the company account into several hundred others.
+  RELEASE_DISBURSEMENT: 'RELEASE_DISBURSEMENT',
 };
 
 const PERMISSION_DEFINITIONS = [
@@ -315,26 +313,21 @@ const PERMISSION_DEFINITIONS = [
       'Add and bulk-upload previous-year questions, and generate trend forecasts',
   },
 
-  // #1074.
+  // #1075.
   {
-    name: PERMISSIONS.READ_REQUISITION,
+    name: PERMISSIONS.READ_DISBURSEMENT,
     description:
-      'View job requisitions, candidates, interview scorecards and hiring funnel analytics',
+      'View salary disbursement batches, their control totals and which credits the bank returned',
   },
   {
-    name: PERMISSIONS.MANAGE_REQUISITION,
+    name: PERMISSIONS.MANAGE_DISBURSEMENT,
     description:
-      'Open, hold and close job requisitions, and set the approved CTC band every offer is checked against',
+      'Build and validate a disbursement batch, download the bank payment file, and record returns',
   },
   {
-    name: PERMISSIONS.MANAGE_CANDIDATE,
+    name: PERMISSIONS.RELEASE_DISBURSEMENT,
     description:
-      'Add candidates and move them through the hiring pipeline, including making offers and recording hires',
-  },
-  {
-    name: PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
-    description:
-      'Submit an interview scorecard for a candidate you interviewed',
+      'Release a validated disbursement batch for payment — the irreversible step that moves the money',
   },
 ];
 
@@ -403,11 +396,10 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_PYQ,
       PERMISSIONS.MANAGE_PYQ,
 
-      // #1074.
-      PERMISSIONS.READ_REQUISITION,
-      PERMISSIONS.MANAGE_REQUISITION,
-      PERMISSIONS.MANAGE_CANDIDATE,
-      PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
+      // #1075.
+      PERMISSIONS.READ_DISBURSEMENT,
+      PERMISSIONS.MANAGE_DISBURSEMENT,
+      PERMISSIONS.RELEASE_DISBURSEMENT,
     ],
   },
   {
@@ -456,12 +448,10 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.VERIFY_TAX_PROOF,
       PERMISSIONS.READ_PYQ,
 
-      // #1074. HR runs the pipeline and sits on panels. It does not open
-      // requisitions or move the CTC band — that is headcount budget, and
-      // widening a band is equivalent to approving any offer against it.
-      PERMISSIONS.READ_REQUISITION,
-      PERMISSIONS.MANAGE_CANDIDATE,
-      PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
+      // #1075. HR assembles the payment file; it does not release it. Same
+      // maker-checker split as APPROVE_PAYROLL, which HR also does not hold.
+      PERMISSIONS.READ_DISBURSEMENT,
+      PERMISSIONS.MANAGE_DISBURSEMENT,
     ],
   },
   {

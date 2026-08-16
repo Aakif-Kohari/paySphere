@@ -89,11 +89,10 @@ const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
 const pyqRoutes = require('./routes/pyq.routes');
 
-// Requisitions, the candidate pipeline and interview scorecards (#1074). The
-// product covered an employee's life from the offer letter onwards and nothing
-// before it — `OfferLetterBuilder.jsx` types in a name and a salary by hand
-// because there was no candidate record to draw them from.
-const recruitmentRoutes = require('./routes/recruitment.routes');
+// Salary disbursement (#1075). Payroll was computed to the rupee and then
+// stopped: `payroll.model.js` has a `disbursed` status and nothing in the
+// product produced the bank file that actually moves the money.
+const disbursementRoutes = require('./routes/disbursement.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -407,9 +406,8 @@ app.use('/api/shifts', shiftRosterRoutes);
 
 app.use('/api/pyqs', pyqRoutes);
 
-// Recruitment (#1074). The router owns `/requisitions`, `/candidates` and
-// `/analytics`, so the prefix carries no noun of its own.
-app.use('/api/recruitment', recruitmentRoutes);
+// Salary disbursement (#1075). The router owns `/batches` and `/profiles`.
+app.use('/api/disbursements', disbursementRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.

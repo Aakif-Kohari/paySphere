@@ -116,8 +116,8 @@ const MOUNTED_ROUTES = [
   ['/api/shifts', 'get', '/api/shifts/roster'],
   ['/api/pyqs', 'get', '/api/pyqs'],
 
-  // Mounted in #1074.
-  ['/api/recruitment', 'get', '/api/recruitment/requisitions'],
+  // Mounted in #1075.
+  ['/api/disbursements', 'get', '/api/disbursements/batches'],
 ];
 
 /**
@@ -167,6 +167,7 @@ const ROUTER_MOUNTS = {
   compliance: '/api/compliance',
   contract: '/api/contracts',
   dashboard: '/api/dashboard',
+  disbursement: '/api/disbursements',
   email: '/api/email',
   employee: '/api/employees',
   employeePortal: '/api/employee-portal',
