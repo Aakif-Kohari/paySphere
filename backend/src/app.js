@@ -95,6 +95,18 @@ const pyqRoutes = require('./routes/pyq.routes');
 // nothing in the product tracked.
 const travelRoutes = require('./routes/travel.routes');
 
+// Stock option schemes, grants, vesting and exercises (#1073). Equity was the
+// one component of total compensation with no model, no route and no
+// calculator — and exercising an option is a taxable perquisite the employer
+// has to withhold on, so it is payroll's business and not just HR's.
+const esopRoutes = require('./routes/esop.routes');
+
+// Requisitions, the candidate pipeline and interview scorecards (#1074). The
+// product covered an employee's life from the offer letter onwards and nothing
+// before it — `OfferLetterBuilder.jsx` types in a name and a salary by hand
+// because there was no candidate record to draw them from.
+const recruitmentRoutes = require('./routes/recruitment.routes');
+
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
 // module threw `ReferenceError: roleRoutes is not defined`. Same damage as
@@ -410,6 +422,14 @@ app.use('/api/pyqs', pyqRoutes);
 // Business travel (#1077). The router owns `/policies`, `/requests`,
 // `/advances` and `/my-trips`.
 app.use('/api/travel', travelRoutes);
+
+// Equity (#1073). The router owns `/schemes`, `/grants` and `/my-grants`, so
+// the prefix carries no noun of its own.
+app.use('/api/esop', esopRoutes);
+
+// Recruitment (#1074). The router owns `/requisitions`, `/candidates` and
+// `/analytics`, so the prefix carries no noun of its own.
+app.use('/api/recruitment', recruitmentRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
