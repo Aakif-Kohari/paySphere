@@ -13,6 +13,7 @@
 
 import { useState } from 'react';
 import PropTypes from 'prop-types';
+import useVirtual from '../../hooks/useVirtual';
 
 /**
  * Standardized DataTable Component
@@ -70,6 +71,15 @@ export default function DataTable({
 
     const sortedData = getSortedData();
 
+    const { virtualItems, startIndex, endIndex, containerRef } = useVirtual({
+        itemCount: sortedData.length,
+        itemHeight: 53,
+        overscan: 5,
+    });
+
+    const paddingTop = startIndex * 53;
+    const paddingBottom = (sortedData.length - endIndex - 1) * 53;
+
     /**
      * Renders the loading skeleton state
      * @returns {JSX.Element} Skeleton rows
@@ -112,7 +122,7 @@ export default function DataTable({
         <div className="w-full overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700" aria-label="Data table">
                 {/* Standardized Table Header: text-xs uppercase tracking-wider */}
-                <thead className="bg-gray-50 dark:bg-slate-900/50">
+                <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-slate-900 shadow-[inset_0_-1px_0_rgba(0,0,0,0.1)] dark:shadow-[inset_0_-1px_0_rgba(255,255,255,0.1)]">
                     <tr>
                         {columns.map((column) => (
                             <th
@@ -154,30 +164,47 @@ export default function DataTable({
                     ) : sortedData.length === 0 ? (
                         renderEmptyState()
                     ) : (
-                        sortedData.map((row, rowIndex) => (
-                            <tr
-                                key={row[keyField] || rowIndex}
-                                onClick={() => onRowClick && onRowClick(row)}
-                                className={`
-                  transition-colors duration-150
-                  ${onRowClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50' : ''}
-                  ${rowIndex % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-gray-50/50 dark:bg-slate-800/50'}
-                `}
-                            >
-                                {columns.map((column) => (
-                                    <td
-                                        key={column.key}
+                        <>
+                            {paddingTop > 0 && (
+                                <tr style={{ height: `${paddingTop}px` }}>
+                                    <td colSpan={columns.length} style={{ height: `${paddingTop}px`, padding: 0 }} />
+                                </tr>
+                            )}
+                            {virtualItems.map((item) => {
+                                const row = sortedData[item.index];
+                                const rowIndex = item.index;
+                                return (
+                                    <tr
+                                        key={row[keyField] || rowIndex}
+                                        onClick={() => onRowClick && onRowClick(row)}
                                         className={`
-                      px-6 py-4 whitespace-nowrap 
-                      text-sm text-gray-700 dark:text-slate-300
-                      ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'}
-                    `}
+                          transition-colors duration-150
+                          ${onRowClick ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50' : ''}
+                          ${rowIndex % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-gray-50/50 dark:bg-slate-800/50'}
+                        `}
+                                        style={{ height: '53px' }}
                                     >
-                                        {column.render ? column.render(row[column.key], row) : row[column.key]}
-                                    </td>
-                                ))}
-                            </tr>
-                        ))
+                                        {columns.map((column) => (
+                                            <td
+                                                key={column.key}
+                                                className={`
+                              px-6 py-4 whitespace-nowrap 
+                              text-sm text-gray-700 dark:text-slate-300
+                              ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'}
+                            `}
+                                            >
+                                                {column.render ? column.render(row[column.key], row) : row[column.key]}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                );
+                            })}
+                            {paddingBottom > 0 && (
+                                <tr style={{ height: `${paddingBottom}px` }}>
+                                    <td colSpan={columns.length} style={{ height: `${paddingBottom}px`, padding: 0 }} />
+                                </tr>
+                            )}
+                        </>
                     )}
                 </tbody>
             </table>

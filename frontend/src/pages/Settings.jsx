@@ -10,6 +10,10 @@ import { logout } from '../features/auth/authSlice';
 import { setThemeMode } from '../features/ui/uiSlice';
 import api from '../services/api';
 import { getCurrencySymbol } from '../utils/currency';
+import zxcvbn from '../utils/zxcvbn';
+import EmailTemplateEditor from '../components/common/EmailTemplateEditor';
+
+import { useToast } from '../context/ToastContext';
 
 // ── Icons for Sidebar (Copied from AddEmployee for consistency) ──
 const GridIcon = () => (
@@ -234,9 +238,51 @@ const ShieldIcon = () => (
   </svg>
 );
 
+function EmailTemplatesManager() {
+  const [templateHtml, setTemplateHtml] = useState('<p>Dear {{employeeName}},</p><p>Your payslip for {{month}} {{year}} is ready.</p>');
+  const [subject, setSubject] = useState('Payslip for {{month}} {{year}}');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.post('/api/email-templates', { name: 'Monthly Payslip', subject, htmlContent: templateHtml });
+      alert('Template saved successfully!');
+    } catch (err) {
+      alert('Failed to save template');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold text-gray-900 dark:text-white">Email Templates</h2>
+      <p className="text-sm text-gray-500 dark:text-slate-400">Customize the HTML content for automated notifications. Use the "Insert Variable" button to add dynamic data.</p>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Email Subject</label>
+          <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500" />
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1">Email Body (HTML)</label>
+          <EmailTemplateEditor initialContent={templateHtml} onChange={setTemplateHtml} />
+        </div>
+
+        <button onClick={handleSave} disabled={saving} className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg shadow-md transition-colors disabled:opacity-50">
+          {saving ? 'Saving...' : 'Save Template'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Settings() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { toast } = useToast();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const localCompanyName = localStorage.getItem('companyName') || 'Acme Corp';
@@ -345,8 +391,6 @@ export default function Settings() {
       .finally(() => setLoading(false));
   }, [localCompanyName, dispatch]);
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
   const handleSaveSettings = async () => {
     // Client-side validation before making the API call (#356)
     const errors = { fullName: '', email: '' };
@@ -355,7 +399,7 @@ export default function Settings() {
       errors.fullName = 'Full name cannot be empty.';
     }
 
-    if (!userProfile.email || !emailRegex.test(userProfile.email.trim())) {
+    if (!userProfile.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userProfile.email.trim())) {
       errors.email = 'Please enter a valid email address.';
     }
 
@@ -378,10 +422,10 @@ export default function Settings() {
       if (settings?.payrollConfig?.currency) {
         localStorage.setItem('currency', settings.payrollConfig.currency);
       }
-      alert('Settings updated successfully!');
+      toast.success('Settings updated successfully!');
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || 'Error saving settings.');
+      toast.error(err.response?.data?.message || 'Error saving settings.');
     }
   };
 
@@ -393,13 +437,13 @@ export default function Settings() {
     if (!file) return;
 
     if (!ALLOWED_TYPES.includes(file.type)) {
-      alert('Please select an image file (JPEG, PNG, WebP, or GIF).');
+      toast.error('Please select an image file (JPEG, PNG, WebP, or GIF).');
       e.target.value = '';
       return;
     }
 
     if (file.size > MAX_AVATAR_SIZE) {
-      alert('File size must be less than 2 MB.');
+      toast.error('File size must be less than 2 MB.');
       e.target.value = '';
       return;
     }
@@ -414,23 +458,27 @@ export default function Settings() {
   const handlePasswordUpdate = async () => {
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
     if (!currentPassword || !newPassword) {
-      return alert('Both current and new password are required.');
+      return toast.error('Both current and new password are required.');
     }
     if (!passwordRegex.test(newPassword)) {
-      return alert(
+      return toast.error(
         'New password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character.',
       );
+    }
+    const strength = zxcvbn(newPassword);
+    if (strength.score < 3) {
+      return toast.warning(`Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`);
     }
     try {
       await api.patch('/api/auth/security/password', {
         currentPassword,
         newPassword,
       });
-      alert('Password updated successfully!');
+      toast.success('Password updated successfully!');
       setCurrentPassword('');
       setNewPassword('');
     } catch (err) {
-      alert(err.response?.data?.message || 'Error updating password.');
+      toast.error(err.response?.data?.message || 'Error updating password.');
     }
   };
 
@@ -443,10 +491,10 @@ export default function Settings() {
       return;
     try {
       await api.patch('/api/auth/security/disconnect-google');
-      alert('Google account disconnected successfully!');
+      toast.success('Google account disconnected successfully!');
       setUserProfile((prev) => ({ ...prev, isGoogleLinked: false }));
     } catch (err) {
-      alert(
+      toast.error(
         err.response?.data?.message || 'Error disconnecting Google account.',
       );
     }
@@ -462,35 +510,35 @@ export default function Settings() {
       const res = await api.post('/api/auth/security/2fa/setup');
       setQrCodeData(res.data); // expects { qrCode, secret }
     } catch (err) {
-      alert(err.response?.data?.message || 'Error starting 2FA setup.');
+      toast.error(err.response?.data?.message || 'Error starting 2FA setup.');
     }
   };
 
   const handleConfirm2FA = async () => {
     if (!twoFactorCode || twoFactorCode.length !== 6) {
-      return alert('Enter the 6-digit code from your authenticator app.');
+      return toast.error('Enter the 6-digit code from your authenticator app.');
     }
     try {
       await api.post('/api/auth/security/2fa/verify', { code: twoFactorCode });
       setUserProfile((prev) => ({ ...prev, isTwoFactorEnabled: true }));
       setQrCodeData(null);
       setTwoFactorCode('');
-      alert('Two-factor authentication enabled!');
+      toast.success('Two-factor authentication enabled!');
     } catch (err) {
-      alert(err.response?.data?.message || 'Invalid code. Try again.');
+      toast.error(err.response?.data?.message || 'Invalid code. Try again.');
     }
   };
 
   const executeDeleteAccount = async () => {
     try {
       await api.delete('/api/auth/security/account');
-      alert('Account successfully deleted.');
+      toast.success('Account successfully deleted.');
       localStorage.removeItem('token');
       localStorage.removeItem('companyName');
       localStorage.removeItem('currency');
       navigate('/auth');
     } catch (err) {
-      alert(err.response?.data?.message || 'Error deleting account.');
+      toast.error(err.response?.data?.message || 'Error deleting account.');
     }
   };
 
@@ -523,10 +571,14 @@ export default function Settings() {
   ];
 
   const settingsTabs = [
+    { id: 'profile', label: 'Profile', icon: <UserIcon /> },
+    { id: 'account', label: 'Account Security', icon: <LockIcon /> },
     { id: 'preferences', label: 'Preferences', icon: <PaletteIcon /> },
     { id: 'company', label: 'Company Info', icon: <BuildingIcon /> },
     { id: 'payroll', label: 'Payroll Config', icon: <WalletIcon /> },
     { id: 'webhooks', label: 'Webhooks', icon: <WebhookIcon /> },
+    { id: 'emailTemplates', label: 'Email Templates', icon: <EmailIcon /> },
+    { id: 'notifications', label: 'Notifications', icon: <BellIcon /> },
     { id: 'about', label: 'About PaySphere', icon: <InfoIcon /> },
   ];
 
@@ -609,8 +661,8 @@ export default function Settings() {
                     setUserProfile({ ...userProfile, fullName: e.target.value })
                   }
                   className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.fullName
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                      : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                    : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
                     }`}
                 />
                 {profileErrors.fullName && (
@@ -630,8 +682,8 @@ export default function Settings() {
                     setUserProfile({ ...userProfile, email: e.target.value })
                   }
                   className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.email
-                      ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
-                      : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
+                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
+                    : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
                     }`}
                 />
                 {profileErrors.email && (
@@ -728,8 +780,8 @@ export default function Settings() {
                 </div>
                 <span
                   className={`px-2.5 py-1 rounded-full text-xs font-bold ${userProfile.isTwoFactorEnabled
-                      ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400'
-                      : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400'
+                    : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
                     }`}
                 >
                   {userProfile.isTwoFactorEnabled ? 'Enabled' : 'Disabled'}
@@ -842,7 +894,7 @@ export default function Settings() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={() =>
-                    alert('All other active sessions have been logged out.')
+                    toast.success('All other active sessions have been logged out.')
                   }
                   className="px-5 py-2.5 bg-white dark:bg-slate-800 text-gray-900 dark:text-white border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-bold transition hover:bg-gray-50 dark:hover:bg-slate-700"
                 >
@@ -1193,6 +1245,9 @@ export default function Settings() {
           </div>
         );
 
+      case 'emailTemplates':
+        return <EmailTemplatesManager />; // Component defined below or imported
+
       case 'notifications':
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -1494,8 +1549,8 @@ export default function Settings() {
                 setIsSidebarOpen(false);
               }}
               className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${item.id === 'settings'
-                  ? 'bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold'
-                  : 'text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
+                ? 'bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold'
+                : 'text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
                 }`}
             >
               {item.icon}
@@ -1582,8 +1637,8 @@ export default function Settings() {
                     aria-controls={`panel-${tab.id}`}
                     id={`tab-${tab.id}`}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === tab.id
-                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-100 dark:border-slate-800'
-                        : 'text-gray-500 dark:text-slate-500 hover:bg-white/60 dark:hover:bg-slate-900/50 hover:text-gray-900 dark:hover:text-white border border-transparent'
+                      ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-100 dark:border-slate-800'
+                      : 'text-gray-500 dark:text-slate-500 hover:bg-white/60 dark:hover:bg-slate-900/50 hover:text-gray-900 dark:hover:text-white border border-transparent'
                       }`}
                   >
                     <span

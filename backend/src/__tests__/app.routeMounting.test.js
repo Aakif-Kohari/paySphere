@@ -42,6 +42,26 @@ jest.mock('otplib', () => ({
   },
 }));
 
+// The same class of problem one layer out, and the reason this suite has never
+// actually run (#1008):
+//
+//     sanitize.middleware → utils/sanitizers → jsdom → parse5 / entities /
+//     @asamuzakjp/css-color …
+//
+// all pure ESM, none of it covered by `transformIgnorePatterns`. The suite died
+// on `Unexpected token 'export'` before its first assertion, which reads as a
+// broken environment rather than as a failing test — so the route-mounting
+// guard #792 added to stop routers going missing was itself missing, and two
+// unrelated boot failures sat behind it undetected.
+//
+// `app.security.test.js` already carries this stub with the same reasoning.
+// Pass-through, so it cannot weaken what is asserted below: sanitisation has no
+// say in whether a route is mounted.
+jest.mock(
+  '../middlewares/sanitize.middleware',
+  () => (req, res, next) => next(),
+);
+
 const app = require('../app');
 
 /**
@@ -71,7 +91,114 @@ const MOUNTED_ROUTES = [
     '/api/monthly-updates/000000000000000000000000',
   ],
   ['/api/expenses', 'get', '/api/expenses'],
+
+  // Mounted all along, but never probed here — the coverage gap the
+  // filesystem-derived checks below turned up while #1009 was being written.
+  // Each of these is a router the hand-written list simply never mentioned, so
+  // nothing would have noticed if a merge dropped one.
+  ['/api/roles', 'get', '/api/roles'],
+  ['/api/search', 'get', '/api/search'],
+  ['/api/integrations', 'get', '/api/integrations'],
+  ['/api/compliance', 'get', '/api/compliance/config'],
+  ['/api/email', 'post', '/api/email/webhooks'],
+
+  // Mounted in #1009. Each of these had a router, a controller, models and in
+  // most cases a frontend page, and no entry in the route table.
+  ['/api/assets', 'get', '/api/assets'],
+  ['/api/vendors', 'get', '/api/vendors/000000000000000000000000/ledger'],
+  ['/api/grievances', 'get', '/api/grievances/cases'],
+  ['/api/tax-proofs', 'get', '/api/tax-proofs/my-proofs'],
+  ['/api/appraisals', 'get', '/api/appraisals/my-review'],
+  ['/api/contracts', 'post', '/api/contracts/issue'],
+  ['/api/forecasts', 'get', '/api/forecasts'],
+  ['/api/accounting', 'get', '/api/accounting/mappings'],
+  ['/api/clients', 'get', '/api/clients/invoices/dashboard'],
+  ['/api/shifts', 'get', '/api/shifts/roster'],
+  ['/api/pyqs', 'get', '/api/pyqs'],
 ];
+
+/**
+ * Routes that are unauthenticated on purpose.
+ *
+ * Kept as an explicit, short list rather than as a `continue` buried in the
+ * loop: every entry here is a route anyone on the internet can call, so the set
+ * is worth being able to read in one place and worth having to justify a
+ * addition to.
+ *
+ *   /api/auth/login    — signing in is how you get a token.
+ *   /api/email/webhooks — the delivery-status receiver the email provider POSTs
+ *                        to. It has no session and cannot have one; it is
+ *                        authenticated by the provider's signature, and a
+ *                        request it cannot make sense of is a 400.
+ *
+ * `contract.routes.js` also exposes `/public/:token` for candidates who have no
+ * account, secured by an unguessable magic token. It is not probed here because
+ * the mount check uses the authenticated `POST /issue` instead.
+ */
+const PUBLIC_ROUTES = new Set(['/api/auth/login', '/api/email/webhooks']);
+
+/**
+ * The router files on disk, and the prefix each one is expected to answer on.
+ *
+ * The list above is hand-maintained, and that is exactly the property that let
+ * #1009 happen: it asserts the routers somebody remembered to add to it. A
+ * router nobody mounted is also a router nobody adds a test row for, so the
+ * guard agreed with the bug.
+ *
+ * This map is the other direction — it starts from `routes/*.routes.js`, so a
+ * new file with no mount is a failure by default rather than by diligence.
+ * Adding a router means adding one line here, and the test tells you so.
+ *
+ * `salaryHistory` and `varianceReport` are mounted on prefixes that another
+ * router already owns (`/api` and `/api/reports`), so they are recorded as
+ * sharing rather than as having one of their own.
+ */
+const ROUTER_MOUNTS = {
+  accounting: '/api/accounting',
+  appraisal: '/api/appraisals',
+  archive: '/api/archive',
+  asset: '/api/assets',
+  attendance: '/api/attendance',
+  audit: '/api/audit-logs',
+  clientInvoice: '/api/clients',
+  compliance: '/api/compliance',
+  contract: '/api/contracts',
+  dashboard: '/api/dashboard',
+  email: '/api/email',
+  employee: '/api/employees',
+  employeePortal: '/api/employee-portal',
+  expense: '/api/expenses',
+  flashcard: '/api/flashcards',
+  forecast: '/api/forecasts',
+  grievance: '/api/grievances',
+
+  // Mounted at the root — `app.use(healthRoutes)` with no prefix — on purpose,
+  // so Kubernetes and Prometheus can reach the probes without a token and
+  // without going through the /api rate limiter. Recorded as null so the
+  // "mounted in app.js" check below knows to look for the bare `app.use`
+  // rather than for a path string that does not exist.
+  health: null,
+
+  integration: '/api/integrations',
+  loan: '/api/loans',
+  monthlyUpdates: '/api/monthly-updates',
+  notification: '/api/notifications',
+  payroll: '/api/payroll',
+  pyq: '/api/pyqs',
+  reports: '/api/reports',
+  role: '/api/roles',
+  salaryHistory: '/api',
+  scheduler: '/api/schedules',
+  search: '/api/search',
+  settlement: '/api/settlements',
+  shiftRoster: '/api/shifts',
+  taxProof: '/api/tax-proofs',
+  user: '/api/auth',
+  varianceReport: '/api/reports',
+  vendor: '/api/vendors',
+  webhook: '/api/webhooks',
+  workflow: '/api/workflows',
+};
 
 describe('app route mounting (#792)', () => {
   it('serves the root probe', async () => {
@@ -96,12 +223,29 @@ describe('app route mounting (#792)', () => {
     // The other half of #663: a router mounted above the middleware stack is
     // reachable *and* unguarded. Every one of these should refuse an
     // anonymous caller rather than answering with data.
-    for (const [, method, path] of MOUNTED_ROUTES) {
-      if (path === '/api/auth/login') continue;
+    const unguarded = [];
 
-      const res = await request(app)[method](path);
-      expect([401, 403]).toContain(res.status);
+    for (const [, method, path] of MOUNTED_ROUTES) {
+      if (PUBLIC_ROUTES.has(path)) continue;
+
+      // `requireBody` is mounted on /api above the routers, so a POST with no
+      // body answers 400 before auth is ever consulted — which would read as
+      // "this route is unauthenticated" when it is nothing of the sort. A
+      // token-free body gets past it and leaves auth as the thing under test.
+      const res =
+        method === 'post'
+          ? await request(app)[method](path).send({ probe: true })
+          : await request(app)[method](path);
+
+      // Reported as a list rather than asserted per-iteration: a bare
+      // `expect(...).toContain(res.status)` inside a loop says only "400 was
+      // not 401" and leaves you to work out which of thirty routes it meant.
+      if (![401, 403].includes(res.status)) {
+        unguarded.push(`${method.toUpperCase()} ${path} → ${res.status}`);
+      }
     }
+
+    expect(unguarded).toEqual([]);
   });
 
   it('applies the security headers to a route from each duplicated table', async () => {
@@ -122,6 +266,109 @@ describe('app route mounting (#792)', () => {
       .set('Content-Type', 'application/json');
 
     expect(res.status).not.toBe(500);
+  });
+});
+
+/**
+ * The guard that would have caught #1009.
+ *
+ * Everything above starts from a list a person wrote. That is fine for
+ * asserting a route still works and useless for noticing one that was never
+ * added — eleven routers sat unmounted for months precisely because nobody who
+ * forgot the mount also remembered the test row.
+ *
+ * These start from the filesystem instead. `routes/*.routes.js` is the set of
+ * routers that exist; anything in it that cannot be reached is a bug by
+ * default.
+ */
+describe('every router on disk is mounted (#1009)', () => {
+  const fs = require('fs');
+  const path = require('path');
+
+  const ROUTES_DIR = path.join(__dirname, '..', 'routes');
+
+  const routerNames = fs
+    .readdirSync(ROUTES_DIR)
+    .filter((file) => file.endsWith('.routes.js'))
+    .map((file) => file.replace('.routes.js', ''))
+    .sort();
+
+  it('finds a plausible number of routers', () => {
+    // A guard on the guard: if the read breaks and returns [], every
+    // assertion below passes vacuously.
+    expect(routerNames.length).toBeGreaterThan(20);
+  });
+
+  const appSource = fs.readFileSync(
+    path.join(__dirname, '..', 'app.js'),
+    'utf8',
+  );
+
+  it.each(routerNames)('%s.routes.js has a declared mount path', (name) => {
+    // Failing here means a new router was added without a line in
+    // ROUTER_MOUNTS. The fix is to add one — and if the honest answer is "it is
+    // not mounted anywhere", to mount it in app.js first. That is the whole
+    // point: leaving a router unreachable has to be a deliberate act rather
+    // than an oversight.
+    expect(Object.prototype.hasOwnProperty.call(ROUTER_MOUNTS, name)).toBe(
+      true,
+    );
+  });
+
+  it.each(routerNames)('%s.routes.js is required by app.js', (name) => {
+    // Two separate things can go wrong and they fail differently: #896 had the
+    // mount without the import (ReferenceError at boot), #1009 had neither
+    // (a silent 404). This checks the import.
+    expect(appSource).toContain(`./routes/${name}.routes`);
+  });
+
+  it.each(routerNames)('%s.routes.js is mounted in app.js', (name) => {
+    const mount = ROUTER_MOUNTS[name];
+
+    if (mount === null) {
+      // Root-mounted: `app.use(healthRoutes)`, no path argument.
+      expect(appSource).toMatch(
+        new RegExp(`app\\.use\\(\\s*${name}Routes\\s*\\)`),
+      );
+      return;
+    }
+
+    expect(appSource).toContain(`'${mount}'`);
+  });
+
+  it('reaches every mount prefix over HTTP', async () => {
+    // The static checks above prove the lines are in the file. This proves
+    // Express agrees — a mount whose path is shadowed by an earlier router, or
+    // registered after the 404 handler, passes the grep and still 404s.
+    const unreachable = [];
+
+    for (const [prefix, method, probe] of MOUNTED_ROUTES) {
+      const res =
+        method === 'post'
+          ? await request(app)[method](probe).send({ probe: true })
+          : await request(app)[method](probe);
+
+      if (res.status === 404)
+        unreachable.push(`${method.toUpperCase()} ${probe} (${prefix})`);
+    }
+
+    expect(unreachable).toEqual([]);
+  });
+
+  it('has a probe in MOUNTED_ROUTES for every mount prefix', () => {
+    // Keeps the two lists honest with each other: a router can be listed in
+    // ROUTER_MOUNTS and still never be exercised over HTTP.
+    const probed = new Set(MOUNTED_ROUTES.map(([prefix]) => prefix));
+
+    // `health` is root-mounted (null) and covered by its own suite; `/api` and
+    // `/api/reports` are shared prefixes already probed by their primary
+    // router.
+    const notProbed = Object.values(ROUTER_MOUNTS)
+      .filter((prefix) => prefix !== null)
+      .filter((prefix) => !probed.has(prefix))
+      .filter((prefix) => !['/api', '/api/reports'].includes(prefix));
+
+    expect(notProbed).toEqual([]);
   });
 });
 

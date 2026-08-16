@@ -6,6 +6,7 @@ import FAQS from "../components/FAQS"
 import Contributors from "../components/Contributors"
 import Footer from "../components/Footer"
 import { Helmet } from "react-helmet-async";
+import "./Landing.css";
 
 // Helper component for floating background shapes
 const FloatingShape = ({ children, className, delay = "0s", duration = "6s" }) => (
@@ -28,13 +29,7 @@ export default function Landing() {
         <meta name="description" content="Automate your payroll, manage employees, and generate reports in minutes. Experience the simplest payroll tool for small businesses." />
       </Helmet>
 
-      {/* --- INLINE CSS FOR SMOOTH FLOATING ANIMATIONS --- */}
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-20px) rotate(5deg); }
-        }
-      `}</style>
+
 
       {/* --- BACKGROUND EFFECTS & SHAPES --- */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">

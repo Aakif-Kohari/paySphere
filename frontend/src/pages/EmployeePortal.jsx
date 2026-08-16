@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
-import EmployeePortalSkeleton from '../components/common/skeleton/EmployeePortalSkeleton';
+import DataGrid from '../components/common/DataGrid';
 import api from '../services/api';
 
 export default function EmployeePortal() {
@@ -44,6 +44,53 @@ export default function EmployeePortal() {
     date.setMonth(monthNum - 1);
     return date.toLocaleString('default', { month: 'long' });
   };
+
+  const columns = [
+    { 
+      key: 'period', 
+      label: 'Period', 
+      sortable: true,
+      render: (_, row) => <span className="font-semibold text-slate-900 dark:text-white">{getMonthName(row.month)} {row.year}</span>
+    },
+    { 
+      key: 'baseSalary', 
+      label: 'Base Salary', 
+      sortable: true, 
+      sortType: 'numeric',
+      render: (val) => <span className="text-slate-600 dark:text-slate-300">,1{val?.toLocaleString('en-IN')}</span> 
+    },
+    { 
+      key: 'overtimePay', 
+      label: 'Overtime Pay', 
+      sortable: true, 
+      sortType: 'numeric',
+      render: (val) => <span className="text-emerald-600 dark:text-emerald-400">+,1{val?.toLocaleString('en-IN')}</span> 
+    },
+    { 
+      key: 'leaveDeduction', 
+      label: 'Leave Deductions', 
+      sortable: true, 
+      sortType: 'numeric',
+      render: (val) => <span className="text-red-500 dark:text-red-400">-,1{val?.toLocaleString('en-IN')}</span> 
+    },
+    { 
+      key: 'netSalary', 
+      label: 'Net Payout', 
+      sortable: true, 
+      sortType: 'numeric',
+      render: (val) => <span className="font-bold text-blue-600 dark:text-blue-400">,1{val?.toLocaleString('en-IN')}</span> 
+    },
+    { 
+      key: 'status', 
+      label: 'Status', 
+      sortable: true,
+      render: (val) => (
+        <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+          {val}
+        </span>
+      )
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
@@ -101,8 +148,7 @@ export default function EmployeePortal() {
                   {profile?.fullName || 'Employee'}
                 </h1>
                 <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                  {employee?.role ? `${employee.role} • ` : ''}
-                  {profile?.companyName || 'PaySphere'}
+                  {employee?.role ? `${employee.role} ? ` : ''}{profile?.companyName || 'PaySphere'}
                 </p>
               </div>
 
@@ -113,7 +159,7 @@ export default function EmployeePortal() {
                       Base Monthly Salary
                     </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
-                      ₹{employee.monthlySalary?.toLocaleString('en-IN') || 0}
+                      ,1{employee.monthlySalary?.toLocaleString('en-IN') || 0}
                     </p>
                   </div>
                   <div>
@@ -121,7 +167,7 @@ export default function EmployeePortal() {
                       Overtime Rate
                     </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
-                      ₹{employee.overtimeRate || 0}/hr
+                      ,1{employee.overtimeRate || 0}/hr
                     </p>
                   </div>
                 </div>

@@ -1,7 +1,7 @@
-import { Alert, Snackbar } from '@mui/material';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import LoanSkeleton from '../components/common/skeleton/LoanSkeleton';
+import LoansSkeleton from '../components/common/skeleton/LoansSkeleton';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const MONTH_NAMES = [
   'Jan',
@@ -95,16 +95,14 @@ const Loans = () => {
   // before committing to a deduction that runs for months.
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState('');
-
-  const [toast, setToast] = useState({
-    open: false,
-    severity: 'success',
-    message: '',
-  });
+  const { toast: globalToast } = useToast();
 
   const notify = useCallback((severity, message) => {
-    setToast({ open: true, severity, message });
-  }, []);
+    if (severity === 'success') globalToast.success(message);
+    else if (severity === 'error') globalToast.error(message);
+    else if (severity === 'warning') globalToast.warning(message);
+    else globalToast.info(message);
+  }, [globalToast]);
 
   const fetchLoans = useCallback(async () => {
     setLoading(true);
@@ -502,7 +500,7 @@ const Loans = () => {
       )}
 
       {loading ? (
-        <LoanSkeleton />
+        <LoansSkeleton />
       ) : loans.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
           <p className="text-gray-500 dark:text-slate-500">
@@ -589,21 +587,6 @@ const Loans = () => {
           ))}
         </div>
       )}
-
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={5000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          severity={toast.severity}
-          onClose={() => setToast((t) => ({ ...t, open: false }))}
-          variant="filled"
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </div>
   );
 };

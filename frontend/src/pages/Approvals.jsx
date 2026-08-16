@@ -1,8 +1,7 @@
-import { Alert, Snackbar } from '@mui/material';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import ApprovalSkeleton from '../components/common/skeleton/ApprovalSkeleton';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const MONTH_NAMES = [
   'January',
@@ -97,16 +96,14 @@ const Approvals = () => {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [rejectTargets, setRejectTargets] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
-
-  const [toast, setToast] = useState({
-    open: false,
-    severity: 'success',
-    message: '',
-  });
+  const { toast: globalToast } = useToast();
 
   const notify = useCallback((severity, message) => {
-    setToast({ open: true, severity, message });
-  }, []);
+    if (severity === 'success') globalToast.success(message);
+    else if (severity === 'error') globalToast.error(message);
+    else if (severity === 'warning') globalToast.warning(message);
+    else globalToast.info(message);
+  }, [globalToast]);
 
   const fetchPending = useCallback(async () => {
     setLoading(true);
@@ -297,7 +294,7 @@ const Approvals = () => {
       )}
 
       {loading ? (
-        <ApprovalSkeleton />
+        <ApprovalsSkeleton />
       ) : pending.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
           <p className="text-gray-500 dark:text-slate-500">
@@ -448,21 +445,6 @@ const Approvals = () => {
           </div>
         </div>
       )}
-
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={5000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          severity={toast.severity}
-          onClose={() => setToast((t) => ({ ...t, open: false }))}
-          variant="filled"
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </div>
   );
 };

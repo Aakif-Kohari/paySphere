@@ -1,8 +1,7 @@
+import styles from './FAQS.module.css';
 import { useState } from "react";
-
 export default function FAQS() {
   const [openIndex, setOpenIndex] = useState(null);
-
   const faqs = [
     {
       q: "Is it really free for teams under 5?",
@@ -17,20 +16,16 @@ export default function FAQS() {
       a: "Absolutely. You can export one-click reports to your CA."
     }
   ];
-
   return (
-    <section id="faq" className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 max-w-4xl mx-auto transition-colors duration-200">
-
+    <section id="faq" className={styles.container}>
       {/* Heading */}
       <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-10 sm:mb-14 md:mb-16 tracking-tight text-slate-900 dark:text-white">
         Frequently Asked Questions
       </h2>
-
       {/* FAQs */}
       <div className="space-y-3 sm:space-y-4">
         {faqs.map((f, i) => {
           const isOpen = openIndex === i;
-
           return (
             <div
               key={i}
@@ -43,7 +38,6 @@ export default function FAQS() {
                 aria-controls={`faq-answer-${i}`}
               >
                 {f.q}
-
                 {/* Icon */}
                 <span
                   aria-hidden="true"
@@ -53,7 +47,6 @@ export default function FAQS() {
                   +
                 </span>
               </button>
-
               {/* Answer */}
               <div
                 id={`faq-answer-${i}`}
@@ -72,7 +65,6 @@ export default function FAQS() {
           );
         })}
       </div>
-
     </section>
   );
 }

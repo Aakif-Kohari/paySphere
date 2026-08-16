@@ -1,3 +1,4 @@
+import styles from './Contributors.module.css';
 import { useEffect, useState } from "react";
 
 export default function Contributors() {
@@ -30,7 +31,7 @@ export default function Contributors() {
   }, []);
 
   return (
-    <section id="contributors" className="px-4 sm:px-6 py-16 sm:py-24 overflow-hidden">
+    <section id="contributors" className={styles.container}>
       <div className="max-w-6xl mx-auto relative">
         
         {/* Section Header */}

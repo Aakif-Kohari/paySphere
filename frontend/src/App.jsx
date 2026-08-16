@@ -1,38 +1,52 @@
-import { useEffect, useMemo } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { logout } from './features/auth/authSlice';
-import Landing from './pages/Landing';
-import LoginSignUp from './pages/LoginSignUp';
-import Dashboard from './pages/Dashboard';
-import MonthlyUpdates from './pages/MonthlyUpdates';
-import AddEmployee from './pages/AddEmployee';
-import ResetPassword from './pages/ResetPassword';
-import Settings from './pages/Settings';
-import ProfileSettings from './pages/ProfileSettings';
-import Reports from './pages/Reports';
-import EmployeePortal from './pages/EmployeePortal';
-import NotFound from './pages/NotFound';
-import ProtectedRoute from './components/ProtectedRoute';
-import ScrollToTop from './components/common/ScrollToTop';
+import { createTheme, CssBaseline, ThemeProvider } from '@mui/material';
+import * as Sentry from '@sentry/react';
+import { Suspense, useEffect, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+
 import CommandPalette from './components/common/CommandPalette';
-import SystemHealth from './pages/SystemHealth';
-import Flashcards from './pages/Flashcards';
+import ScrollToTop from './components/common/ScrollToTop';
+import OfflineSyncIndicator from './components/OfflineSyncIndicator';
+import ProtectedRoute from './components/ProtectedRoute';
+import { ToastProvider } from './context/ToastContext';
+import { logout } from './features/auth/authSlice';
+import { NotFound, ROUTABLE } from './config/navigation';
+import RouteFallback from './components/common/RouteFallback';
+
 function App() {
   const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
   const themeMode = useSelector((state) => state.ui.themeMode);
 
-  // Synchronize Redux auth state when API interceptor detects expired/invalid auth
+  // Sync user context to Sentry (#770)
+  useEffect(() => {
+    if (user) {
+      Sentry.setUser({
+        id: user.id || user._id,
+        email: user.email,
+        username: user.name,
+      });
+    } else {
+      Sentry.setUser(null);
+    }
+  }, [user]);
+
+  // Synchronize Redux auth state when API interceptor
+  // detects expired/invalid authentication
   useEffect(() => {
     const handleAuthLogout = () => {
       dispatch(logout());
     };
+
     window.addEventListener('auth:logout', handleAuthLogout);
-    return () => window.removeEventListener('auth:logout', handleAuthLogout);
+
+    return () => {
+      window.removeEventListener('auth:logout', handleAuthLogout);
+    };
   }, [dispatch]);
 
-  // Sync dark class on html document element for Tailwind v4 custom dark variant
+  // Sync dark class on html document element
+  // for Tailwind v4 custom dark variant
   useEffect(() => {
     if (themeMode === 'dark') {
       document.documentElement.classList.add('dark');
@@ -60,88 +74,53 @@ function App() {
   return (
     <ThemeProvider theme={muiTheme}>
       <CssBaseline />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/auth" element={<LoginSignUp />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/employee-portal"
-            element={
-              <ProtectedRoute>
-                <EmployeePortal />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/monthly-updates"
-            element={
-              <ProtectedRoute>
-                <MonthlyUpdates />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/add-employee"
-            element={
-              <ProtectedRoute>
-                <AddEmployee />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/reset-password/:token" element={<ResetPassword />} />
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute>
-                <Settings />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <ProfileSettings />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/settings/system-health"
-            element={
-              <ProtectedRoute>
-                <SystemHealth />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/reports"
-            element={
-              <ProtectedRoute>
-                <Reports />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/flashcards"
-            element={
-              <ProtectedRoute>
-                <Flashcards />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        <ScrollToTop />
-        <CommandPalette />
-      </BrowserRouter>
+
+      <ToastProvider>
+        <BrowserRouter>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              {/* Built from `config/navigation.js` rather than written out
+                  here, so the router and the sidebar cannot disagree about
+                  which pages exist — which is how seventeen finished pages
+                  ended up with no route at all (#1012).
+
+                  `Page` is a local const rather than a destructured parameter
+                  on purpose: this project does not enable eslint-plugin-react,
+                  so `no-unused-vars` cannot tell that a name is used in JSX.
+                  The config exempts capitalised *variables* through
+                  `varsIgnorePattern`, and that exemption does not reach
+                  function arguments. */}
+              {ROUTABLE.map((route) => {
+                const Page = route.component;
+
+                return (
+                  <Route
+                    key={route.path}
+                    path={route.path}
+                    element={
+                      route.isProtected === false ? (
+                        <Page />
+                      ) : (
+                        <ProtectedRoute>
+                          <Page />
+                        </ProtectedRoute>
+                      )
+                    }
+                  />
+                );
+              })}
+
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+
+          <ScrollToTop />
+          <CommandPalette />
+
+          {/* Global Offline Sync Indicator (Issue #815) */}
+          <OfflineSyncIndicator />
+        </BrowserRouter>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

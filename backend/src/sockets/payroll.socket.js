@@ -5,8 +5,10 @@ const logger = require('../utils/logger');
 const {
   roomIdFor,
   PresenceRegistry,
+  LockRegistry,
   normalizeAdjustment,
 } = require('./payrollSession');
+const notificationRegistry = require('../notifications/registry');
 
 /**
  * The collaborative payroll session (#589), made tenant-safe (#615).
@@ -26,6 +28,7 @@ let io;
 
 /** Who is in which room. Module-level so `getPresence` can report on it. */
 const presence = new PresenceRegistry();
+const locks = new LockRegistry();
 
 /**
  * The signing secret, or a hard failure.
@@ -135,10 +138,20 @@ exports.init = (server) => {
     return next();
   });
 
+  // Hand the socket server to the notification registry (#952). Nothing called
+  // `setIO` before, so the in-app provider's `_io` was null for the life of the
+  // process and a notification only reached the client at its next poll.
+  notificationRegistry.setIO(io);
+
   io.on('connection', (socket) => {
     const { userId, tenantId, name } = socket.identity;
 
     logger.info('Payroll session socket connected', { userId, tenantId });
+
+    // The room a notification is pushed to. Keyed off `socket.identity`, which
+    // comes from the verified token — never from a payload, for the same reason
+    // the payroll room below is not (#615).
+    socket.join('user:' + userId);
 
     socket.on('join_payroll_session', ({ month, year } = {}) => {
       // Built from `socket.identity.tenantId`, never from the payload.
@@ -160,6 +173,7 @@ exports.init = (server) => {
       const roster = presence.join(roomId, { id: userId, name, socketId: socket.id });
 
       io.to(roomId).emit('active_users_update', roster);
+      socket.emit('active_locks_update', locks.getLocks(roomId));
     });
 
     socket.on('payroll_adjustment_change', (data) => {
@@ -183,8 +197,52 @@ exports.init = (server) => {
       });
     });
 
+    socket.on('payroll_row_lock', ({ empId } = {}) => {
+      if (!socket.roomId || !empId) return;
+
+      const success = locks.acquire(socket.roomId, empId, {
+        userId,
+        userName: name,
+        socketId: socket.id,
+      });
+
+      if (success) {
+        socket.to(socket.roomId).emit('payroll_row_locked', {
+          userId,
+          userName: name,
+          empId: String(empId),
+        });
+      } else {
+        socket.emit('payroll_session_error', {
+          message: 'Failed to acquire row lock',
+        });
+      }
+    });
+
+    socket.on('payroll_row_unlock', ({ empId } = {}) => {
+      if (!socket.roomId || !empId) return;
+
+      const success = locks.release(socket.roomId, empId, socket.id);
+      if (success) {
+        socket.to(socket.roomId).emit('payroll_row_unlocked', {
+          userId,
+          userName: name,
+          empId: String(empId),
+        });
+      }
+    });
+
     socket.on('disconnect', () => {
       if (!socket.roomId) return;
+
+      const releasedEmpIds = locks.releaseAllForSocket(socket.roomId, socket.id);
+      releasedEmpIds.forEach((empId) => {
+        socket.to(socket.roomId).emit('payroll_row_unlocked', {
+          userId,
+          userName: name,
+          empId,
+        });
+      });
 
       // Keyed by socket id, so a second tab closing does not remove someone who
       // is still connected on the first.
@@ -201,3 +259,4 @@ exports.getIo = () => io;
 
 /** The presence registry, for tests and for a health endpoint to report on. */
 exports.getPresence = () => presence;
+exports.getLocksRegistry = () => locks;

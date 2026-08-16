@@ -23,7 +23,6 @@ const {
   createDeck,
   getMyDecks,
   updateDeck,
-  deleteDeck,
   getCommunityDecks,
   cloneDeck,
 } = require('../flashcard.controller');
@@ -74,7 +73,11 @@ describe('Flashcard Controller Tests', () => {
         isPublic: false,
         cards: [{ front: '1+1', back: '2' }],
       };
-      FlashcardDeck.create.mockResolvedValue({ _id: 'deck1', ...body, tags: [] });
+      FlashcardDeck.create.mockResolvedValue({
+        _id: 'deck1',
+        ...body,
+        tags: [],
+      });
 
       await createDeck(buildReq(body), res, jest.fn());
 
@@ -85,7 +88,7 @@ describe('Flashcard Controller Tests', () => {
           tags: [],
           createdBy: USER_ID,
           tenantId: TENANT_ID,
-        })
+        }),
       );
       expect(generateSummaryTags).not.toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(201);
@@ -100,7 +103,11 @@ describe('Flashcard Controller Tests', () => {
         isPublic: true,
         cards: [{ front: 'What is ML?', back: 'Machine Learning' }],
       };
-      FlashcardDeck.create.mockResolvedValue({ _id: 'deck2', ...body, tags: ['ai', 'test'] });
+      FlashcardDeck.create.mockResolvedValue({
+        _id: 'deck2',
+        ...body,
+        tags: ['ai', 'test'],
+      });
 
       await createDeck(buildReq(body), res, jest.fn());
 
@@ -110,7 +117,7 @@ describe('Flashcard Controller Tests', () => {
           title: 'AI Trivia',
           isPublic: true,
           tags: ['ai', 'test'],
-        })
+        }),
       );
     });
   });
@@ -148,7 +155,7 @@ describe('Flashcard Controller Tests', () => {
       await updateDeck(
         buildReq({ title: 'New Title', isPublic: true }, {}, { id: 'deck1' }),
         res,
-        jest.fn()
+        jest.fn(),
       );
 
       expect(mockDeck.title).toBe('New Title');
@@ -168,7 +175,7 @@ describe('Flashcard Controller Tests', () => {
       await getCommunityDecks(
         buildReq({}, { subject: 'History', search: 'WWII' }),
         res,
-        jest.fn()
+        jest.fn(),
       );
 
       const [query] = FlashcardDeck.find.mock.calls[0];
@@ -197,7 +204,11 @@ describe('Flashcard Controller Tests', () => {
         tags: ['bio'],
         save: jest.fn().mockResolvedValue({}),
       };
-      FlashcardDeck.findById.mockResolvedValue(originalDeck);
+      // `findOne`, not `findById` (#1010). `cloneDeck` computed a tenant
+      // filter and then dropped it, fetching by bare id — so a deck belonging
+      // to another company was clonable. The filter is applied now, and the
+      // extra assertion below checks it rather than only the happy path.
+      FlashcardDeck.findOne.mockResolvedValue(originalDeck);
 
       const body = {
         title: 'Bio Trivia (Cloned)',
@@ -224,7 +235,7 @@ describe('Flashcard Controller Tests', () => {
           createdBy: USER_ID,
           tenantId: TENANT_ID,
           isPublic: false,
-        })
+        }),
       );
       expect(res.status).toHaveBeenCalledWith(201);
     });

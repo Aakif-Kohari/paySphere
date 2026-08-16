@@ -91,8 +91,21 @@ api.interceptors.response.use(
     }
 
     if (error.response.status === 401) {
+      const isBackground = originalRequest.isBackground || originalRequest.headers?.['X-Background-Request'] === 'true' || originalRequest.headers?.['x-background-request'] === 'true';
+
       if (originalRequest._retry) {
-        // Retried request failed with 401 again -> clear session & redirect
+        // Retried request failed with 401 again -> clear session & redirect (or handle background)
+        if (isBackground) {
+          window.dispatchEvent(
+            new CustomEvent("toast:show", {
+              detail: {
+                message: "Auto-save failed: Session expired. Please login again to save your work.",
+                severity: "warning",
+              },
+            })
+          );
+          return Promise.resolve({ data: { success: false, error: "Session expired" } });
+        }
         handleAuthFailure();
         return Promise.reject(error);
       }
@@ -106,6 +119,17 @@ api.interceptors.response.use(
             return api(originalRequest);
           })
           .catch((err) => {
+            if (isBackground) {
+              window.dispatchEvent(
+                new CustomEvent("toast:show", {
+                  detail: {
+                    message: "Auto-save failed: Session expired. Please login again to save your work.",
+                    severity: "warning",
+                  },
+                })
+              );
+              return Promise.resolve({ data: { success: false, error: "Session expired" } });
+            }
             handleAuthFailure();
             return Promise.reject(err);
           });
@@ -129,6 +153,17 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (err) {
         processQueue(err, null);
+        if (isBackground) {
+          window.dispatchEvent(
+            new CustomEvent("toast:show", {
+              detail: {
+                message: "Auto-save failed: Session expired. Please login again to save your work.",
+                severity: "warning",
+              },
+            })
+          );
+          return Promise.resolve({ data: { success: false, error: "Session expired" } });
+        }
         handleAuthFailure();
         return Promise.reject(err);
       } finally {

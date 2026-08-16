@@ -1,9 +1,8 @@
-import { Alert, Snackbar } from '@mui/material';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Pagination from '../components/common/Pagination';
-import SettlementSkeleton from '../components/common/skeleton/SettlementSkeleton';
 import SettlementsSkeleton from '../components/common/skeleton/SettlementsSkeleton';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const STATUS_LABELS = {
   draft: 'Draft',
@@ -99,15 +98,14 @@ const Settlements = () => {
 
   const [preview, setPreview] = useState(null);
   const [formError, setFormError] = useState('');
-  const [toast, setToast] = useState({
-    open: false,
-    severity: 'success',
-    message: '',
-  });
+  const { toast: globalToast } = useToast();
 
   const notify = useCallback((severity, message) => {
-    setToast({ open: true, severity, message });
-  }, []);
+    if (severity === 'success') globalToast.success(message);
+    else if (severity === 'error') globalToast.error(message);
+    else if (severity === 'warning') globalToast.warning(message);
+    else globalToast.info(message);
+  }, [globalToast]);
 
   const fetchSettlements = useCallback(async () => {
     setLoading(true);
@@ -534,7 +532,6 @@ const Settlements = () => {
 
       {loading ? (
         <SettlementSkeleton />
-        <SettlementsSkeleton />
       ) : settlements.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
           <p className="text-gray-500 dark:text-slate-400">
@@ -655,21 +652,6 @@ const Settlements = () => {
           />
         </div>
       )}
-
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={5000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          severity={toast.severity}
-          onClose={() => setToast((t) => ({ ...t, open: false }))}
-          variant="filled"
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
 import { useEffect, useState } from 'react';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const EVENT_LABELS = {
   EMPLOYEE_CREATE: 'Employee Created',
@@ -19,16 +20,8 @@ const getErrorMessage = (err) =>
 const formatDate = (value) =>
   value ? new Date(value).toLocaleString() : '—';
 
-const copyToClipboard = async (text) => {
-  try {
-    await navigator.clipboard.writeText(text);
-    alert('Secret copied to clipboard.');
-  } catch {
-    alert('Could not copy automatically. Please copy it manually.');
-  }
-};
-
 export default function WebhooksSection() {
+  const { toast } = useToast();
   const [webhooks, setWebhooks] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,12 +38,21 @@ export default function WebhooksSection() {
   const [deliveries, setDeliveries] = useState([]);
   const [deliveriesLoading, setDeliveriesLoading] = useState(false);
 
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Secret copied to clipboard.');
+    } catch {
+      toast.error('Could not copy automatically. Please copy it manually.');
+    }
+  };
+
   const loadWebhooks = () => {
     setLoading(true);
     api
       .get('/api/webhooks')
       .then((res) => setWebhooks(res.data || []))
-      .catch((err) => alert(getErrorMessage(err)))
+      .catch((err) => toast.error(getErrorMessage(err)))
       .finally(() => setLoading(false));
   };
 
@@ -107,7 +109,7 @@ export default function WebhooksSection() {
       };
       if (editingId) {
         await api.patch(`/api/webhooks/${editingId}`, payload);
-        alert('Webhook endpoint updated successfully!');
+        toast.success('Webhook endpoint updated successfully!');
       } else {
         const res = await api.post('/api/webhooks', payload);
         setRevealedSecret({
@@ -115,7 +117,7 @@ export default function WebhooksSection() {
           secret: res.data.secret,
           url: res.data.url,
         });
-        alert('Webhook endpoint created successfully!');
+        toast.success('Webhook endpoint created successfully!');
       }
       closeForm();
       loadWebhooks();
@@ -133,7 +135,7 @@ export default function WebhooksSection() {
       });
       loadWebhooks();
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -151,8 +153,9 @@ export default function WebhooksSection() {
         secret: res.data.secret,
         url: webhook.url,
       });
+      toast.success('Signing secret regenerated successfully.');
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -169,9 +172,10 @@ export default function WebhooksSection() {
         setShowDeliveriesFor(null);
         setDeliveries([]);
       }
+      toast.success('Webhook endpoint deleted successfully.');
       loadWebhooks();
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -189,7 +193,7 @@ export default function WebhooksSection() {
       setDeliveries(res.data || []);
     } catch (err) {
       setShowDeliveriesFor(null);
-      alert(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
     } finally {
       setDeliveriesLoading(false);
     }

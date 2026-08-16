@@ -1,13 +1,48 @@
 const express = require('express');
 const router = express.Router();
-const { getArchivedEmployees } = require('../controllers/archive.controller');
-// `auth.middleware` exports the middleware itself (`module.exports = auth`),
-// not an object containing it. Destructuring gave `undefined`, and
-// `router.get(path, undefined, handler)` throws at require time — so simply
-// mounting this router was enough to stop the server booting. Same shape as
-// the `verifyToken` destructure that broke #614.
+const {
+  getArchivedEmployees,
+  getArchivedEmployee,
+  anonymizeEmployee,
+  evaluateRetention,
+} = require('../controllers/archive.controller');
 const auth = require('../middlewares/auth.middleware');
+const { requirePermission } = require('../middlewares/rbac.middleware');
+const { requireTenantScope } = require('../utils/tenantScope');
+const { writeRateLimiter } = require('../middlewares/rateLimiter.middleware');
+const { PERMISSIONS } = require('../config/permissions');
 
-router.get('/employees', auth, getArchivedEmployees);
+router.get(
+  '/employees',
+  auth,
+  requireTenantScope(),
+  requirePermission(PERMISSIONS.READ_EMPLOYEE),
+  getArchivedEmployees,
+);
+
+router.get(
+  '/retention-check',
+  auth,
+  requireTenantScope(),
+  requirePermission(PERMISSIONS.READ_EMPLOYEE),
+  evaluateRetention,
+);
+
+router.get(
+  '/employees/:id',
+  auth,
+  requireTenantScope(),
+  requirePermission(PERMISSIONS.READ_EMPLOYEE),
+  getArchivedEmployee,
+);
+
+router.post(
+  '/employees/:id/anonymize',
+  auth,
+  requireTenantScope(),
+  requirePermission(PERMISSIONS.WRITE_EMPLOYEE),
+  writeRateLimiter,
+  anonymizeEmployee,
+);
 
 module.exports = router;

@@ -1,46 +1,79 @@
 {
-  "dashboard": {
-    "title": "Panel de Control",
-    "welcome": "Bienvenido de nuevo",
-    "totalEmployees": "Total de Empleados",
-    "monthlyPayroll": "Nómina Mensual",
-    "pendingApprovals": "Aprobaciones Pendientes",
-    "activeEmployees": "Empleados Activos",
-    "recentEmployees": "Empleados Recientes",
-    "employeeBreakdown": "Desglose de Empleados",
-    "noEmployees": "No se encontraron empleados",
-    "addFirstEmployee": "Agrega tu primer empleado para comenzar",
-    "viewAll": "Ver Todo",
-    "runPayroll": "Ejecutar Nómina",
-    "exportCsv": "Exportar CSV",
-    "searchEmployees": "Buscar empleados...",
-    "addEmployee": "Agregar Empleado",
-    "payrollHistory": "Historial de Nómina",
-    "reports": "Reportes"
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "search": "Buscar...",
+    "loading": "Cargando...",
+    "noData": "No hay datos disponibles",
+    "actions": "Acciones",
+    "status": "Estado",
+    "date": "Fecha",
+    "amount": "Monto",
+    "submit": "Enviar",
+    "back": "Volver"
   },
   "nav": {
     "dashboard": "Panel de Control",
     "employees": "Empleados",
     "payroll": "Nómina",
     "reports": "Reportes",
-    "loans": "Préstamos",
-    "approvals": "Aprobaciones",
     "settings": "Configuración",
+    "approvals": "Aprobaciones",
     "logout": "Cerrar Sesión"
+  },
+  "dashboard": {
+    "title": "Resumen del Panel",
+    "welcome": "Bienvenido de nuevo, {{name}}",
+    "stats": {
+      "totalEmployees": "Total de Empleados",
+      "activeEmployees": "Empleados Activos",
+      "monthlyPayroll": "Nómina Mensual",
+      "pendingApprovals": "Aprobaciones Pendientes"
+    },
+    "recentActivity": "Actividad Reciente",
+    "quickActions": "Acciones Rápidas",
+    "runPayroll": "Ejecutar Nómina",
+    "addEmployee": "Agregar Empleado"
+  },
+  "employees": {
+    "title": "Directorio de Empleados",
+    "addNew": "Agregar Nuevo Empleado",
+    "exportCsv": "Exportar CSV",
+    "exportPdf": "Exportar PDF",
+    "table": {
+      "name": "Nombre Completo",
+      "role": "Rol",
+      "department": "Departamento",
+      "salary": "Salario Mensual",
+      "status": "Estado"
+    },
+    "form": {
+      "personalInfo": "Información Personal",
+      "employmentDetails": "Detalles de Empleo",
+      "compensation": "Compensación",
+      "bankDetails": "Detalles Bancarios"
+    }
   },
   "settings": {
     "title": "Configuración",
+    "profile": "Perfil",
+    "security": "Seguridad de la Cuenta",
     "preferences": "Preferencias",
-    "language": "Idioma",
+    "company": "Información de la Empresa",
+    "payrollConfig": "Configuración de Nómina",
+    "notifications": "Notificaciones",
     "theme": "Tema",
-    "savePreferences": "Guardar Preferencias"
+    "language": "Idioma",
+    "lightMode": "Modo Claro",
+    "darkMode": "Modo Oscuro",
+    "systemDefault": "Predeterminado del Sistema"
   },
-  "common": {
-    "save": "Guardar Cambios",
-    "cancel": "Cancelar",
-    "delete": "Eliminar",
-    "edit": "Editar",
-    "loading": "Cargando...",
-    "noData": "No hay datos disponibles"
+  "errors": {
+    "required": "Este campo es obligatorio",
+    "invalidEmail": "Dirección de correo inválida",
+    "networkError": "Error de red. Por favor revise su conexión.",
+    "unauthorized": "Sesión expirada. Por favor inicie sesión nuevamente."
   }
 }

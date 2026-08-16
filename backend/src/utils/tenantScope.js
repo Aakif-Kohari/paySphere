@@ -101,6 +101,46 @@ function tenantFilter(req, extra = {}) {
 }
 
 /**
+ * Does this document belong to the request's tenant?
+ *
+ * `tenantFilter` is the right tool almost everywhere: putting the tenant in the
+ * query lets mongoose cast it, and makes a cross-tenant row unfetchable rather
+ * than merely unreturned. This exists for the few places that genuinely cannot
+ * — a document reached indirectly inside a transaction, where the id comes from
+ * another document rather than from the request.
+ *
+ * It exists at all because the hand-rolled version is wrong (#1010). Several
+ * controllers wrote some variation of
+ *
+ *     if (doc.tenantId.toString() !== req.tenantId) return res.status(404)…
+ *
+ * and `auth.middleware` sets `req.tenantId` from `user.tenantId`, which is an
+ * ObjectId. A string primitive is never strictly equal to an object, so that
+ * comparison is *always true* and the handler 404s for everybody — including
+ * the tenant that owns the row. It failed closed by luck. Written the other way
+ * round, as `if (doc.tenantId.toString() === req.tenantId)`, the identical
+ * mistake fails open.
+ *
+ * Both sides go through `String()` so it cannot matter whether either is an
+ * ObjectId, a string, or a populated document's `_id`.
+ *
+ * A missing tenant on either side is `false`, never a match — "unknown" must
+ * not read as "same".
+ *
+ * @param {unknown} documentTenantId
+ * @param {object} req
+ * @returns {boolean}
+ */
+function sameTenant(documentTenantId, req) {
+  const requestTenantId = getTenantId(req);
+
+  if (!requestTenantId) return false;
+  if (documentTenantId === undefined || documentTenantId === null) return false;
+
+  return String(documentTenantId) === String(requestTenantId);
+}
+
+/**
  * Express guard for routers whose every handler is tenant-scoped.
  *
  * Mount after `auth`. Cheaper than remembering to call `requireTenant` in
@@ -127,5 +167,6 @@ module.exports = {
   getTenantId,
   requireTenant,
   tenantFilter,
+  sameTenant,
   requireTenantScope,
 };
