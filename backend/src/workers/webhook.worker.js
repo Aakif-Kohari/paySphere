@@ -122,6 +122,8 @@ async function processWebhookJob(job) {
     if (attempt < 5) {
       const delays = [60000, 300000, 1800000, 7200000];
       deliveryLog.nextRetryAt = new Date(Date.now() + (delays[attempt - 1] || 0));
+    } else {
+      deliveryLog.isDlq = true;
     }
 
     // Save Failure Log. If the log write itself fails, the original webhook

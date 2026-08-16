@@ -59,6 +59,11 @@ const webhookDeliverySchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isDlq: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   { timestamps: true },
 );
