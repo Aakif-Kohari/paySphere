@@ -177,6 +177,53 @@ describe('the route table is well formed', () => {
   });
 });
 
+
+describe('route-level code splitting', () => {
+  const lazyType = Symbol.for('react.lazy');
+
+  it('keeps only first-paint routes eager', () => {
+    const publicFirstPaint = APP_ROUTES.filter(
+      (route) => route.path === '/' || route.path === '/auth',
+    );
+
+    expect(publicFirstPaint).toHaveLength(2);
+    expect(publicFirstPaint.every((route) => route.component?.$$typeof !== lazyType)).toBe(
+      true,
+    );
+
+    const resetPassword = APP_ROUTES.find(
+      (route) => route.path === '/reset-password/:token',
+    );
+    expect(resetPassword?.component?.$$typeof).toBe(lazyType);
+  });
+
+  it('lazy-loads every protected page route', () => {
+    const protectedRoutes = APP_ROUTES.filter(
+      (route) => route.isProtected !== false && route.component,
+    );
+
+    expect(protectedRoutes.length).toBeGreaterThan(20);
+
+    const eagerProtectedRoutes = protectedRoutes.filter(
+      (route) => route.component?.$$typeof !== lazyType,
+    );
+
+    expect(eagerProtectedRoutes).toEqual([]);
+  });
+
+  it('does not accidentally eager-import page modules in the registry', () => {
+    const eagerPageImports = registrySource
+      .split('\n')
+      .filter((line) => /^import .* from ['"]\\.\\.\\/pages\\//.test(line.trim()));
+
+    expect(eagerPageImports).toEqual([
+      "import Landing from '../pages/Landing';",
+      "import LoginSignUp from '../pages/LoginSignUp';",
+      "import NotFound from '../pages/NotFound';",
+    ]);
+  });
+});
+
 describe('navigationFor', () => {
   const labelsIn = (sections) =>
     sections.flatMap((section) => section.items.map((item) => item.label));
