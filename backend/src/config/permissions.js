@@ -485,6 +485,12 @@ const ROLE_DEFINITIONS = [
       // Employees see the roster they are on.
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.READ_PYQ,
+
+      // #1074. An employee who interviews files a scorecard; the interviewer is
+      // taken from `req.userId`, so this does not let one person file feedback
+      // under another's name. Deliberately not READ_REQUISITION, which exposes
+      // every candidate's expected and offered CTC.
+      PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
     ],
   },
 ];
