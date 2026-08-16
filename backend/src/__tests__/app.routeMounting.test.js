@@ -176,6 +176,7 @@ const ROUTER_MOUNTS = {
   compliance: '/api/compliance',
   contract: '/api/contracts',
   dashboard: '/api/dashboard',
+  disbursement: '/api/disbursements',
   email: '/api/email',
   employee: '/api/employees',
   employeePortal: '/api/employee-portal',

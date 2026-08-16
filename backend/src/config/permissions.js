@@ -375,24 +375,19 @@ const PERMISSION_DEFINITIONS = [
 
   // #1074.
   {
-    name: PERMISSIONS.READ_REQUISITION,
+    name: PERMISSIONS.READ_DISBURSEMENT,
     description:
-      'View job requisitions, candidates, interview scorecards and hiring funnel analytics',
+      'View salary disbursement batches, their control totals and which credits the bank returned',
   },
   {
-    name: PERMISSIONS.MANAGE_REQUISITION,
+    name: PERMISSIONS.MANAGE_DISBURSEMENT,
     description:
-      'Open, hold and close job requisitions, and set the approved CTC band every offer is checked against',
+      'Build and validate a disbursement batch, download the bank payment file, and record returns',
   },
   {
-    name: PERMISSIONS.MANAGE_CANDIDATE,
+    name: PERMISSIONS.RELEASE_DISBURSEMENT,
     description:
-      'Add candidates and move them through the hiring pipeline, including making offers and recording hires',
-  },
-  {
-    name: PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
-    description:
-      'Submit an interview scorecard for a candidate you interviewed',
+      'Release a validated disbursement batch for payment — the irreversible step that moves the money',
   },
 ];
 
