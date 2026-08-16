@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const Employee = require('../models/employee.model');
 const PayrollUpdate = require('../models/payroll.model');
 const User = require('../models/user.model');
+const ExchangeRate = require('../models/exchangeRate.model');
 const { calculateNetSalary } = require('../utils/salaryCalculator');
 const { generatePayrollCSV } = require('../utils/csvExport');
 const logger = require('../utils/logger');
@@ -710,6 +711,34 @@ exports.getExchangeRates = async (req, res, next) => {
 exports.submitPayrollForReview = async (req, res, next) => {
   let session = null;
   try {
+    // Load latest exchange rates
+    let rateDoc = await ExchangeRate.findOne().sort({ date: -1 });
+    if (!rateDoc) {
+      rateDoc = {
+        rates: new Map([
+          ['EUR', 0.92],
+          ['GBP', 0.79],
+          ['INR', 83.5],
+          ['CAD', 1.36],
+          ['AUD', 1.51],
+          ['JPY', 155.2],
+          ['SGD', 1.34],
+          ['USD', 1.0]
+        ])
+      };
+    }
+
+    const getRateVal = (target) => {
+      const targetUpper = (target || 'USD').toUpperCase();
+      if (targetUpper === 'USD') return 1.0;
+      if (rateDoc && rateDoc.rates) {
+        if (typeof rateDoc.rates.get === 'function') {
+          return rateDoc.rates.get(targetUpper) || 1.0;
+        }
+        return rateDoc.rates[targetUpper] || 1.0;
+      }
+      return 1.0;
+    };
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ message: 'Request body is required' });
     }
@@ -1266,7 +1295,11 @@ exports.submitPayrollForReview = async (req, res, next) => {
       const payrollData = {
         employeeId: item.employee._id,
         employeeName: item.employee.fullName,
-        currency: item.employee.currency || 'INR',
+        currency: item.employee.targetCurrency || item.employee.currency || 'USD',
+        targetCurrency: item.employee.targetCurrency || item.employee.currency || 'USD',
+        baseCurrency: item.employee.baseCurrency || 'USD',
+        exchangeRate: getRateVal(item.employee.targetCurrency || item.employee.currency || 'USD'),
+        convertedNetSalary: Math.round((item.netSalary / getRateVal(item.employee.targetCurrency || item.employee.currency || 'USD')) * 100) / 100,
         month: currentMonth,
         year: currentYear,
         baseSalary: item.baseSalary,
