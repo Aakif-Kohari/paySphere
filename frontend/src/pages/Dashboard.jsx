@@ -25,6 +25,8 @@ import Loans from './Loans';
 import Settlements from './Settlements';
 import Archive from './Archive';
 import ErrorBoundary, { ComponentFeedbackFallback } from '../components/common/ErrorBoundary';
+import VirtualizedTable from '../components/common/VirtualizedTable'; // Added for #1030
+import { EmployeeTableRow } from '../components/common/TableRow'; // Added for #1030
 
 
 // Accept international phone numbers with an optional leading "+" and
@@ -495,51 +497,35 @@ const EmployeeManagement = ({
         </div>
       </div>
 
-      {/* Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {employees.length === 0 && !search && !roleFilter ? (
-          <EmptyState
-            title="No employees yet"
-            description="Add employees to see their salary breakdown here."
-            action={
-              <button
-                onClick={onAddEmployee}
-                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-              >
-                + Add Employee
-              </button>
+      {/* Virtualized Employee Table (Issue #1030) */}
+      <div className="h-[600px] w-full">
+        {loading ? (
+          <div className="flex items-center justify-center h-full bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600"></div>
+          </div>
+        ) : (
+          <VirtualizedTable
+            data={employees}
+            renderRow={EmployeeTableRow}
+            rowHeight={64}
+            headerHeight={44}
+            header={
+              <div className="flex items-center px-6 h-full text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400 min-w-[900px]">
+                <div className="w-1/4 min-w-[200px]">Employee</div>
+                <div className="w-1/5 min-w-[120px]">Role</div>
+                <div className="w-1/5 min-w-[120px]">Department</div>
+                <div className="w-1/5 text-right min-w-[100px]">Salary</div>
+                <div className="w-1/5 text-center min-w-[100px]">Status</div>
+                <div className="w-16 min-w-[60px]"></div>
+              </div>
+            }
+            emptyState={
+              <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                <p className="text-lg font-semibold text-gray-700 dark:text-slate-300">No employees found</p>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Add your first employee to get started.</p>
+              </div>
             }
           />
-        ) : employees.length === 0 && (search || roleFilter) ? (
-          <EmptyState
-            title="No employees found"
-            description={`No employees match "${search || roleFilter}". Try a different name or role.`}
-          />
-        ) : (
-          employees.map((emp) => (
-            <EmployeeCard
-              key={emp._id}
-              emp={emp}
-              payroll={payrollMap[emp._id]}
-              variant="breakdown"
-              onDeleteEmployee={onDeleteEmployee}
-              onEdit={() => onEditEmployee(emp)}
-            />
-          ))
-        )}
-
-        {employees.length > 0 && (
-          <div
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
-            onClick={onAddEmployee}
-            className="border-2 border-dashed border-gray-300 dark:border-slate-800 rounded-xl flex items-center justify-center min-h-48 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-indigo-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition duration-200"
-          >
-            <p className="text-gray-500 dark:text-slate-500 font-semibold">
-              + Add more employees
-            </p>
-          </div>
         )}
       </div>
 
@@ -1208,6 +1194,71 @@ export default function PaySphereDashboard() {
             </button>
           </div>
         </header>
+        {/* Dynamic Content */}
+        <ErrorBoundary fallback={<ComponentFeedbackFallback />}>
+          {activePage === 'Approvals' ? (
+            <Approvals />
+          ) : activePage === 'Settlements' ? (
+            <Settlements />
+          ) : activePage === 'Loans' ? (
+            <Loans />
+          ) : activePage === 'Payroll' ? (
+            <PayrollTable
+              payrolls={paginatedPayrolls}
+              loading={payrollLoading}
+              currentPage={payrollPage}
+              totalPages={payrollTotalPages}
+              totalCount={payrollTotalCount}
+              setCurrentPage={setPayrollPage}
+            />
+          ) : activePage === 'Dashboard' ? (
+            <DashboardOverview
+              search={search}
+              setSearch={setSearch}
+              roleFilter={roleFilter}
+              setRoleFilter={setRoleFilter}
+              availableRoles={availableRoles}
+              filtered={filtered}
+              navigate={navigate}
+              onAddUpdate={() => navigate('/monthly-updates')}
+              onAddEmployee={() => navigate('/add-employee')}
+              totalPayout={totalPayout}
+              employeeCount={totalEmployees}
+              loading={loading}
+              payrolls={payrolls}
+              onEditEmployee={(emp) => setEmployeeToEdit(emp)}
+            />
+          ) : activePage === 'Archive' ? (
+            <Archive />
+          ) : (
+            <EmployeeManagement
+              search={search}
+              setSearch={setSearch}
+              roleFilter={roleFilter}
+              setRoleFilter={setRoleFilter}
+              availableRoles={availableRoles}
+              employees={filtered}
+              loading={loading}
+              onAddEmployee={() => navigate('/add-employee')}
+              onAddUpdate={() => navigate('/monthly-updates')}
+              payrolls={payrolls}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              setCurrentPage={setCurrentPage}
+              onDeleteEmployee={(emp) => setEmployeeToDelete(emp)}
+              onEditEmployee={(emp) => setEmployeeToEdit(emp)}
+            />
+          )}
+        </ErrorBoundary>
+
+        {/* Edit Form Modal (Steps 2-5) */}
+        {employeeToEdit && (
+          <EditEmployeeModal
+            employee={employeeToEdit}
+            onClose={() => setEmployeeToEdit(null)}
+            onSave={handleEditSubmit}
+          />
+        )}
 
         {/* Added BottomNavBar for mobile (Issue #1025) */}
         <BottomNavBar />
