@@ -52,7 +52,7 @@ export default function PayrollTable({ data = [], currency = 'INR' }) {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+        <table aria-label="Payroll records table" className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
           {/* Standardized Header: text-xs uppercase tracking-wider */}
           <thead className="bg-gray-50 dark:bg-slate-900/50">
             <tr>

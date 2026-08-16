@@ -249,6 +249,8 @@ const Loans = () => {
 
         <button
           onClick={() => setShowForm((v) => !v)}
+          aria-expanded={showForm}
+          aria-label={showForm ? 'Close advance form' : 'Issue an advance'}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition"
         >
           {showForm ? 'Close' : 'Issue an advance'}
@@ -470,6 +472,7 @@ const Loans = () => {
           <button
             key={status || 'all'}
             onClick={() => setStatusFilter(status)}
+            aria-label={`Filter by ${status ? STATUS_LABELS[status] : 'All'} status`}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
               statusFilter === status
                 ? 'bg-blue-600 text-white'
@@ -542,6 +545,7 @@ const Loans = () => {
                       <button
                         disabled={busy}
                         onClick={() => handleStatusChange(loan._id, 'on_hold')}
+                        aria-label={`Pause advance for ${loan.employeeName}`}
                         className="px-3 py-1.5 border border-amber-500 text-amber-600 dark:text-amber-400 rounded-lg text-sm font-semibold disabled:opacity-50"
                       >
                         Pause
@@ -550,6 +554,7 @@ const Loans = () => {
                       <button
                         disabled={busy}
                         onClick={() => handleStatusChange(loan._id, 'active')}
+                        aria-label={`Resume advance for ${loan.employeeName}`}
                         className="px-3 py-1.5 border border-green-500 text-green-600 dark:text-green-400 rounded-lg text-sm font-semibold disabled:opacity-50"
                       >
                         Resume
@@ -558,6 +563,7 @@ const Loans = () => {
                     <button
                       disabled={busy}
                       onClick={() => handleStatusChange(loan._id, 'cancelled')}
+                      aria-label={`Cancel advance for ${loan.employeeName}`}
                       className="px-3 py-1.5 border border-red-500 text-red-600 dark:text-red-400 rounded-lg text-sm font-semibold disabled:opacity-50"
                     >
                       Cancel

@@ -110,7 +110,7 @@ export default function DataTable({
 
     return (
         <div className="w-full overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700" aria-label="Data table">
                 {/* Standardized Table Header: text-xs uppercase tracking-wider */}
                 <thead className="bg-gray-50 dark:bg-slate-900/50">
                     <tr>
@@ -131,6 +131,7 @@ export default function DataTable({
                                         ? sortConfig.direction === 'asc' ? 'ascending' : 'descending'
                                         : 'none'
                                 }
+                                aria-label={column.sortable ? `Sort by ${column.label}` : undefined}
                             >
                                 <div className={`flex items-center gap-1 ${column.align === 'right' ? 'justify-end' : column.align === 'center' ? 'justify-center' : 'justify-start'
                                     }`}>

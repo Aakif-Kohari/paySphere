@@ -70,12 +70,14 @@ export default function EmployeePortal() {
           <ThemeToggle />
           <button
             onClick={() => navigate('/profile')}
+            aria-label="Profile Settings"
             className="px-3.5 py-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition"
           >
             Profile Settings
           </button>
           <button
             onClick={handleSignOut}
+            aria-label="Sign Out"
             className="px-3.5 py-1.5 text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"
           >
             Sign Out
@@ -138,7 +140,7 @@ export default function EmployeePortal() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
+                  <table aria-label="Payslip History Table" className="w-full text-left text-sm">
                     <thead>
                       <tr className="border-b border-gray-200 dark:border-slate-800 text-gray-400 dark:text-slate-400 uppercase text-xs">
                         <th className="py-3 px-4">Period</th>

@@ -355,6 +355,7 @@ const Approvals = () => {
                       type="checkbox"
                       checked={selectedIds.has(p._id)}
                       onChange={() => toggleOne(p._id)}
+                      aria-label={`Select ${p.employeeName}`}
                       className="w-4 h-4"
                     />
                     <div>
@@ -377,6 +378,7 @@ const Approvals = () => {
                     <button
                       disabled={busy}
                       onClick={() => handleApprove([p._id])}
+                      aria-label={`Approve ${p.employeeName}`}
                       className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm transition"
                     >
                       Approve
@@ -384,6 +386,7 @@ const Approvals = () => {
                     <button
                       disabled={busy}
                       onClick={() => setRejectTargets([p._id])}
+                      aria-label={`Reject ${p.employeeName}`}
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm transition"
                     >
                       Reject
@@ -397,7 +400,7 @@ const Approvals = () => {
       )}
 
       {rejectTargets && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="Reject payroll record" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-900 p-6 rounded-xl w-full max-w-md">
             <h3 className="text-lg font-bold mb-1 text-gray-900 dark:text-white">
               Reject {rejectTargets.length} payroll record
@@ -412,6 +415,7 @@ const Approvals = () => {
               <textarea
                 className="w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent mb-1 text-gray-900 dark:text-white min-h-24 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 placeholder="Reason for rejection…"
+                aria-label="Reason for rejection"
                 value={rejectReason}
                 maxLength={MAX_REASON_LENGTH}
                 onChange={(e) => setRejectReason(e.target.value)}

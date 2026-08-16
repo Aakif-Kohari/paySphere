@@ -46,6 +46,7 @@ function SortableCard({ id, title, value, subtitle }) {
     <div
       ref={setNodeRef}
       style={style}
+      aria-label={`Draggable dashboard preview card: ${title}`}
       className="rounded-3xl border border-gray-200 dark:border-slate-800 bg-white/90 dark:bg-slate-950/90 p-5 shadow-xl"
       {...attributes}
       {...listeners}

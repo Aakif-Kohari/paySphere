@@ -66,7 +66,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-900/85 backdrop-blur-md border-b border-gray-100 dark:border-slate-800 transition-colors duration-200">
+    <nav aria-label="Main navigation" className="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-900/85 backdrop-blur-md border-b border-gray-100 dark:border-slate-800 transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-20 flex justify-between items-center">
 
         {/* Logo */}
@@ -100,6 +100,8 @@ export default function Navbar() {
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="relative p-2 text-gray-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors focus:outline-none"
                 aria-label="Notifications"
+                aria-expanded={showNotifications}
+                aria-haspopup="true"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -113,7 +115,7 @@ export default function Navbar() {
 
               {/* Notification Dropdown */}
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-xl py-3 z-50">
+                <div role="region" aria-label="Notifications panel" className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-xl py-3 z-50">
                   <div className="flex items-center justify-between px-4 pb-2 border-b border-gray-100 dark:border-slate-800">
                     <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Notifications</h3>
                     {unreadCount > 0 && (
@@ -151,6 +153,7 @@ export default function Navbar() {
                               onClick={() => handleMarkAsRead(notif._id)}
                               className="w-2 h-2 rounded-full bg-blue-600 mt-1 shrink-0"
                               title="Mark as read"
+                              aria-label={`Mark notification "${notif.title}" as read`}
                             />
                           )}
                         </div>
@@ -182,7 +185,8 @@ export default function Navbar() {
           <button
             className="flex flex-col gap-1 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             onClick={() => setIsOpen(!isOpen)}
-            aria-label="Toggle menu"
+            aria-label={isOpen ? "Close menu" : "Open menu"}
+            aria-expanded={isOpen}
           >
             <span className="w-6 h-0.5 bg-black dark:bg-white transition-colors"></span>
             <span className="w-6 h-0.5 bg-black dark:bg-white transition-colors"></span>

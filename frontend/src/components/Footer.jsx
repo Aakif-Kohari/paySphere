@@ -19,7 +19,7 @@ export default function Footer() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-              <Link to="/auth?mode=signup" className="w-full cursor-pointer sm:w-auto bg-white text-blue-600 text-base sm:text-lg font-bold px-6 sm:px-10 py-3 sm:py-4 rounded-xl shadow-xl transition-all hover:scale-105 active:scale-95">
+              <Link to="/auth?mode=signup" aria-label="Start your free trial" className="w-full cursor-pointer sm:w-auto bg-white text-blue-600 text-base sm:text-lg font-bold px-6 sm:px-10 py-3 sm:py-4 rounded-xl shadow-xl transition-all hover:scale-105 active:scale-95">
                 Start Your Free Trial
               </Link>
             </div>
@@ -32,7 +32,7 @@ export default function Footer() {
       </section>
 
       {/* Footer */}
-      <footer className="pt-20 sm:pt-24 md:pt-32 pb-12 sm:pb-16 px-4 sm:px-6 border-t border-gray-100 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-900/10 transition-colors duration-200">
+      <footer aria-label="Site footer" className="pt-20 sm:pt-24 md:pt-32 pb-12 sm:pb-16 px-4 sm:px-6 border-t border-gray-100 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-900/10 transition-colors duration-200">
         <div className="max-w-7xl mx-auto">
 
           {/* Grid */}
@@ -85,6 +85,7 @@ export default function Footer() {
               <form className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
+                  aria-label="Subscribe to newsletter"
                   className="bg-blue-600 cursor-pointer hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-blue-100 dark:shadow-none transition-all active:scale-95 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 >
                   Join

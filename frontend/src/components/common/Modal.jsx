@@ -7,7 +7,7 @@
  * Issue: #686
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 import CloseIcon from '@mui/icons-material/Close';
@@ -26,6 +26,9 @@ export default function Modal({
 }) {
   const modalRef = useRef(null);
   const previousActiveElement = useRef(null);
+  const generatedId = useId();
+  const titleId = `modal-title-${generatedId}`;
+  const descriptionId = `modal-description-${generatedId}`;
 
   /**
    * Traps focus inside the modal. When the user tabs past the last element,
@@ -100,12 +103,12 @@ export default function Modal({
         tabIndex={-1} // Allows the div itself to receive focus for screen reader announcement
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
-        aria-describedby="modal-description"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
         className={`relative w-full ${maxWidth} mx-4 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 max-h-[90vh] flex flex-col outline-none`}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700">
-          <h2 id="modal-title" className="text-lg font-bold text-gray-900 dark:text-white">
+          <h2 id={titleId} className="text-lg font-bold text-gray-900 dark:text-white">
             {title}
           </h2>
           <button
@@ -117,7 +120,7 @@ export default function Modal({
           </button>
         </div>
 
-        <div id="modal-description" className="px-6 py-4 overflow-y-auto flex-1 text-sm text-gray-700 dark:text-slate-300">
+        <div id={descriptionId} className="px-6 py-4 overflow-y-auto flex-1 text-sm text-gray-700 dark:text-slate-300">
           {children}
         </div>
 

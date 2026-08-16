@@ -76,6 +76,7 @@ export default function Contributors() {
                   href={contributor.html_url}
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label={`View ${contributor.login}'s GitHub profile`}
                   className="group relative flex flex-col items-center p-6 rounded-2xl border border-gray-200 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/30 hover:bg-white dark:hover:bg-slate-800/80 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-in fade-in zoom-in focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   style={{ animationDelay: `${(index % 15) * 50}ms` }}
                 >
