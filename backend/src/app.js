@@ -89,6 +89,12 @@ const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
 const pyqRoutes = require('./routes/pyq.routes');
 
+// Business travel, per-diem and advance settlement (#1077). `expenseClaim` is
+// for money already spent; a trip is pre-approved, funded in advance, and its
+// per-diem has no receipt at all — so an unspent advance was a receivable
+// nothing in the product tracked.
+const travelRoutes = require('./routes/travel.routes');
+
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
 // module threw `ReferenceError: roleRoutes is not defined`. Same damage as
@@ -400,6 +406,10 @@ app.use('/api/clients', clientInvoiceRoutes);
 app.use('/api/shifts', shiftRosterRoutes);
 
 app.use('/api/pyqs', pyqRoutes);
+
+// Business travel (#1077). The router owns `/policies`, `/requests`,
+// `/advances` and `/my-trips`.
+app.use('/api/travel', travelRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.

@@ -135,6 +135,21 @@ const PERMISSIONS = {
   // account in any tenant could bulk-upload questions and trigger forecast
   // generation.
   MANAGE_PYQ: 'MANAGE_PYQ',
+
+  // --- Business travel (#1077) ---------------------------------------------
+  READ_TRAVEL: 'READ_TRAVEL',
+  // Filing a trip you are about to take. Held by employees — that is the point
+  // of the feature.
+  SUBMIT_TRAVEL_REQUEST: 'SUBMIT_TRAVEL_REQUEST',
+  // Approving a trip, releasing an advance and settling it. Kept apart from
+  // submission for the same reason APPROVE_EXPENSE is kept apart from
+  // WRITE_EXPENSE: whoever asks for the money should not be the only person
+  // standing between it and a bank transfer.
+  APPROVE_TRAVEL: 'APPROVE_TRAVEL',
+  // The grade x city-class rate table decides what everybody in the company is
+  // entitled to, so editing it is not a per-trip decision. Same class of
+  // authority as MANAGE_EXPENSE_CATEGORY.
+  MANAGE_TRAVEL_POLICY: 'MANAGE_TRAVEL_POLICY',
 };
 
 const PERMISSION_DEFINITIONS = [
@@ -299,6 +314,27 @@ const PERMISSION_DEFINITIONS = [
     description:
       'Add and bulk-upload previous-year questions, and generate trend forecasts',
   },
+
+  // #1077.
+  {
+    name: PERMISSIONS.READ_TRAVEL,
+    description:
+      'View travel policies, trips, settlements and the outstanding travel-advance ledger',
+  },
+  {
+    name: PERMISSIONS.SUBMIT_TRAVEL_REQUEST,
+    description: 'Submit your own business travel requests and view your trips',
+  },
+  {
+    name: PERMISSIONS.APPROVE_TRAVEL,
+    description:
+      'Approve or reject a travel request, release a travel advance, and settle a trip against actuals',
+  },
+  {
+    name: PERMISSIONS.MANAGE_TRAVEL_POLICY,
+    description:
+      'Set the per-diem rates, lodging caps and travel-class entitlements every grade is paid under',
+  },
 ];
 
 // --- Roles -----------------------------------------------------------------
@@ -365,6 +401,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.VERIFY_TAX_PROOF,
       PERMISSIONS.READ_PYQ,
       PERMISSIONS.MANAGE_PYQ,
+
+      // #1077.
+      PERMISSIONS.READ_TRAVEL,
+      PERMISSIONS.SUBMIT_TRAVEL_REQUEST,
+      PERMISSIONS.APPROVE_TRAVEL,
+      PERMISSIONS.MANAGE_TRAVEL_POLICY,
     ],
   },
   {
@@ -412,6 +454,15 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.SUBMIT_TAX_PROOF,
       PERMISSIONS.VERIFY_TAX_PROOF,
       PERMISSIONS.READ_PYQ,
+
+      // #1077. HR approves trips, releases advances and settles them — the same
+      // shape as APPROVE_EXPENSE, which it also holds. Not
+      // MANAGE_TRAVEL_POLICY: the rate table decides what everybody is entitled
+      // to, and that stays with the owner for the same reason
+      // MANAGE_EXPENSE_CATEGORY does.
+      PERMISSIONS.READ_TRAVEL,
+      PERMISSIONS.SUBMIT_TRAVEL_REQUEST,
+      PERMISSIONS.APPROVE_TRAVEL,
     ],
   },
   {
@@ -445,6 +496,12 @@ const ROLE_DEFINITIONS = [
       // Employees see the roster they are on.
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.READ_PYQ,
+
+      // #1077. Filing a trip and seeing your own. `createRequest` falls back to
+      // the caller's own employee record when no id is sent, and `getMyTrips`
+      // resolves from `req.userId`, so holding this does not let one employee
+      // file against a colleague.
+      PERMISSIONS.SUBMIT_TRAVEL_REQUEST,
     ],
   },
 ];
