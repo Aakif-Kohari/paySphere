@@ -89,6 +89,12 @@ const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
 const pyqRoutes = require('./routes/pyq.routes');
 
+// Stock option schemes, grants, vesting and exercises (#1073). Equity was the
+// one component of total compensation with no model, no route and no
+// calculator — and exercising an option is a taxable perquisite the employer
+// has to withhold on, so it is payroll's business and not just HR's.
+const esopRoutes = require('./routes/esop.routes');
+
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
 // module threw `ReferenceError: roleRoutes is not defined`. Same damage as
@@ -400,6 +406,10 @@ app.use('/api/clients', clientInvoiceRoutes);
 app.use('/api/shifts', shiftRosterRoutes);
 
 app.use('/api/pyqs', pyqRoutes);
+
+// Equity (#1073). The router owns `/schemes`, `/grants` and `/my-grants`, so
+// the prefix carries no noun of its own.
+app.use('/api/esop', esopRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.

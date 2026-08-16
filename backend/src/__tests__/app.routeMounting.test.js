@@ -115,6 +115,9 @@ const MOUNTED_ROUTES = [
   ['/api/clients', 'get', '/api/clients/invoices/dashboard'],
   ['/api/shifts', 'get', '/api/shifts/roster'],
   ['/api/pyqs', 'get', '/api/pyqs'],
+
+  // Mounted in #1073.
+  ['/api/esop', 'get', '/api/esop/schemes'],
 ];
 
 /**
@@ -167,6 +170,7 @@ const ROUTER_MOUNTS = {
   email: '/api/email',
   employee: '/api/employees',
   employeePortal: '/api/employee-portal',
+  esop: '/api/esop',
   expense: '/api/expenses',
   flashcard: '/api/flashcards',
   forecast: '/api/forecasts',
