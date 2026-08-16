@@ -6,7 +6,8 @@
  * 
  * Issue: #1020
  */
-import { useEffect, useCallback } from 'react';
+
+import { useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
@@ -34,6 +35,12 @@ export default function Modal({
 }) {
   // Initialize focus trap with scroll locking
   const modalRef = useFocusTrap(isOpen, { returnFocus: true, lockScroll: true });
+
+  // Unique per-instance ids so aria-labelledby/aria-describedby don't collide
+  // when more than one Modal is mounted at once.
+  const generatedId = useId();
+  const titleId = `modal-title-${generatedId}`;
+  const descriptionId = `modal-description-${generatedId}`;
 
   /**
    * Handles Escape key to close the modal
@@ -74,8 +81,8 @@ export default function Modal({
         ref={modalRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
-        aria-describedby="modal-description"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
         className={`
           relative w-full ${maxWidth} 
           bg-white dark:bg-slate-800 
@@ -89,7 +96,7 @@ export default function Modal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex-shrink-0">
           <h2
-            id="modal-title"
+            id={titleId}
             className="text-lg font-bold text-gray-900 dark:text-white"
           >
             {title}
@@ -105,7 +112,7 @@ export default function Modal({
 
         {/* Body */}
         <div
-          id="modal-description"
+          id={descriptionId}
           className="px-6 py-4 overflow-y-auto flex-1 text-sm text-gray-700 dark:text-slate-300"
         >
           {children}

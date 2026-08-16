@@ -1160,6 +1160,7 @@ export default function PaySphereDashboard() {
             <button
               className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => setIsSidebarOpen(true)}
+              aria-label="Open navigation sidebar"
             >
               ☰
             </button>
@@ -1178,6 +1179,7 @@ export default function PaySphereDashboard() {
             <ThemeToggle />
             <button
               onClick={() => navigate('/profile')}
+              aria-label="Profile settings"
               className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
               {getInitials(companyName)}
@@ -1188,6 +1190,7 @@ export default function PaySphereDashboard() {
                 localStorage.removeItem('companyName');
                 navigate('/');
               }}
+              aria-label="Sign Out"
               className="px-3 py-1.5 cursor-pointer text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"
             >
               Sign Out

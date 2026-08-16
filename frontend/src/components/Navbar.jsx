@@ -118,7 +118,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className={styles.container}>
+    <nav aria-label="Main navigation" className={styles.container}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-20 flex justify-between items-center">
         {/* Logo */}
         <div className="flex items-center gap-6">
@@ -171,6 +171,8 @@ export default function Navbar() {
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="relative p-2 text-gray-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors focus:outline-none"
                 aria-label="Notifications"
+                aria-expanded={showNotifications}
+                aria-haspopup="true"
               >
                 <svg
                   className="w-6 h-6"
@@ -194,7 +196,7 @@ export default function Navbar() {
 
               {/* Notification Dropdown */}
               {showNotifications && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-xl py-3 z-50">
+                <div role="region" aria-label="Notifications panel" className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-xl py-3 z-50">
                   <div className="flex items-center justify-between px-4 pb-2 border-b border-gray-100 dark:border-slate-800">
                     <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
                       Notifications
@@ -302,7 +304,8 @@ export default function Navbar() {
           <button
             className="flex flex-col gap-1 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             onClick={() => setIsOpen(!isOpen)}
-            aria-label="Toggle menu"
+            aria-label={isOpen ? "Close menu" : "Open menu"}
+            aria-expanded={isOpen}
           >
             <span className="w-6 h-0.5 bg-black dark:bg-white transition-colors"></span>
             <span className="w-6 h-0.5 bg-black dark:bg-white transition-colors"></span>

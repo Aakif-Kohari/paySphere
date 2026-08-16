@@ -282,6 +282,9 @@ export default function AttendanceCalendarModal({ isOpen, onClose, employee, onA
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Muster Roll Calendar for ${employee?.fullName || 'employee'}`}
       style={{
         position: "fixed",
         inset: 0,
@@ -332,6 +335,7 @@ export default function AttendanceCalendarModal({ isOpen, onClose, employee, onA
           </div>
           <button
             onClick={onClose}
+            aria-label="Close modal"
             style={{
               background: "none",
               border: "none",
@@ -393,6 +397,7 @@ export default function AttendanceCalendarModal({ isOpen, onClose, employee, onA
           <div style={{ display: "flex", gap: "6px" }}>
             <button
               onClick={() => handleMarkAll("PRESENT")}
+              aria-label="Mark all days as present"
               style={{
                 fontSize: "12px",
                 fontWeight: 600,
@@ -518,6 +523,7 @@ export default function AttendanceCalendarModal({ isOpen, onClose, employee, onA
                 <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
                   key={d}
                   onClick={() => handleTileClick(d)}
+                  aria-label={`Day ${d}: ${cfg.label}. Click to cycle status.`}
                   style={{
                     height: "58px",
                     borderRadius: "10px",
@@ -559,6 +565,7 @@ export default function AttendanceCalendarModal({ isOpen, onClose, employee, onA
                           setSelectedDayForOt(d);
                           setOtInput(String(dayState.otHours || 2));
                         }}
+                        aria-label={`Edit overtime hours for Day ${d}`}
                         style={{
                           fontSize: "10px",
                           fontWeight: 700,
@@ -701,6 +708,7 @@ export default function AttendanceCalendarModal({ isOpen, onClose, employee, onA
               step="0.5"
               value={otInput}
               onChange={(e) => setOtInput(e.target.value)}
+              aria-label={`Overtime hours for Day ${selectedDayForOt}`}
               style={{
                 width: "100%",
                 padding: "8px 12px",

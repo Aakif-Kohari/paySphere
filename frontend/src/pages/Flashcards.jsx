@@ -265,7 +265,8 @@ export default function Flashcards() {
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate('/dashboard')}
-              className="p-2 -ml-2 text-gray-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none"
+              aria-label="Back to dashboard"
+              className="p-1 rounded-md text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition"
             >
               <ArrowBackIcon />
             </button>
@@ -282,7 +283,7 @@ export default function Flashcards() {
         <main className="flex-1 p-4 sm:p-8 space-y-6 max-w-7xl w-full mx-auto">
           {/* Notifications */}
           {errorMsg && (
-            <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
+            <div role="alert" className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
               {errorMsg}
             </div>
           )}
@@ -313,9 +314,11 @@ export default function Flashcards() {
           </div>
 
           {/* Tab Selector */}
-          <div className="flex border-b border-gray-200 dark:border-slate-800">
+          <div role="tablist" aria-label="Flashcard section tabs" className="flex border-b border-gray-200 dark:border-slate-800">
             <button
               onClick={() => setActiveTab('my-decks')}
+              role="tab"
+              aria-selected={activeTab === 'my-decks'}
               className={`px-6 py-3 font-semibold text-sm transition-colors border-b-2 ${
                 activeTab === 'my-decks'
                   ? 'border-blue-600 text-blue-600 dark:text-blue-400'
@@ -326,6 +329,8 @@ export default function Flashcards() {
             </button>
             <button
               onClick={() => setActiveTab('community')}
+              role="tab"
+              aria-selected={activeTab === 'community'}
               className={`px-6 py-3 font-semibold text-sm transition-colors border-b-2 ${
                 activeTab === 'community'
                   ? 'border-blue-600 text-blue-600 dark:text-blue-400'
@@ -413,6 +418,7 @@ export default function Flashcards() {
                               type="checkbox"
                               checked={deck.isPublic}
                               onChange={() => handleTogglePublic(deck)}
+                              aria-label={`Share ${deck.title} publicly`}
                               className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
                             />
                             <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
@@ -429,18 +435,21 @@ export default function Flashcards() {
                         <div className="grid grid-cols-3 gap-2">
                           <button
                             onClick={() => startStudySession(deck)}
+                            aria-label={`Study ${deck.title}`}
                             className="px-2 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold transition cursor-pointer"
                           >
                             Study
                           </button>
                           <button
                             onClick={() => openEditModal(deck)}
+                            aria-label={`Edit ${deck.title}`}
                             className="px-2 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-white rounded text-xs font-bold transition cursor-pointer"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleDeleteDeck(deck._id)}
+                            aria-label={`Delete ${deck.title}`}
                             className="px-2 py-1.5 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 text-red-600 dark:text-red-400 rounded text-xs font-bold transition cursor-pointer"
                           >
                             Delete

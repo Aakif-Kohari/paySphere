@@ -1,3 +1,12 @@
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import ArchiveIcon from '@mui/icons-material/Archive';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import FactCheckIcon from '@mui/icons-material/FactCheck';
+import GridViewIcon from '@mui/icons-material/GridView';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
+import LogoutIcon from '@mui/icons-material/Logout';
+import PeopleIcon from '@mui/icons-material/People';
+import SchoolIcon from '@mui/icons-material/School';
 import styles from './Sidebar.module.css';
 import { useEffect, useMemo, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -340,6 +349,7 @@ const Sidebar = ({
         <div
           role="button"
           tabIndex={0}
+          aria-label="Close sidebar overlay"
           onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
           className={styles.container}
           onClick={onClose}
@@ -347,15 +357,10 @@ const Sidebar = ({
       )}
 
       <aside
-        className={`
-          fixed inset-y-0 left-0 z-40 w-64 
-          bg-white dark:bg-slate-900 
-          border-r border-gray-200 dark:border-slate-800
-          transform transition-transform duration-300 ease-in-out
-          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0
-          hidden md:flex md:flex-col /* Added for #1025: Hide sidebar on mobile, show on md+ */
-        `}
+        aria-label="Sidebar navigation"
+        className={`w-56 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 fixed inset-y-0 left-0 flex flex-col z-50 transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          } md:translate-x-0`}
+        ref={sidebarRef}
       >
         <div className="p-5 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -374,45 +379,32 @@ const Sidebar = ({
           <button
             className="md:hidden p-2 text-gray-500 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             onClick={onClose}
-            aria-label="Close navigation"
+            aria-label="Close sidebar"
           >
             ✕
           </button>
         </div>
 
-        {/* Scrollable: 25 destinations do not fit a laptop viewport, and the
-            footer below has to stay reachable. */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-4">
-          {sections.map(({ group, items }) => (
-            <div key={group.id}>
-              <p className="px-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-600">
-                {group.label}
-              </p>
-
-              <div className="space-y-0.5">
-                {items.map((item) => {
-                  const Icon = ICONS[item.icon] || ICONS.grid;
-                  const current = isCurrent(item);
-
-                  return (
-                    <Link
-                      key={`${group.id}:${item.label}`}
-                      to={item.navPath || item.path}
-                      onClick={() => handleItemClick(item)}
-                      aria-current={current ? 'page' : undefined}
-                      className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        current
-                          ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 dark:shadow-none'
-                          : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-                      }`}
-                    >
-                      <Icon />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
+        <nav aria-label="Main menu" className="flex-1 p-3 space-y-1">
+          {sidebarItems.map((item) => (
+            /* Fixed: Added href and role for screen readers (Issue #660) */
+            <a
+              key={item.id}
+              href={`/${item.id.toLowerCase()}`}
+              onClick={(e) => {
+                e.preventDefault();
+                setActivePage(item.id);
+                onClose();
+              }}
+              aria-current={activePage === item.id ? 'page' : undefined}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500 ${activePage === item.id
+                  ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20 dark:shadow-none' /* Issue #521: Replaced hardcoded hex */
+                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                }`}
+            >
+              {item.icon}
+              {item.label}
+            </a>
           ))}
         </nav>
 

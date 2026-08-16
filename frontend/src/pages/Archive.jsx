@@ -127,7 +127,7 @@ export default function Archive() {
       )}
 
       {error ? (
-        <div className="p-4 bg-red-50 text-red-600 rounded-xl border border-red-100">
+        <div role="alert" className="p-4 bg-red-50 text-red-600 rounded-xl border border-red-100">
           {error}
         </div>
       ) : archivedEmployees.length === 0 ? (

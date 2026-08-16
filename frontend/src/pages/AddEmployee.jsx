@@ -366,6 +366,7 @@ export default function AddEmployee() {
             <button
               className="md:hidden p-2 -ml-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => setIsSidebarOpen(true)}
+              aria-label="Open navigation sidebar"
             >
               ☰
             </button>
@@ -377,8 +378,8 @@ export default function AddEmployee() {
 
           <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
             <ThemeToggle />
-            <button className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><BellIcon /></button>
-            <button className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><HelpCircleIcon /></button>
+            <button aria-label="Notifications" className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><BellIcon /></button>
+            <button aria-label="Help & Support" className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><HelpCircleIcon /></button>
             <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
               {getInitials(companyName)}
             </div>
@@ -388,6 +389,7 @@ export default function AddEmployee() {
                 localStorage.removeItem("companyName");
                 navigate("/auth");
               }}
+              aria-label="Sign Out"
               className="px-3 py-1.5 text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"
             >
               Sign Out
@@ -399,9 +401,9 @@ export default function AddEmployee() {
         <main className="flex-1 p-4 sm:p-8 lg:p-10">
           <div className="max-w-5xl mx-auto flex flex-col lg:flex-row gap-8">
 
-            {/* ── LEFT: Form Section ── */}
+           {/* ── LEFT: Form Section ── */}
             <div className="flex-1">
-              <div className="max-w-4xl mx-auto p-4 md:p-8">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 transition-colors duration-200">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Add New Employee</h1>
                 <EmployeeForm
                   onSubmit={handleFormSubmit}
@@ -409,7 +411,6 @@ export default function AddEmployee() {
                   isEdit={false}
                 />
               </div>
-
               {/* Bulk CSV Upload Card (Preserved) */}
               <div className="mt-8 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 transition-colors duration-200">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">

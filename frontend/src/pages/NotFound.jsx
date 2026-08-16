@@ -22,6 +22,7 @@ export default function NotFound() {
         <div className="flex gap-4 justify-center">
           <Button 
             onClick={() => navigate("/")} 
+            aria-label="Back to Home"
             variant="contained" 
             color="primary"
             className="px-8 py-3 rounded-full"
@@ -30,6 +31,7 @@ export default function NotFound() {
           </Button>
           <Button 
             onClick={() => navigate(-1)} 
+            aria-label="Go Back to previous page"
             variant="outlined" 
             color="primary"
             className="px-8 py-3 rounded-full dark:border-blue-500 dark:text-blue-400"

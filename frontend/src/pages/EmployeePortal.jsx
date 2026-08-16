@@ -117,12 +117,14 @@ export default function EmployeePortal() {
           <ThemeToggle />
           <button
             onClick={() => navigate('/profile')}
+            aria-label="Profile Settings"
             className="px-3.5 py-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition"
           >
             Profile Settings
           </button>
           <button
             onClick={handleSignOut}
+            aria-label="Sign Out"
             className="px-3.5 py-1.5 text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"
           >
             Sign Out
@@ -183,7 +185,51 @@ export default function EmployeePortal() {
                   No payslips finalized for you yet.
                 </div>
               ) : (
-                <DataGrid columns={columns} data={payslips} className="border-none shadow-none" />
+                <div className="overflow-x-auto">
+                  <table aria-label="Payslip History Table" className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-slate-800 text-gray-400 dark:text-slate-400 uppercase text-xs">
+                        <th className="py-3 px-4">Period</th>
+                        <th className="py-3 px-4">Base Salary</th>
+                        <th className="py-3 px-4">Overtime Pay</th>
+                        <th className="py-3 px-4">Leave Deductions</th>
+                        <th className="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                          Net Payout
+                        </th>
+                        <th className="py-3 px-4">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-slate-800/60">
+                      {payslips.map((pay) => (
+                        <tr
+                          key={pay._id}
+                          className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition"
+                        >
+                          <td className="py-4 px-4 font-semibold text-slate-900 dark:text-white">
+                            {getMonthName(pay.month)} {pay.year}
+                          </td>
+                          <td className="py-4 px-4 text-slate-600 dark:text-slate-300">
+                            ₹{pay.baseSalary?.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-4 px-4 text-emerald-600 dark:text-emerald-400">
+                            +₹{pay.overtimePay?.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-4 px-4 text-red-500 dark:text-red-400">
+                            -₹{pay.leaveDeduction?.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-4 px-4 font-bold text-blue-600 dark:text-blue-400">
+                            ₹{pay.netSalary?.toLocaleString('en-IN')}
+                          </td>
+                          <td className="py-4 px-4">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                              {pay.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </>

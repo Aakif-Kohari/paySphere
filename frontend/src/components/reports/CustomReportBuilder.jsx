@@ -97,7 +97,7 @@ const CustomReportBuilder = () => {
     <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
       <h2 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">Custom Report Builder</h2>
       
-      {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">{error}</div>}
+      {error && <div role="alert" className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg">{error}</div>}
 
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Dataset</label>
@@ -108,6 +108,7 @@ const CustomReportBuilder = () => {
             setSelectedColumns(DATASETS[e.target.value].columns.slice(0, 4).map(c => c.value));
             setFilters([]);
           }}
+          aria-label="Select dataset"
           className="w-full sm:w-1/3 p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
         >
           {Object.entries(DATASETS).map(([key, val]) => (
@@ -125,6 +126,7 @@ const CustomReportBuilder = () => {
                 type="checkbox" 
                 checked={selectedColumns.includes(col.value)}
                 onChange={() => handleColumnToggle(col.value)}
+                aria-label={`Select column ${col.label}`}
                 className="rounded text-blue-600 focus:ring-blue-500"
               />
               <span className="text-sm text-slate-700 dark:text-slate-300">{col.label}</span>
@@ -141,18 +143,18 @@ const CustomReportBuilder = () => {
         {filters.length === 0 && <p className="text-sm text-gray-500 dark:text-slate-400">No filters applied.</p>}
         {filters.map((f, i) => (
           <div key={i} className="flex flex-wrap gap-2 mb-2 items-center">
-            <select value={f.field} onChange={e => updateFilter(i, 'field', e.target.value)} className="p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <select aria-label="Filter field" value={f.field} onChange={e => updateFilter(i, 'field', e.target.value)} className="p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
               {DATASETS[dataset].columns.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
-            <select value={f.operator} onChange={e => updateFilter(i, 'operator', e.target.value)} className="p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            <select aria-label="Filter operator" value={f.operator} onChange={e => updateFilter(i, 'operator', e.target.value)} className="p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
               <option value="equals">Equals</option>
               <option value="not_equals">Not Equals</option>
               <option value="contains">Contains</option>
               <option value="gt">Greater Than</option>
               <option value="lt">Less Than</option>
             </select>
-            <input type="text" value={f.value} onChange={e => updateFilter(i, 'value', e.target.value)} placeholder="Value" className="p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none flex-1 min-w-[150px]" />
-            <button type="button" onClick={() => removeFilter(i)} className="p-2 text-red-500 hover:text-red-700 font-bold focus:outline-none">&times;</button>
+            <input aria-label="Filter value" type="text" value={f.value} onChange={e => updateFilter(i, 'value', e.target.value)} placeholder="Value" className="p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none flex-1 min-w-[150px]" />
+            <button aria-label="Remove filter" type="button" onClick={() => removeFilter(i)} className="p-2 text-red-500 hover:text-red-700 font-bold focus:outline-none">&times;</button>
           </div>
         ))}
       </div>
@@ -172,7 +174,7 @@ const CustomReportBuilder = () => {
         <div>
           <h3 className="text-lg font-bold mb-4 text-slate-900 dark:text-white">Preview ({results.length} records)</h3>
           <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-slate-700">
-            <table className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+            <table aria-label="Custom report preview results" className="w-full text-left text-sm text-gray-500 dark:text-gray-400">
               <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-slate-800 dark:text-gray-400">
                 <tr>
                   {resultColumns.map(col => (

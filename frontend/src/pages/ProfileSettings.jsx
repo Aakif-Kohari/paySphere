@@ -313,6 +313,7 @@ export default function ProfileSettings() {
                   />
                   <button
                     onClick={() => fileInputRef.current?.click()}
+                    aria-label="Change profile picture"
                     className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700 transition"
                   >
                     Change Picture
@@ -321,6 +322,7 @@ export default function ProfileSettings() {
                     onClick={() =>
                       setUserProfile({ ...userProfile, avatar: '' })
                     }
+                    aria-label="Remove profile picture"
                     className="px-4 py-2 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
                   >
                     Remove
@@ -340,11 +342,10 @@ export default function ProfileSettings() {
                   onChange={(e) =>
                     setUserProfile({ ...userProfile, fullName: e.target.value })
                   }
-                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
-                    profileErrors.fullName
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.fullName
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
                       : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
-                  }`}
+                    }`}
                 />
                 {profileErrors.fullName && (
                   <p className="text-xs text-red-500 mt-1.5 font-medium">
@@ -362,11 +363,10 @@ export default function ProfileSettings() {
                   onChange={(e) =>
                     setUserProfile({ ...userProfile, email: e.target.value })
                   }
-                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
-                    profileErrors.email
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.email
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
                       : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
-                  }`}
+                    }`}
                 />
                 {profileErrors.email && (
                   <p className="text-xs text-red-500 mt-1.5 font-medium">
@@ -461,11 +461,10 @@ export default function ProfileSettings() {
                   </p>
                 </div>
                 <span
-                  className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                    userProfile.isTwoFactorEnabled
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold ${userProfile.isTwoFactorEnabled
                       ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400'
                       : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
-                  }`}
+                    }`}
                 >
                   {userProfile.isTwoFactorEnabled ? 'Enabled' : 'Disabled'}
                 </span>
@@ -501,6 +500,7 @@ export default function ProfileSettings() {
                           value={twoFactorCode}
                           onChange={(e) => setTwoFactorCode(e.target.value)}
                           placeholder="6-digit code"
+                          aria-label="6-digit two-factor authentication code"
                           className="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border text-xs text-center font-bold tracking-widest"
                         />
                         <button
@@ -562,6 +562,7 @@ export default function ProfileSettings() {
                   </div>
                   <button
                     onClick={handleDisconnectGoogle}
+                    aria-label="Disconnect Google Account"
                     className="text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     Disconnect
@@ -605,6 +606,7 @@ export default function ProfileSettings() {
                         !settings.notifications.payrollCompletion,
                       )
                     }
+                    aria-label="Payroll completion notifications"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
@@ -630,6 +632,7 @@ export default function ProfileSettings() {
                         !settings.notifications.systemAlerts,
                       )
                     }
+                    aria-label="System alert notifications"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
@@ -655,6 +658,7 @@ export default function ProfileSettings() {
                         !settings.notifications.emailReminders,
                       )
                     }
+                    aria-label="Email reminder notifications"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
@@ -680,6 +684,7 @@ export default function ProfileSettings() {
                         !settings.notifications.featureAnnouncements,
                       )
                     }
+                    aria-label="Feature announcement notifications"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
@@ -723,6 +728,7 @@ export default function ProfileSettings() {
             <button
               className="text-gray-500 hover:text-gray-900 dark:hover:text-white"
               onClick={() => navigate(-1)}
+              aria-label="Go back"
             >
               <svg
                 width="24"
@@ -778,11 +784,12 @@ export default function ProfileSettings() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-200 ${
-                      activeTab === tab.id
+                    role="tab"
+                    aria-selected={activeTab === tab.id}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-200 ${activeTab === tab.id
                         ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-100 dark:border-slate-800'
                         : 'text-gray-500 dark:text-slate-500 hover:bg-white/60 dark:hover:bg-slate-900/50 hover:text-gray-900 dark:hover:text-white border border-transparent'
-                    }`}
+                      }`}
                   >
                     <span
                       className={

@@ -1,7 +1,8 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import DataGrid from '../common/DataGrid';
 
-export default function PayrollTable({ data }) {
+export default function PayrollTable({ data, currency }) {
   const columns = [
     { key: 'name', label: 'Employee', sortable: true },
     { key: 'department', label: 'Department', sortable: true },
