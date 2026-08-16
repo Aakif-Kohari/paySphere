@@ -135,6 +135,21 @@ const PERMISSIONS = {
   // account in any tenant could bulk-upload questions and trigger forecast
   // generation.
   MANAGE_PYQ: 'MANAGE_PYQ',
+
+  // --- Recruitment (#1074) -------------------------------------------------
+  READ_REQUISITION: 'READ_REQUISITION',
+  // Opening a role commits headcount budget, and the approved CTC band is what
+  // every offer is checked against — so being able to widen a band is being
+  // able to approve any offer. Owner only, for the same reason MANAGE_CONTRACT
+  // is.
+  MANAGE_REQUISITION: 'MANAGE_REQUISITION',
+  // Running the pipeline: adding applicants and moving them between stages.
+  // HR's day job, and deliberately not the same authority as setting the band
+  // those candidates are offered against.
+  MANAGE_CANDIDATE: 'MANAGE_CANDIDATE',
+  // Interviewers are not recruiters. This is held by whoever sits on a panel,
+  // which is a different and much larger population than HR.
+  SUBMIT_INTERVIEW_FEEDBACK: 'SUBMIT_INTERVIEW_FEEDBACK',
 };
 
 const PERMISSION_DEFINITIONS = [
@@ -299,6 +314,28 @@ const PERMISSION_DEFINITIONS = [
     description:
       'Add and bulk-upload previous-year questions, and generate trend forecasts',
   },
+
+  // #1074.
+  {
+    name: PERMISSIONS.READ_REQUISITION,
+    description:
+      'View job requisitions, candidates, interview scorecards and hiring funnel analytics',
+  },
+  {
+    name: PERMISSIONS.MANAGE_REQUISITION,
+    description:
+      'Open, hold and close job requisitions, and set the approved CTC band every offer is checked against',
+  },
+  {
+    name: PERMISSIONS.MANAGE_CANDIDATE,
+    description:
+      'Add candidates and move them through the hiring pipeline, including making offers and recording hires',
+  },
+  {
+    name: PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
+    description:
+      'Submit an interview scorecard for a candidate you interviewed',
+  },
 ];
 
 // --- Roles -----------------------------------------------------------------
@@ -365,6 +402,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.VERIFY_TAX_PROOF,
       PERMISSIONS.READ_PYQ,
       PERMISSIONS.MANAGE_PYQ,
+
+      // #1074.
+      PERMISSIONS.READ_REQUISITION,
+      PERMISSIONS.MANAGE_REQUISITION,
+      PERMISSIONS.MANAGE_CANDIDATE,
+      PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
     ],
   },
   {
@@ -412,6 +455,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.SUBMIT_TAX_PROOF,
       PERMISSIONS.VERIFY_TAX_PROOF,
       PERMISSIONS.READ_PYQ,
+
+      // #1074. HR runs the pipeline and sits on panels. It does not open
+      // requisitions or move the CTC band — that is headcount budget, and
+      // widening a band is equivalent to approving any offer against it.
+      PERMISSIONS.READ_REQUISITION,
+      PERMISSIONS.MANAGE_CANDIDATE,
+      PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
     ],
   },
   {
@@ -445,6 +495,12 @@ const ROLE_DEFINITIONS = [
       // Employees see the roster they are on.
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.READ_PYQ,
+
+      // #1074. An employee who interviews files a scorecard; the interviewer is
+      // taken from `req.userId`, so this does not let one person file feedback
+      // under another's name. Deliberately not READ_REQUISITION, which exposes
+      // every candidate's expected and offered CTC.
+      PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
     ],
   },
 ];
