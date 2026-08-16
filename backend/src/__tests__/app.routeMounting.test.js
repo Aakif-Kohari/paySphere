@@ -170,6 +170,7 @@ const ROUTER_MOUNTS = {
   email: '/api/email',
   employee: '/api/employees',
   employeePortal: '/api/employee-portal',
+  esop: '/api/esop',
   expense: '/api/expenses',
   flashcard: '/api/flashcards',
   forecast: '/api/forecasts',
