@@ -116,8 +116,17 @@ const MOUNTED_ROUTES = [
   ['/api/shifts', 'get', '/api/shifts/roster'],
   ['/api/pyqs', 'get', '/api/pyqs'],
 
-  // Mounted in #1075.
-  ['/api/disbursements', 'get', '/api/disbursements/batches'],
+  // Mounted in #1076.
+  ['/api/training', 'get', '/api/training/courses'],
+
+  // Mounted in #1073. Restored along with the permissions and the app.js mount:
+  // #1083's merge kept only its own side of the conflicts in
+  // `config/permissions.js` and `app.js`, so the ESOP feature's files landed on
+  // main and its wiring did not.
+  ['/api/esop', 'get', '/api/esop/schemes'],
+
+  // Mounted in #1074.
+  ['/api/recruitment', 'get', '/api/recruitment/requisitions'],
 ];
 
 /**
@@ -199,6 +208,7 @@ const ROUTER_MOUNTS = {
   settlement: '/api/settlements',
   shiftRoster: '/api/shifts',
   taxProof: '/api/tax-proofs',
+  training: '/api/training',
   user: '/api/auth',
   varianceReport: '/api/reports',
   vendor: '/api/vendors',

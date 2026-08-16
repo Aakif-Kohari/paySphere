@@ -89,10 +89,22 @@ const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
 const pyqRoutes = require('./routes/pyq.routes');
 
-// Salary disbursement (#1075). Payroll was computed to the rupee and then
-// stopped: `payroll.model.js` has a `disbursed` status and nothing in the
-// product produced the bank file that actually moves the money.
-const disbursementRoutes = require('./routes/disbursement.routes');
+// Training and certification expiry (#1076). The frontend's "Learning" nav
+// group held only exam-prep content; there was no employment training record
+// anywhere, and no way to answer "who holds a current POSH certification".
+const trainingRoutes = require('./routes/training.routes');
+
+// Stock option schemes, grants, vesting and exercises (#1073). Equity was the
+// one component of total compensation with no model, no route and no
+// calculator — and exercising an option is a taxable perquisite the employer
+// has to withhold on, so it is payroll's business and not just HR's.
+const esopRoutes = require('./routes/esop.routes');
+
+// Requisitions, the candidate pipeline and interview scorecards (#1074). The
+// product covered an employee's life from the offer letter onwards and nothing
+// before it — `OfferLetterBuilder.jsx` types in a name and a salary by hand
+// because there was no candidate record to draw them from.
+const recruitmentRoutes = require('./routes/recruitment.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -406,8 +418,17 @@ app.use('/api/shifts', shiftRosterRoutes);
 
 app.use('/api/pyqs', pyqRoutes);
 
-// Salary disbursement (#1075). The router owns `/batches` and `/profiles`.
-app.use('/api/disbursements', disbursementRoutes);
+// Training and certification (#1076). The router owns `/courses`,
+// `/enrollments`, `/compliance` and `/my-training`.
+app.use('/api/training', trainingRoutes);
+
+// Equity (#1073). The router owns `/schemes`, `/grants` and `/my-grants`, so
+// the prefix carries no noun of its own.
+app.use('/api/esop', esopRoutes);
+
+// Recruitment (#1074). The router owns `/requisitions`, `/candidates` and
+// `/analytics`, so the prefix carries no noun of its own.
+app.use('/api/recruitment', recruitmentRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
