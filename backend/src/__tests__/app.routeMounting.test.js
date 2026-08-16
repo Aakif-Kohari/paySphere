@@ -115,6 +115,9 @@ const MOUNTED_ROUTES = [
   ['/api/clients', 'get', '/api/clients/invoices/dashboard'],
   ['/api/shifts', 'get', '/api/shifts/roster'],
   ['/api/pyqs', 'get', '/api/pyqs'],
+
+  // Mounted in #1076.
+  ['/api/training', 'get', '/api/training/courses'],
 ];
 
 /**
@@ -193,6 +196,7 @@ const ROUTER_MOUNTS = {
   settlement: '/api/settlements',
   shiftRoster: '/api/shifts',
   taxProof: '/api/tax-proofs',
+  training: '/api/training',
   user: '/api/auth',
   varianceReport: '/api/reports',
   vendor: '/api/vendors',

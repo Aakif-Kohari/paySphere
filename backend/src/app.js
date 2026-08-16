@@ -89,6 +89,11 @@ const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
 const pyqRoutes = require('./routes/pyq.routes');
 
+// Training and certification expiry (#1076). The frontend's "Learning" nav
+// group held only exam-prep content; there was no employment training record
+// anywhere, and no way to answer "who holds a current POSH certification".
+const trainingRoutes = require('./routes/training.routes');
+
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
 // module threw `ReferenceError: roleRoutes is not defined`. Same damage as
@@ -400,6 +405,10 @@ app.use('/api/clients', clientInvoiceRoutes);
 app.use('/api/shifts', shiftRosterRoutes);
 
 app.use('/api/pyqs', pyqRoutes);
+
+// Training and certification (#1076). The router owns `/courses`,
+// `/enrollments`, `/compliance` and `/my-training`.
+app.use('/api/training', trainingRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
