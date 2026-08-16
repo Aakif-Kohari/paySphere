@@ -179,6 +179,19 @@ const PERMISSIONS = {
   // Interviewers are not recruiters. This is held by whoever sits on a panel,
   // which is a different and much larger population than HR.
   SUBMIT_INTERVIEW_FEEDBACK: 'SUBMIT_INTERVIEW_FEEDBACK',
+
+  // --- Salary disbursement (#1075) -----------------------------------------
+  READ_DISBURSEMENT: 'READ_DISBURSEMENT',
+  // Building a batch, validating it and downloading the bank file. The download
+  // is the only response in the product that carries full bank account numbers,
+  // which is why it is not covered by the read permission.
+  MANAGE_DISBURSEMENT: 'MANAGE_DISBURSEMENT',
+  // The point of no return, and kept apart for the same maker-checker reason as
+  // APPROVE_PAYROLL (#458): whoever assembles a payment file should not be the
+  // only person standing between it and a bank transfer. This is the highest
+  // consequence write in the product — everything else changes a record, this
+  // one moves money out of the company account into several hundred others.
+  RELEASE_DISBURSEMENT: 'RELEASE_DISBURSEMENT',
 };
 
 const PERMISSION_DEFINITIONS = [
@@ -402,6 +415,23 @@ const PERMISSION_DEFINITIONS = [
     description:
       'Submit an interview scorecard for a candidate you interviewed',
   },
+
+  // #1075.
+  {
+    name: PERMISSIONS.READ_DISBURSEMENT,
+    description:
+      'View salary disbursement batches, their control totals and which credits the bank returned',
+  },
+  {
+    name: PERMISSIONS.MANAGE_DISBURSEMENT,
+    description:
+      'Build and validate a disbursement batch, download the bank payment file, and record returns',
+  },
+  {
+    name: PERMISSIONS.RELEASE_DISBURSEMENT,
+    description:
+      'Release a validated disbursement batch for payment — the irreversible step that moves the money',
+  },
 ];
 
 // --- Roles -----------------------------------------------------------------
@@ -486,6 +516,11 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_REQUISITION,
       PERMISSIONS.MANAGE_CANDIDATE,
       PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
+
+      // #1075.
+      PERMISSIONS.READ_DISBURSEMENT,
+      PERMISSIONS.MANAGE_DISBURSEMENT,
+      PERMISSIONS.RELEASE_DISBURSEMENT,
     ],
   },
   {
@@ -555,6 +590,11 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_REQUISITION,
       PERMISSIONS.MANAGE_CANDIDATE,
       PERMISSIONS.SUBMIT_INTERVIEW_FEEDBACK,
+
+      // #1075. HR assembles the payment file; it does not release it. Same
+      // maker-checker split as APPROVE_PAYROLL, which HR also does not hold.
+      PERMISSIONS.READ_DISBURSEMENT,
+      PERMISSIONS.MANAGE_DISBURSEMENT,
     ],
   },
   {
