@@ -175,6 +175,7 @@ const auditLogSchema = new mongoose.Schema(
 auditLogSchema.index({ tenantId: 1, createdAt: -1 });
 auditLogSchema.index({ tenantId: 1, userId: 1, createdAt: -1 });
 auditLogSchema.index({ tenantId: 1, action: 1, createdAt: -1 });
+auditLogSchema.index({ tenantId: 1, createdAt: -1, action: 1 });
 
 auditLogSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('AuditLog', auditLogSchema);

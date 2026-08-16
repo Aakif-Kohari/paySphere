@@ -1,6 +1,7 @@
 const auditLogRepository = require('../repositories/auditLog.repository');
 const { AUDIT_ACTIONS } = require('../models/auditLog.model');
 const { tenantFilter } = require('../utils/tenantScope');
+const cacheService = require('../services/cache.service');
 
 /**
  * Reading the audit trail (#664).
@@ -130,6 +131,12 @@ exports.getAuditLogs = async (req, res, next) => {
       limit = MAX_PAGE_SIZE;
     }
 
+    const cacheKey = `audit:logs:${req.tenantId || 'unscoped'}:${cacheService.generateHash(JSON.stringify(built.query))}:p${page}:l${limit}`;
+    const cachedData = await cacheService.get(cacheKey);
+    if (cachedData) {
+      return res.success(cachedData);
+    }
+
     const skip = (page - 1) * limit;
 
     // The count and the page in parallel: they are independent
@@ -143,8 +150,7 @@ exports.getAuditLogs = async (req, res, next) => {
       userId: log.userId || { fullName: 'Deleted User', email: '' },
     }));
 
-    // Return a metadata object containing totalRecords and totalPages
-    res.success({
+    const responsePayload = {
       logs: processedLogs,
       metadata: {
         totalRecords: totalLogs,
@@ -152,7 +158,13 @@ exports.getAuditLogs = async (req, res, next) => {
         currentPage: page,
         pageSize: limit,
       },
-    });
+    };
+
+    // Cache the response payload with a 1-minute TTL (60 seconds)
+    await cacheService.setEx(cacheKey, 60, responsePayload);
+
+    // Return the response payload
+    res.success(responsePayload);
   } catch (error) {
     next(error);
   }
