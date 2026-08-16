@@ -58,6 +58,8 @@ const employeePortalRoutes = require('./routes/employeePortal.routes');
 const workflowRoutes = require('./routes/workflow.routes');
 const salaryHistoryRoutes = require('./routes/salaryHistory.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+const statsRoutes = require('./routes/stats.routes');
+const departmentsRoutes = require('./routes/departments.routes');
 const flashcardRoutes = require('./routes/flashcard.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const integrationRoutes = require('./routes/integration.routes');
@@ -353,6 +355,8 @@ app.use('/api/roles', roleRoutes);
 // ever called, so until #896 *no* route had security headers or an access log —
 // the dashboard was not a special case, it was just the one that got noticed.
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/stats', statsRoutes);
+app.use('/api/departments', departmentsRoutes);
 
 // The in-app notification centre (#440). The other half of the duplicate.
 app.use('/api/notifications', notificationRoutes);
