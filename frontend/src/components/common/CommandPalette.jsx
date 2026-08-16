@@ -203,6 +203,9 @@ const CommandPalette = () => {
     open && (
       <div
         className="fixed inset-0 z-[1000] flex items-start justify-center bg-black/50 backdrop-blur-sm pt-[12vh] px-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
         onMouseDown={() => setOpen(false)}
       >
         <Command
@@ -218,6 +221,7 @@ const CommandPalette = () => {
               // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
               placeholder="Type a command or search employees…"
+              aria-label="Search commands and employees"
               className="w-full bg-transparent py-3.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none"
             />
             <kbd className="hidden sm:inline-flex px-1.5 py-0.5 text-[10px] font-mono text-gray-400 dark:text-slate-500 border border-gray-200 dark:border-slate-700 rounded">

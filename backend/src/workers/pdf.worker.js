@@ -1,6 +1,7 @@
 const { workerData, parentPort } = require("worker_threads");
 const PDFDocument = require("pdfkit");
 const { formatCurrency } = require("../utils/currency");
+const logger = require("../utils/logger");
 
 /**
  * Generates Form 16 (Part A & Part B) PDF
@@ -117,7 +118,7 @@ async function handleCompanyReportGeneration(payload) {
     try {
       const logoBuffer = Buffer.from(companyLogo.replace(/^data:image\/\w+;base64,/, ""), 'base64');
       doc.image(logoBuffer, 40, 30, { fit: [50, 50] });
-    } catch (error) { console.error(error); }
+    } catch (error) { logger.error("PDF logo rendering failed in handleCompanyReportGeneration", { error: error.message || error }); }
   }
   doc.fontSize(22).font("Helvetica-Bold").fillColor("#1e3a5f").text(companyName, { align: "center" });
   doc.fontSize(12).font("Helvetica").fillColor("#666666").text(`Payroll Summary Report — ${monthName} ${year}`, { align: "center" });
@@ -266,7 +267,7 @@ async function handlePayslipGeneration(payload) {
     try {
       const logoBuffer = Buffer.from(companyLogo.replace(/^data:image\/\w+;base64,/, ""), 'base64');
       doc.image(logoBuffer, 50, 40, { fit: [50, 50] });
-    } catch (error) { console.error(error); }
+    } catch (error) { logger.error("PDF logo rendering failed in handlePayslipGeneration", { error: error.message || error }); }
   }
   doc.fontSize(20).text("PaySphere", { align: "center" });
   doc.moveDown();

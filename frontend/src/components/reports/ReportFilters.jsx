@@ -28,6 +28,7 @@ export default function ReportFilters({ onGenerate, loading ,successMessage}) {
           name="month"
           value={filters.month}
           onChange={handleChange}
+          aria-label="Filter by month"
           className="px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
         >
           <option value="Months">Months</option>
@@ -50,6 +51,7 @@ export default function ReportFilters({ onGenerate, loading ,successMessage}) {
           name="year"
           value={filters.year}
           onChange={handleChange}
+          aria-label="Filter by year"
           className="px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
         >
           <option value="Years">Years</option>
@@ -63,6 +65,7 @@ export default function ReportFilters({ onGenerate, loading ,successMessage}) {
           name="department"
           value={filters.department}
           onChange={handleChange}
+          aria-label="Filter by department"
           className="px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
         >
           <option value="Departments"> Departments</option>
@@ -79,6 +82,7 @@ export default function ReportFilters({ onGenerate, loading ,successMessage}) {
           name="employee"
           value={filters.employee}
           onChange={handleChange}
+          aria-label="Filter by employee"
           className="px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
         >
            <option value=" Employees"> Employees</option>
@@ -95,6 +99,7 @@ export default function ReportFilters({ onGenerate, loading ,successMessage}) {
           name="status"
           value={filters.status}
           onChange={handleChange}
+          aria-label="Filter by status"
           className="px-4 py-3 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
         >
           <option value="Status"> Status</option>
@@ -115,6 +120,7 @@ export default function ReportFilters({ onGenerate, loading ,successMessage}) {
   <button
     onClick={() => onGenerate(filters)}
     disabled={loading}
+    aria-label="Generate report"
     className={`px-6 py-3 rounded-lg font-semibold text-white transition ${
       loading
         ? "bg-gray-400 cursor-not-allowed"

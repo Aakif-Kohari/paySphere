@@ -381,6 +381,7 @@ export default function Reports() {
           <div className="sticky top-0 z-30 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 lg:px-8 py-4 flex items-center justify-between">
             <button
               onClick={() => setIsSidebarOpen(true)}
+              aria-label="Open navigation sidebar"
               className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -390,6 +391,7 @@ export default function Reports() {
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate("/dashboard")}
+                aria-label="Back to dashboard"
                 className="p-1 rounded-md text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition"
               >
                 <ArrowBackIcon />
@@ -413,6 +415,7 @@ export default function Reports() {
               </div>
               <button
                 onClick={() => setIsScheduleModalOpen(true)}
+                aria-label="Schedule Report"
                 className="px-4 py-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700 transition"
               >
                 Schedule Report
@@ -448,6 +451,7 @@ export default function Reports() {
                 <button
                   onClick={handleDownloadPDF}
                   disabled={exportingType !== null}
+                  aria-label="Download PDF Report"
                   className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white rounded-lg text-sm font-semibold transition"
                 >
                   {exportingType === 'pdf' ? (
@@ -466,6 +470,7 @@ export default function Reports() {
                 <button
                   onClick={handleDownloadZIP}
                   disabled={exportingType !== null}
+                  aria-label="Download All Payslips ZIP"
                   className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white rounded-lg text-sm font-semibold transition"
                 >
                   {exportingType === 'zip' ? (
@@ -484,6 +489,7 @@ export default function Reports() {
                 <button
                   onClick={handleExportXLSX}
                   disabled={exportingType !== null}
+                  aria-label="Export Payroll Summary Excel"
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg text-sm font-semibold transition"
                 >
                   {exportingType === 'xlsx' ? (
@@ -502,6 +508,7 @@ export default function Reports() {
                 <button
                   onClick={handleExportCSV}
                   disabled={exportingType !== null}
+                  aria-label="Export Payroll Summary CSV"
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-semibold transition"
                 >
                   {exportingType === 'csv' ? (

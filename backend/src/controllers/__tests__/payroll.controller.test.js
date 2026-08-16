@@ -4,6 +4,15 @@ const PayrollUpdate = require("../../models/payroll.model");
 const User = require("../../models/user.model");
 const mongoose = require("mongoose");
 
+jest.mock("../../utils/lockManager", () => ({
+  acquireLock: jest.fn().mockResolvedValue(true),
+  releaseLock: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("../../models/exchangeRate.model", () => ({
+  findOne: jest.fn(() => ({ sort: jest.fn().mockResolvedValue(null) })),
+}));
+
 jest.mock("../../models/employee.model");
 jest.mock("../../models/payroll.model");
 jest.mock("../../models/user.model");
@@ -596,5 +605,79 @@ describe("sendAllPayslipsEmailHandler — req.body.year undefined guard (#352)",
       { _id: "payroll1" },
       { payslipEmailed: true }
     );
+  });
+});
+
+describe("submitPayrollForReview — Concurrent Mutex Lock (#1091)", () => {
+  const lockManager = require("../../utils/lockManager");
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test("should reject request with 409 Conflict if lock is already held", async () => {
+    lockManager.acquireLock.mockResolvedValueOnce(false); // Lock acquisition fails
+
+    const req = {
+      tenantId: "tenant123",
+      userId: "user123",
+      body: {
+        activities: [{ employeeId: "emp1", tags: [{ label: "10 hours overtime" }] }],
+        month: 8,
+        year: 2026,
+      },
+    };
+
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    };
+
+    await submitPayrollForReview(req, res, jest.fn());
+
+    expect(lockManager.acquireLock).toHaveBeenCalledWith(
+      expect.stringContaining("payroll_lock:tenant123:2026:8"),
+      300000
+    );
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("Another payroll process is currently running"),
+      })
+    );
+  });
+
+  test("should acquire and release lock on successful processing", async () => {
+    lockManager.acquireLock.mockResolvedValueOnce(true);
+
+    const mockEmployee = { _id: "emp1", fullName: "John Doe", isActive: true, targetCurrency: "USD" };
+    Employee.find.mockResolvedValueOnce([mockEmployee]);
+    User.findById.mockResolvedValueOnce({ _id: "user123" });
+
+    // Mock count & find stubs
+    PayrollUpdate.find.mockResolvedValueOnce([]); // no locked records
+    PayrollUpdate.bulkWrite.mockResolvedValueOnce({});
+    PayrollUpdate.find.mockResolvedValueOnce([{ _id: "p1", employeeId: "emp1" }]); // return updated
+
+    const req = {
+      tenantId: "tenant123",
+      userId: "user123",
+      body: {
+        activities: [{ employeeId: "emp1", tags: [] }],
+        month: 8,
+        year: 2026,
+      },
+    };
+
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    };
+
+    await submitPayrollForReview(req, res, jest.fn());
+
+    expect(lockManager.acquireLock).toHaveBeenCalled();
+    expect(lockManager.releaseLock).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 });

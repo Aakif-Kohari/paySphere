@@ -177,6 +177,37 @@ function unregisterWebhookService() {
   registered = false;
 }
 
+async function retryDlqJob(deliveryLogId, tenantId) {
+  const WebhookDelivery = require("../models/webhookDelivery.model");
+  const delivery = await WebhookDelivery.findOne({ _id: deliveryLogId, tenantId });
+  if (!delivery) {
+    throw new Error("Webhook delivery log not found.");
+  }
+
+  const endpoint = await WebhookEndpoint.findOne({ _id: delivery.endpointId, tenantId, isActive: true });
+  if (!endpoint) {
+    throw new Error("Webhook endpoint is inactive or not found.");
+  }
+
+  await webhookQueue.add(
+    "deliver",
+    {
+      endpointId: endpoint._id.toString(),
+      tenantId: tenantId.toString(),
+      url: endpoint.url,
+      secret: endpoint.secret,
+      eventName: delivery.eventName,
+      payload: delivery.payload,
+    }
+  );
+
+  delivery.isDlq = false;
+  delivery.errorMessage = "Retried manually by admin";
+  await delivery.save();
+
+  return delivery;
+}
+
 module.exports = {
   webhookQueue,
   EVENT_MAPPING,
@@ -184,4 +215,5 @@ module.exports = {
   isWebhookServiceRegistered,
   unregisterWebhookService,
   handleAuditEvent,
+  retryDlqJob,
 };

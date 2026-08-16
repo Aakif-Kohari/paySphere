@@ -29,6 +29,21 @@ const helmet = require('helmet');
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
 
+// #1008. Both of these are called further down — `swaggerJsdoc(swaggerOptions)`
+// and `swaggerUi.serve` / `swaggerUi.setup(…)` in the /api-docs block — and
+// neither was ever imported, so evaluating this module threw
+// `ReferenceError: swaggerJsdoc is not defined`.
+//
+// This is exactly the failure #896 documents for `roleRoutes` a few lines
+// below: the packages were in package.json the whole time, the usage was in
+// this file the whole time, and the one line joining them was missing. Worth
+// naming plainly because it is the third instance — a require block and the
+// code depending on it get edited in different places, and nothing fails until
+// boot. `__tests__/appBoot.test.js` now loads this module for real, so a
+// fourth cannot reach main.
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
+
 const roleRoutes = require('./routes/role.routes');
 const userRoutes = require('./routes/user.routes');
 const employeeRoutes = require('./routes/employee.routes');
@@ -54,6 +69,49 @@ const varianceReportRoutes = require('./routes/varianceReport.routes');
 const searchRoutes = require('./routes/search.routes');
 const emailRoutes = require('./routes/email.routes');
 const complianceRoutes = require('./routes/compliance.routes');
+const forexRoutes = require('./routes/forex.routes');
+
+// The eleven routers #1009 found unmounted. Each one had a router, a
+// controller, its models and — for most of them — a finished frontend page, and
+// no line anywhere in this file, so every endpoint they define answered 404.
+// Roughly 1,600 lines of controller that no request could reach.
+//
+// The mount paths are below, next to the mounts themselves, because two of them
+// are not the obvious choice and the reason belongs where someone would look.
+const assetRoutes = require('./routes/asset.routes');
+const vendorRoutes = require('./routes/vendor.routes');
+const grievanceRoutes = require('./routes/grievance.routes');
+const taxProofRoutes = require('./routes/taxProof.routes');
+const appraisalRoutes = require('./routes/appraisal.routes');
+const contractRoutes = require('./routes/contract.routes');
+const forecastRoutes = require('./routes/forecast.routes');
+const accountingRoutes = require('./routes/accounting.routes');
+const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
+const shiftRosterRoutes = require('./routes/shiftRoster.routes');
+const pyqRoutes = require('./routes/pyq.routes');
+
+// Business travel, per-diem and advance settlement (#1077). `expenseClaim` is
+// for money already spent; a trip is pre-approved, funded in advance, and its
+// per-diem has no receipt at all — so an unspent advance was a receivable
+// nothing in the product tracked.
+const travelRoutes = require('./routes/travel.routes');
+
+// Stock option schemes, grants, vesting and exercises (#1073). Equity was the
+// one component of total compensation with no model, no route and no
+// calculator — and exercising an option is a taxable perquisite the employer
+// has to withhold on, so it is payroll's business and not just HR's.
+const esopRoutes = require('./routes/esop.routes');
+
+// Requisitions, the candidate pipeline and interview scorecards (#1074). The
+// product covered an employee's life from the offer letter onwards and nothing
+// before it — `OfferLetterBuilder.jsx` types in a name and a salary by hand
+// because there was no candidate record to draw them from.
+const recruitmentRoutes = require('./routes/recruitment.routes');
+
+// Salary disbursement (#1075). Payroll was computed to the rupee and then
+// stopped: `payroll.model.js` has a `disbursed` status and nothing in the
+// product produced the bank file that actually moves the money.
+const disbursementRoutes = require('./routes/disbursement.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -189,6 +247,9 @@ app.use(cors(corsOptions));
 const redactionMiddleware = require('./middlewares/redaction.middleware');
 app.use(redactionMiddleware);
 
+const responseMiddleware = require('./middlewares/response.middleware');
+app.use(responseMiddleware);
+
 // Require request body for state-changing methods
 app.use('/api', requireBody);
 
@@ -257,6 +318,7 @@ app.use('/api/workflows', workflowRoutes);
 app.use('/api', salaryHistoryRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/email', emailRoutes);
+app.use('/api/forex', forexRoutes);
 
 // Webhook endpoints (#474) — an admin lets an external system subscribe to
 // payroll and employee events. The controller and models were written in #645
@@ -317,6 +379,67 @@ app.use('/api/search', searchRoutes);
 // so there was no URL that reached it — and consequently nobody noticed that
 // neither of the two models it requires had been committed (#951).
 app.use('/api/compliance', complianceRoutes);
+
+// ─── Feature routers that were never mounted (#1009) ───────────────────────
+//
+// Eleven of them, each shipped complete — router, controller, models, utils,
+// and in most cases a frontend page calling it — and never added to this table.
+// This is the fifth time: #614 (workflows), #474 (webhooks), #954
+// (integrations), #509 (monthly updates) and #719 (expenses) are all the same
+// omission, and all documented above. `app.routeMounting.test.js` now derives
+// its expectations by walking `routes/` instead of from a hand-written list, so
+// the next router to arrive without a mount fails CI rather than going quiet
+// for a few months.
+//
+// The paths are not a free choice. Each router defines its own sub-paths and
+// the frontend pages already call specific URLs, so the mount is whatever makes
+// the two line up. Most are unsurprising; the two that are not are called out.
+
+app.use('/api/assets', assetRoutes);
+app.use('/api/vendors', vendorRoutes);
+
+// POSH grievances (#958). Gated by `requireICC` rather than `requirePermission`
+// — the committee is deliberately not the same population as "HR", and admins
+// are locked out on purpose for anti-retaliation reasons.
+app.use('/api/grievances', grievanceRoutes);
+
+app.use('/api/tax-proofs', taxProofRoutes);
+app.use('/api/appraisals', appraisalRoutes);
+app.use('/api/contracts', contractRoutes);
+
+// Plural. `BudgetPlanner.jsx` posts to `/api/forecasts/generate` and the router
+// defines `/generate`, so `/api/forecast` would leave the page on a 404.
+app.use('/api/forecasts', forecastRoutes);
+
+app.use('/api/accounting', accountingRoutes);
+
+// Not `/api/client-invoices`. This router defines `/invoices`,
+// `/invoices/:id/payment`, `/invoices/dashboard` and `/invoices/aging-report`
+// internally, and `ClientInvoices.jsx` calls
+// `/api/clients/invoices/dashboard` — so the mount is the `/api/clients` half
+// of that path and the router supplies the rest.
+app.use('/api/clients', clientInvoiceRoutes);
+
+// Same shape: the router defines `/roster`, `/templates` and `/swap/...`, and
+// `Roster.jsx` calls `/api/shifts/roster`.
+app.use('/api/shifts', shiftRosterRoutes);
+
+app.use('/api/pyqs', pyqRoutes);
+
+// Business travel (#1077). The router owns `/policies`, `/requests`,
+// `/advances` and `/my-trips`.
+app.use('/api/travel', travelRoutes);
+
+// Equity (#1073). The router owns `/schemes`, `/grants` and `/my-grants`, so
+// the prefix carries no noun of its own.
+app.use('/api/esop', esopRoutes);
+
+// Recruitment (#1074). The router owns `/requisitions`, `/candidates` and
+// `/analytics`, so the prefix carries no noun of its own.
+app.use('/api/recruitment', recruitmentRoutes);
+
+// Salary disbursement (#1075). The router owns `/batches` and `/profiles`.
+app.use('/api/disbursements', disbursementRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.

@@ -806,6 +806,7 @@ export default function MonthlyUpdates() {
                 className="bottom-cta-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 onClick={handleFinalize}
                 disabled={finalizing || activity.length === 0}
+                aria-label="Finalize Payroll Batch"
                 style={{
                   padding:"13px 28px",
                   background: activity.length === 0 ? (isDark ? "#334155" : "#9CA3AF") : finalizing ? (isDark ? "#475569" : "#6B7280") : (isDark ? "#3b82f6" : "#1E3A8A"),
@@ -1013,6 +1014,7 @@ export default function MonthlyUpdates() {
                     <button
                       key={emp._id}
                       onClick={() => handleDisambiguationSelect(emp)}
+                      aria-label={`Select ${emp.fullName}`}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -1036,6 +1038,7 @@ export default function MonthlyUpdates() {
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <button
                     onClick={handleDisambiguationCancel}
+                    aria-label="Cancel employee selection"
                     style={{
                       padding: "8px 16px",
                       borderRadius: "8px",
@@ -1055,7 +1058,7 @@ export default function MonthlyUpdates() {
 
           {/* Employee Picker Modal for Calendar (#137) */}
           {showEmpPicker && (
-            <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-overlay" onClick={() => setShowEmpPicker(false)}>
+            <div role="dialog" aria-modal="true" aria-label="Select Employee for Calendar" className="modal-overlay" onClick={() => setShowEmpPicker(false)}>
               <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-box" onClick={e => e.stopPropagation()} style={{ padding: "24px" }}>
                 <h3 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "6px" }}>Select Employee for Calendar</h3>
                 <p style={{ fontSize: "13.5px", color: isDark ? "#9CA3AF" : "#6B7280", marginBottom: "18px" }}>

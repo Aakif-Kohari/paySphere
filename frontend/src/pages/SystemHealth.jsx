@@ -43,6 +43,7 @@ export default function SystemHealth() {
           <div>
             <button
               onClick={() => navigate("/settings")}
+              aria-label="Back to Settings"
               className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline mb-1 inline-block"
             >
               ← Back to Settings
@@ -56,6 +57,7 @@ export default function SystemHealth() {
           <button
             onClick={fetchHealth}
             disabled={loading}
+            aria-label="Refresh health metrics"
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 disabled:opacity-50"
           >
             <span>🔄</span>
@@ -64,7 +66,7 @@ export default function SystemHealth() {
         </div>
 
         {error && (
-          <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm">
+          <div role="alert" className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm">
             {error}
           </div>
         )}

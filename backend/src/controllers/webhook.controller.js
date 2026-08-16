@@ -395,6 +395,40 @@ exports.getWebhookDeliveries = async (req, res, next) => {
   }
 };
 
+exports.retryWebhookDelivery = async (req, res, next) => {
+  try {
+    const tenantId = requireTenant(req);
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid delivery id format" });
+    }
+
+    const webhookService = require("../services/webhook.service");
+    const delivery = await webhookService.retryDlqJob(id, tenantId);
+
+    eventBus.emit("AUDIT_LOG", {
+      userId: req.userId,
+      action: "WEBHOOK_RETRY",
+      resourceType: "Webhook",
+      resourceIds: [delivery.endpointId],
+      details: { deliveryId: id },
+      req,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Webhook delivery successfully enqueued for retry",
+      delivery,
+    });
+  } catch (error) {
+    if (error.message.includes("not found") || error.message.includes("inactive")) {
+      return res.status(404).json({ message: error.message });
+    }
+    next(error);
+  }
+};
+
 exports.SUBSCRIBABLE_EVENTS = SUBSCRIBABLE_EVENTS;
 exports.validateUrl = validateUrl;
 exports.validateEvents = validateEvents;

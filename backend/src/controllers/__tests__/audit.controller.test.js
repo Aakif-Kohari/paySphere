@@ -7,6 +7,12 @@ jest.mock('../../models/auditLog.model', () => {
   return model;
 });
 
+jest.mock('../../services/cache.service', () => ({
+  get: jest.fn().mockResolvedValue(null),
+  setEx: jest.fn().mockResolvedValue(true),
+  generateHash: jest.fn().mockReturnValue('mock-hash'),
+}));
+
 const mongoose = require('mongoose');
 const AuditLog = require('../../models/auditLog.model');
 const {
@@ -350,5 +356,55 @@ describe('exportAuditLogsCSV (#664)', () => {
 
     const csv = res.send.mock.calls[0][0];
     expect(csv).toContain('Deleted User');
+  });
+});
+
+describe('getAuditLogs — Caching (#1094)', () => {
+  const cacheService = require('../../services/cache.service');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('should return cached logs and skip DB query on cache hit', async () => {
+    const cachedData = {
+      logs: [{ action: 'CACHE_HIT', details: 'c-hit' }],
+      metadata: { totalRecords: 1, totalPages: 1, currentPage: 1, pageSize: 50 },
+    };
+    cacheService.get.mockResolvedValueOnce(cachedData);
+
+    const req = buildReq();
+    const res = buildRes();
+    
+    await getAuditLogs(req, res, jest.fn());
+
+    expect(cacheService.get).toHaveBeenCalled();
+    expect(AuditLog.find).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      data: cachedData,
+    });
+  });
+
+  test('should query DB and save to cache on cache miss', async () => {
+    cacheService.get.mockResolvedValueOnce(null);
+    AuditLog.find.mockReturnValue(queryStub([{ action: 'DB_READ' }]));
+    AuditLog.countDocuments.mockResolvedValueOnce(1);
+
+    const req = buildReq();
+    const res = buildRes();
+
+    await getAuditLogs(req, res, jest.fn());
+
+    expect(cacheService.get).toHaveBeenCalled();
+    expect(AuditLog.find).toHaveBeenCalled();
+    expect(cacheService.setEx).toHaveBeenCalledWith(
+      expect.stringContaining('audit:logs:'),
+      60,
+      expect.objectContaining({
+        logs: expect.any(Array),
+        metadata: expect.any(Object),
+      })
+    );
   });
 });

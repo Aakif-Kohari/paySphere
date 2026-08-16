@@ -1,6 +1,7 @@
-const AuditLog = require('../models/auditLog.model');
+const auditLogRepository = require('../repositories/auditLog.repository');
 const { AUDIT_ACTIONS } = require('../models/auditLog.model');
 const { tenantFilter } = require('../utils/tenantScope');
+const cacheService = require('../services/cache.service');
 
 /**
  * Reading the audit trail (#664).
@@ -118,7 +119,7 @@ function buildQuery(req) {
 exports.getAuditLogs = async (req, res, next) => {
   try {
     const built = buildQuery(req);
-    if (!built.ok) return res.status(400).json({ message: built.message });
+    if (!built.ok) return res.error(built.message, null, 'bad_request', 400);
 
     let page = parseInt(req.query.page, 10);
     if (isNaN(page) || page < 1) page = 1;
@@ -130,17 +131,18 @@ exports.getAuditLogs = async (req, res, next) => {
       limit = MAX_PAGE_SIZE;
     }
 
+    const cacheKey = `audit:logs:${req.tenantId || 'unscoped'}:${cacheService.generateHash(JSON.stringify(built.query))}:p${page}:l${limit}`;
+    const cachedData = await cacheService.get(cacheKey);
+    if (cachedData) {
+      return res.success(cachedData);
+    }
+
     const skip = (page - 1) * limit;
 
     // The count and the page in parallel: they are independent
     const [logs, totalLogs] = await Promise.all([
-      AuditLog.find(built.query)
-        .sort({ createdAt: -1 })
-        .populate('userId', 'fullName email')
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      AuditLog.countDocuments(built.query),
+      auditLogRepository.findPaginatedLogs(built.query, skip, limit),
+      auditLogRepository.countDocuments(built.query),
     ]);
 
     const processedLogs = logs.map((log) => ({
@@ -148,8 +150,7 @@ exports.getAuditLogs = async (req, res, next) => {
       userId: log.userId || { fullName: 'Deleted User', email: '' },
     }));
 
-    // Return a metadata object containing totalRecords and totalPages
-    res.status(200).json({
+    const responsePayload = {
       logs: processedLogs,
       metadata: {
         totalRecords: totalLogs,
@@ -157,7 +158,13 @@ exports.getAuditLogs = async (req, res, next) => {
         currentPage: page,
         pageSize: limit,
       },
-    });
+    };
+
+    // Cache the response payload with a 1-minute TTL (60 seconds)
+    await cacheService.setEx(cacheKey, 60, responsePayload);
+
+    // Return the response payload
+    res.success(responsePayload);
   } catch (error) {
     next(error);
   }
@@ -167,13 +174,9 @@ exports.getAuditLogs = async (req, res, next) => {
 exports.exportAuditLogsCSV = async (req, res, next) => {
   try {
     const built = buildQuery(req);
-    if (!built.ok) return res.status(400).json({ message: built.message });
+    if (!built.ok) return res.error(built.message, null, 'bad_request', 400);
 
-    const logs = await AuditLog.find(built.query)
-      .sort({ createdAt: -1 })
-      .limit(MAX_EXPORT_ROWS)
-      .populate('userId', 'fullName email')
-      .lean();
+    const logs = await auditLogRepository.findExportLogs(built.query, MAX_EXPORT_ROWS);
 
     const header = [
       'Timestamp',

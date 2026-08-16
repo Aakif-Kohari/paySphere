@@ -223,6 +223,8 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
 
             <button
               onClick={() => setShowForm((v) => !v)}
+              aria-expanded={showForm}
+              aria-label={showForm ? 'Cancel revision' : 'Revise salary'}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm"
             >
               {showForm ? 'Cancel' : 'Revise salary'}
@@ -230,7 +232,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table aria-label="Salary breakdown" className="w-full text-sm text-left">
               <thead className="text-gray-500 dark:text-slate-500 border-b border-gray-200 dark:border-slate-800">
                 <tr>
                   <th className="py-2">Component</th>

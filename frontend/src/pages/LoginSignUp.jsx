@@ -342,8 +342,10 @@ export default function PaySphereLogin() {
           {/* RIGHT PANEL */}
           <div className="w-full md:flex-1 px-5 sm:px-8 md:px-12 py-8 sm:py-10 flex flex-col justify-center text-slate-800 dark:text-slate-200">
             {/* tabs */}
-            <div className="flex bg-gray-100 dark:bg-slate-950 rounded-xl p-1 mb-6 sm:mb-8 transition-colors">
+            <div role="tablist" aria-label="Account type" className="flex bg-gray-100 dark:bg-slate-950 rounded-xl p-1 mb-6 sm:mb-8 transition-colors">
               <button
+                role="tab"
+                aria-selected={activeTab === 'login'}
                 onClick={() => {
                   setActiveTab('login');
                   resetFormState();
@@ -358,6 +360,8 @@ export default function PaySphereLogin() {
               </button>
 
               <button
+                role="tab"
+                aria-selected={activeTab === 'signup'}
                 onClick={() => {
                   setActiveTab('signup');
                   resetFormState();
@@ -478,7 +482,7 @@ export default function PaySphereLogin() {
                       </div>
 
                       {error && (
-                        <p className="text-red-500 text-xs mb-4">{error}</p>
+                        <p className="text-red-500 text-xs mb-4" role="alert">{error}</p>
                       )}
 
                       <button
@@ -504,6 +508,7 @@ export default function PaySphereLogin() {
                   <button
                     onClick={onGoogleClick}
                     disabled={loading}
+                    aria-label="Sign in with Google"
                     className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     <GoogleIcon />
@@ -513,6 +518,7 @@ export default function PaySphereLogin() {
                   <button
                     onClick={onGitHubClick}
                     disabled={loading}
+                    aria-label="Sign in with GitHub"
                     className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     <GitHubIcon />
@@ -654,6 +660,7 @@ export default function PaySphereLogin() {
                   <button
                     onClick={onGoogleClick}
                     disabled={loading}
+                    aria-label="Sign up with Google"
                     className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     <GoogleIcon />
@@ -663,6 +670,7 @@ export default function PaySphereLogin() {
                   <button
                     onClick={onGitHubClick}
                     disabled={loading}
+                    aria-label="Sign up with GitHub"
                     className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     <GitHubIcon />

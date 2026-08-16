@@ -13,11 +13,17 @@ const {
   FULLNAME_MAX_LENGTH,
   ROLE_MAX_LENGTH,
 } = require('../utils/validators');
+const { tenantFilter } = require('../utils/tenantScope');
 const PayrollUpdate = require('../models/payroll.model');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const cacheService = require('../services/cache.service');
 const Settlement = require('../models/settlement.model');
+const { Client } = require('@elastic/elasticsearch');
+
+const esClient = new Client({
+  node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200',
+});
 /**
  * Normalize an employee email for storage.
  *
@@ -155,11 +161,9 @@ exports.addEmployee = async (req, res, next) => {
     // phone-number format.
     const normalizedPhone = normalizeEmployeePhone(phone);
     if (!normalizedPhone.ok) {
-      return res
-        .status(400)
-        .json({
-          message: 'Phone number must be a valid international phone number',
-        });
+      return res.status(400).json({
+        message: 'Phone number must be a valid international phone number',
+      });
     }
 
     // Get the user's company name
@@ -639,13 +643,27 @@ exports.updateEmployee = async (req, res, next) => {
 
     // `employee` used to be referenced (for the `department` update) before
     // this declaration ran, which threw a ReferenceError on every update.
-    const employee = await Employee.findById(id);
+    // Scoped (#1010). One file guarded three handlers three different ways —
+    // `createdBy !== req.userId` here and in `deleteEmployee`,
+    // `tenantId.toString() !== req.tenantId` in `toggleActive` — and none of
+    // the three was right.
+    const employee = await Employee.findOne(tenantFilter(req, { _id: id }));
 
     if (!employee || employee.deletedAt) {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    // Ensure the logged-in user is the creator of this employee
+    // The `createdBy` check below is deliberately left as it is.
+    //
+    // It is not a tenant check and never was — it asks "did *you personally*
+    // create this record", which is arguably too strict for a shared HR
+    // workspace where the account that onboards someone is often not the one
+    // who later edits them. But relaxing it widens who may modify employee
+    // records, and that is a change to the permission model rather than a
+    // security fix. It belongs in its own PR with its own argument; #1010
+    // records the reasoning. Scoping the fetch above is the part that closes
+    // the cross-tenant hole, and it composes with this check rather than
+    // replacing it.
     if (employee.createdBy.toString() !== req.userId) {
       return res
         .status(403)
@@ -711,11 +729,9 @@ exports.updateEmployee = async (req, res, next) => {
     // Same pattern for phone: optional, validated only if provided.
     const normalizedPhone = normalizeEmployeePhone(phone);
     if (!normalizedPhone.ok) {
-      return res
-        .status(400)
-        .json({
-          message: 'Phone number must be a valid international phone number',
-        });
+      return res.status(400).json({
+        message: 'Phone number must be a valid international phone number',
+      });
     }
 
     // Capture old name for payroll propagation check (#253)
@@ -838,16 +854,22 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
 
-    const employee = await Employee.findById(id);
+    // Scoped (#1010). This handler did have a tenant check — and it never
+    // passed. `auth.middleware` sets `req.tenantId` from `user.tenantId`,
+    // an ObjectId, so `employee.tenantId.toString() !== req.tenantId` compared
+    // a string primitive against an object and was *always* true: every call
+    // answered 403, including from the company that owns the record.
+    //
+    // Deactivating an employee is what removes them from payroll (#260), so
+    // this was not a cosmetic failure — there was no way to take a leaver off
+    // the payroll through this endpoint.
+    //
+    // The comparison fails closed here purely by luck. The same mistake
+    // written as `if (a.toString() === b) { allow }` fails open.
+    const employee = await Employee.findOne(tenantFilter(req, { _id: id }));
 
     if (!employee || employee.deletedAt) {
       return res.status(404).json({ message: 'Employee not found' });
-    }
-
-    if (employee.tenantId.toString() !== req.tenantId) {
-      return res
-        .status(403)
-        .json({ message: 'Not authorized to update this employee' });
     }
 
     employee.isActive = !employee.isActive;
@@ -891,7 +913,10 @@ exports.deleteEmployee = async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
 
-    const employee = await Employee.findById(id);
+    // Scoped (#1010). The `createdBy` check below is kept for the reason given
+    // in `updateEmployee`: relaxing it is a permission-model decision, not a
+    // security fix, and the two should not travel together.
+    const employee = await Employee.findOne(tenantFilter(req, { _id: id }));
 
     if (!employee || employee.deletedAt) {
       return res.status(404).json({
@@ -1156,5 +1181,74 @@ exports.exportEmployeesCSV = async (req, res, next) => {
     return res.status(200).send(csvContent);
   } catch (error) {
     next(error);
+  }
+};
+
+exports.searchEmployees = async (req, res) => {
+  try {
+    // Extract query parameters
+    const { q, department, role } = req.query;
+
+    // Security: ALWAYS isolate by the requesting user's tenantId!
+    const tenantId = req.tenantId;
+
+    // Build the Elasticsearch query body
+    const searchBody = {
+      query: {
+        bool: {
+          // "must" acts like an AND operator
+          must: [
+            { term: { tenantId: tenantId } }, // Strict tenant isolation
+          ],
+        },
+      },
+    };
+
+    // Fuzzy Text Search (Name or Email)
+    if (q) {
+      searchBody.query.bool.must.push({
+        multi_match: {
+          query: q,
+          fields: ['fullName^2', 'email'], // ^2 boosts the score of name matches over email
+          fuzziness: 'AUTO', // Allows for typos (e.g., "Jhon" finds "John")
+        },
+      });
+    }
+
+    // Facet Filtering (Department)
+    if (department) {
+      searchBody.query.bool.must.push({
+        term: { department: department },
+      });
+    }
+
+    // Facet Filtering (Role)
+    if (role) {
+      searchBody.query.bool.must.push({
+        term: { role: role },
+      });
+    }
+
+    // Execute the search
+    const result = await esClient.search({
+      index: 'employees',
+      body: searchBody,
+    });
+
+    // Format the response to strip out Elasticsearch metadata
+    const hits = result.hits.hits.map((hit) => ({
+      _id: hit._id,
+      ...hit._source,
+      score: hit._score, // Optional: shows how relevant the result is
+    }));
+
+    res.status(200).json({
+      success: true,
+      total: result.hits.total.value,
+      data: hits,
+    });
+  } catch (error) {
+    logger.error('Elasticsearch query failed', { error: error.message || error });
+    res.status(500).json({ success: false, message: 'Search engine error' });
   }
 };

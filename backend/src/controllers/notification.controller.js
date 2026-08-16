@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const Notification = require('../models/notification.model');
+const PushSubscription = require('../models/pushSubscription.model');
 const { getTenantId } = require('../utils/tenantScope');
+const { VAPID_PUBLIC_KEY } = require('../services/pushNotification.service');
 
 /**
  * The in-app notification centre (#440, #898).
@@ -189,9 +191,84 @@ const deleteNotification = async (req, res, next) => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Push Subscription Handlers (Issue #1027)
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/notifications/vapid-public-key
+ * Returns the VAPID public key so the frontend can subscribe.
+ */
+const getVapidPublicKey = (req, res) => {
+  res.status(200).json({ publicKey: VAPID_PUBLIC_KEY });
+};
+
+/**
+ * POST /api/notifications/subscribe
+ * Saves a new push subscription from the client.
+ */
+const subscribe = async (req, res, next) => {
+  try {
+    const { subscription } = req.body;
+
+    if (!subscription || !subscription.endpoint || !subscription.keys) {
+      return res.status(400).json({ message: 'Invalid subscription object' });
+    }
+
+    // Upsert the subscription (update if endpoint exists, create if new)
+    await PushSubscription.findOneAndUpdate(
+      { endpoint: subscription.endpoint },
+      {
+        tenantId: req.tenantId,
+        userId: req.userId,
+        endpoint: subscription.endpoint,
+        keys: {
+          auth: subscription.keys.auth,
+          p256dh: subscription.keys.p256dh,
+        },
+        userAgent: req.get('user-agent') || '',
+        isActive: true,
+      },
+      { upsert: true, new: true },
+    );
+
+    res.status(201).json({ message: 'Subscription saved successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/notifications/unsubscribe
+ * Removes a push subscription when the user disables notifications.
+ */
+const unsubscribe = async (req, res, next) => {
+  try {
+    const { endpoint } = req.body;
+
+    if (!endpoint) {
+      return res.status(400).json({ message: 'Endpoint is required' });
+    }
+
+    await PushSubscription.findOneAndDelete({
+      endpoint,
+      userId: req.userId,
+    });
+
+    res.status(200).json({ message: 'Unsubscribed successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
+  // In-app notification handlers (#440, #898)
   getNotifications,
   markAsRead,
   markAllAsRead,
   deleteNotification,
+  // Push subscription handlers (#1027)
+  getVapidPublicKey,
+  subscribe,
+  unsubscribe,
 };

@@ -121,6 +121,6 @@ if (process.env.REDIS_URL) {
 };
 
 startServer().catch((error) => {
-  console.error('SERVER STARTUP FAILED:', error);
+  logger.error('SERVER STARTUP FAILED', { error: error.message || error });
   process.exit(1);
 });

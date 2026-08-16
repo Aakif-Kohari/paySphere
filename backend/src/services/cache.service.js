@@ -281,6 +281,20 @@ async function invalidateAllDashboardCaches(userId) {
 }
 
 /**
+ * Invalidates all audit logs cache for a specific tenant.
+ * @param {string} tenantId
+ */
+async function invalidateAuditLogs(tenantId) {
+  if (!tenantId) return;
+  try {
+    await deleteByPattern(`audit:logs:${tenantId}:*`);
+    logger.info(`Audit logs cache invalidated for tenant ${tenantId}`);
+  } catch (error) {
+    logger.error(`Failed to invalidate audit logs cache for tenant ${tenantId}:`, error.message);
+  }
+}
+
+/**
  * Backward-compatible alias for deleteByPattern
  */
 const invalidatePattern = deleteByPattern;
@@ -310,5 +324,6 @@ module.exports = {
   invalidateReports,
   invalidateDashboardSummary,
   invalidateAllDashboardCaches,
+  invalidateAuditLogs,
   destroy,
 };

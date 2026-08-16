@@ -425,6 +425,7 @@ export default function PayrollWizard() {
           <button
             onClick={handleSendEmails}
             disabled={sendingEmails}
+            aria-label="Send digital payslips to all employees"
             style={{
               width: "100%",
               padding: "12px",
@@ -458,6 +459,7 @@ export default function PayrollWizard() {
         {/* Done Actions */}
         <button
           onClick={() => navigate("/dashboard")}
+          aria-label="Done, go to dashboard"
           style={{
             width: "100%",
             padding: "14px",
@@ -553,6 +555,7 @@ export default function PayrollWizard() {
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                  aria-label="Pay period month"
                   style={{
                     width: "100%",
                     padding: "12px",
@@ -577,6 +580,7 @@ export default function PayrollWizard() {
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  aria-label="Pay period year"
                   style={{
                     width: "100%",
                     padding: "12px",

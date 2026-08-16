@@ -2,6 +2,7 @@ const AuditLog = require("../models/auditLog.model");
 const { AUDIT_ACTIONS, AUDIT_RESOURCE_TYPES } = require("../models/auditLog.model");
 const { isUsableTenantId } = require("../utils/tenantScope");
 const logger = require("../utils/logger");
+const cacheService = require("./cache.service");
 
 /**
  * Write one audit entry.
@@ -86,6 +87,9 @@ const createAuditLog = async ({
       ipAddress: req?.ip || req?.connection?.remoteAddress,
       userAgent: req?.headers?.["user-agent"],
     });
+
+    // Invalidate cached audit logs for the tenant
+    await cacheService.invalidateAuditLogs(resolvedTenantId);
 
     return true;
   } catch (error) {

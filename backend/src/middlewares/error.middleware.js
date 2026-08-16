@@ -8,6 +8,7 @@
 
 const logger = require('../utils/logger');
 const { AppError } = require('../utils/apiError');
+const ResponseFormatter = require('../utils/responseFormatter');
 
 /**
  * Handles Mongoose CastError (invalid ObjectId)
@@ -49,16 +50,15 @@ const handleJWTError = () => {
   return new AppError('Invalid token. Please log in again.', 401);
 };
 
-/**
- * Formats the error response for Development environments
- * Includes stack traces for easier debugging
- */
 const sendErrorDev = (err, res) => {
   res.status(err.statusCode).json({
-    status: err.status,
-    error: err,
-    message: err.message,
-    stack: err.stack,
+    success: false,
+    error: {
+      message: err.message,
+      code: err.status || 'error',
+      details: err,
+      stack: err.stack,
+    },
   });
 };
 
@@ -69,10 +69,9 @@ const sendErrorDev = (err, res) => {
 const sendErrorProd = (err, res) => {
   // Operational, trusted error: send message to client
   if (err.isOperational) {
-    res.status(err.statusCode).json({
-      status: err.status,
-      message: err.message,
-    });
+    res.status(err.statusCode).json(
+      ResponseFormatter.error(err.message, null, err.status || 'error')
+    );
   } 
   // Programming or other unknown error: don't leak details
   else {
@@ -84,10 +83,9 @@ const sendErrorProd = (err, res) => {
     });
 
     // Send generic message to client
-    res.status(500).json({
-      status: 'error',
-      message: 'Something went very wrong!',
-    });
+    res.status(500).json(
+      ResponseFormatter.error('Something went very wrong!', null, 'internal_server_error')
+    );
   }
 };
 

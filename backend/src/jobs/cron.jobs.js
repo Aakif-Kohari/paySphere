@@ -6,6 +6,9 @@ const { enqueueEmail } = require('../jobs/email.queue');
 const { emailableStatusFilter } = require('../config/payrollStatus');
 const { processMonthlyAccrual } = require('./leaveAccrual.job');
 const logger = require('../utils/logger');
+const { runDatabaseBackupJob } = require('./backup.job');
+const { runDatabaseArchivalJob } = require('./archival.job');
+const { runForexSyncJob } = require('./forexSync.job');
 
 const LOCK_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -336,6 +339,30 @@ const startCronJobs = () => {
     );
   });
   logger.info('HRMS integration sync cron job registered.');
+
+  // 03:00 daily — Database backup to S3/local.
+  cron.schedule('0 3 * * *', () => {
+    runDatabaseBackupJob().catch((error) =>
+      logger.error('Database backup job threw', { error: error.message }),
+    );
+  });
+  logger.info('Daily database backup cron job registered.');
+
+  // 00:00 daily — Forex exchange rate daily sync.
+  cron.schedule('0 0 * * *', () => {
+    runForexSyncJob().catch((error) =>
+      logger.error('Forex sync job threw', { error: error.message }),
+    );
+  });
+  logger.info('Daily forex sync cron job registered.');
+
+  // 00:00 on the 1st of every month — Database archival to S3 Glacier/local.
+  cron.schedule('0 0 1 * *', () => {
+    runDatabaseArchivalJob().catch((error) =>
+      logger.error('Database archival job threw', { error: error.message }),
+    );
+  });
+  logger.info('Monthly database archival cron job registered.');
 };
 
 /**
@@ -382,6 +409,9 @@ module.exports = {
   runMonthlyPayslipJob,
   runDailyGreetingsJob,
   runHrmsSyncJob,
+  runDatabaseBackupJob,
+  runDatabaseArchivalJob,
+  runForexSyncJob,
   previousPeriod,
   acquireLock,
   releaseLock,

@@ -282,6 +282,8 @@ const Settlements = () => {
 
         <button
           onClick={() => setShowForm((v) => !v)}
+          aria-expanded={showForm}
+          aria-label={showForm ? 'Close exit form' : 'Start an exit'}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition"
         >
           {showForm ? 'Close' : 'Start an exit'}
@@ -498,6 +500,7 @@ const Settlements = () => {
             <button
               key={status || 'all'}
               onClick={() => handleFilterChange(status)}
+              aria-label={`Filter by ${status ? STATUS_LABELS[status] : 'All'} status`}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
                 statusFilter === status
                   ? 'bg-blue-600 text-white'
@@ -585,6 +588,7 @@ const Settlements = () => {
                       <button
                         disabled={busy}
                         onClick={() => runAction(item._id, 'submit')}
+                        aria-label={`Submit settlement for ${item.employeeName}`}
                         className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
                       >
                         Submit for approval
@@ -595,6 +599,7 @@ const Settlements = () => {
                         <button
                           disabled={busy}
                           onClick={() => runAction(item._id, 'approve')}
+                          aria-label={`Approve settlement for ${item.employeeName}`}
                           className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
                         >
                           Approve
@@ -602,6 +607,7 @@ const Settlements = () => {
                         <button
                           disabled={busy}
                           onClick={() => handleReject(item._id)}
+                          aria-label={`Send back settlement for ${item.employeeName}`}
                           className="px-3 py-1.5 border border-red-500 text-red-600 dark:text-red-400 rounded-lg text-sm font-semibold disabled:opacity-50"
                         >
                           Send back
@@ -612,6 +618,7 @@ const Settlements = () => {
                       <button
                         disabled={busy}
                         onClick={() => runAction(item._id, 'mark-paid')}
+                        aria-label={`Mark paid and offboard ${item.employeeName}`}
                         className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
                       >
                         Mark paid &amp; offboard
@@ -623,6 +630,7 @@ const Settlements = () => {
                       <button
                         disabled={busy}
                         onClick={() => runAction(item._id, 'cancel')}
+                        aria-label={`Cancel settlement for ${item.employeeName}`}
                         className="px-3 py-1.5 border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-400 rounded-lg text-sm font-semibold disabled:opacity-50"
                       >
                         Cancel
