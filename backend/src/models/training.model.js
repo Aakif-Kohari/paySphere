@@ -1,6 +1,8 @@
 /**
- * @fileoverview Training course and enrolment schemas.
- * @description Issue: #1076
+ * @fileoverview Training Course and Enrolment Schemas
+ * @description Manages mandatory compliance courses, professional certifications,
+ * and individual employee training records with expiration tracking.
+ * Issue: #1076, #1085
  *
  * `validUntil` is stored on the enrolment rather than derived on read, and that
  * is a deliberate exception to the rule the rest of this codebase follows.
@@ -24,6 +26,10 @@ const {
   APPLIES_TO,
 } = require('../utils/trainingCompliance');
 
+// ============================================================================
+// Training Course Schema
+// ============================================================================
+
 const trainingCourseSchema = new mongoose.Schema(
   {
     tenantId: {
@@ -46,13 +52,14 @@ const trainingCourseSchema = new mongoose.Schema(
       type: String,
       enum: [
         'Compliance',
+        'InfoSec',
         'Safety',
         'Technical',
         'Leadership',
         'Onboarding',
         'Other',
       ],
-      default: 'Other',
+      default: 'Compliance',
       index: true,
     },
 
@@ -68,8 +75,11 @@ const trainingCourseSchema = new mongoose.Schema(
       enum: Object.values(APPLIES_TO),
       default: APPLIES_TO.ALL,
     },
-    /** Department names or role titles, depending on `appliesTo`. Ignored when
-     *  `appliesTo` is `All`. */
+    /**
+     * Department names or role titles, depending on `appliesTo`. Ignored when
+     * `appliesTo` is `All`. Also serves as `targetDepartments` for simpler
+     * department-only targeting (#1085).
+     */
     appliesToValues: { type: [String], default: [] },
 
     durationMinutes: { type: Number, default: 0, min: 0 },
@@ -86,6 +96,14 @@ const trainingCourseSchema = new mongoose.Schema(
     validityMonths: { type: Number, default: 0, min: 0, max: 240 },
 
     /**
+     * Validity in days, used as an alternative to validityMonths for courses
+     * with shorter or non-monthly renewal cycles (#1085). When both are set,
+     * validityMonths takes precedence for backward compatibility.
+     * 0 means lifetime certification.
+     */
+    validityDays: { type: Number, default: 0, min: 0, max: 7300 },
+
+    /**
      * How much notice a renewal needs, per course.
      *
      * A four-hour refresher wants two weeks; a two-day external certification
@@ -94,13 +112,17 @@ const trainingCourseSchema = new mongoose.Schema(
      */
     reminderLeadDays: { type: Number, default: 30, min: 0, max: 365 },
 
-    isActive: { type: Boolean, default: true },
+    /** Link to LMS, external training platform, or reference material (#1085). */
+    externalLink: { type: String, default: '', trim: true, maxlength: 2000 },
+
+    isActive: { type: Boolean, default: true, index: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true },
 );
 
 trainingCourseSchema.index({ tenantId: 1, code: 1 }, { unique: true });
+trainingCourseSchema.index({ tenantId: 1, isActive: 1 });
 
 /**
  * A targeted course with no targets applies to nobody, which is almost never
@@ -123,6 +145,10 @@ trainingCourseSchema.pre('validate', function validateTargets(next) {
   }
   return next();
 });
+
+// ============================================================================
+// Training Enrollment / Employee Training Record Schema
+// ============================================================================
 
 const trainingEnrollmentSchema = new mongoose.Schema(
   {
@@ -163,6 +189,8 @@ const trainingEnrollmentSchema = new mongoose.Schema(
      * Stored evidence, not a cache. See the file header: recomputing this on
      * read would make a policy change retroactively invalidate — or revive —
      * certifications that were correct when issued.
+     *
+     * Also indexed as `expiresAt` alias for the expiration engine (#1085).
      */
     validUntil: { type: Date, default: null, index: true },
 
@@ -172,6 +200,22 @@ const trainingEnrollmentSchema = new mongoose.Schema(
       trim: true,
       maxlength: 100,
     },
+
+    /** URL to uploaded certificate proof (#1085). */
+    certificateUrl: { type: String, default: '', trim: true, maxlength: 2000 },
+
+    /** When the certificate proof was uploaded (#1085). */
+    certificateUploadedAt: { type: Date, default: null },
+
+    /** User who verified the certificate proof (#1085). */
+    verifiedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+
+    /** Last reminder timestamp to prevent duplicate/spam notifications (#1085). */
+    lastReminderSentAt: { type: Date, default: null },
 
     /** A waiver is a documented decision, so the reason is required with it. */
     waivedReason: { type: String, default: '', maxlength: 500 },
@@ -197,6 +241,10 @@ trainingEnrollmentSchema.index(
 );
 trainingEnrollmentSchema.index({ tenantId: 1, status: 1, validUntil: 1 });
 
+// ============================================================================
+// Plugins & Model Registration
+// ============================================================================
+
 trainingCourseSchema.plugin(auditTrailPlugin);
 trainingEnrollmentSchema.plugin(auditTrailPlugin);
 
@@ -206,4 +254,9 @@ const TrainingEnrollment = mongoose.model(
   trainingEnrollmentSchema,
 );
 
-module.exports = { TrainingCourse, TrainingEnrollment };
+// Backward-compatible alias: some modules may import EmployeeTrainingRecord
+// from the #1085 schema. Point it at the same collection/model so there is
+// one source of truth and no duplicate collection risk.
+const EmployeeTrainingRecord = TrainingEnrollment;
+
+module.exports = { TrainingCourse, TrainingEnrollment, EmployeeTrainingRecord };
