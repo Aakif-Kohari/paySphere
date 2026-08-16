@@ -9,6 +9,7 @@ const Employee = require('../models/employee.model');
 const PayrollUpdate = require('../models/payroll.model');
 const User = require('../models/user.model');
 const ExchangeRate = require('../models/exchangeRate.model');
+const { acquireLock, releaseLock } = require('../utils/lockManager');
 const { calculateNetSalary } = require('../utils/salaryCalculator');
 const { generatePayrollCSV } = require('../utils/csvExport');
 const logger = require('../utils/logger');
@@ -710,6 +711,7 @@ exports.getExchangeRates = async (req, res, next) => {
 
 exports.submitPayrollForReview = async (req, res, next) => {
   let session = null;
+  let lockKey = null;
   try {
     // Load latest exchange rates
     let rateDoc = await ExchangeRate.findOne().sort({ date: -1 });
@@ -752,6 +754,15 @@ exports.submitPayrollForReview = async (req, res, next) => {
       month !== undefined ? Number(month) : new Date().getMonth() + 1;
     let currentYear =
       year !== undefined ? Number(year) : new Date().getFullYear();
+
+    // Acquire Mutex Lock
+    lockKey = `payroll_lock:${req.tenantId || 'global'}:${currentYear}:${currentMonth}`;
+    const acquired = await acquireLock(lockKey, 300000); // 5 minute lock
+    if (!acquired) {
+      return res.status(409).json({
+        message: 'Another payroll process is currently running for this company and month. Please try again later.'
+      });
+    }
 
     if (
       isNaN(currentMonth) ||
@@ -1611,6 +1622,10 @@ exports.submitPayrollForReview = async (req, res, next) => {
     });
 
     next(error);
+  } finally {
+    if (lockKey) {
+      await releaseLock(lockKey);
+    }
   }
 };
 
