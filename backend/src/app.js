@@ -89,6 +89,11 @@ const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
 const pyqRoutes = require('./routes/pyq.routes');
 
+// Salary disbursement (#1075). Payroll was computed to the rupee and then
+// stopped: `payroll.model.js` has a `disbursed` status and nothing in the
+// product produced the bank file that actually moves the money.
+const disbursementRoutes = require('./routes/disbursement.routes');
+
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
 // module threw `ReferenceError: roleRoutes is not defined`. Same damage as
@@ -400,6 +405,9 @@ app.use('/api/clients', clientInvoiceRoutes);
 app.use('/api/shifts', shiftRosterRoutes);
 
 app.use('/api/pyqs', pyqRoutes);
+
+// Salary disbursement (#1075). The router owns `/batches` and `/profiles`.
+app.use('/api/disbursements', disbursementRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
