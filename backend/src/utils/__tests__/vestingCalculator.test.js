@@ -596,3 +596,46 @@ describe('canGrant', () => {
     expect(canGrant(scheme, grants, 1000).allowed).toBe(true);
   });
 });
+
+describe('calculateTenderAllocations', () => {
+  const tenderOffer = {
+    totalPoolShares: 1000,
+    offerPricePerShare: 150,
+    totalBudget: 150000,
+    defaultTaxRatePercent: 20,
+  };
+
+  it('allocates 100% of bids when not oversubscribed', () => {
+    const bids = [
+      { employeeId: 'emp1', sharesOffered: 400, costBasisPerShare: 50 },
+      { employeeId: 'emp2', sharesOffered: 500, costBasisPerShare: 50 },
+    ];
+
+    const result = calculateTenderAllocations(tenderOffer, bids);
+    expect(result.isOversubscribed).toBe(false);
+    expect(result.totalSharesBid).toBe(900);
+    expect(result.totalSharesAllocated).toBe(900);
+
+    const alloc1 = result.allocations[0];
+    expect(alloc1.sharesAllocated).toBe(400);
+    expect(alloc1.grossProceeds).toBe(60000); // 400 * 150
+    expect(alloc1.capitalGainsTax).toBe(8000); // (60000 - 20000) * 0.20
+    expect(alloc1.netProceeds).toBe(52000);
+  });
+
+  it('scales down allocations pro-rata when oversubscribed', () => {
+    const bids = [
+      { employeeId: 'emp1', sharesOffered: 1000, costBasisPerShare: 50 },
+      { employeeId: 'emp2', sharesOffered: 1000, costBasisPerShare: 50 },
+    ]; // 2000 bid vs 1000 pool -> 50% allocation
+
+    const result = calculateTenderAllocations(tenderOffer, bids);
+    expect(result.isOversubscribed).toBe(true);
+    expect(result.totalSharesBid).toBe(2000);
+    expect(result.totalSharesAllocated).toBe(1000);
+
+    expect(result.allocations[0].sharesAllocated).toBe(500);
+    expect(result.allocations[1].sharesAllocated).toBe(500);
+  });
+});
+
