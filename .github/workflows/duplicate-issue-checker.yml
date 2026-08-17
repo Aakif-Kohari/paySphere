@@ -1,0 +1,139 @@
+name: Duplicate Issue Checker
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  check-duplicates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for duplicate issues
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const newIssue = context.payload.issue;
+            const newTitle = newIssue.title.toLowerCase();
+            const newBody = (newIssue.body || '').toLowerCase();
+            const newIssueNumber = newIssue.number;
+            const repoOwner = context.repo.owner;
+            const repoName = context.repo.repo;
+
+            function tokenize(text) {
+              return text
+                .replace(/[^\w\s]/g, ' ')
+                .split(/\s+/)
+                .filter(t => t.length > 2);
+            }
+
+            function jaccardSimilarity(setA, setB) {
+              if (setA.size === 0 || setB.size === 0) return 0;
+              const intersection = new Set([...setA].filter(x => setB.has(x)));
+              const union = new Set([...setA, ...setB]);
+              return intersection.size / union.size;
+            }
+
+            function levenshteinDistance(a, b) {
+              const matrix = [];
+              for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+              for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+              for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                  if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                  } else {
+                    matrix[i][j] = Math.min(
+                      matrix[i - 1][j - 1] + 1,
+                      matrix[i][j - 1] + 1,
+                      matrix[i - 1][j] + 1
+                    );
+                  }
+                }
+              }
+              return matrix[b.length][a.length];
+            }
+
+            function titleSimilarity(titleA, titleB) {
+              const maxLen = Math.max(titleA.length, titleB.length);
+              if (maxLen === 0) return 0;
+              const dist = levenshteinDistance(titleA, titleB);
+              return 1 - dist / maxLen;
+            }
+
+            const newTokens = new Set([
+              ...tokenize(newTitle),
+              ...tokenize(newBody).slice(0, 50)
+            ]);
+
+            const searchQuery = encodeURIComponent(
+              `repo:${repoOwner}/${repoName} is:issue in:title,body ${tokenize(newTitle).slice(0, 5).join(' OR ')}`
+            );
+
+            const potentialMatches = [];
+            try {
+              const searchResponse = await github.rest.search.issuesAndPullRequests({
+                q: `repo:${repoOwner}/${repoName} is:issue`,
+                per_page: 50,
+                sort: 'updated',
+                order: 'desc'
+              });
+
+              for (const issue of searchResponse.data.items) {
+                if (issue.number === newIssueNumber) continue;
+                const existingTitle = issue.title.toLowerCase();
+                const existingBody = (issue.body || '').toLowerCase();
+                const existingTokens = new Set([
+                  ...tokenize(existingTitle),
+                  ...tokenize(existingBody).slice(0, 50)
+                ]);
+
+                const jSim = jaccardSimilarity(newTokens, existingTokens);
+                const tSim = titleSimilarity(newTitle, existingTitle);
+                const combinedScore = (jSim * 0.4) + (tSim * 0.6);
+
+                if (combinedScore >= 0.5) {
+                  potentialMatches.push({
+                    number: issue.number,
+                    title: issue.title,
+                    state: issue.state,
+                    html_url: issue.html_url,
+                    score: combinedScore,
+                    titleScore: tSim,
+                    jaccardScore: jSim
+                  });
+                }
+              }
+            } catch (err) {
+              console.error('Search error:', err.message);
+            }
+
+            potentialMatches.sort((a, b) => b.score - a.score);
+            const topMatches = potentialMatches.slice(0, 5);
+
+            if (topMatches.length > 0) {
+              let commentBody = '## 🔍 Potential Duplicate Issues Found\n\n';
+              commentBody += 'This issue looks similar to the following issues:\n\n';
+              for (const match of topMatches) {
+                const confidence = Math.round(match.score * 100);
+                const stateBadge = match.state === 'open' ? '🟢 Open' : '🔴 Closed';
+                commentBody += `- **[${match.title}](${match.html_url})** — #${match.number} (${stateBadge}) — Similarity: **${confidence}%**\n`;
+              }
+              commentBody += '\n---\n';
+              commentBody += 'If this is a duplicate, please close this issue and add any additional context to the existing issue. ';
+              commentBody += 'This comment was automatically generated by the duplicate issue checker bot.';
+
+              await github.rest.issues.createComment({
+                owner: repoOwner,
+                repo: repoName,
+                issue_number: newIssueNumber,
+                body: commentBody
+              });
+
+              console.log(`Posted duplicate comment on issue #${newIssueNumber} with ${topMatches.length} potential matches.`);
+            } else {
+              console.log(`No potential duplicates found for issue #${newIssueNumber}.`);
+            }
