@@ -8,7 +8,8 @@ const crypto = require('crypto');
 const User = require('../models/user.model');
 const Employee = require('../models/employee.model');
 const PayrollUpdate = require('../models/payroll.model');
-const { enqueueEmail } = require('../jobs/email.queue');const { authenticator } = require('otplib');
+const { enqueueEmail } = require('../jobs/email.queue');
+const { authenticator } = require('otplib');
 const QRCode = require('qrcode');
 const {
   isNonEmptyString,
@@ -795,7 +796,7 @@ exports.forgotPassword = async (req, res, next) => {
       `<hr/>` +
       `<p>If you did not request this, please ignore this email and your password will remain unchanged.</p>`;
 
-await enqueueEmail('generic', {
+    await enqueueEmail('generic', {
       to: user.email,
       subject: 'PaySphere Password Reset Link',
       text,
@@ -935,14 +936,28 @@ exports.deleteAccount = async (req, res, next) => {
 
     const deleteOptions = session ? { session } : {};
 
+    const Tenant = require('../models/tenant.model');
     const AuditLog = require('../models/auditLog.model');
+    const tenant = await Tenant.findById(req.tenantId);
 
-    // Scoped by tenant: these rows are the company's, and since #585 they no
-    // longer carry a `createdBy` to match on. Filtering by the old key deleted
-    // nothing and left the company's employee and payroll records behind after
-    // the account that owned them was gone (#613).
-    await Employee.deleteMany({ tenantId: req.tenantId }, deleteOptions);
-    await PayrollUpdate.deleteMany({ tenantId: req.tenantId }, deleteOptions);
+    const isTenantOwner =
+      tenant && String(tenant.ownerId) === String(req.userId);
+
+    if (isTenantOwner) {
+      // Scoped by tenant: these rows are the company's, and since #585 they no
+      // longer carry a `createdBy` to match on. Filtering by the old key deleted
+      // nothing and left the company's employee and payroll records behind after
+      // the account that owned them was gone (#613).
+      await Employee.deleteMany({ tenantId: req.tenantId }, deleteOptions);
+      await PayrollUpdate.deleteMany({ tenantId: req.tenantId }, deleteOptions);
+      // Soft-delete the tenant as well
+      await Tenant.findByIdAndUpdate(
+        tenant._id,
+        { $set: { isActive: false } },
+        deleteOptions,
+      );
+    }
+
     await AuditLog.deleteMany({ userId: req.userId }, deleteOptions);
     await User.findByIdAndDelete(req.userId, deleteOptions);
 
