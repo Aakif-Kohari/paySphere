@@ -1,20 +1,5 @@
 /**
- * Travel routes — mounted at /api/travel (#1077).
- *
- * Four permissions, split along the same maker–checker line as expenses (#719):
- *
- *   - READ_TRAVEL           trips, settlements and the outstanding-advance ledger
- *   - SUBMIT_TRAVEL_REQUEST file a trip. Held by employees — filing for a trip
- *                           you are about to take is the point of the feature.
- *   - APPROVE_TRAVEL        approve, reject, release an advance and settle. HR.
- *                           Kept apart from submission for the same reason
- *                           APPROVE_EXPENSE is kept apart from WRITE_EXPENSE:
- *                           whoever asks for the money should not be the only
- *                           person standing between it and a bank transfer.
- *   - MANAGE_TRAVEL_POLICY  set the grade × city-class rate table. Owner only —
- *                           the policy decides what everybody in the company is
- *                           entitled to, so editing it is not a per-trip
- *                           decision.
+ * Travel routes — mounted at /api/travel (#1077, #1148).
  */
 
 const express = require('express');
@@ -34,20 +19,26 @@ const {
   settleRequest,
   getOutstandingAdvances,
   getMyTrips,
+  getTravelVarianceReport,
+  settleMultiCurrencyTrip,
 } = require('../controllers/travel.controller');
 
 const router = express.Router();
 
 // --- Self-service ---------------------------------------------------------
-//
-// Declared first so it cannot be shadowed by a `/:id` pattern. `getMyTrips`
-// resolves the employee from `req.userId`, so the route carries no identifier a
-// caller could substitute.
 router.get(
   '/my-trips',
   auth,
   requirePermission(PERMISSIONS.SUBMIT_TRAVEL_REQUEST),
   getMyTrips,
+);
+
+// --- Executive Variance Reports -------------------------------------------
+router.get(
+  '/variance-report',
+  auth,
+  requirePermission(PERMISSIONS.READ_TRAVEL),
+  getTravelVarianceReport,
 );
 
 // --- Policy ---------------------------------------------------------------
@@ -109,11 +100,15 @@ router.post(
   writeRateLimiter,
   settleRequest,
 );
+router.post(
+  '/requests/:id/multi-currency-settle',
+  auth,
+  requirePermission(PERMISSIONS.APPROVE_TRAVEL),
+  writeRateLimiter,
+  settleMultiCurrencyTrip,
+);
 
 // --- Receivables ----------------------------------------------------------
-//
-// Declared under its own segment rather than `/requests/...` so it cannot be
-// confused with a request id.
 router.get(
   '/advances/outstanding',
   auth,
