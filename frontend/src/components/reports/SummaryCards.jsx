@@ -6,7 +6,7 @@ import {
   TrendingUp,
 } from "@mui/icons-material";
 
-export default function SummaryCards({ data }) {
+export default function SummaryCards({ data = {} }) {
   const cards = [
     {
       title: "Total Payroll",

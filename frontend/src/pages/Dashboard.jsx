@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
-import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDashboardSummary, useRecentActivity, usePayrollTrend } from '../hooks/useDashboardData';
 import EmployeeCard from '../components/EmployeeCard';
@@ -15,7 +14,7 @@ import DashboardSkeleton from '../components/common/skeleton/DashboardSkeleton';
 import EmployeeManagementSkeleton from '../components/common/skeleton/EmployeeManagementSkeleton';
 import PayrollTableSkeleton from '../components/common/skeleton/PayrollTableSkeleton';
 import DashboardGrid from '../components/dashboard/DashboardGrid';
-import { logout } from '../features/auth/authSlice';
+import { useAppStore } from '../store/useAppStore';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 import api from '../services/api';
 import { formatCurrency, getCurrencySymbol } from '../utils/currency';
@@ -908,7 +907,7 @@ const PayrollTable = ({
 
 export default function PaySphereDashboard() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const logout = useAppStore((state) => state.logout);
 
   // Replaced useState/useEffect with TanStack Query hooks (Issue #684)
   const {
@@ -951,7 +950,7 @@ export default function PaySphereDashboard() {
     useState(debouncedSearch);
   const [prevRoleFilter, setPrevRoleFilter] = useState(roleFilter);
   const companyName = localStorage.getItem('companyName') || 'Acme Corp';
-  const token = useSelector((state) => state.auth.token);
+  const token = useAppStore((state) => state.token);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const qParam = searchParams.get('q');
@@ -1186,7 +1185,7 @@ export default function PaySphereDashboard() {
             </button>
             <button
               onClick={() => {
-                dispatch(logout());
+                logout();
                 localStorage.removeItem('companyName');
                 navigate('/');
               }}

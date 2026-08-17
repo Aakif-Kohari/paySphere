@@ -7,7 +7,7 @@
  */
 
 import { useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useAppStore } from '../store/useAppStore';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { exportEmployeesToPDF } from '../utils/pdfExport';
@@ -26,7 +26,7 @@ export default function EmployeeExportActions({ employees }) {
     const [isExportingPDF, setIsExportingPDF] = useState(false);
     const { toast } = useToast();
 
-    const companyName = useSelector((state) => state.auth.user?.companyName) || localStorage.getItem('companyName') || 'PaySphere';
+    const companyName = useAppStore((state) => state.user?.companyName) || localStorage.getItem('companyName') || 'PaySphere';
     const currency = localStorage.getItem('currency') || 'INR';
 
     /**

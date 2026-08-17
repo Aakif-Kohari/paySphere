@@ -4,8 +4,8 @@ import api from '../services/api';
 import zxcvbn from '../utils/zxcvbn';
 
 import { Helmet } from 'react-helmet-async';
-import { useGoogleLogin } from '@react-oauth/google';
 import ThemeToggle from '../components/ThemeToggle';
+import { useAppStore } from '../store/useAppStore';
 
 const GoogleIcon = () => (
   <svg width="20" height="20" viewBox="0 0 48 48">
@@ -28,6 +28,7 @@ const GitHubIcon = () => (
 
 export default function PaySphereLogin() {
   const navigate = useNavigate();
+  const setCredentials = useAppStore((state) => state.setCredentials);
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get('mode') === 'signup' ? 'signup' : 'login';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -118,7 +119,7 @@ export default function PaySphereLogin() {
         setActiveTab('signup');
       } else {
         const { token, companyName: savedCompanyName } = response.data;
-        localStorage.setItem('token', token);
+        setCredentials({ user: response.data.user || null, token });
         localStorage.setItem('companyName', savedCompanyName);
         if (response.data.currency) {
           localStorage.setItem('currency', response.data.currency);
@@ -178,7 +179,7 @@ export default function PaySphereLogin() {
       const { token, companyName: savedCompanyName } = response.data;
 
       // Save to localStorage
-      localStorage.setItem('token', token);
+      setCredentials({ user: response.data.user || null, token });
       localStorage.setItem('companyName', savedCompanyName);
       if (response.data.currency) {
         localStorage.setItem('currency', response.data.currency);
@@ -218,50 +219,6 @@ export default function PaySphereLogin() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleGoogleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setLoading(true);
-      setError('');
-      try {
-        const payload = {
-          accessToken: tokenResponse.access_token,
-        };
-
-        if (activeTab === 'signup') {
-          payload.companyName = companyName;
-        }
-
-        const response = await api.post(`/api/auth/google`, payload);
-
-        if (response.status === 202 && response.data.needsCompanyName) {
-          setError(response.data.message);
-          setActiveTab('signup');
-        } else {
-          const { token, companyName: savedCompanyName } = response.data;
-          localStorage.setItem('token', token);
-          localStorage.setItem('companyName', savedCompanyName);
-          if (response.data.currency) {
-            localStorage.setItem('currency', response.data.currency);
-          }
-          navigate('/dashboard');
-        }
-      } catch (err) {
-        setError(err.response?.data?.message || 'Google Login failed.');
-      } finally {
-        setLoading(false);
-      }
-    },
-    onError: () => setError('Google Login failed.'),
-  });
-
-  const onGoogleClick = () => {
-    if (activeTab === 'signup' && !companyName) {
-      setError('Please enter your Company Name to sign up with Google.');
-      return;
-    }
-    handleGoogleLogin();
   };
 
   const onGitHubClick = () => {
@@ -506,13 +463,12 @@ export default function PaySphereLogin() {
 
                 <div className="flex flex-col sm:flex-row gap-3">
                   <button
-                    onClick={onGoogleClick}
-                    disabled={loading}
+                    disabled
                     aria-label="Sign in with Google"
                     className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     <GoogleIcon />
-                    Google
+                    Google (unavailable)
                   </button>
 
                   <button
@@ -658,13 +614,12 @@ export default function PaySphereLogin() {
 
                 <div className="flex flex-col sm:flex-row gap-3">
                   <button
-                    onClick={onGoogleClick}
-                    disabled={loading}
+                    disabled
                     aria-label="Sign up with Google"
                     className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     <GoogleIcon />
-                    Google
+                    Google (unavailable)
                   </button>
 
                   <button

@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import EmployeeForm from "../components/EmployeeForm";
-import { logout } from "../features/auth/authSlice";
+import { useAppStore } from "../store/useAppStore";
 import useCtrlEnterSubmit from "../hooks/useCtrlEnterSubmit";
 import api from "../services/api";
 import { getCurrencySymbol } from "../utils/currency";
@@ -94,7 +93,7 @@ const normalizePhoneValue = (value) =>
 
 export default function AddEmployee() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const logout = useAppStore((state) => state.logout);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
@@ -385,7 +384,7 @@ export default function AddEmployee() {
             </div>
             <button
               onClick={() => {
-                dispatch(logout());
+                logout();
                 localStorage.removeItem("companyName");
                 navigate("/auth");
               }}

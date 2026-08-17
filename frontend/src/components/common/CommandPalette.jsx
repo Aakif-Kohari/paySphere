@@ -1,7 +1,6 @@
 /* eslint-disable */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
 import { Command } from 'cmdk';
 import SearchIcon from '@mui/icons-material/Search';
 import GridViewIcon from '@mui/icons-material/GridView';
@@ -16,8 +15,7 @@ import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LogoutIcon from '@mui/icons-material/Logout';
 import api from '../../services/api';
-import { toggleTheme } from '../../features/ui/uiSlice';
-import { logout } from '../../features/auth/authSlice';
+import { useAppStore } from '../../store/useAppStore';
 
 const NAV_COMMANDS = [
   {
@@ -88,15 +86,15 @@ const NAV_COMMANDS = [
 
 const CommandPalette = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const toggleTheme = useAppStore((state) => state.toggleTheme);
+  const logout = useAppStore((state) => state.logout);
 
   const [open, setOpen] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [search, setSearch] = useState('');
 
-  const reduxToken = useSelector((state) => state.auth.token);
-  const token = reduxToken || localStorage.getItem('token');
+  const token = useAppStore((state) => state.token) || localStorage.getItem('token');
 
   // Open on Cmd/Ctrl+K and index employees fresh each time
   useEffect(() => {
@@ -180,7 +178,7 @@ const CommandPalette = () => {
         label: 'Toggle Theme',
         keywords: 'dark light mode appearance',
         icon: <DarkModeIcon fontSize="small" />,
-        action: () => dispatch(toggleTheme()),
+        action: toggleTheme,
       },
       {
         id: 'sign-out',
@@ -188,13 +186,13 @@ const CommandPalette = () => {
         keywords: 'logout exit',
         icon: <LogoutIcon fontSize="small" />,
         action: () => {
-          dispatch(logout());
+          logout();
           localStorage.removeItem('companyName');
           navigate('/');
         },
       },
     ],
-    [dispatch, navigate],
+    [logout, navigate, toggleTheme],
   );
 
   if (!token) return null;

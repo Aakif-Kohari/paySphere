@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
-import DataGrid from '../components/common/DataGrid';
+import Sidebar from '../components/Sidebar';
+import EmployeePortalSkeleton from '../components/common/skeleton/EmployeePortalSkeleton';
 import api from '../services/api';
+import { useAppStore } from '../store/useAppStore';
 
 export default function EmployeePortal() {
   const navigate = useNavigate();
@@ -11,6 +13,9 @@ export default function EmployeePortal() {
   const [employee, setEmployee] = useState(null);
   const [payslips, setPayslips] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const logout = useAppStore((state) => state.logout);
+  const companyName = localStorage.getItem('companyName') || 'PaySphere';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -33,10 +38,8 @@ export default function EmployeePortal() {
   }, []);
 
   const handleSignOut = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('companyName');
-    localStorage.removeItem('userRole');
-    navigate('/');
+    logout();
+    navigate('/auth');
   };
 
   const getMonthName = (monthNum) => {
@@ -44,53 +47,6 @@ export default function EmployeePortal() {
     date.setMonth(monthNum - 1);
     return date.toLocaleString('default', { month: 'long' });
   };
-
-  const columns = [
-    { 
-      key: 'period', 
-      label: 'Period', 
-      sortable: true,
-      render: (_, row) => <span className="font-semibold text-slate-900 dark:text-white">{getMonthName(row.month)} {row.year}</span>
-    },
-    { 
-      key: 'baseSalary', 
-      label: 'Base Salary', 
-      sortable: true, 
-      sortType: 'numeric',
-      render: (val) => <span className="text-slate-600 dark:text-slate-300">,1{val?.toLocaleString('en-IN')}</span> 
-    },
-    { 
-      key: 'overtimePay', 
-      label: 'Overtime Pay', 
-      sortable: true, 
-      sortType: 'numeric',
-      render: (val) => <span className="text-emerald-600 dark:text-emerald-400">+,1{val?.toLocaleString('en-IN')}</span> 
-    },
-    { 
-      key: 'leaveDeduction', 
-      label: 'Leave Deductions', 
-      sortable: true, 
-      sortType: 'numeric',
-      render: (val) => <span className="text-red-500 dark:text-red-400">-,1{val?.toLocaleString('en-IN')}</span> 
-    },
-    { 
-      key: 'netSalary', 
-      label: 'Net Payout', 
-      sortable: true, 
-      sortType: 'numeric',
-      render: (val) => <span className="font-bold text-blue-600 dark:text-blue-400">,1{val?.toLocaleString('en-IN')}</span> 
-    },
-    { 
-      key: 'status', 
-      label: 'Status', 
-      sortable: true,
-      render: (val) => (
-        <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
-          {val}
-        </span>
-      )
-    }
-  ];
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
@@ -102,9 +58,26 @@ export default function EmployeePortal() {
         />
       </Helmet>
 
+      <Sidebar
+        companyName={companyName}
+        activePage="My portal"
+        setActivePage={() => {}}
+        isSidebarOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        onLogout={handleSignOut}
+      />
+
       {/* Top Bar */}
-      <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 flex items-center justify-between sticky top-0 z-30 transition-colors">
+      <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 sm:px-6 md:ml-56 flex items-center justify-between sticky top-0 z-30 transition-colors">
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(true)}
+            aria-label="Open sidebar"
+            className="md:hidden p-2 -ml-2 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800"
+          >
+            ☰
+          </button>
           <span className="font-bold text-xl text-blue-600 dark:text-blue-400">
             PaySphere
           </span>
@@ -133,7 +106,7 @@ export default function EmployeePortal() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-8">
+      <main className="flex-1 w-full md:w-[calc(100%-14rem)] md:ml-56 p-4 sm:p-8 space-y-8">
         {loading ? (
           <EmployeePortalSkeleton />
         ) : (

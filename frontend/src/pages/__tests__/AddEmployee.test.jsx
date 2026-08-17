@@ -7,27 +7,21 @@ import AddEmployee from "../AddEmployee";
 import api from "../../services/api";
 
 // ── Test doubles ────────────────────────────────────────────────────────────
-// AddEmployee relies on routing, Redux and the API client. Each is replaced
+// AddEmployee relies on routing, global state and the API client. Each is replaced
 // with a lightweight stub so the test can drive the form in isolation.
-const { navigate, dispatch } = vi.hoisted(() => ({
+const { navigate, storeState } = vi.hoisted(() => ({
   navigate: vi.fn(),
-  dispatch: vi.fn(),
+  storeState: { logout: vi.fn() },
 }));
 
 vi.mock("react-router-dom", () => ({
   useNavigate: () => navigate,
 }));
 
-vi.mock("react-redux", () => ({
-  useDispatch: () => dispatch,
-}));
+vi.mock("../../store/useAppStore", () => ({ useAppStore: (selector) => selector(storeState) }));
 
 vi.mock("../../services/api", () => ({
   default: { get: vi.fn(), post: vi.fn() },
-}));
-
-vi.mock("../../features/auth/authSlice", () => ({
-  logout: vi.fn(),
 }));
 
 vi.mock("../../hooks/useCtrlEnterSubmit", () => ({

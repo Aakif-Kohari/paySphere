@@ -12,6 +12,11 @@
 
 @import 'tailwindcss';
 
+/* Tailwind v4 otherwise bases `dark:` utilities on the operating-system
+   preference. The application theme is controlled by `html.dark` through the
+   Zustand store, so every screen must use that same selector. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ==========================================================================
    1. THEME CONFIGURATION (Tailwind v4 CSS-first approach)
    ========================================================================== */

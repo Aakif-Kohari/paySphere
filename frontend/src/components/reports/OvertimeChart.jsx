@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useSelector } from 'react-redux';
+import { useAppStore } from '../../store/useAppStore';
 import * as THREE from 'three';
 
 export default function OvertimeChart({ data = [] }) {
   const containerRef = useRef(null);
-  const themeMode = useSelector((state) => state.ui.themeMode);
+  const themeMode = useAppStore((state) => state.themeMode);
   const isDark = themeMode === 'dark';
 
   const visibleData = useMemo(

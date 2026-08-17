@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { useSelector, useDispatch } from "react-redux";
-import { logoutUser } from "../features/auth/authSlice";
+import { useAppStore } from "../store/useAppStore";
 import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
 import { getCurrencySymbol, formatCurrency } from "../utils/currency";
@@ -177,8 +176,8 @@ const COLORS = ["#818CF8","#34D399","#FB7185","#FBBF24","#60A5FA","#A78BFA"];
 
 export default function MonthlyUpdates() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const themeMode = useSelector((state) => state.ui.themeMode);
+  const themeMode = useAppStore((state) => state.themeMode);
+  const logoutUser = useAppStore((state) => state.logoutUser);
   const isDark = themeMode === "dark";
 
   const [isMobile] = useState(() => window.innerWidth <= 480);
@@ -216,8 +215,7 @@ export default function MonthlyUpdates() {
   const [pendingParsed, setPendingParsed] = useState(null);
 
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
-  const reduxToken = useSelector((state) => state.auth.token);
-  const token = reduxToken || localStorage.getItem("token");
+  const token = useAppStore((state) => state.token) || localStorage.getItem("token");
   const currency = localStorage.getItem("currency") || "INR";
 
   useEffect(() => {
@@ -558,7 +556,7 @@ export default function MonthlyUpdates() {
             </div>
             <button
               onClick={() => {
-                dispatch(logoutUser());
+                logoutUser();
                 localStorage.removeItem("companyName");
                 navigate("/auth");
               }}
