@@ -13,8 +13,135 @@ const {
   calculateFinalScore,
   suggestIncrement,
 } = require('../utils/appraisalScorer');
+const {
+  DEFAULT_DISTRIBUTION,
+  applyZScoreNormalization,
+  applyForcedDistribution,
+  buildDistributionReport,
+  calibrateIncrementBudget,
+} = require('../utils/appraisalNormalizer');
 const { tenantFilter } = require('../utils/tenantScope');
 const eventBus = require('../services/event.service');
+
+/**
+ * Load a cycle and the finalised reviews that make up its calibration cohort.
+ *
+ * Only finalised reviews take part. A cycle half-way through manager review
+ * would otherwise be calibrated against whoever happened to have submitted so
+ * far, and every band would move again the moment another manager finished.
+ *
+ * @param {object} req
+ * @param {string} cycleId
+ * @returns {Promise<object>}
+ */
+async function loadCalibrationCohort(req, cycleId) {
+  // Scoped (#1010): the id comes from the URL, so an unscoped lookup would let
+  // a caller at one company calibrate another company's cycle.
+  const cycle = await AppraisalCycle.findOne(
+    tenantFilter(req, { _id: cycleId }),
+  );
+
+  if (!cycle) {
+    return { ok: false, status: 404, message: 'Appraisal cycle not found' };
+  }
+
+  const reviews = await AppraisalReview.find(
+    tenantFilter(req, { cycleId: cycle._id, status: 'Finalized' }),
+  );
+
+  return { ok: true, cycle, reviews };
+}
+
+/**
+ * The distribution a cycle is calibrated against.
+ *
+ * A cycle already calibrated keeps the spread it was calibrated against;
+ * anything else uses the current default.
+ *
+ * @param {object} cycle
+ * @returns {object[]}
+ */
+function distributionFor(cycle) {
+  const stored = cycle?.targetDistribution;
+
+  return Array.isArray(stored) && stored.length
+    ? stored.map((band) => (band.toObject ? band.toObject() : band))
+    : DEFAULT_DISTRIBUTION;
+}
+
+/**
+ * Attach each review's monthly salary, which the budget fit prices from.
+ *
+ * One query for the whole cohort rather than one per review: a 400-person
+ * cycle would otherwise issue 400 round trips to price a single preview.
+ *
+ * @param {object[]} assignments
+ * @param {object[]} reviews
+ * @param {object} req
+ * @returns {Promise<object[]>}
+ */
+async function attachSalaries(assignments, reviews, req) {
+  const employeeIds = reviews
+    .map((review) => review.employeeId)
+    .filter(Boolean);
+
+  const employees = await Employee.find(
+    tenantFilter(req, { _id: { $in: employeeIds } }),
+  ).select('fullName monthlySalary');
+
+  const byEmployeeId = new Map(employees.map((emp) => [String(emp._id), emp]));
+  const employeeByReview = new Map(
+    reviews.map((review) => [String(review._id), String(review.employeeId)]),
+  );
+
+  return assignments.map((entry) => {
+    const employeeId = employeeByReview.get(String(entry.reviewId));
+    const employee = employeeId ? byEmployeeId.get(employeeId) : null;
+
+    return {
+      ...entry,
+      employeeId: employeeId || entry.employeeId || null,
+      employeeName: employee?.fullName || null,
+      monthlySalary: Number(employee?.monthlySalary) || 0,
+    };
+  });
+}
+
+/**
+ * Run the whole calibration pipeline over a cohort, writing nothing.
+ *
+ * Shared by the preview and the commit so the two cannot drift: a preview that
+ * computes its bands differently from the endpoint that saves them is worse
+ * than no preview at all.
+ *
+ * @param {object} req
+ * @param {object} cycle
+ * @param {object[]} reviews
+ * @param {object} [options]
+ * @returns {Promise<object>}
+ */
+async function runCalibration(req, cycle, reviews, options = {}) {
+  const distribution = options.distribution || distributionFor(cycle);
+
+  const normalization = applyZScoreNormalization(reviews, {
+    maxShift: options.maxShift,
+    scaleCorrection: options.scaleCorrection,
+  });
+
+  const forced = applyForcedDistribution(normalization.reviews, distribution);
+  const priced = await attachSalaries(forced.assignments, reviews, req);
+  const budget = calibrateIncrementBudget(priced, {
+    totalBudget: options.totalBudget,
+  });
+
+  return {
+    distribution,
+    normalization,
+    forced,
+    budget,
+    report: buildDistributionReport(forced.assignments, distribution),
+  };
+}
 
 /**
  * POST /api/appraisals/cycles
@@ -47,11 +174,9 @@ exports.upsertGoals = async (req, res, next) => {
     // Validate total weightage equals 100
     const totalWeight = goals.reduce((sum, g) => sum + Number(g.weightage), 0);
     if (totalWeight !== 100) {
-      return res
-        .status(400)
-        .json({
-          message: `Total goal weightage must equal 100%. Currently: ${totalWeight}%`,
-        });
+      return res.status(400).json({
+        message: `Total goal weightage must equal 100%. Currently: ${totalWeight}%`,
+      });
     }
 
     // Delete existing goals for this employee/cycle and replace (simplest upsert strategy)
@@ -260,6 +385,223 @@ exports.getMyReview = async (req, res, next) => {
     });
 
     res.status(200).json({ review, goals });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/appraisals/cycles/:id/distribution
+ * The cycle's rating spread against target, and each manager's leniency.
+ *
+ * The read HR needs before a calibration meeting: which managers rate above
+ * the company and by how much, and how far the cycle sits from its target
+ * spread. None of it exists today.
+ */
+exports.getCycleDistribution = async (req, res, next) => {
+  try {
+    const cohort = await loadCalibrationCohort(req, req.params.id);
+    if (!cohort.ok) {
+      return res.status(cohort.status).json({ message: cohort.message });
+    }
+
+    const { cycle, reviews } = cohort;
+    const distribution = distributionFor(cycle);
+
+    // Reported on the scores as they stand — before any normalisation — because
+    // that is the thing being diagnosed.
+    const current = reviews.map((review) => ({
+      reviewId: String(review._id),
+      employeeId: review.employeeId ? String(review.employeeId) : null,
+      originalScore: Number(review.finalScore) || 0,
+      normalizedScore:
+        review.normalizedScore === null ? undefined : review.normalizedScore,
+      band: review.calibrationBand || undefined,
+    }));
+
+    const statistics = applyZScoreNormalization(reviews).statistics;
+
+    res.status(200).json({
+      cycle: {
+        id: String(cycle._id),
+        name: cycle.name,
+        status: cycle.status,
+        calibratedAt: cycle.calibratedAt,
+        incrementBudget: cycle.incrementBudget,
+      },
+      cohortSize: reviews.length,
+      statistics,
+      distribution: buildDistributionReport(current, distribution),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/appraisals/cycles/:id/normalize
+ * Model the calibration without persisting any of it.
+ *
+ * Deliberately a preview. Moving somebody's rating is the most contested thing
+ * this module does, and it should be possible to see the whole cohort's
+ * outcome — and what it costs — before anything is committed.
+ */
+exports.previewCalibration = async (req, res, next) => {
+  try {
+    const cohort = await loadCalibrationCohort(req, req.params.id);
+    if (!cohort.ok) {
+      return res.status(cohort.status).json({ message: cohort.message });
+    }
+
+    const { cycle, reviews } = cohort;
+
+    if (!reviews.length) {
+      return res.status(400).json({
+        message: 'This cycle has no finalized reviews to calibrate',
+      });
+    }
+
+    const result = await runCalibration(req, cycle, reviews, {
+      maxShift: req.body?.maxShift,
+      scaleCorrection: req.body?.scaleCorrection,
+      totalBudget: req.body?.totalBudget ?? cycle.incrementBudget,
+    });
+
+    res.status(200).json({
+      message: 'Calibration preview generated. Nothing has been saved.',
+      cohortSize: reviews.length,
+      normalizationApplied: result.normalization.applied,
+      normalizationSkippedReason: result.normalization.reason,
+      statistics: result.normalization.statistics,
+      distribution: result.report,
+      movedCount: result.forced.movedCount,
+      budget: {
+        totalBudget: result.budget.totalBudget,
+        requestedCost: result.budget.requestedCost,
+        approvedCost: result.budget.approvedCost,
+        scaled: result.budget.scaled,
+        scalingFactor: result.budget.scalingFactor,
+        reason: result.budget.reason,
+      },
+      assignments: result.budget.assignments,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/appraisals/cycles/:id/calibrate
+ * Persist the normalised scores, bands and approved increments.
+ */
+exports.calibrateCycle = async (req, res, next) => {
+  try {
+    const cohort = await loadCalibrationCohort(req, req.params.id);
+    if (!cohort.ok) {
+      return res.status(cohort.status).json({ message: cohort.message });
+    }
+
+    const { cycle, reviews } = cohort;
+
+    if (!reviews.length) {
+      return res.status(400).json({
+        message: 'This cycle has no finalized reviews to calibrate',
+      });
+    }
+
+    // Calibrating twice would re-normalise scores that have already been
+    // normalised — the second pass is fed the corrected figures and corrects
+    // them again. `recalibrate: true` is the explicit way to redo it.
+    if (cycle.calibratedAt && req.body?.recalibrate !== true) {
+      return res.status(409).json({
+        message:
+          'This cycle has already been calibrated. Pass recalibrate: true to run it again.',
+        calibratedAt: cycle.calibratedAt,
+      });
+    }
+
+    const result = await runCalibration(req, cycle, reviews, {
+      maxShift: req.body?.maxShift,
+      scaleCorrection: req.body?.scaleCorrection,
+      totalBudget: req.body?.totalBudget ?? cycle.incrementBudget,
+      distribution:
+        Array.isArray(req.body?.distribution) && req.body.distribution.length
+          ? req.body.distribution
+          : undefined,
+    });
+
+    const byReviewId = new Map(
+      result.budget.assignments.map((entry) => [String(entry.reviewId), entry]),
+    );
+
+    const now = new Date();
+
+    // One write per review, and each one scoped by tenant as well as by id.
+    // `finalScore` is deliberately not touched: overwriting it would destroy
+    // the only record of what the manager actually assessed, and an employee
+    // asking why their rating moved could not be shown both numbers.
+    const operations = reviews
+      .map((review) => {
+        const outcome = byReviewId.get(String(review._id));
+        if (!outcome) return null;
+
+        return {
+          updateOne: {
+            filter: tenantFilter(req, { _id: review._id }),
+            update: {
+              $set: {
+                normalizedScore: outcome.normalizedScore,
+                calibrationBand: outcome.band,
+                approvedIncrementPercent: outcome.approvedIncrementPercent,
+                calibratedAt: now,
+                calibratedBy: req.userId,
+              },
+            },
+          },
+        };
+      })
+      .filter(Boolean);
+
+    if (operations.length) {
+      await AppraisalReview.bulkWrite(operations);
+    }
+
+    cycle.targetDistribution = result.distribution;
+    cycle.incrementBudget = result.budget.totalBudget;
+    cycle.calibratedAt = now;
+    cycle.calibratedBy = req.userId;
+    await cycle.save();
+
+    eventBus.emit('AUDIT_LOG', {
+      userId: req.userId,
+      action: 'APPRAISAL_CYCLE_CALIBRATED',
+      resourceType: 'AppraisalCycle',
+      resourceIds: [cycle._id],
+      details: {
+        cycleName: cycle.name,
+        cohortSize: reviews.length,
+        normalizationApplied: result.normalization.applied,
+        movedCount: result.forced.movedCount,
+        requestedCost: result.budget.requestedCost,
+        approvedCost: result.budget.approvedCost,
+        budgetScaled: result.budget.scaled,
+      },
+      req,
+    });
+
+    res.status(200).json({
+      message: 'Cycle calibrated',
+      cohortSize: reviews.length,
+      updatedCount: operations.length,
+      distribution: result.report,
+      movedCount: result.forced.movedCount,
+      budget: {
+        totalBudget: result.budget.totalBudget,
+        requestedCost: result.budget.requestedCost,
+        approvedCost: result.budget.approvedCost,
+        scaled: result.budget.scaled,
+      },
+    });
   } catch (error) {
     next(error);
   }
