@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import AvatarUpload from '../components/AvatarUpload';
 import ThemeToggle from '../components/ThemeToggle';
+import { useToast } from '../context/ToastContext';
 import { logout } from '../features/auth/authSlice';
 import api from '../services/api';
-import { useToast } from '../context/ToastContext';
 
 const UserIcon = () => (
   <svg
@@ -75,8 +76,6 @@ export default function ProfileSettings() {
     isTwoFactorEnabled: false,
     payrollId: '',
   });
-
-  const fileInputRef = useRef(null);
 
   const [settings, setSettings] = useState({
     notifications: {
@@ -156,32 +155,6 @@ export default function ProfileSettings() {
       console.error(err);
       toast.error(err.response?.data?.message || 'Error saving profile.');
     }
-  };
-
-  const MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2 MB
-  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-
-  const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      toast.error('Please select an image file (JPEG, PNG, WebP, or GIF).');
-      e.target.value = '';
-      return;
-    }
-
-    if (file.size > MAX_AVATAR_SIZE) {
-      toast.error('File size must be less than 2 MB.');
-      e.target.value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setUserProfile((prev) => ({ ...prev, avatar: reader.result }));
-    };
-    reader.readAsDataURL(file);
   };
 
   const handlePasswordUpdate = async () => {
@@ -303,21 +276,12 @@ export default function ProfileSettings() {
                 <p className="text-sm text-gray-500 dark:text-slate-500 mb-4">
                   {role} at {userProfile.companyName}
                 </p>
-                <div className="flex flex-wrap justify-center sm:justify-start gap-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-                    ref={fileInputRef}
-                    onChange={handleAvatarChange}
+                <div className="space-y-3">
+                  <AvatarUpload
+                    value={userProfile.avatar}
+                    onChange={(avatar) => setUserProfile((prev) => ({ ...prev, avatar }))}
+                    onError={toast.error}
                   />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    aria-label="Change profile picture"
-                    className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700 transition"
-                  >
-                    Change Picture
-                  </button>
                   <button
                     onClick={() =>
                       setUserProfile({ ...userProfile, avatar: '' })
