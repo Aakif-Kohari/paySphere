@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
+<<<<<<< Updated upstream
 import { logout } from '../features/auth/authSlice';
+=======
+import { useToast } from '../context/ToastContext';
+import { useAppStore } from '../store/useAppStore';
+>>>>>>> Stashed changes
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -57,7 +61,7 @@ const BellIcon = () => (
 
 export default function ProfileSettings() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const logout = useAppStore((state) => state.logout);
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('profile');
@@ -764,7 +768,7 @@ export default function ProfileSettings() {
             </div>
             <button
               onClick={() => {
-                dispatch(logout());
+                logout();
                 localStorage.removeItem('companyName');
                 localStorage.removeItem('currency');
                 navigate('/auth');

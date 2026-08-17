@@ -1,13 +1,11 @@
 /* eslint-disable jsx-a11y/label-has-associated-control, jsx-a11y/anchor-is-valid */
 import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
 import WebhooksSection from '../components/WebhooksSection';
 import RolesPermissions from '../components/RolesPermissions';
-import { logout } from '../features/auth/authSlice';
-import { setThemeMode } from '../features/ui/uiSlice';
+import { useAppStore } from '../store/useAppStore';
 import api from '../services/api';
 import { getCurrencySymbol } from '../utils/currency';
 import zxcvbn from '../utils/zxcvbn';
@@ -248,7 +246,7 @@ function EmailTemplatesManager() {
     try {
       await api.post('/api/email-templates', { name: 'Monthly Payslip', subject, htmlContent: templateHtml });
       alert('Template saved successfully!');
-    } catch (err) {
+    } catch {
       alert('Failed to save template');
     } finally {
       setSaving(false);
@@ -281,7 +279,8 @@ function EmailTemplatesManager() {
 
 export default function Settings() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const logout = useAppStore((state) => state.logout);
+  const setThemeMode = useAppStore((state) => state.setThemeMode);
   const { toast } = useToast();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -374,7 +373,7 @@ export default function Settings() {
                   ? 'dark'
                   : 'light'
                 : t;
-            dispatch(setThemeMode(newMode));
+            setThemeMode(newMode);
           }
         } else {
           setSettings((prev) => ({
@@ -389,7 +388,7 @@ export default function Settings() {
       })
       .catch((err) => console.error('Failed to fetch settings', err))
       .finally(() => setLoading(false));
-  }, [localCompanyName, dispatch]);
+  }, [localCompanyName, setThemeMode]);
 
   const handleSaveSettings = async () => {
     // Client-side validation before making the API call (#356)
@@ -948,7 +947,7 @@ export default function Settings() {
                                 ? 'dark'
                                 : 'light'
                               : t;
-                          dispatch(setThemeMode(newMode));
+                          setThemeMode(newMode);
                         }}
                         className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                       />
@@ -1603,7 +1602,7 @@ export default function Settings() {
             </div>
             <button
               onClick={() => {
-                dispatch(logout());
+                logout();
                 localStorage.removeItem('companyName');
                 localStorage.removeItem('currency');
                 navigate('/auth');

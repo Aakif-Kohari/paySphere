@@ -1,15 +1,12 @@
-import { configureStore } from '@reduxjs/toolkit';
 import { createRoot } from 'react-dom/client';
 import { act } from 'react-dom/test-utils';
-import { Provider } from 'react-redux';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import authReducer from '../../features/auth/authSlice';
-import uiReducer from '../../features/ui/uiSlice';
+import { useAppStore } from '../../store/useAppStore';
 import Sidebar from '../Sidebar';
 
 /**
- * The MemoryRouter and the auth reducer are new (#1012).
+ * The MemoryRouter and the global auth state are new (#1012).
  *
  * The sidebar used to cancel every click and hand an id back to the parent, so
  * it needed no router context. It renders real router links now — navigation
@@ -17,30 +14,28 @@ import Sidebar from '../Sidebar';
  * fifteen pages that render it, each of which implemented it differently and
  * two of which pointed at paths that were not routes.
  *
- * `auth` is in the store because the nav is filtered by account type: an
+ * Auth state is global because the nav is filtered by account type: an
  * employee has a self-service portal, not a payroll console, so showing them
  * "Approvals" advertises a page that will 403.
  */
 const renderSidebar = (root, props = {}, preloadedState = {}) => {
-  const store = configureStore({
-    reducer: { ui: uiReducer, auth: authReducer },
-    preloadedState,
+  useAppStore.setState({
+    user: preloadedState.auth?.user || null,
+    themeMode: preloadedState.ui?.themeMode || 'light',
   });
 
   act(() => {
     root.render(
-      <Provider store={store}>
-        <MemoryRouter initialEntries={[props.at || '/dashboard']}>
-          <Sidebar
-            companyName="PaySphere"
-            activePage="Dashboard"
-            setActivePage={() => {}}
-            isSidebarOpen={true}
-            onClose={() => {}}
-            {...props}
-          />
-        </MemoryRouter>
-      </Provider>,
+      <MemoryRouter initialEntries={[props.at || '/dashboard']}>
+        <Sidebar
+          companyName="PaySphere"
+          activePage="Dashboard"
+          setActivePage={() => {}}
+          isSidebarOpen={true}
+          onClose={() => {}}
+          {...props}
+        />
+      </MemoryRouter>,
     );
   });
 };

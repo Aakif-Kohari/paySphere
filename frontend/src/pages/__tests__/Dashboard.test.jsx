@@ -7,14 +7,14 @@ import Dashboard from "../Dashboard";
 import api from "../../services/api";
 
 // ── Test doubles ────────────────────────────────────────────────────────────
-// The dashboard depends on routing, Redux, i18n and the API client. The API is
+// The dashboard depends on routing, global state, i18n and the API client. The API is
 // stubbed with per-endpoint fixtures so charts/metrics can be asserted against
 // known numbers. Several leaf components are stubbed because they depend on
 // packages that are not installed in this workspace (@mui/*, @dnd-kit/*) or
 // carry pre-existing defects (Sidebar references an undefined SchoolIcon).
-const { navigate, dispatch } = vi.hoisted(() => ({
+const { navigate, storeState } = vi.hoisted(() => ({
   navigate: vi.fn(),
-  dispatch: vi.fn(),
+  storeState: { token: 'test-token', logout: vi.fn() },
 }));
 
 vi.mock("react-router-dom", () => ({
@@ -22,9 +22,8 @@ vi.mock("react-router-dom", () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()],
 }));
 
-vi.mock("react-redux", () => ({
-  useDispatch: () => dispatch,
-  useSelector: () => "test-token",
+vi.mock("../../store/useAppStore", () => ({
+  useAppStore: (selector) => selector(storeState),
 }));
 
 vi.mock("react-i18next", () => ({

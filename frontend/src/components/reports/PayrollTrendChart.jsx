@@ -1,4 +1,4 @@
-import { useSelector } from 'react-redux';
+import { useAppStore } from '../../store/useAppStore';
 import {
     CartesianGrid,
     Line,
@@ -10,8 +10,8 @@ import {
 } from "recharts";
 import { createChartTooltip, formatTooltipValue } from './chartTooltip';
 
-export default function PayrollTrendChart({ data }) {
-  const themeMode = useSelector((state) => state.ui.themeMode);
+export default function PayrollTrendChart({ data = [] }) {
+  const themeMode = useAppStore((state) => state.themeMode);
   const isDark = themeMode === 'dark';
   const tooltipContent = createChartTooltip({
     isDark,

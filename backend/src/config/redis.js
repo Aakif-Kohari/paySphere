@@ -24,10 +24,14 @@ const logger = require("../utils/logger");
  *     a downed Redis does not turn into log spam on every reconnect attempt.
  */
 
-const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
+const REDIS_URL = process.env.REDIS_URL;
 
-const connection = new Redis(REDIS_URL, {
+// Keep Redis genuinely optional. Previously an unset REDIS_URL silently tried
+// localhost, producing connection errors even though index.js deliberately
+// did not start webhook/email workers without Redis configured.
+const connection = new Redis(REDIS_URL || "redis://127.0.0.1:6379", {
   maxRetriesPerRequest: null,
+  lazyConnect: !REDIS_URL,
 });
 
 let lastLoggedErrorAt = 0;

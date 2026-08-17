@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useAppStore } from '../../store/useAppStore';
 import {
   Bar,
   BarChart,
@@ -16,7 +16,7 @@ const TurnoverMetrics = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const themeMode = useSelector((state) => state.ui.themeMode);
+  const themeMode = useAppStore((state) => state.themeMode);
   const isDark = themeMode === 'dark';
 
   useEffect(() => {

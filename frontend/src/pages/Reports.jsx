@@ -1,7 +1,7 @@
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useSelector } from 'react-redux';
+import { useAppStore } from '../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
 import Select from 'react-select';
 import ReportsSkeleton from '../components/common/skeleton/ReportsSkeleton';
@@ -87,7 +87,7 @@ const downloadFileWithProgress = async (url, filename, type, setExportingType, t
 
 export default function Reports() {
   const navigate = useNavigate();
-  const token = useSelector((state) => state.auth.token);
+  const token = useAppStore((state) => state.token);
   const { toast } = useToast();
   const [activePage, setActivePage] = useState('Reports');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -563,7 +563,7 @@ export default function Reports() {
             ) : (
               <div className="space-y-6">
                 {/* Recharts Components from PR #245 */}
-                <SummaryCards summary={reportData.summary} />
+                <SummaryCards data={reportData.summary} />
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <PayrollTrendChart data={reportData.trend} />
                   <DepartmentChart data={reportData.department} />

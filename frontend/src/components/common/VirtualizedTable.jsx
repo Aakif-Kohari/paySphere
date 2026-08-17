@@ -7,9 +7,8 @@
  * Issue: #1030
  */
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { FixedSizeList as List } from 'react-window';
+import { List } from 'react-window';
 import PropTypes from 'prop-types';
-import AutoSizer from 'react-virtualized-auto-sizer'; // Note: If not installed, we use a manual resize observer fallback below.
 
 /**
  * Custom hook to track container width without external dependencies.
@@ -59,8 +58,8 @@ export default function VirtualizedTable({
     /**
      * Syncs horizontal scroll between the header and the virtualized list body.
      */
-    const handleScroll = useCallback(({ scrollLeft: newScrollLeft }) => {
-        setScrollLeft(newScrollLeft);
+    const handleScroll = useCallback((event) => {
+        setScrollLeft(event.currentTarget.scrollLeft);
     }, []);
 
     /**
@@ -68,9 +67,18 @@ export default function VirtualizedTable({
      */
     const handleHeaderScroll = (e) => {
         if (listRef.current) {
-            listRef.current.scrollTo({ scrollLeft: e.target.scrollLeft });
+            const listElement = listRef.current.element;
+            if (listElement) {
+                listElement.scrollLeft = e.target.scrollLeft;
+            }
         }
     };
+
+    // react-window v2 passes custom values through `rowProps`, rather than the
+    // v1 `itemData` prop used by this table originally.
+    const Row = useCallback(({ index, style, data: rowData }) => (
+        renderRow({ index, style, data: rowData })
+    ), [renderRow]);
 
     if (!data || data.length === 0) {
         return (
@@ -102,18 +110,16 @@ export default function VirtualizedTable({
             <div className="flex-1 min-h-0">
                 {containerWidth > 0 && (
                     <List
-                        ref={listRef}
-                        height={Math.min(600, data.length * rowHeight)} // Max height 600px or content height
-                        itemCount={data.length}
-                        itemSize={rowHeight}
-                        width={containerWidth}
-                        itemData={data}
+                        listRef={listRef}
+                        rowComponent={Row}
+                        rowCount={data.length}
+                        rowHeight={rowHeight}
+                        rowProps={{ data }}
                         onScroll={handleScroll}
                         overscanCount={5} // Render 5 extra rows above/below viewport for smooth scrolling
                         className="scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent"
-                    >
-                        {renderRow}
-                    </List>
+                        style={{ height: Math.min(600, data.length * rowHeight), width: containerWidth }}
+                    />
                 )}
             </div>
         </div>
