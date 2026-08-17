@@ -1,0 +1,79 @@
+{
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "search": "Buscar...",
+    "loading": "Cargando...",
+    "noData": "No hay datos disponibles",
+    "actions": "Acciones",
+    "status": "Estado",
+    "date": "Fecha",
+    "amount": "Monto",
+    "submit": "Enviar",
+    "back": "Volver"
+  },
+  "nav": {
+    "dashboard": "Panel de Control",
+    "employees": "Empleados",
+    "payroll": "Nómina",
+    "reports": "Reportes",
+    "settings": "Configuración",
+    "approvals": "Aprobaciones",
+    "logout": "Cerrar Sesión"
+  },
+  "dashboard": {
+    "title": "Resumen del Panel",
+    "welcome": "Bienvenido de nuevo, {{name}}",
+    "stats": {
+      "totalEmployees": "Total de Empleados",
+      "activeEmployees": "Empleados Activos",
+      "monthlyPayroll": "Nómina Mensual",
+      "pendingApprovals": "Aprobaciones Pendientes"
+    },
+    "recentActivity": "Actividad Reciente",
+    "quickActions": "Acciones Rápidas",
+    "runPayroll": "Ejecutar Nómina",
+    "addEmployee": "Agregar Empleado"
+  },
+  "employees": {
+    "title": "Directorio de Empleados",
+    "addNew": "Agregar Nuevo Empleado",
+    "exportCsv": "Exportar CSV",
+    "exportPdf": "Exportar PDF",
+    "table": {
+      "name": "Nombre Completo",
+      "role": "Rol",
+      "department": "Departamento",
+      "salary": "Salario Mensual",
+      "status": "Estado"
+    },
+    "form": {
+      "personalInfo": "Información Personal",
+      "employmentDetails": "Detalles de Empleo",
+      "compensation": "Compensación",
+      "bankDetails": "Detalles Bancarios"
+    }
+  },
+  "settings": {
+    "title": "Configuración",
+    "profile": "Perfil",
+    "security": "Seguridad de la Cuenta",
+    "preferences": "Preferencias",
+    "company": "Información de la Empresa",
+    "payrollConfig": "Configuración de Nómina",
+    "notifications": "Notificaciones",
+    "theme": "Tema",
+    "language": "Idioma",
+    "lightMode": "Modo Claro",
+    "darkMode": "Modo Oscuro",
+    "systemDefault": "Predeterminado del Sistema"
+  },
+  "errors": {
+    "required": "Este campo es obligatorio",
+    "invalidEmail": "Dirección de correo inválida",
+    "networkError": "Error de red. Por favor revise su conexión.",
+    "unauthorized": "Sesión expirada. Por favor inicie sesión nuevamente."
+  }
+}

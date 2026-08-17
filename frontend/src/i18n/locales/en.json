@@ -1,0 +1,79 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search...",
+    "loading": "Loading...",
+    "noData": "No data available",
+    "actions": "Actions",
+    "status": "Status",
+    "date": "Date",
+    "amount": "Amount",
+    "submit": "Submit",
+    "back": "Back"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "employees": "Employees",
+    "payroll": "Payroll",
+    "reports": "Reports",
+    "settings": "Settings",
+    "approvals": "Approvals",
+    "logout": "Logout"
+  },
+  "dashboard": {
+    "title": "Dashboard Overview",
+    "welcome": "Welcome back, {{name}}",
+    "stats": {
+      "totalEmployees": "Total Employees",
+      "activeEmployees": "Active Employees",
+      "monthlyPayroll": "Monthly Payroll",
+      "pendingApprovals": "Pending Approvals"
+    },
+    "recentActivity": "Recent Activity",
+    "quickActions": "Quick Actions",
+    "runPayroll": "Run Payroll",
+    "addEmployee": "Add Employee"
+  },
+  "employees": {
+    "title": "Employee Directory",
+    "addNew": "Add New Employee",
+    "exportCsv": "Export CSV",
+    "exportPdf": "Export PDF",
+    "table": {
+      "name": "Full Name",
+      "role": "Role",
+      "department": "Department",
+      "salary": "Monthly Salary",
+      "status": "Status"
+    },
+    "form": {
+      "personalInfo": "Personal Information",
+      "employmentDetails": "Employment Details",
+      "compensation": "Compensation",
+      "bankDetails": "Bank Details"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": "Profile",
+    "security": "Account Security",
+    "preferences": "Preferences",
+    "company": "Company Info",
+    "payrollConfig": "Payroll Config",
+    "notifications": "Notifications",
+    "theme": "Theme",
+    "language": "Language",
+    "lightMode": "Light Mode",
+    "darkMode": "Dark Mode",
+    "systemDefault": "System Default"
+  },
+  "errors": {
+    "required": "This field is required",
+    "invalidEmail": "Invalid email address",
+    "networkError": "Network error. Please check your connection.",
+    "unauthorized": "Session expired. Please login again."
+  }
+}
