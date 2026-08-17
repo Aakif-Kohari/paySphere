@@ -1,13 +1,69 @@
 /**
- * @fileoverview OCR Receipt Parsing Service
- * @description Provides automated optical character recognition (OCR) and text parsing
- * for receipts, extracting vendor, total amount, transaction date, tax, and currency.
+ * @fileoverview OCR Service Wrapper & Parsing Engine
+ * @description Simulates OCR extraction from receipt images and provides automated 
+ * text parsing for receipts, extracting vendor, total amount, transaction date, tax, and currency.
+ * In production, extractReceiptData would integrate with AWS Textract, Google Cloud Vision, or Tesseract.js.
+ * Issue: #1082
  */
 
 'use strict';
 
 const logger = require('../utils/logger');
 const FXService = require('./fx.service');
+
+/**
+ * Mock OCR extraction function.
+ * Parses receipt images to extract merchant, date, total, and confidence score.
+ * 
+ * @param {string} imageUrl - URL or base64 string of the receipt image
+ * @returns {Promise<{merchant: string, date: Date, total: number, confidence: number, rawText: string}>}
+ */
+async function extractReceiptData(imageUrl) {
+  // Simulate network/processing delay
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  logger.info(`[OCR] Processing receipt: ${imageUrl}`);
+
+  // Mock extraction logic based on "image" characteristics
+  // In a real app, this would call an external API and parse the JSON response
+  const mockData = [
+    { merchant: 'Starbucks Coffee', date: new Date('2026-08-10'), total: 450.00, confidence: 0.95 },
+    { merchant: 'Uber Trip', date: new Date('2026-08-12'), total: 850.50, confidence: 0.88 },
+    { merchant: 'Amazon Web Services', date: new Date('2026-08-01'), total: 12500.00, confidence: 0.99 },
+    { merchant: 'Local Restaurant', date: new Date('2026-08-14'), total: 2400.00, confidence: 0.75 }
+  ];
+
+  // Randomly select a mock receipt to simulate OCR variance
+  const extracted = mockData[Math.floor(Math.random() * mockData.length)];
+  
+  const rawText = `
+    RECEIPT
+    Merchant: ${extracted.merchant}
+    Date: ${extracted.date.toISOString().split('T')[0]}
+    Items:
+    - Item 1: ${extracted.total * 0.8}
+    - Tax: ${extracted.total * 0.2}
+    TOTAL: ${extracted.total}
+    Thank you for your business!
+  `;
+
+  return {
+    merchant: extracted.merchant,
+    date: extracted.date,
+    total: extracted.total,
+    confidence: extracted.confidence,
+    rawText: rawText.trim()
+  };
+}
+
+/**
+ * Validates if the OCR confidence is high enough to trust the extracted data.
+ * @param {number} confidence - 0.0 to 1.0
+ * @returns {boolean}
+ */
+function isConfidenceReliable(confidence) {
+  return confidence >= 0.80;
+}
 
 class OCRService {
   /**
@@ -113,14 +169,35 @@ class OCRService {
 
   /**
    * Process a receipt buffer/payload, parse OCR fields, and perform currency conversion to target currency.
+   * Supports both raw text strings and image URLs/base64 (via mock OCR extraction).
    *
-   * @param {Buffer|string} input Receipt image/text input
+   * @param {Buffer|string} input Receipt image URL, base64 string, or raw text
    * @param {string} [targetCurrency='USD'] Employee reimbursement target currency
    * @returns {Promise<object>}
    */
   static async processReceipt(input, targetCurrency = 'USD') {
-    const rawText = typeof input === 'string' ? input : input.toString('utf8');
+    let rawText;
+    let ocrConfidence = null;
+
+    // Determine if input is an image reference or raw text
+    if (typeof input === 'string' && (input.startsWith('http') || input.startsWith('data:') || input.length > 500)) {
+      // Treat as image URL or base64 - use OCR extraction
+      const ocrResult = await extractReceiptData(input);
+      rawText = ocrResult.rawText;
+      ocrConfidence = ocrResult.confidence;
+      
+      logger.info(`[OCR] Extraction complete. Confidence: ${ocrConfidence}. Reliable: ${isConfidenceReliable(ocrConfidence)}`);
+    } else {
+      // Treat as raw text or buffer
+      rawText = typeof input === 'string' ? input : input.toString('utf8');
+    }
+
     const parsedData = this.parseReceiptText(rawText);
+
+    // Override confidence with OCR engine confidence if available and lower
+    if (ocrConfidence !== null && ocrConfidence < parsedData.confidence) {
+      parsedData.confidence = ocrConfidence;
+    }
 
     let conversion = null;
     if (parsedData.totalAmount > 0 && parsedData.currency !== targetCurrency) {
@@ -146,3 +223,5 @@ class OCRService {
 }
 
 module.exports = OCRService;
+module.exports.extractReceiptData = extractReceiptData;
+module.exports.isConfidenceReliable = isConfidenceReliable;
