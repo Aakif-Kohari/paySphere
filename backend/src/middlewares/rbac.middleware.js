@@ -38,9 +38,9 @@ const { resolveAccountType } = require('../config/accountTypes');
 
 /**
  * When true, an account whose role cannot be resolved is denied instead of
- * being repaired. Off by default — see the note in `resolveRole` below.
+ * being repaired. Defaults to true unless explicitly set to false or running in development.
  */
-const STRICT_MODE = process.env.RBAC_STRICT === 'true';
+const STRICT_MODE = process.env.RBAC_STRICT !== 'false' && process.env.NODE_ENV !== 'development';
 
 /**
  * Resolve the caller's role, repairing the account if it has none.
