@@ -130,6 +130,11 @@ const MOUNTED_ROUTES = [
 
   // Mounted in #1075.
   ['/api/disbursements', 'get', '/api/disbursements/batches'],
+
+  // Mounted in #1159. The leave module's first reachable endpoint of any kind:
+  // its models and two pure engines have been in the tree since #646 with no
+  // controller and no router, so nothing in it has ever answered a request.
+  ['/api/leave-closure', 'get', '/api/leave-closure/policies'],
 ];
 
 /**
@@ -197,6 +202,7 @@ const ROUTER_MOUNTS = {
   health: null,
 
   integration: '/api/integrations',
+  leaveClosure: '/api/leave-closure',
   loan: '/api/loans',
   monthlyUpdates: '/api/monthly-updates',
   notification: '/api/notifications',
