@@ -1,9 +1,14 @@
 /**
- * @fileoverview Training course, enrolment and compliance endpoints.
- * @description Issue: #1076
+ * @fileoverview Training Course, Enrolment and Compliance Endpoints
+ * @description Manages course creation, employee assignments, certificate uploads,
+ * compliance dashboard statistics, and audit-safe certification tracking.
+ * Issues: #1076, #1085
  *
  * Every query is filtered by `tenantId` on the way in rather than checked after
  * the fetch, the shape #1010 settled on.
+ *
+ * `validUntil` is stored evidence — never recomputed on read. Changing a course's
+ * validity period does NOT retroactively alter existing certifications.
  */
 
 const mongoose = require('mongoose');
@@ -11,6 +16,7 @@ const mongoose = require('mongoose');
 const {
   TrainingCourse,
   TrainingEnrollment,
+  EmployeeTrainingRecord, // Alias for TrainingEnrollment (see training.model.js)
 } = require('../models/training.model');
 const Employee = require('../models/employee.model');
 const {
@@ -24,7 +30,14 @@ const {
   complianceByDepartment,
   renewalsDue,
 } = require('../utils/trainingCompliance');
+const { getComplianceStats } = require('../services/certificationExpiry.service');
+const { checkMandatoryCompliance } = require('../utils/complianceGatekeeper.utils');
 const eventBus = require('../services/event.service');
+const logger = require('../utils/logger');
+
+// ============================================================================
+// Helpers
+// ============================================================================
 
 /**
  * A caller-supplied date, falling back to now.
@@ -43,7 +56,36 @@ function resolveAsOf(raw) {
 }
 
 /**
+ * Everything the compliance reports need, loaded once.
+ *
+ * The three report endpoints below all need the same three collections, and
+ * three copies of these queries is three chances for one of them to forget the
+ * tenant filter.
+ *
+ * @param {string} tenantId
+ * @returns {Promise<{courses: Array, employees: Array, enrollments: Array}>}
+ */
+async function loadComplianceInputs(tenantId) {
+  const [courses, employees, enrollments] = await Promise.all([
+    TrainingCourse.find({ tenantId, isActive: true }).lean(),
+    Employee.find({ tenantId, isActive: true })
+      .select('_id fullName department role')
+      .lean(),
+    TrainingEnrollment.find({ tenantId }).lean(),
+  ]);
+
+  return { courses, employees, enrollments };
+}
+
+// ============================================================================
+// Course CRUD
+// ============================================================================
+
+/**
  * POST /api/training/courses
+ *
+ * Supports both legacy fields (#1076) and new fields (#1085).
+ * `targetDepartments` maps to `appliesToValues` when provided.
  */
 exports.createCourse = async (req, res, next) => {
   try {
@@ -55,15 +97,22 @@ exports.createCourse = async (req, res, next) => {
       isMandatory,
       appliesTo,
       appliesToValues,
+      targetDepartments,
       durationMinutes,
       passMark,
       maxAttempts,
       validityMonths,
+      validityDays,
       reminderLeadDays,
+      externalLink,
     } = req.body;
 
-    if (!code || !title) {
-      return res.status(400).json({ message: 'code and title are required' });
+    // title is always required; code is required for legacy compatibility
+    if (!title) {
+      return res.status(400).json({ message: 'title is required' });
+    }
+    if (!code) {
+      return res.status(400).json({ message: 'code is required' });
     }
 
     const course = await TrainingCourse.create({
@@ -74,12 +123,15 @@ exports.createCourse = async (req, res, next) => {
       category,
       isMandatory,
       appliesTo,
-      appliesToValues,
+      // targetDepartments (#1085) is an alias for appliesToValues when appliesTo is department-based
+      appliesToValues: appliesToValues || targetDepartments || [],
       durationMinutes,
       passMark,
       maxAttempts,
       validityMonths,
+      validityDays: validityDays || 365,
       reminderLeadDays,
+      externalLink,
       createdBy: req.userId,
     });
 
@@ -93,6 +145,7 @@ exports.createCourse = async (req, res, next) => {
         title,
         isMandatory: Boolean(isMandatory),
         validityMonths,
+        validityDays,
       },
       req,
     });
@@ -131,11 +184,11 @@ exports.getCourses = async (req, res, next) => {
 /**
  * PATCH /api/training/courses/:id
  *
- * Note what this deliberately does *not* do: changing `validityMonths` does not
- * touch the `validUntil` already recorded on existing enrolments. Those are
- * evidence of what the policy was when each certification was issued, and
- * rewriting them would retroactively invalidate certifications that were current
- * — or revive lapsed ones.
+ * Note what this deliberately does *not* do: changing `validityMonths` or
+ * `validityDays` does not touch the `validUntil` already recorded on existing
+ * enrolments. Those are evidence of what the policy was when each certification
+ * was issued, and rewriting them would retroactively invalidate certifications
+ * that were current — or revive lapsed ones.
  */
 exports.updateCourse = async (req, res, next) => {
   try {
@@ -154,7 +207,9 @@ exports.updateCourse = async (req, res, next) => {
       'passMark',
       'maxAttempts',
       'validityMonths',
+      'validityDays',
       'reminderLeadDays',
+      'externalLink',
       'isActive',
     ];
 
@@ -169,6 +224,11 @@ exports.updateCourse = async (req, res, next) => {
     // should be reachable from a PATCH body.
     for (const field of editable) {
       if (req.body[field] !== undefined) course[field] = req.body[field];
+    }
+
+    // Map targetDepartments alias to appliesToValues if provided
+    if (req.body.targetDepartments !== undefined) {
+      course.appliesToValues = req.body.targetDepartments;
     }
 
     await course.save();
@@ -186,21 +246,31 @@ exports.updateCourse = async (req, res, next) => {
   }
 };
 
+// ============================================================================
+// Assignment
+// ============================================================================
+
 /**
  * POST /api/training/courses/:id/assign
  *
  * Assigns to an explicit list of employees, or to everyone the course applies
  * to. Existing enrolments are left alone — reassigning would reset somebody's
  * in-progress attempt to `Assigned` and lose their score.
+ *
+ * Also supports the #1085 body-shape `{ courseId, employeeIds }` via the
+ * dedicated assignCourse handler below.
  */
 exports.assignCourse = async (req, res, next) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) {
+    // Support both URL-param style (/courses/:id/assign) and body-style (#1085)
+    const courseId = req.params.id || req.body.courseId;
+
+    if (!courseId || !mongoose.isValidObjectId(courseId)) {
       return res.status(400).json({ message: 'Invalid course id' });
     }
 
     const course = await TrainingCourse.findOne({
-      _id: req.params.id,
+      _id: courseId,
       tenantId: req.tenantId,
     }).lean();
     if (!course) return res.status(404).json({ message: 'Course not found' });
@@ -255,6 +325,7 @@ exports.assignCourse = async (req, res, next) => {
     );
 
     if (toCreate.length > 0) {
+      // Use ordered: false to gracefully skip duplicates (#1085 pattern)
       await TrainingEnrollment.insertMany(
         toCreate.map((employee) => ({
           tenantId: req.tenantId,
@@ -264,6 +335,7 @@ exports.assignCourse = async (req, res, next) => {
           assignedAt: new Date(),
           assignedBy: req.userId,
         })),
+        { ordered: false },
       );
     }
 
@@ -282,9 +354,21 @@ exports.assignCourse = async (req, res, next) => {
       alreadyEnrolled: alreadyEnrolled.size,
     });
   } catch (error) {
+    // Duplicate key errors from ordered:false are expected and non-fatal
+    if (error.code === 11000) {
+      return res.status(201).json({
+        message: 'Assignment processed (some employees were already enrolled)',
+        assigned: 0,
+        alreadyEnrolled: error.insertedDocs?.length || 0,
+      });
+    }
     return next(error);
   }
 };
+
+// ============================================================================
+// Completion & Certificate Upload
+// ============================================================================
 
 /**
  * POST /api/training/enrollments/:id/complete
@@ -292,6 +376,8 @@ exports.assignCourse = async (req, res, next) => {
  * A failing score records `Failed` and sets no validity. Recording it as
  * complete would let a failing attempt satisfy a mandatory course, which is the
  * whole thing this feature exists to prevent.
+ *
+ * For manual certificate uploads (no score), use POST /api/training/upload-certificate.
  */
 exports.completeEnrollment = async (req, res, next) => {
   try {
@@ -381,6 +467,88 @@ exports.completeEnrollment = async (req, res, next) => {
 };
 
 /**
+ * POST /api/training/upload-certificate
+ *
+ * Manual certificate upload with auto-verification. Computes and stores
+ * `validUntil` at upload time (stored evidence, never recomputed on read).
+ * This is distinct from `completeEnrollment` which handles scored LMS completions.
+ */
+exports.uploadCertificate = async (req, res, next) => {
+  try {
+    const { recordId, certificateUrl } = req.body;
+
+    if (!recordId || !mongoose.isValidObjectId(recordId)) {
+      return res.status(400).json({ message: 'Valid recordId is required' });
+    }
+    if (!certificateUrl || !String(certificateUrl).trim()) {
+      return res.status(400).json({ message: 'certificateUrl is required' });
+    }
+
+    // EmployeeTrainingRecord is aliased to TrainingEnrollment in the model
+    const record = await EmployeeTrainingRecord.findOne({
+      _id: recordId,
+      tenantId: req.tenantId,
+    });
+    if (!record) {
+      return res.status(404).json({ message: 'Training record not found' });
+    }
+
+    if (record.status === ENROLLMENT_STATUS.WAIVED) {
+      return res.status(409).json({
+        message: 'This enrollment has been waived and cannot receive a certificate',
+      });
+    }
+
+    const course = await TrainingCourse.findById(record.courseId).lean();
+    if (!course) {
+      return res.status(404).json({ message: 'Associated course not found' });
+    }
+
+    const now = new Date();
+    record.status = ENROLLMENT_STATUS.COMPLETED;
+    record.completedAt = now;
+    record.certificateUrl = String(certificateUrl).trim();
+    record.certificateUploadedAt = now;
+    record.verifiedBy = req.userId;
+
+    // Compute and store validity at upload time — this is evidence, not a cache.
+    // Uses validityMonths first (legacy), falls back to validityDays (#1085).
+    const validity = computeValidity(course, now);
+    record.validUntil = validity.validUntil;
+
+    await record.save();
+
+    eventBus.emit('AUDIT_LOG', {
+      userId: req.userId,
+      action: 'CERTIFICATE_UPLOADED',
+      resourceType: 'TrainingEnrollment',
+      resourceIds: [record._id],
+      details: {
+        courseId: course._id,
+        courseCode: course.code,
+        validUntil: record.validUntil,
+      },
+      req,
+    });
+
+    return res.status(200).json({
+      message: 'Certificate uploaded and verified',
+      record,
+    });
+  } catch (error) {
+    logger.error('Failed to upload certificate', {
+      userId: req.userId,
+      error: error.message,
+    });
+    return next(error);
+  }
+};
+
+// ============================================================================
+// Waiver
+// ============================================================================
+
+/**
  * POST /api/training/enrollments/:id/waive
  *
  * A waiver is a documented decision, so the reason is required rather than
@@ -427,11 +595,15 @@ exports.waiveEnrollment = async (req, res, next) => {
   }
 };
 
+// ============================================================================
+// Self-Service & Compliance Gating
+// ============================================================================
+
 /**
  * GET /api/training/my-training
  *
  * Self-service. The employee is resolved from `req.userId`, never from a
- * parameter.
+ * parameter. Includes compliance gate check for appraisal gating (#1085).
  */
 exports.getMyTraining = async (req, res, next) => {
   try {
@@ -477,16 +649,29 @@ exports.getMyTraining = async (req, res, next) => {
         score: enrollment.score,
         completedAt: enrollment.completedAt,
         certificateReference: enrollment.certificateReference,
+        certificateUrl: enrollment.certificateUrl,
+        externalLink: course?.externalLink,
         ...state,
       };
     });
+
+    // Compliance gate check for appraisal/promotion gating (#1085)
+    let complianceCheck = null;
+    try {
+      complianceCheck = await checkMandatoryCompliance(employee._id, req.tenantId);
+    } catch (err) {
+      logger.warn('Compliance gate check failed, returning training without gate status', {
+        employeeId: employee._id,
+        error: err.message,
+      });
+    }
 
     return res.json({
       asOf,
       employee: { id: employee._id, fullName: employee.fullName },
       training: items,
-      outstanding: items.filter((item) => item.isMandatory && !item.isCompliant)
-        .length,
+      outstanding: items.filter((item) => item.isMandatory && !item.isCompliant).length,
+      complianceCheck,
     });
   } catch (error) {
     return next(error);
@@ -514,6 +699,50 @@ async function loadComplianceInputs(tenantId) {
 
   return { courses, employees, enrollments };
 }
+
+// ============================================================================
+// Dashboard Statistics (#1085)
+// ============================================================================
+
+/**
+ * GET /api/training/dashboard/stats
+ *
+ * Aggregated compliance statistics and near-term expiration risk table
+ * for the HR/admin dashboard.
+ */
+exports.getDashboardStats = async (req, res, next) => {
+  try {
+    const stats = await getComplianceStats(req.tenantId);
+
+    // Fetch records expiring in the next 30 days for the risk table
+    const now = new Date();
+    const in30Days = new Date(now);
+    in30Days.setDate(in30Days.getDate() + 30);
+
+    const expiringRecords = await EmployeeTrainingRecord.find({
+      tenantId: req.tenantId,
+      status: ENROLLMENT_STATUS.COMPLETED,
+      validUntil: { $gte: now, $lte: in30Days },
+    })
+      .populate('employeeId', 'fullName department')
+      .populate('courseId', 'title code')
+      .sort({ validUntil: 1 })
+      .limit(50)
+      .lean();
+
+    return res.status(200).json({ stats, expiringRecords });
+  } catch (error) {
+    logger.error('Failed to load dashboard stats', {
+      tenantId: req.tenantId,
+      error: error.message,
+    });
+    return next(error);
+  }
+};
+
+// ============================================================================
+// Compliance Reports (Legacy, Preserved)
+// ============================================================================
 
 /**
  * GET /api/training/compliance/gaps

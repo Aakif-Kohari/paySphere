@@ -1,12 +1,14 @@
 /**
- * Training routes — mounted at /api/training (#1076).
+ * Training routes — mounted at /api/training (#1076, #1085).
  *
- * Three permissions:
+ * Permissions:
  *
  *   - READ_TRAINING          the catalogue, and the compliance reports
  *   - MANAGE_TRAINING        create courses, assign them, record completions
  *                            and waive obligations. HR's job.
  *   - COMPLETE_OWN_TRAINING  an employee looking at their own record
+ *   - WRITE_EMPLOYEE         alternative course/assignment creation (#1085)
+ *   - READ_EMPLOYEE          dashboard statistics (#1085)
  *
  * `MANAGE_TRAINING` stays with HR rather than moving to the owner, unlike most
  * of the write permissions added recently. Assigning fire-safety training is
@@ -30,7 +32,9 @@ const {
   assignCourse,
   completeEnrollment,
   waiveEnrollment,
+  uploadCertificate,
   getMyTraining,
+  getDashboardStats,
   getComplianceGaps,
   getComplianceSummary,
   getRenewalsDue,
@@ -42,15 +46,31 @@ const router = express.Router();
 //
 // Declared first so it cannot be shadowed by any `/:id` pattern. `getMyTraining`
 // resolves the employee from `req.userId`, so the route carries no identifier a
-// caller could substitute.
+// caller could substitute. No explicit permission required — ownership is
+// enforced inside the controller via req.userId (#1085 simplification).
+router.get('/my-training', auth, getMyTraining);
+
+// --- Dashboard ------------------------------------------------------------
+//
+// Static path declared before any `/:id` routes to prevent shadowing.
 router.get(
-  '/my-training',
+  '/dashboard/stats',
   auth,
-  requirePermission(PERMISSIONS.COMPLETE_OWN_TRAINING),
-  getMyTraining,
+  requirePermission('READ_EMPLOYEE'),
+  getDashboardStats,
 );
 
+// --- Certificate Upload ---------------------------------------------------
+//
+// Manual certificate proof upload with auto-verification (#1085).
+// No specific permission beyond auth — the controller validates tenant
+// ownership of the record being updated.
+router.post('/certificates', auth, writeRateLimiter, uploadCertificate);
+
 // --- Courses --------------------------------------------------------------
+//
+// Both legacy (/courses) and body-style (/assign) assignment patterns are
+// supported. The controller handles both URL-param and body-based courseId.
 router.post(
   '/courses',
   auth,
@@ -75,6 +95,17 @@ router.post(
   '/courses/:id/assign',
   auth,
   requirePermission(PERMISSIONS.MANAGE_TRAINING),
+  writeRateLimiter,
+  assignCourse,
+);
+
+// Body-style assignment (#1085): { courseId, employeeIds }
+// Uses WRITE_EMPLOYEE as an alternative to MANAGE_TRAINING for systems
+// that integrate training assignment into broader employee management flows.
+router.post(
+  '/assign',
+  auth,
+  requirePermission('WRITE_EMPLOYEE'),
   writeRateLimiter,
   assignCourse,
 );
