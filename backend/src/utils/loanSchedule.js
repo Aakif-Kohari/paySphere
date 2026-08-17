@@ -31,6 +31,17 @@ const LOAN_STATUS = {
   ON_HOLD: 'on_hold',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled',
+  /**
+   * Closed early by settling the balance in a lump sum (#1155).
+   *
+   * Kept apart from `completed` rather than reusing it. To the recovery step
+   * the two are the same — neither is collected against — but to everyone else
+   * they are not: a loan that ran its full tenure earned all its interest, and
+   * one settled in month three had the rest of it rebated. Reporting cannot
+   * tell those apart if they share a status, and the rebate has nowhere to
+   * hang.
+   */
+  FORECLOSED: 'foreclosed',
 };
 
 const MAX_TENURE_MONTHS = 120;
@@ -160,7 +171,7 @@ function computeInstallmentAmount({
 function addMonths(month, year, offset) {
   const zeroBased = month - 1 + offset;
   return {
-    month: ((zeroBased % 12) + 12) % 12 + 1,
+    month: (((zeroBased % 12) + 12) % 12) + 1,
     year: year + Math.floor(zeroBased / 12),
   };
 }
@@ -287,7 +298,8 @@ function findRepayment(loan, month, year) {
   const repayments = Array.isArray(loan?.repayments) ? loan.repayments : [];
   return (
     repayments.find(
-      (r) => Number(r.month) === Number(month) && Number(r.year) === Number(year),
+      (r) =>
+        Number(r.month) === Number(month) && Number(r.year) === Number(year),
     ) || null
   );
 }
@@ -303,14 +315,14 @@ function findRepayment(loan, month, year) {
  */
 function computeOutstanding(loan) {
   const totalPayable = Number(loan?.totalPayable);
-  const base = Number.isFinite(totalPayable) && totalPayable > 0
-    ? totalPayable
-    : Number(loan?.principal) || 0;
+  const base =
+    Number.isFinite(totalPayable) && totalPayable > 0
+      ? totalPayable
+      : Number(loan?.principal) || 0;
 
-  const repaid = (Array.isArray(loan?.repayments) ? loan.repayments : []).reduce(
-    (sum, r) => sum + (Number(r.amount) || 0),
-    0,
-  );
+  const repaid = (
+    Array.isArray(loan?.repayments) ? loan.repayments : []
+  ).reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
 
   return round2(Math.max(base - repaid, 0));
 }
@@ -349,6 +361,13 @@ function resolveDueInstallment(loan, month, year) {
 
   if (loan.status === LOAN_STATUS.COMPLETED) {
     return { due: 0, reason: 'completed', alreadyRecovered: false };
+  }
+
+  // Settled early. Nothing is owed, and the schedule rows beyond the closure
+  // period were truncated when it was foreclosed — collecting against them
+  // would take an instalment on a balance of zero (#1155).
+  if (loan.status === LOAN_STATUS.FORECLOSED) {
+    return { due: 0, reason: 'foreclosed', alreadyRecovered: false };
   }
 
   if (loan.status === LOAN_STATUS.ON_HOLD) {
@@ -556,10 +575,22 @@ function applyRepayment(loan, { month, year, amount, payrollId = null }) {
  * an employer resume collecting against a balance of zero.
  */
 const ALLOWED_STATUS_TRANSITIONS = {
-  [LOAN_STATUS.ACTIVE]: [LOAN_STATUS.ON_HOLD, LOAN_STATUS.CANCELLED, LOAN_STATUS.COMPLETED],
-  [LOAN_STATUS.ON_HOLD]: [LOAN_STATUS.ACTIVE, LOAN_STATUS.CANCELLED],
+  [LOAN_STATUS.ACTIVE]: [
+    LOAN_STATUS.ON_HOLD,
+    LOAN_STATUS.CANCELLED,
+    LOAN_STATUS.COMPLETED,
+    LOAN_STATUS.FORECLOSED,
+  ],
+  // A held loan can still be settled early — being on hold is why an employee
+  // asks to close it out (#1155).
+  [LOAN_STATUS.ON_HOLD]: [
+    LOAN_STATUS.ACTIVE,
+    LOAN_STATUS.CANCELLED,
+    LOAN_STATUS.FORECLOSED,
+  ],
   [LOAN_STATUS.COMPLETED]: [],
   [LOAN_STATUS.CANCELLED]: [],
+  [LOAN_STATUS.FORECLOSED]: [],
 };
 
 /**

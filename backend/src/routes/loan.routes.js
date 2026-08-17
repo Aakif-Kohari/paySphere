@@ -8,6 +8,10 @@ const {
   previewLoanSchedule,
   updateLoanStatus,
   recordManualRepayment,
+  getForeclosureQuote,
+  forecloseLoan,
+  recordPrepayment,
+  getExitClearance,
 } = require('../controllers/loan.controller');
 const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
@@ -30,6 +34,19 @@ router.get(
   getLoanSummary,
 );
 
+// Also declared before `/:id`, for the same reason `/summary` is: `clearance`
+// would otherwise be captured as a loan id and every request would 400 on the
+// ObjectId check.
+//
+// A read, and gated as one — full-and-final settlement needs to know what a
+// leaver still owes before it can compute their final payment (#1155).
+router.get(
+  '/clearance/:employeeId',
+  auth,
+  requirePermission(PERMISSIONS.READ_PAYROLL),
+  getExitClearance,
+);
+
 // Preview writes nothing, so the admin can model the instalment before
 // committing to it.
 router.post(
@@ -47,7 +64,12 @@ router.post(
   createLoan,
 );
 
-router.get('/:id', auth, requirePermission(PERMISSIONS.READ_PAYROLL), getLoanById);
+router.get(
+  '/:id',
+  auth,
+  requirePermission(PERMISSIONS.READ_PAYROLL),
+  getLoanById,
+);
 
 router.get(
   '/:id/schedule',
@@ -70,6 +92,36 @@ router.post(
   requirePermission(PERMISSIONS.WRITE_PAYROLL),
   writeRateLimiter,
   recordManualRepayment,
+);
+
+// --- Early closure (#1155) -------------------------------------------------
+
+// Quoting a closure writes nothing, so it sits with the other reads. An
+// employee asking what it costs to settle early must not be committed to
+// settling by asking.
+router.get(
+  '/:id/foreclosure-quote',
+  auth,
+  requirePermission(PERMISSIONS.READ_PAYROLL),
+  getForeclosureQuote,
+);
+
+// Both of these move money and close or reshape a commitment, so they carry
+// the same write permission and rate limit as issuing the loan did.
+router.post(
+  '/:id/foreclose',
+  auth,
+  requirePermission(PERMISSIONS.WRITE_PAYROLL),
+  writeRateLimiter,
+  forecloseLoan,
+);
+
+router.post(
+  '/:id/prepay',
+  auth,
+  requirePermission(PERMISSIONS.WRITE_PAYROLL),
+  writeRateLimiter,
+  recordPrepayment,
 );
 
 module.exports = router;

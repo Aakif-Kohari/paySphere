@@ -161,6 +161,19 @@ const loanSchema = new mongoose.Schema(
     approvedAt: { type: Date },
     completedAt: { type: Date },
     cancelledAt: { type: Date },
+
+    // --- Early closure (#1155) ---------------------------------------------
+    //
+    // Stored rather than derived, because both are facts about a decision taken
+    // on a date rather than properties of the terms. The rebate in particular
+    // cannot be recomputed afterwards: `applyForeclosure` truncates the
+    // schedule at the closure period, so the rows it was calculated from are
+    // gone by the time anyone asks.
+    foreclosedAt: { type: Date },
+    /** The fee charged for closing early, where policy carries one. */
+    foreclosureCharge: { type: Number, default: 0, min: 0 },
+    /** Interest the original schedule projected and closure gave back. */
+    interestRebate: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true },
 );
