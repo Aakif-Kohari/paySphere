@@ -536,6 +536,62 @@ function canGrant(scheme, grants, requestedOptions) {
   return { allowed: true, reason: null, pool };
 }
 
+/**
+ * Calculates pro-rata allocations and payouts for a secondary liquidity tender offer.
+ *
+ * @param {object} tenderOffer - { totalPoolShares, offerPricePerShare, totalBudget }
+ * @param {Array<object>} bids - Array of { employeeId, sharesOffered, costBasisPerShare, taxRatePercent }
+ * @returns {{ isOversubscribed: boolean, totalSharesBid: number, totalSharesAllocated: number, totalPayout: number, allocations: Array }}
+ */
+function calculateTenderAllocations(tenderOffer, bids = []) {
+  const totalPoolShares = Math.floor(Number(tenderOffer.totalPoolShares) || 0);
+  const offerPrice = Number(tenderOffer.offerPricePerShare) || 0;
+  const taxRate = Number(tenderOffer.defaultTaxRatePercent || 20); // standard 20% capital gains
+
+  const totalSharesBid = bids.reduce((sum, b) => sum + Math.max(0, Math.floor(Number(b.sharesOffered) || 0)), 0);
+  const isOversubscribed = totalSharesBid > totalPoolShares;
+  const allocationRatio = isOversubscribed && totalSharesBid > 0 ? totalPoolShares / totalSharesBid : 1.0;
+
+  let totalSharesAllocated = 0;
+  let totalPayout = 0;
+
+  const allocations = bids.map((bid) => {
+    const offered = Math.max(0, Math.floor(Number(bid.sharesOffered) || 0));
+    const allocated = isOversubscribed ? Math.floor(offered * allocationRatio) : offered;
+    const costBasis = Number(bid.costBasisPerShare) || 0;
+
+    const gross = round2(allocated * offerPrice);
+    const totalCostBasis = round2(allocated * costBasis);
+    const taxableGain = Math.max(0, round2(gross - totalCostBasis));
+    const effectiveTaxRate = Number(bid.taxRatePercent !== undefined ? bid.taxRatePercent : taxRate);
+    const tax = round2((taxableGain * effectiveTaxRate) / 100);
+    const net = round2(gross - tax);
+
+    totalSharesAllocated += allocated;
+    totalPayout += net;
+
+    return {
+      bidId: bid._id || bid.id,
+      employeeId: bid.employeeId,
+      sharesOffered: offered,
+      sharesAllocated: allocated,
+      offerPricePerShare: offerPrice,
+      grossProceeds: gross,
+      capitalGainsTax: tax,
+      netProceeds: net,
+    };
+  });
+
+  return {
+    isOversubscribed,
+    totalSharesBid,
+    totalPoolShares,
+    totalSharesAllocated,
+    totalPayout: round2(totalPayout),
+    allocations,
+  };
+}
+
 module.exports = {
   VESTING_FREQUENCIES,
   GRANT_STATUS,
@@ -549,4 +605,6 @@ module.exports = {
   computeForfeitureOnExit,
   summarisePool,
   canGrant,
+  calculateTenderAllocations,
 };
+

@@ -11,7 +11,13 @@
 
 const mongoose = require('mongoose');
 
-const { EsopScheme, EsopGrant, EsopExercise } = require('../models/esop.model');
+const {
+  EsopScheme,
+  EsopGrant,
+  EsopExercise,
+  EsopTenderOffer,
+  EsopTenderBid,
+} = require('../models/esop.model');
 const Employee = require('../models/employee.model');
 const {
   buildVestingSchedule,
@@ -21,6 +27,7 @@ const {
   summarisePool,
   canGrant,
   normaliseTerms,
+  calculateTenderAllocations,
   GRANT_STATUS,
 } = require('../utils/vestingCalculator');
 const logger = require('../utils/logger');
@@ -592,4 +599,170 @@ exports.getMyGrants = async (req, res, next) => {
   }
 };
 
+/**
+ * POST /api/esop/tender-offers
+ * Creates a secondary liquidity tender offer for eligible option holders.
+ */
+exports.createTenderOffer = async (req, res, next) => {
+  try {
+    const {
+      schemeId,
+      title,
+      offerPricePerShare,
+      totalPoolShares,
+      startDate,
+      endDate,
+    } = req.body;
+
+    const scheme = await EsopScheme.findOne({
+      _id: schemeId,
+      tenantId: req.tenantId,
+    });
+    if (!scheme) return res.status(404).json({ message: 'ESOP Scheme not found' });
+
+    const totalBudget = Number(offerPricePerShare) * Number(totalPoolShares);
+
+    const tenderOffer = await EsopTenderOffer.create({
+      tenantId: req.tenantId,
+      schemeId: scheme._id,
+      title,
+      offerPricePerShare,
+      totalPoolShares,
+      totalBudget,
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      status: 'Open',
+    });
+
+    eventBus.emit('AUDIT_LOG', {
+      userId: req.userId,
+      action: 'ESOP_TENDER_OFFER_CREATED',
+      resourceType: 'EsopTenderOffer',
+      resourceIds: [tenderOffer._id],
+      details: { title, totalPoolShares, offerPricePerShare, totalBudget },
+      req,
+    });
+
+    res.status(201).json({ message: 'Tender offer created successfully', tenderOffer });
+  } catch (error) { next(error); }
+};
+
+/**
+ * GET /api/esop/tender-offers
+ * Lists all tender offers for the tenant.
+ */
+exports.getTenderOffers = async (req, res, next) => {
+  try {
+    const offers = await EsopTenderOffer.find({ tenantId: req.tenantId })
+      .populate('schemeId', 'name currency')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json({ success: true, offers });
+  } catch (error) { next(error); }
+};
+
+/**
+ * POST /api/esop/tender-offers/:id/bid
+ * Employee submits shares into an open secondary tender offer.
+ */
+exports.submitTenderBid = async (req, res, next) => {
+  try {
+    const { sharesOffered, costBasisPerShare } = req.body;
+    const employee = await Employee.findOne({
+      userId: req.userId,
+      tenantId: req.tenantId,
+    }).select('_id');
+
+    const employeeId = employee ? employee._id : req.body.employeeId;
+    if (!employeeId) {
+      return res.status(400).json({ message: 'Employee identification required' });
+    }
+
+    const offer = await EsopTenderOffer.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
+    if (!offer) return res.status(404).json({ message: 'Tender offer not found' });
+    if (offer.status !== 'Open') {
+      return res.status(400).json({ message: 'Tender offer is no longer open for bids' });
+    }
+
+    const bid = await EsopTenderBid.findOneAndUpdate(
+      { tenantId: req.tenantId, tenderOfferId: offer._id, employeeId },
+      {
+        sharesOffered: Number(sharesOffered),
+        costBasisPerShare: Number(costBasisPerShare || 0),
+        status: 'Submitted',
+      },
+      { upsert: true, new: true },
+    );
+
+    res.status(200).json({ message: 'Tender bid submitted successfully', bid });
+  } catch (error) { next(error); }
+};
+
+/**
+ * POST /api/esop/tender-offers/:id/settle
+ * Settle tender offer, compute pro-rata allocations, and calculate capital gains tax.
+ */
+exports.settleTenderOffer = async (req, res, next) => {
+  try {
+    const offer = await EsopTenderOffer.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
+    if (!offer) return res.status(404).json({ message: 'Tender offer not found' });
+
+    const bids = await EsopTenderBid.find({
+      tenantId: req.tenantId,
+      tenderOfferId: offer._id,
+      status: 'Submitted',
+    }).lean();
+
+    if (!bids.length) {
+      return res.status(400).json({ message: 'No bids submitted for this tender offer' });
+    }
+
+    const calculation = calculateTenderAllocations(offer, bids);
+
+    for (const alloc of calculation.allocations) {
+      await EsopTenderBid.updateOne(
+        { _id: alloc.bidId },
+        {
+          sharesAllocated: alloc.sharesAllocated,
+          grossProceeds: alloc.grossProceeds,
+          capitalGainsTax: alloc.capitalGainsTax,
+          netProceeds: alloc.netProceeds,
+          status: 'Settled',
+        },
+      );
+    }
+
+    offer.status = 'Settled';
+    offer.settlementDate = new Date();
+    await offer.save();
+
+    eventBus.emit('AUDIT_LOG', {
+      userId: req.userId,
+      action: 'ESOP_TENDER_OFFER_SETTLED',
+      resourceType: 'EsopTenderOffer',
+      resourceIds: [offer._id],
+      details: {
+        totalSharesBid: calculation.totalSharesBid,
+        totalSharesAllocated: calculation.totalSharesAllocated,
+        totalPayout: calculation.totalPayout,
+        isOversubscribed: calculation.isOversubscribed,
+      },
+      req,
+    });
+
+    res.status(200).json({
+      message: 'Tender offer settled with pro-rata allocations',
+      settlementSummary: calculation,
+    });
+  } catch (error) { next(error); }
+};
+
 exports._internals = { resolveAsOf };
+

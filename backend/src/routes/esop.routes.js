@@ -1,20 +1,5 @@
 /**
- * ESOP routes — mounted at /api/esop (#1073).
- *
- * Three permissions rather than the usual read/write pair, because the three
- * acts here have genuinely different authority:
- *
- *   - READ_ESOP        the cap table for everybody in the company
- *   - MANAGE_ESOP      issuing a grant, which dilutes the cap table, and
- *                      recording an exercise, which creates a taxable event and
- *                      a TDS liability. Owner only.
- *   - READ_OWN_ESOP    an employee looking at their own grants
- *
- * The split matters more here than elsewhere in the product. Every other HR
- * write changes a record; a grant changes who owns the company. It is the same
- * reasoning that keeps MANAGE_CONTRACT away from the HR manager role (#1011) —
- * issuing an offer letter commits the company to a salary — one notch further
- * along.
+ * ESOP routes — mounted at /api/esop (#1073, #1147).
  */
 
 const express = require('express');
@@ -32,15 +17,15 @@ const {
   exerciseOptions,
   forfeitGrant,
   getMyGrants,
+  createTenderOffer,
+  getTenderOffers,
+  submitTenderBid,
+  settleTenderOffer,
 } = require('../controllers/esop.controller');
 
 const router = express.Router();
 
 // --- Self-service ---------------------------------------------------------
-//
-// Declared first so `/my-grants` is matched before any `/:id` pattern below
-// could claim it. `getMyGrants` resolves the employee from `req.userId`, so the
-// route carries no identifier a caller could substitute.
 router.get(
   '/my-grants',
   auth,
@@ -84,9 +69,6 @@ router.get(
   getVestingSchedule,
 );
 
-// Recording an exercise writes a perquisite and a TDS figure that will be filed
-// under the employer's TAN, so it sits with MANAGE_ESOP rather than with the
-// employee doing the exercising.
 router.post(
   '/grants/:id/exercise',
   auth,
@@ -100,6 +82,35 @@ router.post(
   requirePermission(PERMISSIONS.MANAGE_ESOP),
   writeRateLimiter,
   forfeitGrant,
+);
+
+// --- Secondary Liquidity Tender Offers ------------------------------------
+router.post(
+  '/tender-offers',
+  auth,
+  requirePermission(PERMISSIONS.MANAGE_ESOP),
+  writeRateLimiter,
+  createTenderOffer,
+);
+router.get(
+  '/tender-offers',
+  auth,
+  requirePermission(PERMISSIONS.READ_ESOP),
+  getTenderOffers,
+);
+router.post(
+  '/tender-offers/:id/bid',
+  auth,
+  requirePermission(PERMISSIONS.READ_OWN_ESOP),
+  writeRateLimiter,
+  submitTenderBid,
+);
+router.post(
+  '/tender-offers/:id/settle',
+  auth,
+  requirePermission(PERMISSIONS.MANAGE_ESOP),
+  writeRateLimiter,
+  settleTenderOffer,
 );
 
 module.exports = router;
