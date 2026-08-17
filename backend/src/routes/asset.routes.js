@@ -12,6 +12,9 @@ const {
   runMonthlyDepreciation,
   getDepreciationSchedule,
   disposeAsset,
+  getFixedAssetRegister,
+  getOverdueReturns,
+  impairAsset,
 } = require('../controllers/asset.controller');
 
 const router = express.Router();
@@ -34,6 +37,23 @@ router.post(
   createAsset,
 );
 router.get('/', auth, requirePermission(PERMISSIONS.READ_ASSET), getAssets);
+
+// --- Register reporting (#1156) --------------------------------------------
+//
+// Declared before `/:id/...` so the literal segments are not captured as an
+// asset id — the same reason `/api/loans/summary` sits above `/api/loans/:id`.
+router.get(
+  '/register',
+  auth,
+  requirePermission(PERMISSIONS.READ_ASSET),
+  getFixedAssetRegister,
+);
+router.get(
+  '/overdue-returns',
+  auth,
+  requirePermission(PERMISSIONS.READ_ASSET),
+  getOverdueReturns,
+);
 
 // Workflows & Schedules
 router.get(
@@ -62,6 +82,19 @@ router.post(
   requirePermission(PERMISSIONS.MANAGE_ASSET),
   writeRateLimiter,
   disposeAsset,
+);
+
+// Writing an asset down changes the company's reported net block, which is an
+// accounting-period act rather than day-to-day asset admin. Gated on
+// RUN_DEPRECIATION for the same reason the depreciation run is, and
+// deliberately not on MANAGE_ASSET — that is what an HR coordinator holds to
+// assign a laptop.
+router.post(
+  '/:id/impair',
+  auth,
+  requirePermission(PERMISSIONS.RUN_DEPRECIATION),
+  writeRateLimiter,
+  impairAsset,
 );
 
 // System / Cron
