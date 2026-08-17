@@ -1,0 +1,121 @@
+name: Backend Deploy Preview
+
+# Runs the backend test suite as a smoke check on every PR that touches
+# backend/ files, then — once Render's PR Preview Environments are enabled
+# for this repo (see render.yaml) — looks up the preview URL Render created
+# for this PR and comments it so reviewers don't have to run the API
+# locally.
+#
+# Deployment itself is handled by Render's native Preview Environments
+# feature (render.yaml, `previews.generation: automatic`), triggered by
+# Render's own GitHub App. This workflow only needs a Render API key to
+# look up the resulting URL:
+#   RENDER_API_KEY - Render account API key (Account Settings > API Keys)
+#
+# If the secret is not configured the workflow still lints + tests the
+# backend as a smoke check and reports the result on the PR.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'backend/**'
+      - 'render.yaml'
+      - '.github/workflows/backend-deploy-preview.yml'
+
+concurrency:
+  group: backend-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    name: Backend preview build & deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Lint
+        working-directory: backend
+        run: npm run lint
+
+      - name: Test
+        working-directory: backend
+        run: npm test
+
+      - name: Look up Render preview URL
+        id: render
+        if: ${{ secrets.RENDER_API_KEY != '' }}
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Render names PR preview services "<service-name>-pr-<number>".
+          SERVICE_NAME="paysphere-backend-pr-${PR_NUMBER}"
+          PREVIEW_URL=""
+
+          for attempt in $(seq 1 10); do
+            RESPONSE="$(curl -s -H "Authorization: Bearer $RENDER_API_KEY" \
+              "https://api.render.com/v1/services?name=${SERVICE_NAME}&limit=1")"
+            PREVIEW_URL="$(echo "$RESPONSE" | jq -r '.[0].service.serviceDetails.url // empty')"
+
+            if [ -n "$PREVIEW_URL" ]; then
+              break
+            fi
+            echo "Preview not ready yet (attempt ${attempt}/10), waiting 30s..."
+            sleep 30
+          done
+
+          echo "preview_url=${PREVIEW_URL}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Comment preview URL on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const previewUrl = steps?.render?.outputs?.preview_url;
+
+            let body;
+            if (previewUrl) {
+              body = [
+                '🚀 **Backend preview is ready!**',
+                '',
+                `You can point clients at the preview API from this PR at: ${previewUrl}`,
+                '',
+                '- The preview is an isolated, temporary environment and is torn down automatically when this PR is merged or closed.',
+                '- Check deploy status directly in the Render dashboard.',
+              ].join('\n');
+            } else {
+              body = [
+                '✅ **Backend lint + tests passed.**',
+                '',
+                'Deploy previews are not enabled because the `RENDER_API_KEY` secret is not configured on this repository, or the Render preview is still building.',
+                '',
+                'Maintainers: add that secret and connect `render.yaml` as a Blueprint in the Render dashboard to enable automatic preview URLs (see `.github/workflows/backend-deploy-preview.yml`).',
+              ].join('\n');
+            }
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body,
+            });

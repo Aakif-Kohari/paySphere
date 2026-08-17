@@ -1,36 +1,60 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { HelmetProvider } from 'react-helmet-async'
-import { GoogleOAuthProvider } from '@react-oauth/google'
-import { StyledEngineProvider, CssBaseline, ThemeProvider, createTheme } from '@mui/material'
-import { Provider } from 'react-redux'
-import store from './store/store'
-import './index.css'
-import App from './App.jsx'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import * as Sentry from '@sentry/react';
+import * as serviceWorkerRegistration from './serviceWorkerRegistration'; // Added for #1022
 
-const GOOGLE_CLIENT_ID = "250441239388-ldget7kv1v1hvf6vm1r6b0p48fassv43.apps.googleusercontent.com";
+// Do not send errors to a placeholder project. Sentry is enabled only when a
+// real DSN has been supplied by the deployment environment.
+if (import.meta.env.VITE_SENTRY_DSN) {
+  Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
+    tracesSampleRate: 1.0,
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 0.1,
+    environment: import.meta.env.MODE || 'production',
+  });
+}
+import { HelmetProvider } from 'react-helmet-async';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import App from './App';
+import './index.css';
+import './i18n'; // Initialize i18n before app renders (Issue #736)
 
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#3b82f6',
-    },
+import ErrorBoundary from './components/common/ErrorBoundary.jsx';
+
+// Configure QueryClient with default options (Issue #684)
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { refetchOnWindowFocus: false, retry: 1 },
   },
 });
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <StyledEngineProvider injectFirst>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-          <HelmetProvider>
-            <Provider store={store}>
-              <App />
-            </Provider>
-          </HelmetProvider>
-        </GoogleOAuthProvider>
-      </ThemeProvider>
-    </StyledEngineProvider>
-  </StrictMode>,
-)
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <HelmetProvider>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </HelmetProvider>
+  </React.StrictMode>,
+);
+
+// Register Service Worker for offline caching (Issue #1022)
+if (import.meta.env.PROD) {
+  serviceWorkerRegistration.register({
+    onUpdate: (registration) => {
+      console.log('New content available; please refresh.');
+      // In a real app, show a toast notification prompting the user to reload
+      if (registration && registration.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        window.location.reload();
+      }
+    },
+    onSuccess: () => {
+      console.log('App is available offline.');
+    }
+  });
+} else {
+  serviceWorkerRegistration.unregister();
+}

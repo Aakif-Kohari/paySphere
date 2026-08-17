@@ -1,0 +1,86 @@
+name: PR Unassigned Issue Check
+
+on:
+  pull_request:
+    types: [opened, edited]
+
+jobs:
+  check-unassigned:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Check for unassigned issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prBody = context.payload.pull_request.body;
+            if (!prBody) {
+              console.log("No PR body found. Skipping.");
+              return;
+            }
+
+            // Match standard GitHub closing keywords: Fixes #123, Resolves #123, etc.
+            const regex = /(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/ig;
+            const matches = [...prBody.matchAll(regex)];
+
+            if (matches.length === 0) {
+              console.log("No linked issues found in PR body. Skipping.");
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.pull_request.number;
+            
+            let hasUnassignedIssue = false;
+
+            for (const match of matches) {
+              const issueNumber = parseInt(match[1], 10);
+              
+              try {
+                const { data: issue } = await github.rest.issues.get({
+                  owner,
+                  repo,
+                  issue_number: issueNumber
+                });
+
+                // GitHub treats PRs as issues in the API. Ignore if the linked "issue" is actually another PR.
+                if (issue.pull_request) {
+                  continue; 
+                }
+
+                if (issue.assignees && issue.assignees.length === 0) {
+                  hasUnassignedIssue = true;
+                  console.log(`Issue #${issueNumber} is currently unassigned.`);
+                  break; // Only need to trigger the warning once per PR
+                }
+              } catch (error) {
+                console.error(`Failed to fetch issue #${issueNumber}: ${error.message}`);
+              }
+            }
+
+            if (hasUnassignedIssue) {
+              const commentBody = "Thank you for your PR! It looks like the issue you are fixing is currently unassigned. To prevent overlapping work, please comment on the original issue to get it assigned to you first.";
+              
+              // Post the required comment
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: commentBody
+              });
+
+              // Add the optional 'needs-assignment' label
+              try {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number: prNumber,
+                  labels: ['needs-assignment']
+                });
+                console.log("Added 'needs-assignment' label.");
+              } catch (e) {
+                console.log("Could not add label (it might not exist in the repo yet).", e.message);
+              }
+            }
