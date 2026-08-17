@@ -665,3 +665,50 @@ describe('outstandingAdvances', () => {
     expect(result.totalOutstanding).toBe(0);
   });
 });
+
+describe('rebalanceMultiCurrencyTravelSettlement', () => {
+  const forexRates = { USD: 80, EUR: 90 };
+
+  it('calculates reimbursement due when expenses and per-diem exceed advance', () => {
+    const request = {
+      advanceReleased: 500,
+      advanceCurrency: 'USD', // 500 * 80 = 40,000 INR
+      perDiemEntitlement: 10000,
+    };
+
+    const expenses = [
+      { category: 'Hotel', amount: 300, currency: 'USD', exchangeRate: 80 }, // 24,000 INR
+      { category: 'Meals', amount: 200, currency: 'EUR', exchangeRate: 90 }, // 18,000 INR
+    ];
+
+    const result = rebalanceMultiCurrencyTravelSettlement(request, expenses, forexRates, 'INR');
+    expect(result.advanceReleasedBase).toBe(40000);
+    expect(result.totalExpensesBase).toBe(42000);
+    expect(result.totalActualSpend).toBe(52000);
+    expect(result.netVariance).toBe(12000);
+    expect(result.settlementAction).toBe('REIMBURSEMENT_DUE');
+    expect(result.reimbursementPayable).toBe(12000);
+    expect(result.surplusToRecover).toBe(0);
+  });
+
+  it('triggers surplus recovery due when unspent advance remains', () => {
+    const request = {
+      advanceReleased: 1000,
+      advanceCurrency: 'USD', // 80,000 INR
+      perDiemEntitlement: 5000,
+    };
+
+    const expenses = [
+      { category: 'Hotel', amount: 400, currency: 'USD', exchangeRate: 80 }, // 32,000 INR
+    ];
+
+    const result = rebalanceMultiCurrencyTravelSettlement(request, expenses, forexRates, 'INR');
+    expect(result.advanceReleasedBase).toBe(80000);
+    expect(result.totalActualSpend).toBe(37000);
+    expect(result.netVariance).toBe(-43000);
+    expect(result.settlementAction).toBe('SURPLUS_RECOVERY_DUE');
+    expect(result.surplusToRecover).toBe(43000);
+    expect(result.reimbursementPayable).toBe(0);
+  });
+});
+
