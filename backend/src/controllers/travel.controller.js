@@ -31,6 +31,7 @@ const {
   detectPolicyViolations,
   settleTrip,
   outstandingAdvances,
+  rebalanceMultiCurrencyTravelSettlement,
 } = require('../utils/perDiemCalculator');
 const eventBus = require('../services/event.service');
 
@@ -575,4 +576,135 @@ exports.getMyTrips = async (req, res, next) => {
   }
 };
 
+/**
+ * GET /api/travel/variance-report
+ * Generates an executive summary of trip variances, budget adherence, and surplus recovery statuses.
+ */
+exports.getTravelVarianceReport = async (req, res, next) => {
+  try {
+    const settlements = await TravelSettlement.find({ tenantId: req.tenantId })
+      .populate('employeeId', 'fullName department')
+      .populate('requestId', 'purpose advanceReleased')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    let totalAdvances = 0;
+    let totalActuals = 0;
+    let totalReimbursements = 0;
+    let totalSurplusRecoveries = 0;
+
+    const report = settlements.map((s) => {
+      const advance = s.advanceDeducted || s.requestId?.advanceReleased || 0;
+      const actual = s.actualExpensesTotal + s.perDiemTotal;
+      totalAdvances += advance;
+      totalActuals += actual;
+
+      if (s.settlementType === 'reimbursement') {
+        totalReimbursements += s.netPayable;
+      } else if (s.settlementType === 'recovery') {
+        totalSurplusRecoveries += s.netPayable;
+      }
+
+      return {
+        settlementId: s._id,
+        employee: s.employeeId,
+        tripPurpose: s.requestId?.purpose || 'N/A',
+        settlementType: s.settlementType,
+        advanceAmount: advance,
+        actualSpent: actual,
+        netPayable: s.netPayable,
+        settledAt: s.createdAt,
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      summary: {
+        totalTripsSettled: settlements.length,
+        totalAdvances: Math.round(totalAdvances * 100) / 100,
+        totalActuals: Math.round(totalActuals * 100) / 100,
+        totalReimbursements: Math.round(totalReimbursements * 100) / 100,
+        totalSurplusRecoveries: Math.round(totalSurplusRecoveries * 100) / 100,
+        netCompanyVariance: Math.round((totalActuals - totalAdvances) * 100) / 100,
+      },
+      settlements: report,
+    });
+  } catch (error) { next(error); }
+};
+
+/**
+ * POST /api/travel/requests/:id/multi-currency-settle
+ * Settles international trip with multi-currency receipts against advance.
+ */
+exports.settleMultiCurrencyTrip = async (req, res, next) => {
+  try {
+    const { expenses = [], forexRates = {}, receipts = [] } = req.body;
+
+    const request = await TravelRequest.findOne({
+      _id: req.params.id,
+      tenantId: req.tenantId,
+    });
+    if (!request) return res.status(404).json({ message: 'Travel request not found' });
+
+    const existingSettlement = await TravelSettlement.findOne({
+      tenantId: req.tenantId,
+      requestId: request._id,
+    });
+    if (existingSettlement) {
+      return res.status(409).json({ message: 'This trip has already been settled' });
+    }
+
+    const rebalance = rebalanceMultiCurrencyTravelSettlement(
+      request,
+      expenses,
+      forexRates,
+    );
+
+    const settlementType = rebalance.settlementAction === 'REIMBURSEMENT_DUE'
+      ? 'reimbursement'
+      : rebalance.settlementAction === 'SURPLUS_RECOVERY_DUE'
+        ? 'recovery'
+        : 'nil';
+
+    const netPayable = rebalance.reimbursementPayable || rebalance.surplusToRecover || 0;
+
+    const settlement = await TravelSettlement.create({
+      tenantId: req.tenantId,
+      requestId: request._id,
+      employeeId: request.employeeId,
+      perDiemTotal: rebalance.perDiemBase,
+      actualExpensesTotal: rebalance.totalExpensesBase,
+      advanceDeducted: rebalance.advanceReleasedBase,
+      settlementType,
+      netPayable,
+      receipts: receipts.length ? receipts : undefined,
+      recordedBy: req.userId,
+    });
+
+    request.status = REQUEST_STATUS.SETTLED;
+    await request.save();
+
+    eventBus.emit('AUDIT_LOG', {
+      userId: req.userId,
+      action: 'TRAVEL_MULTI_CURRENCY_SETTLED',
+      resourceType: 'TravelSettlement',
+      resourceIds: [settlement._id],
+      details: {
+        requestId: request._id,
+        settlementType,
+        netPayable,
+        netVariance: rebalance.netVariance,
+      },
+      req,
+    });
+
+    res.status(201).json({
+      message: 'Multi-currency travel settlement processed successfully',
+      settlement,
+      rebalanceSummary: rebalance,
+    });
+  } catch (error) { next(error); }
+};
+
 exports._internals = { resolveAsOf, policyForGrade };
+

@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import EmptyState from '../components/common/EmptyState';
 import { formatCurrency } from '../utils/currency';
 import DashboardSkeleton from '../components/common/skeleton/DashboardSkeleton';
+import Sidebar from '../components/Sidebar';
+import { useAppStore } from '../store/useAppStore';
 
 /**
  * The archive of soft-deleted employees (#759, #897).
@@ -14,6 +17,8 @@ import DashboardSkeleton from '../components/common/skeleton/DashboardSkeleton';
  * not an undo.
  */
 export default function Archive() {
+  const navigate = useNavigate();
+  const logout = useAppStore((state) => state.logout);
   const [archivedEmployees, setArchivedEmployees] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -24,6 +29,13 @@ export default function Archive() {
   // flight at once, and a shared flag would spin every card on the page.
   const [restoring, setRestoring] = useState({});
   const [restoreError, setRestoreError] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const companyName = localStorage.getItem('companyName') || 'PaySphere';
+
+  const handleLogout = () => {
+    logout();
+    navigate('/auth');
+  };
 
   const fetchArchive = useCallback(async (requestedPage) => {
     setLoading(true);
@@ -96,7 +108,25 @@ export default function Archive() {
   }
 
   return (
-    <div className="animate-in fade-in zoom-in duration-500">
+    <>
+      <Sidebar
+        companyName={companyName}
+        activePage="Archive"
+        setActivePage={() => {}}
+        isSidebarOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        onLogout={handleLogout}
+      />
+      <main className="min-h-screen bg-slate-50 dark:bg-slate-950 md:ml-56 p-4 sm:p-8">
+        <button
+          type="button"
+          onClick={() => setIsSidebarOpen(true)}
+          aria-label="Open sidebar"
+          className="md:hidden mb-4 p-2 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800"
+        >
+          ☰
+        </button>
+        <div className="animate-in fade-in zoom-in duration-500">
       <Helmet>
         <title>Archive | PaySphere</title>
       </Helmet>
@@ -204,6 +234,8 @@ export default function Archive() {
           )}
         </>
       )}
-    </div>
+        </div>
+      </main>
+    </>
   );
 }

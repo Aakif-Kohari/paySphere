@@ -590,6 +590,72 @@ function outstandingAdvances(
   };
 }
 
+/**
+ * Rebalances a multi-currency travel settlement against advance and actual receipts.
+ *
+ * @param {object} travelRequest - { advanceReleased, advanceCurrency, perDiemEntitlement }
+ * @param {Array<object>} expenses - Array of { currency, amount, category, exchangeRate }
+ * @param {object} forexRates - Map of currency codes to base currency (e.g. { USD: 83.5, EUR: 90.2, GBP: 105.0 })
+ * @param {string} [baseCurrency='INR']
+ * @returns {object}
+ */
+function rebalanceMultiCurrencyTravelSettlement(
+  travelRequest,
+  expenses = [],
+  forexRates = {},
+  baseCurrency = 'INR',
+) {
+  const advanceReleased = Number(travelRequest.advanceReleased || 0);
+  const advanceCurrency = travelRequest.advanceCurrency || baseCurrency;
+  const advanceRate = advanceCurrency === baseCurrency ? 1.0 : Number(forexRates[advanceCurrency] || 1.0);
+  const advanceReleasedBase = round2(advanceReleased * advanceRate);
+
+  const perDiemBase = Number(travelRequest.perDiemEntitlement || 0);
+
+  let totalExpensesBase = 0;
+  const convertedExpenses = expenses.map((exp) => {
+    const amount = Number(exp.amount || 0);
+    const curr = exp.currency || baseCurrency;
+    const rate = curr === baseCurrency ? 1.0 : Number(exp.exchangeRate || forexRates[curr] || 1.0);
+    const convertedAmount = round2(amount * rate);
+
+    totalExpensesBase += convertedAmount;
+
+    return {
+      category: exp.category || 'Miscellaneous',
+      originalAmount: amount,
+      originalCurrency: curr,
+      exchangeRateUsed: rate,
+      baseAmount: convertedAmount,
+      baseCurrency,
+    };
+  });
+
+  const totalActualSpend = round2(totalExpensesBase + perDiemBase);
+  const netVariance = round2(totalActualSpend - advanceReleasedBase);
+
+  let settlementAction = 'NIL_BALANCE';
+  if (netVariance > 0) {
+    settlementAction = 'REIMBURSEMENT_DUE';
+  } else if (netVariance < 0) {
+    settlementAction = 'SURPLUS_RECOVERY_DUE';
+  }
+
+  return {
+    advanceReleased,
+    advanceCurrency,
+    advanceReleasedBase,
+    perDiemBase,
+    totalExpensesBase: round2(totalExpensesBase),
+    totalActualSpend,
+    netVariance,
+    settlementAction,
+    reimbursementPayable: netVariance > 0 ? netVariance : 0,
+    surplusToRecover: netVariance < 0 ? Math.abs(netVariance) : 0,
+    convertedExpenses,
+  };
+}
+
 module.exports = {
   CITY_CLASS,
   PART_DAY_RULE,
@@ -609,4 +675,6 @@ module.exports = {
   detectPolicyViolations,
   settleTrip,
   outstandingAdvances,
+  rebalanceMultiCurrencyTravelSettlement,
 };
+

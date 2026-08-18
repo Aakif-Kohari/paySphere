@@ -11,6 +11,14 @@ const {
   canTransitionStatus,
   round2,
 } = require('../utils/loanSchedule');
+const {
+  PREPAYMENT_STRATEGY,
+  computeForeclosureQuote,
+  computePrincipalOutstanding,
+  reamortizeSchedule,
+  applyForeclosure,
+  computeExitClearance,
+} = require('../utils/loanForeclosure');
 
 /**
  * How many months of salary an employee may hold as an outstanding advance.
@@ -93,15 +101,24 @@ class LoanService {
       interestMethod: body.interestMethod,
       interestRatePercent: Number(body.interestRatePercent) || 0,
       startMonth:
-        body.startMonth !== undefined ? Number(body.startMonth) : now.getMonth() + 1,
+        body.startMonth !== undefined
+          ? Number(body.startMonth)
+          : now.getMonth() + 1,
       startYear:
-        body.startYear !== undefined ? Number(body.startYear) : now.getFullYear(),
+        body.startYear !== undefined
+          ? Number(body.startYear)
+          : now.getFullYear(),
     };
 
     const built = buildAmortizationSchedule(terms);
 
     if (!built.ok) {
-      return { ok: false, status: 400, message: 'Invalid loan terms', errors: built.errors };
+      return {
+        ok: false,
+        status: 400,
+        message: 'Invalid loan terms',
+        errors: built.errors,
+      };
     }
 
     // An advance larger than a few months' salary cannot be recovered from that
@@ -139,7 +156,9 @@ class LoanService {
       // create() threw a ValidationError on every call (#613).
       createdBy: userId,
       tenantId,
-      type: Object.values(LOAN_TYPE).includes(body.type) ? body.type : LOAN_TYPE.ADVANCE,
+      type: Object.values(LOAN_TYPE).includes(body.type)
+        ? body.type
+        : LOAN_TYPE.ADVANCE,
       principal: built.schedule.length ? terms.principal : 0,
       interestMethod: terms.interestMethod,
       interestRatePercent: terms.interestRatePercent,
@@ -183,7 +202,11 @@ class LoanService {
 
     if (queryParams.employeeId) {
       if (!mongoose.Types.ObjectId.isValid(queryParams.employeeId)) {
-        return { ok: false, status: 400, message: 'Invalid employee id format' };
+        return {
+          ok: false,
+          status: 400,
+          message: 'Invalid employee id format',
+        };
       }
       query.employeeId = queryParams.employeeId;
     }
@@ -239,7 +262,12 @@ class LoanService {
       }
     });
 
-    return { ok: true, totalCount, totalOutstanding: round2(totalOutstanding), byStatus };
+    return {
+      ok: true,
+      totalCount,
+      totalOutstanding: round2(totalOutstanding),
+      byStatus,
+    };
   }
 
   /**
@@ -258,7 +286,10 @@ class LoanService {
       // a drift between the two is visible instead of silent.
       derivedOutstanding: computeOutstanding(loan),
       installmentsPaid: loan.repayments.length,
-      installmentsRemaining: Math.max(loan.tenureMonths - loan.repayments.length, 0),
+      installmentsRemaining: Math.max(
+        loan.tenureMonths - loan.repayments.length,
+        0,
+      ),
     };
   }
 
@@ -273,7 +304,9 @@ class LoanService {
 
     // Annotate each projected row with what was actually collected, so the UI
     // can show planned vs actual side by side.
-    const paidByPeriod = new Map(loan.repayments.map((r) => [`${r.year}-${r.month}`, r]));
+    const paidByPeriod = new Map(
+      loan.repayments.map((r) => [`${r.year}-${r.month}`, r]),
+    );
 
     const schedule = loan.schedule.map((row) => {
       const paid = paidByPeriod.get(`${row.year}-${row.month}`);
@@ -307,13 +340,22 @@ class LoanService {
       interestMethod: body.interestMethod,
       interestRatePercent: Number(body.interestRatePercent) || 0,
       startMonth:
-        body.startMonth !== undefined ? Number(body.startMonth) : now.getMonth() + 1,
+        body.startMonth !== undefined
+          ? Number(body.startMonth)
+          : now.getMonth() + 1,
       startYear:
-        body.startYear !== undefined ? Number(body.startYear) : now.getFullYear(),
+        body.startYear !== undefined
+          ? Number(body.startYear)
+          : now.getFullYear(),
     });
 
     if (!built.ok) {
-      return { ok: false, status: 400, message: 'Invalid loan terms', errors: built.errors };
+      return {
+        ok: false,
+        status: 400,
+        message: 'Invalid loan terms',
+        errors: built.errors,
+      };
     }
 
     return {
@@ -374,7 +416,10 @@ class LoanService {
 
     const { loan } = owned;
 
-    if (loan.status === LOAN_STATUS.CANCELLED || loan.status === LOAN_STATUS.COMPLETED) {
+    if (
+      loan.status === LOAN_STATUS.CANCELLED ||
+      loan.status === LOAN_STATUS.COMPLETED
+    ) {
       return {
         ok: false,
         status: 409,
@@ -384,7 +429,11 @@ class LoanService {
 
     const amount = Number(body?.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      return { ok: false, status: 400, message: 'Amount must be a positive number' };
+      return {
+        ok: false,
+        status: 400,
+        message: 'Amount must be a positive number',
+      };
     }
 
     const outstanding = computeOutstanding(loan);
@@ -422,6 +471,304 @@ class LoanService {
     await loan.save();
 
     return { ok: true, loan, amount, month, year };
+  }
+
+  /**
+   * Read the closure period out of a query string or body.
+   *
+   * Both are optional. Omitted, `computeForeclosureQuote` prices as at the last
+   * period actually collected, which is the right default for a loan whose
+   * recovery is a month behind.
+   *
+   * @param {object} source
+   * @returns {{options: object, errors: string[]}}
+   */
+  parseClosureOptions(source = {}) {
+    const errors = [];
+    const options = {};
+
+    if (source.asOfMonth !== undefined || source.asOfYear !== undefined) {
+      const month = Number(source.asOfMonth);
+      const year = Number(source.asOfYear);
+
+      if (!Number.isInteger(month) || !Number.isInteger(year)) {
+        errors.push('asOfMonth and asOfYear must both be supplied as integers');
+      } else {
+        options.asOfMonth = month;
+        options.asOfYear = year;
+      }
+    }
+
+    if (source.foreclosureChargePercent !== undefined) {
+      const charge = Number(source.foreclosureChargePercent);
+      if (!Number.isFinite(charge)) {
+        errors.push('foreclosureChargePercent must be a number');
+      } else {
+        options.foreclosureChargePercent = charge;
+      }
+    }
+
+    return { options, errors };
+  }
+
+  /**
+   * Price the closure of a loan. Writes nothing.
+   *
+   * Deliberately a read: an employee asking what it costs to close early
+   * should not be committed to closing by asking.
+   */
+  async getForeclosureQuote(tenantId, loanId, query) {
+    const owned = await this.loadOwnedLoan(loanId, tenantId);
+    if (!owned.ok) return owned;
+
+    const { options, errors } = this.parseClosureOptions(query || {});
+    if (errors.length) {
+      return {
+        ok: false,
+        status: 400,
+        message: 'Invalid quote parameters',
+        errors,
+      };
+    }
+
+    const quote = computeForeclosureQuote(owned.loan, options);
+
+    if (!quote.ok) {
+      return {
+        ok: false,
+        status: 409,
+        message: 'This loan cannot be foreclosed',
+        errors: quote.errors,
+      };
+    }
+
+    return { ok: true, loan: owned.loan, quote };
+  }
+
+  /**
+   * Close a loan early, settling the balance in one payment.
+   */
+  async forecloseLoan(tenantId, loanId, body) {
+    const owned = await this.loadOwnedLoan(loanId, tenantId);
+    if (!owned.ok) return owned;
+
+    const { loan } = owned;
+
+    const { options, errors } = this.parseClosureOptions(body || {});
+    if (errors.length) {
+      return {
+        ok: false,
+        status: 400,
+        message: 'Invalid foreclosure parameters',
+        errors,
+      };
+    }
+
+    const quote = computeForeclosureQuote(loan, options);
+
+    if (!quote.ok) {
+      return {
+        ok: false,
+        status: 409,
+        message: 'This loan cannot be foreclosed',
+        errors: quote.errors,
+      };
+    }
+
+    // The caller states the figure it is settling against. A quote computed a
+    // day earlier can have moved on — a month can have accrued between the two
+    // — and closing at a stale number leaves a balance behind on a loan the
+    // employee has been told is settled.
+    if (body?.expectedNetPayable !== undefined) {
+      const expected = round2(Number(body.expectedNetPayable));
+
+      if (expected !== quote.netPayable) {
+        return {
+          ok: false,
+          status: 409,
+          message: `The quote has changed. Expected ${expected}, current closure amount is ${quote.netPayable}`,
+          quote,
+        };
+      }
+    }
+
+    if (!canTransitionStatus(loan.status, LOAN_STATUS.FORECLOSED)) {
+      return {
+        ok: false,
+        status: 409,
+        message: `A loan that is "${loan.status}" cannot be foreclosed`,
+        currentStatus: loan.status,
+      };
+    }
+
+    const applied = applyForeclosure(loan, quote, {
+      month: quote.asOfMonth,
+      year: quote.asOfYear,
+    });
+
+    if (!applied.ok) {
+      return {
+        ok: false,
+        status: 409,
+        message: 'Foreclosure failed',
+        errors: applied.errors,
+      };
+    }
+
+    loan.repayments = applied.repayments;
+    loan.totalRepaid = applied.totalRepaid;
+    loan.outstanding = applied.outstanding;
+    loan.schedule = applied.schedule;
+    loan.status = applied.status;
+    loan.foreclosedAt = new Date();
+    loan.foreclosureCharge = applied.foreclosureCharge;
+    loan.interestRebate = applied.interestRebate;
+    loan.statusNote = sanitizeText(body?.note || '');
+
+    await loan.save();
+
+    return { ok: true, loan, quote };
+  }
+
+  /**
+   * Record a part-prepayment and rebuild the remaining schedule.
+   *
+   * The rebuild is the point. `recordManualRepayment` above already accepts a
+   * lump sum, but it leaves the frozen schedule describing a loan that no
+   * longer exists, so every later recovery is apportioned against the wrong
+   * row (#1155).
+   */
+  async recordPrepayment(tenantId, loanId, body) {
+    const owned = await this.loadOwnedLoan(loanId, tenantId);
+    if (!owned.ok) return owned;
+
+    const { loan } = owned;
+
+    const now = new Date();
+    const month =
+      body?.month !== undefined ? Number(body.month) : now.getMonth() + 1;
+    const year =
+      body?.year !== undefined ? Number(body.year) : now.getFullYear();
+    const strategy = body?.strategy || PREPAYMENT_STRATEGY.REDUCE_TENURE;
+    const amount = Number(body?.amount);
+
+    const result = reamortizeSchedule(loan, {
+      prepaymentAmount: amount,
+      effectiveMonth: month,
+      effectiveYear: year,
+      strategy,
+    });
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        status: 400,
+        message: 'Prepayment could not be applied',
+        errors: result.errors,
+        principalOutstanding: result.principalOutstanding,
+      };
+    }
+
+    // The lump sum itself is recorded like any other repayment, keyed by
+    // period, so re-running the same period replaces it rather than collecting
+    // twice.
+    const applied = applyRepayment(loan, {
+      month,
+      year,
+      amount: round2(amount),
+    });
+
+    loan.repayments = applied.repayments;
+    loan.totalRepaid = applied.totalRepaid;
+
+    if (result.closesLoan) {
+      // The lump sum cleared the principal outright, so there is nothing left
+      // to schedule and the loan is settled.
+      loan.schedule = [];
+      loan.outstanding = 0;
+      loan.status = LOAN_STATUS.COMPLETED;
+      loan.completedAt = new Date();
+    } else {
+      // Rows up to the prepayment stay — they were collected — and the rest are
+      // replaced by the rebuilt table.
+      const kept = loan.schedule.filter(
+        (row) => Number(row.year) * 12 + Number(row.month) <= year * 12 + month,
+      );
+
+      loan.schedule = [
+        ...kept.map((row) => (row.toObject ? row.toObject() : row)),
+        ...result.schedule.map((row, index) => ({
+          ...row,
+          installmentNumber: kept.length + index + 1,
+        })),
+      ];
+
+      loan.installmentAmount = result.installmentAmount;
+      loan.tenureMonths = kept.length + result.revisedTenureMonths;
+      // Everything collected so far, plus everything the rebuilt table will
+      // collect. Recomputed rather than adjusted, so the two cannot drift.
+      loan.totalPayable = round2(applied.totalRepaid + result.totalPayable);
+      loan.totalInterest = round2(
+        loan.repayments.reduce(
+          (sum, entry) => sum + (Number(entry.interestComponent) || 0),
+          0,
+        ) + result.totalInterest,
+      );
+      loan.outstanding = round2(result.totalPayable);
+    }
+
+    await loan.save();
+
+    return {
+      ok: true,
+      loan,
+      prepayment: result,
+      amount: round2(amount),
+      month,
+      year,
+    };
+  }
+
+  /**
+   * What an employee owes across every open loan, priced for closure.
+   *
+   * Full-and-final settlement needs this: a leaver's advances are recovered
+   * from their final payment, and recovering them at `computeOutstanding()`
+   * would collect interest for months after they have left.
+   */
+  async getExitClearance(tenantId, employeeId, query) {
+    const owned = await this.loadOwnedEmployee(employeeId, tenantId);
+    if (!owned.ok) return owned;
+
+    const { options, errors } = this.parseClosureOptions(query || {});
+    if (errors.length) {
+      return {
+        ok: false,
+        status: 400,
+        message: 'Invalid clearance parameters',
+        errors,
+      };
+    }
+
+    const loans = await Loan.find({
+      tenantId,
+      employeeId: owned.employee._id,
+      status: { $in: [LOAN_STATUS.ACTIVE, LOAN_STATUS.ON_HOLD] },
+    });
+
+    const clearance = computeExitClearance(loans, options);
+
+    return {
+      ok: true,
+      employeeId: String(owned.employee._id),
+      employeeName: owned.employee.fullName,
+      // Reported alongside so finance can see what the naive figure would have
+      // recovered and what the rebate saves the leaver.
+      grossPrincipalOutstanding: round2(
+        loans.reduce((sum, loan) => sum + computePrincipalOutstanding(loan), 0),
+      ),
+      ...clearance,
+    };
   }
 }
 

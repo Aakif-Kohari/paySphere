@@ -1,24 +1,26 @@
-import { useState, useCallback } from 'react';
 import * as authService from '../services/authService';
+import { useAppStore } from '../../../store/useAppStore';
 
 const useAuth = () => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const user = useAppStore((state) => state.user);
+  const loading = useAppStore((state) => state.authLoading);
+  const error = useAppStore((state) => state.authError);
+  const setCredentials = useAppStore((state) => state.setCredentials);
+  const setAuthLoading = useAppStore((state) => state.setAuthLoading);
+  const setAuthError = useAppStore((state) => state.setAuthError);
 
-  const login = useCallback(async (credentials) => {
-    setLoading(true);
-    setError(null);
+  const login = async (credentials) => {
+    setAuthLoading(true);
+    setAuthError(null);
     try {
       const data = await authService.login(credentials);
-      setUser(data.user);
-      localStorage.setItem('token', data.token);
+      setCredentials({ user: data.user || null, token: data.token });
     } catch (err) {
-      setError(err.message || 'Login failed');
+      setAuthError(err.message || 'Login failed');
     } finally {
-      setLoading(false);
+      setAuthLoading(false);
     }
-  }, []);
+  };
 
   return { user, loading, error, login };
 };

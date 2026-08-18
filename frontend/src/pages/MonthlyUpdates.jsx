@@ -1,15 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { useSelector, useDispatch } from "react-redux";
-import { logoutUser } from "../features/auth/authSlice";
+import { useAppStore } from "../store/useAppStore";
 import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
-import { getCurrencySymbol, formatCurrency } from "../utils/currency";
-import AttendanceCalendarModal from "../components/AttendanceCalendarModal";
-import PayrollWizard from "../components/PayrollWizard";
-import { useToast } from "../context/ToastContext";
-import "./MonthlyUpdates.css";
+import { useJobProgress } from "../hooks/useJobProgress";
 
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -177,8 +172,8 @@ const COLORS = ["#818CF8","#34D399","#FB7185","#FBBF24","#60A5FA","#A78BFA"];
 
 export default function MonthlyUpdates() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const themeMode = useSelector((state) => state.ui.themeMode);
+  const themeMode = useAppStore((state) => state.themeMode);
+  const logoutUser = useAppStore((state) => state.logoutUser);
   const isDark = themeMode === "dark";
 
   const [isMobile] = useState(() => window.innerWidth <= 480);
@@ -195,29 +190,12 @@ export default function MonthlyUpdates() {
   const [showResults, setShowResults] = useState(false);
   const [payrollResults, setPayrollResults] = useState(null);
   const [finalizeError, setFinalizeError] = useState("");
-
-
-  // Attendance Calendar Modal states (#137)
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [selectedCalendarEmp, setSelectedCalendarEmp] = useState(null);
-  const [showEmpPicker, setShowEmpPicker] = useState(false);
-
-  // Bulk Email Dispatch states (#140)
-  const [sendingBulkEmail, setSendingBulkEmail] = useState(false);
-  const [emailStatuses, setEmailStatuses] = useState({});
-  const [bulkEmailMsg, setBulkEmailMsg] = useState("");
-
-  // Copy Payroll Summary state (#184)
-  const [copiedSummary, setCopiedSummary] = useState(false);
-  const { toast } = useToast();
-
-  // Disambiguation state for first-name collision (#274)
-  const [disambiguationMatches, setDisambiguationMatches] = useState([]);
-  const [pendingParsed, setPendingParsed] = useState(null);
-
+  const { progress, startJob } = useJobProgress('payroll_finalize');
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState({ defaultOvertimeRate: 0, defaultDailyRate: 0 });
+  const [updatingSettings, setUpdatingSettings] = useState(false);
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
-  const reduxToken = useSelector((state) => state.auth.token);
-  const token = reduxToken || localStorage.getItem("token");
+  const token = useAppStore((state) => state.token) || localStorage.getItem("token");
   const currency = localStorage.getItem("currency") || "INR";
 
   useEffect(() => {
@@ -317,7 +295,6 @@ export default function MonthlyUpdates() {
 
   const pendingCount = activity.filter(a => a.pending).length;
 
-  // Finalize payroll
   const handleFinalize = async () => {
     if (activity.length === 0) return;
     setFinalizing(true);
@@ -325,104 +302,33 @@ export default function MonthlyUpdates() {
 
     try {
       const now = new Date();
-      const res = await api.post(
-        `/api/payroll/finalize`,
-        {
-          activities: activity.map(a => ({ employeeId: a.employeeId, name: a.name, tags: a.tags })),
-          month: now.getMonth() + 1,
-          year: now.getFullYear(),
-        }
-      );
-
-      setPayrollResults(res.data);
-      setShowResults(true);
-
-      // Mark all activities as no longer pending
-      setActivity(prev => prev.map(a => ({ ...a, pending: false })));
+      // Use WebSocket job starting instead of regular API call
+      startJob({
+        activities: activity.map(a => ({ name: a.name, tags: a.tags })),
+        month: now.getMonth() + 1,
+        year: now.getFullYear(),
+      });
     } catch (err) {
-      setFinalizeError(err.response?.data?.message || "Failed to finalize payroll.");
-    } finally {
+      setFinalizeError(err.message || "Failed to start payroll process.");
       setFinalizing(false);
     }
   };
 
-  // Handle Bulk Send Email (#140)
-  const handleSendAllEmails = async () => {
-    setSendingBulkEmail(true);
-    setBulkEmailMsg("");
-    try {
-      const now = new Date();
-      const res = await api.post("/api/payroll/send-all-emails", {
-        month: now.getMonth() + 1,
-        year: now.getFullYear(),
-      });
-      const statusMap = { ...emailStatuses };
-      if (res.data.results && Array.isArray(res.data.results)) {
-        res.data.results.forEach((r) => {
-          statusMap[r.employeeName] = r.status;
-        });
-      }
-      setEmailStatuses(statusMap);
-      setBulkEmailMsg(res.data.message || "Payslip emails dispatched!");
-    } catch (err) {
-      setBulkEmailMsg(err.response?.data?.message || "Failed to dispatch payslip emails.");
-    } finally {
-      setSendingBulkEmail(false);
+  // Watch for job completion
+  useEffect(() => {
+    if (progress.status === 'completed' && progress.message) {
+      try {
+        const results = JSON.parse(progress.message);
+        setPayrollResults(results);
+        setShowResults(true);
+        setActivity(prev => prev.map(a => ({ ...a, pending: false })));
+        setFinalizing(false);
+      } catch (e) {}
+    } else if (progress.status === 'error') {
+      setFinalizeError(progress.message || "Error processing payroll");
+      setFinalizing(false);
     }
-  };
-
-  // Handle Copy Payroll Summary to Clipboard (#184)
-  const handleCopySummary = () => {
-    if (!payrollResults || !payrollResults.results) return;
-    const now = new Date();
-    const monthName = now.toLocaleString("default", { month: "long" });
-    const year = now.getFullYear();
-    const totalPayout = payrollResults.results.reduce((sum, r) => sum + (r.netSalary || 0), 0);
-
-    let summaryText = `💰 PaySphere Payroll Summary (${monthName} ${year})\n`;
-    summaryText += `-----------------------------------\n`;
-    summaryText += `👥 Total Employees: ${payrollResults.results.length}\n`;
-    summaryText += `💵 Total Payout: ${formatCurrency(totalPayout, currency)}\n`;
-    summaryText += `-----------------------------------\n`;
-
-    payrollResults.results.forEach((r) => {
-      summaryText += `• ${r.employeeName}: ${formatCurrency(r.netSalary, r.currency)}\n`;
-    });
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(summaryText);
-    } else {
-      const textarea = document.createElement("textarea");
-      textarea.value = summaryText;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-    }
-
-    setCopiedSummary(true);
-    setTimeout(() => setCopiedSummary(false), 2000);
-  };
-
-  const handleExportCsv = async () => {
-    try {
-      const now = new Date();
-      const response = await api.get(`/api/payroll/export-csv?month=${now.getMonth() + 1}&year=${now.getFullYear()}`, {
-        responseType: 'blob',
-      });
-      const blob = response.data;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `payroll-${now.getMonth() + 1}-${now.getFullYear()}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-} catch {
-      toast.error('No data to export');
-    }
-  };
+  }, [progress.status, progress.message]);
 
   return (
     <div style={{ minHeight: "100vh", background: isDark ? "#090d16" : "#F3F4F6", fontFamily: "'DM Sans','Segoe UI',sans-serif", display: "flex", overflowX: "hidden", transition: "background 0.2s" }}>
@@ -558,7 +464,7 @@ export default function MonthlyUpdates() {
             </div>
             <button
               onClick={() => {
-                dispatch(logoutUser());
+                logoutUser();
                 localStorage.removeItem("companyName");
                 navigate("/auth");
               }}
@@ -805,8 +711,7 @@ export default function MonthlyUpdates() {
               <button
                 className="bottom-cta-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 onClick={handleFinalize}
-                disabled={finalizing || activity.length === 0}
-                aria-label="Finalize Payroll Batch"
+                disabled={finalizing || activity.length === 0 || progress.status === 'starting' || progress.status === 'running'}
                 style={{
                   padding:"13px 28px",
                   background: activity.length === 0 ? (isDark ? "#334155" : "#9CA3AF") : finalizing ? (isDark ? "#475569" : "#6B7280") : (isDark ? "#3b82f6" : "#1E3A8A"),
@@ -818,9 +723,20 @@ export default function MonthlyUpdates() {
                   transition:"background 0.15s, transform 0.12s",
                   opacity: finalizing ? 0.7 : 1,
                 }}
-                onMouseEnter={e => { if (activity.length > 0 && !finalizing) { e.currentTarget.style.background=isDark ? "#2563EB" : "#1E40AF"; e.currentTarget.style.transform="translateY(-1px)"; }}}
-                onMouseLeave={e => { if (activity.length > 0 && !finalizing) { e.currentTarget.style.background=isDark ? "#3b82f6" : "#1E3A8A"; e.currentTarget.style.transform="none"; }}}
-              >{finalizing ? "Processing..." : "Review & Finalize"}</button>
+                onMouseEnter={e => { if (activity.length > 0 && !finalizing) { e.currentTarget.style.background="#1E40AF"; e.currentTarget.style.transform="translateY(-1px)"; }}}
+                onMouseLeave={e => { if (activity.length > 0 && !finalizing) { e.currentTarget.style.background="#1E3A8A"; e.currentTarget.style.transform="none"; }}}
+              >
+                {finalizing 
+                  ? (progress.status === 'running' ? `Processing... ${progress.percent}%` : "Processing...") 
+                  : "Review & Finalize"}
+              </button>
+              
+              {/* Progress bar container */}
+              {finalizing && progress.status === 'running' && (
+                <div style={{ position: "absolute", top: 0, left: 0, height: 3, width: "100%", background: "#E5E7EB" }}>
+                  <div style={{ height: "100%", background: "#2563EB", width: `${progress.percent}%`, transition: "width 0.3s ease" }} />
+                </div>
+              )}
             </div>
           </div>
 

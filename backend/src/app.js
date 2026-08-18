@@ -47,7 +47,9 @@ const swaggerUi = require('swagger-ui-express');
 const roleRoutes = require('./routes/role.routes');
 const userRoutes = require('./routes/user.routes');
 const employeeRoutes = require('./routes/employee.routes');
+const employeeImportRoutes = require('./routes/employeeImport.routes');
 const payrollRoutes = require('./routes/payroll.routes');
+const payrollApprovalRoutes = require('./routes/payrollApproval.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
@@ -58,6 +60,8 @@ const employeePortalRoutes = require('./routes/employeePortal.routes');
 const workflowRoutes = require('./routes/workflow.routes');
 const salaryHistoryRoutes = require('./routes/salaryHistory.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+const statsRoutes = require('./routes/stats.routes');
+const departmentsRoutes = require('./routes/departments.routes');
 const flashcardRoutes = require('./routes/flashcard.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const integrationRoutes = require('./routes/integration.routes');
@@ -112,6 +116,12 @@ const recruitmentRoutes = require('./routes/recruitment.routes');
 // stopped: `payroll.model.js` has a `disbursed` status and nothing in the
 // product produced the bank file that actually moves the money.
 const disbursementRoutes = require('./routes/disbursement.routes');
+
+// Leave year-end closure (#1159). The leave module has had models and two pure
+// engines since #646 and never a controller or a router, so none of it has
+// been reachable over HTTP — `calculateCarryForward()` is called from nowhere
+// and `maxCarryForward` has never had an effect on anything.
+const leaveClosureRoutes = require('./routes/leaveClosure.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -295,7 +305,9 @@ app.use(healthRoutes);
 app.use('/api', generalRateLimiter);
 app.use('/api/auth', userRoutes);
 app.use('/api/employees', employeeRoutes);
+app.use('/api/employees', employeeImportRoutes);
 app.use('/api/payroll', payrollRoutes);
+app.use('/api/payroll', payrollApprovalRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/employee-portal', employeePortalRoutes);
 app.use('/api/schedules', schedulerRoutes);
@@ -353,6 +365,8 @@ app.use('/api/roles', roleRoutes);
 // ever called, so until #896 *no* route had security headers or an access log —
 // the dashboard was not a special case, it was just the one that got noticed.
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/stats', statsRoutes);
+app.use('/api/departments', departmentsRoutes);
 
 // The in-app notification centre (#440). The other half of the duplicate.
 app.use('/api/notifications', notificationRoutes);
@@ -440,6 +454,12 @@ app.use('/api/recruitment', recruitmentRoutes);
 
 // Salary disbursement (#1075). The router owns `/batches` and `/profiles`.
 app.use('/api/disbursements', disbursementRoutes);
+
+// Leave year-end closure (#1159). The router owns `/policies`, `/preview`,
+// `/run` and `/history`. Not mounted at `/api/leave`: this router closes a
+// leave year and does not manage leave requests, so taking the whole `/leave`
+// prefix would claim a namespace it does not implement.
+app.use('/api/leave-closure', leaveClosureRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.

@@ -10,7 +10,7 @@ import SchoolIcon from '@mui/icons-material/School';
 import styles from './Sidebar.module.css';
 import { useEffect, useMemo, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useAppStore } from '../store/useAppStore';
 import { useTranslation } from 'react-i18next';
 import ThemeToggle from './ThemeToggle';
 import { navigationFor } from '../config/navigation';
@@ -266,7 +266,7 @@ const Sidebar = ({
 
   // `role` is what the login response calls the account type — the server's
   // `resolveAccountType` returns 'ADMIN' or 'EMPLOYEE'.
-  const accountType = useSelector((state) => state.auth.user?.role);
+  const accountType = useAppStore((state) => state.user?.role);
 
   useEffect(() => {
     if (!isSidebarOpen) return undefined;
@@ -386,25 +386,32 @@ const Sidebar = ({
         </div>
 
         <nav aria-label="Main menu" className="flex-1 p-3 space-y-1">
-          {sidebarItems.map((item) => (
-            /* Fixed: Added href and role for screen readers (Issue #660) */
-            <a
-              key={item.id}
-              href={`/${item.id.toLowerCase()}`}
-              onClick={(e) => {
-                e.preventDefault();
-                setActivePage(item.id);
-                onClose();
-              }}
-              aria-current={activePage === item.id ? 'page' : undefined}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500 ${activePage === item.id
-                  ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20 dark:shadow-none' /* Issue #521: Replaced hardcoded hex */
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-                }`}
-            >
-              {item.icon}
-              {item.label}
-            </a>
+          {sections.map(({ group, items }) => (
+            <div key={group.id} className="space-y-1 pb-3 last:pb-0">
+              <p className="px-4 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                {group.label}
+              </p>
+              {items.map((item) => {
+                const Icon = ICONS[item.icon] || ICONS.grid;
+                const current = isCurrent(item);
+
+                return (
+                  <Link
+                    key={`${item.path}-${item.label}`}
+                    to={item.navPath || item.path}
+                    onClick={() => handleItemClick(item)}
+                    aria-current={current ? 'page' : undefined}
+                    className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500 ${current
+                      ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20 dark:shadow-none'
+                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <Icon />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
           ))}
         </nav>
 

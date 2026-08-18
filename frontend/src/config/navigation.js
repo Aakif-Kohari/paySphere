@@ -144,6 +144,7 @@ export const APP_ROUTES = [
   {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
+    appShell: true,
     label: 'Approvals',
     group: 'payroll',
     icon: 'check',
@@ -151,6 +152,7 @@ export const APP_ROUTES = [
   {
     path: '/loans',
     component: lazy(() => import('../pages/Loans')),
+    appShell: true,
     label: 'Loans & advances',
     group: 'payroll',
     icon: 'wallet',
@@ -158,6 +160,7 @@ export const APP_ROUTES = [
   {
     path: '/settlements',
     component: lazy(() => import('../pages/Settlements')),
+    appShell: true,
     label: 'Settlements',
     group: 'payroll',
     icon: 'exit',
@@ -226,6 +229,7 @@ export const APP_ROUTES = [
   {
     path: '/grievances',
     component: lazy(() => import('../pages/GrievancePortal')),
+    appShell: true,
     label: 'Grievances',
     group: 'compliance',
     icon: 'alert',
@@ -252,6 +256,7 @@ export const APP_ROUTES = [
   {
     path: '/workflows',
     component: lazy(() => import('../pages/WorkflowBuilder')),
+    appShell: true,
     label: 'Workflows',
     group: 'workplace',
     icon: 'flow',
@@ -294,6 +299,7 @@ export const APP_ROUTES = [
   {
     path: '/settings/system-health',
     component: lazy(() => import('../pages/SystemHealth')),
+    appShell: true,
   },
   {
     path: '/profile',

@@ -6,12 +6,17 @@ const loanService = require('../services/loan.service');
  */
 exports.createLoan = async (req, res, next) => {
   try {
-    const result = await loanService.createLoan(req.tenantId, req.userId, req.body || {});
+    const result = await loanService.createLoan(
+      req.tenantId,
+      req.userId,
+      req.body || {},
+    );
 
     if (!result.ok) {
       const body = { message: result.message };
       if (result.errors) body.errors = result.errors;
-      if (result.existingOutstanding !== undefined) body.existingOutstanding = result.existingOutstanding;
+      if (result.existingOutstanding !== undefined)
+        body.existingOutstanding = result.existingOutstanding;
       if (result.cap !== undefined) body.cap = result.cap;
       return res.status(result.status).json(body);
     }
@@ -108,7 +113,10 @@ exports.getLoanById = async (req, res, next) => {
  */
 exports.getLoanSchedule = async (req, res, next) => {
   try {
-    const result = await loanService.getLoanSchedule(req.tenantId, req.params.id);
+    const result = await loanService.getLoanSchedule(
+      req.tenantId,
+      req.params.id,
+    );
 
     if (!result.ok) {
       return res.status(result.status).json({ message: result.message });
@@ -134,7 +142,9 @@ exports.previewLoanSchedule = async (req, res, next) => {
     const result = loanService.previewLoanSchedule(req.body || {});
 
     if (!result.ok) {
-      return res.status(result.status).json({ message: result.message, errors: result.errors });
+      return res
+        .status(result.status)
+        .json({ message: result.message, errors: result.errors });
     }
 
     res.status(200).json({
@@ -207,7 +217,8 @@ exports.recordManualRepayment = async (req, res, next) => {
 
     if (!result.ok) {
       const body = { message: result.message };
-      if (result.outstanding !== undefined) body.outstanding = result.outstanding;
+      if (result.outstanding !== undefined)
+        body.outstanding = result.outstanding;
       return res.status(result.status).json(body);
     }
 
@@ -234,6 +245,166 @@ exports.recordManualRepayment = async (req, res, next) => {
       loan,
       outstanding: loan.outstanding,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+/**
+ * GET /api/loans/:id/foreclosure-quote — what it costs to close the loan early.
+ *
+ * A read. Asking the price of closing a loan must not close it, and the
+ * employee is entitled to see the figure before committing to it.
+ */
+exports.getForeclosureQuote = async (req, res, next) => {
+  try {
+    const result = await loanService.getForeclosureQuote(
+      req.tenantId,
+      req.params.id,
+      req.query,
+    );
+
+    if (!result.ok) {
+      const body = { message: result.message };
+      if (result.errors) body.errors = result.errors;
+      return res.status(result.status).json(body);
+    }
+
+    const { loan, quote } = result;
+
+    res.status(200).json({
+      loanId: String(loan._id),
+      employeeName: loan.employeeName,
+      status: loan.status,
+      quote,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+/**
+ * POST /api/loans/:id/foreclose — settle the balance and close the loan.
+ */
+exports.forecloseLoan = async (req, res, next) => {
+  try {
+    const result = await loanService.forecloseLoan(
+      req.tenantId,
+      req.params.id,
+      req.body || {},
+    );
+
+    if (!result.ok) {
+      const body = { message: result.message };
+      if (result.errors) body.errors = result.errors;
+      if (result.quote) body.quote = result.quote;
+      if (result.currentStatus) body.currentStatus = result.currentStatus;
+      return res.status(result.status).json(body);
+    }
+
+    const { loan, quote } = result;
+
+    eventBus.emit('AUDIT_LOG', {
+      userId: req.userId,
+      action: 'LOAN_FORECLOSED',
+      resourceType: 'Loan',
+      resourceIds: [loan._id],
+      details: {
+        employeeName: loan.employeeName,
+        principalSettled: quote.principalOutstanding,
+        interestDue: quote.interestDueNow,
+        interestRebate: quote.interestRebate,
+        foreclosureCharge: quote.foreclosureCharge,
+        netPayable: quote.netPayable,
+      },
+      req,
+    });
+
+    logger.info('Loan foreclosed', {
+      userId: req.userId,
+      loanId: loan._id,
+      netPayable: quote.netPayable,
+      interestRebate: quote.interestRebate,
+    });
+
+    res
+      .status(200)
+      .json({ message: 'Loan foreclosed and settled', loan, quote });
+  } catch (error) {
+    next(error);
+  }
+};
+/**
+ * POST /api/loans/:id/prepay — part-prepayment, with the schedule rebuilt.
+ */
+exports.recordPrepayment = async (req, res, next) => {
+  try {
+    const result = await loanService.recordPrepayment(
+      req.tenantId,
+      req.params.id,
+      req.body || {},
+    );
+
+    if (!result.ok) {
+      const body = { message: result.message };
+      if (result.errors) body.errors = result.errors;
+      if (result.principalOutstanding !== undefined) {
+        body.principalOutstanding = result.principalOutstanding;
+      }
+      return res.status(result.status).json(body);
+    }
+
+    const { loan, prepayment, amount, month, year } = result;
+
+    eventBus.emit('AUDIT_LOG', {
+      userId: req.userId,
+      action: 'LOAN_PREPAYMENT',
+      resourceType: 'Loan',
+      resourceIds: [loan._id],
+      details: {
+        employeeName: loan.employeeName,
+        amount,
+        month,
+        year,
+        strategy: prepayment.strategy,
+        monthsSaved: prepayment.monthsSaved,
+        revisedInstallment: prepayment.installmentAmount,
+        outstanding: loan.outstanding,
+      },
+      req,
+    });
+
+    res.status(200).json({
+      message: prepayment.closesLoan
+        ? 'Prepayment cleared the loan'
+        : 'Prepayment applied and schedule re-amortised',
+      loan,
+      prepayment,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+/**
+ * GET /api/loans/clearance/:employeeId — a leaver's total closure position.
+ */
+exports.getExitClearance = async (req, res, next) => {
+  try {
+    const result = await loanService.getExitClearance(
+      req.tenantId,
+      req.params.employeeId,
+      req.query,
+    );
+
+    if (!result.ok) {
+      const body = { message: result.message };
+      if (result.errors) body.errors = result.errors;
+      return res.status(result.status).json(body);
+    }
+
+    // `ok` is the service's own signalling and is not part of the response.
+    const clearance = { ...result };
+    delete clearance.ok;
+
+    res.status(200).json(clearance);
   } catch (error) {
     next(error);
   }

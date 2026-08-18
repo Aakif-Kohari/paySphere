@@ -1,7 +1,6 @@
 import { createTheme, CssBaseline, ThemeProvider } from '@mui/material';
 import * as Sentry from '@sentry/react';
 import { Suspense, useEffect, useMemo } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import CommandPalette from './components/common/CommandPalette';
@@ -9,14 +8,15 @@ import ScrollToTop from './components/common/ScrollToTop';
 import OfflineSyncIndicator from './components/OfflineSyncIndicator';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ToastProvider } from './context/ToastContext';
-import { logout } from './features/auth/authSlice';
+import { useAppStore } from './store/useAppStore';
 import { NotFound, ROUTABLE } from './config/navigation';
 import RouteFallback from './components/common/RouteFallback';
+import AppPageShell from './components/Layout/AppPageShell';
 
 function App() {
-  const dispatch = useDispatch();
-  const user = useSelector((state) => state.auth.user);
-  const themeMode = useSelector((state) => state.ui.themeMode);
+  const user = useAppStore((state) => state.user);
+  const themeMode = useAppStore((state) => state.themeMode);
+  const logout = useAppStore((state) => state.logout);
 
   // Sync user context to Sentry (#770)
   useEffect(() => {
@@ -35,7 +35,7 @@ function App() {
   // detects expired/invalid authentication
   useEffect(() => {
     const handleAuthLogout = () => {
-      dispatch(logout());
+      logout();
     };
 
     window.addEventListener('auth:logout', handleAuthLogout);
@@ -43,7 +43,7 @@ function App() {
     return () => {
       window.removeEventListener('auth:logout', handleAuthLogout);
     };
-  }, [dispatch]);
+  }, [logout]);
 
   // Sync dark class on html document element
   // for Tailwind v4 custom dark variant
@@ -102,7 +102,11 @@ function App() {
                         <Page />
                       ) : (
                         <ProtectedRoute>
-                          <Page />
+                          {route.appShell ? (
+                            <AppPageShell><Page /></AppPageShell>
+                          ) : (
+                            <Page />
+                          )}
                         </ProtectedRoute>
                       )
                     }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 import { useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useAppStore } from "../store/useAppStore";
 import api from "../services/api";
 
 const MONTHS = [
@@ -54,7 +54,7 @@ const fmt = (n) => "₹" + Math.round(Math.abs(n)).toLocaleString("en-IN");
 
 export default function PayrollWizard() {
   const navigate = useNavigate();
-  const themeMode = useSelector((state) => state.ui.themeMode);
+  const themeMode = useAppStore((state) => state.themeMode);
   const isDark = themeMode === "dark";
 
   // Navigation / Focus references for accessibility

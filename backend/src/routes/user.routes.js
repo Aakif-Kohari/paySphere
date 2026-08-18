@@ -1,66 +1,13 @@
-const express = require('express');
-const {
-  signup,
-  login,
-  getSettings,
-  updateSettings,
-  updatePassword,
-  googleAuth,
-  githubAuth,
-  forgotPassword,
-  resetPassword,
-  disconnectGoogle,
-  deleteAccount,
-  generate2FA,
-  verifyAndEnable2FA,
-  disable2FA,
-  validate2FALogin,
-} = require('../controllers/user.controller');
-const auth = require('../middlewares/auth.middleware');
-const {
-  authRateLimiter,
-  writeRateLimiter,
-} = require('../middlewares/rateLimiter.middleware');
-const validateRecaptcha = require('../middlewares/recaptcha.middleware');
+const express = require("express");
+const { signup, login, getSettings, updateSettings, googleAuth } = require("../controllers/user.controller");
+const auth = require("../middlewares/auth.middleware");
+const { validateRequest } = require("../middlewares/validate.middleware");
+const { signupSchema, loginSchema } = require("../validations/schemas");
 const router = express.Router();
 
-/**
- * @openapi
- * /api/auth/signup:
- *   post:
- *     summary: Create a new user account
- *     tags:
- *       - Authentication
- *     description: Registers a new user.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - password
- *               - name
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *                 example: dev@example.com
- *               password:
- *                 type: string
- *                 format: password
- *                 example: SecurePass123!
- *               name:
- *                 type: string
- *                 example: Dev Patel
- *     responses:
- *       201:
- *         description: User created successfully
- *       400:
- *         description: Bad request (validation errors)
- */
-router.post('/signup', authRateLimiter, validateRecaptcha, signup);
+router.post("/signup", validateRequest(signupSchema), signup);
+router.post("/login", validateRequest(loginSchema), login);
+router.post("/google", googleAuth);
 
 /**
  * @openapi

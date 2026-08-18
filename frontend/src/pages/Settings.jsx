@@ -1,19 +1,18 @@
 /* eslint-disable jsx-a11y/label-has-associated-control, jsx-a11y/anchor-is-valid */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
 import WebhooksSection from '../components/WebhooksSection';
 import RolesPermissions from '../components/RolesPermissions';
-import { logout } from '../features/auth/authSlice';
-import { setThemeMode } from '../features/ui/uiSlice';
+import { useAppStore } from '../store/useAppStore';
 import api from '../services/api';
 import { getCurrencySymbol } from '../utils/currency';
 import zxcvbn from '../utils/zxcvbn';
 import EmailTemplateEditor from '../components/common/EmailTemplateEditor';
 
 import { useToast } from '../context/ToastContext';
+import AvatarUpload from '../components/AvatarUpload';
 
 // ── Icons for Sidebar (Copied from AddEmployee for consistency) ──
 const GridIcon = () => (
@@ -248,7 +247,7 @@ function EmailTemplatesManager() {
     try {
       await api.post('/api/email-templates', { name: 'Monthly Payslip', subject, htmlContent: templateHtml });
       alert('Template saved successfully!');
-    } catch (err) {
+    } catch {
       alert('Failed to save template');
     } finally {
       setSaving(false);
@@ -281,7 +280,8 @@ function EmailTemplatesManager() {
 
 export default function Settings() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const logout = useAppStore((state) => state.logout);
+  const setThemeMode = useAppStore((state) => state.setThemeMode);
   const { toast } = useToast();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -302,7 +302,6 @@ export default function Settings() {
     organizationId: '',
     employeeCount: 0,
   });
-  const fileInputRef = useRef(null);
 
   const [settings, setSettings] = useState({
     preferences: { language: 'English (US)', theme: 'system' },
@@ -374,7 +373,7 @@ export default function Settings() {
                   ? 'dark'
                   : 'light'
                 : t;
-            dispatch(setThemeMode(newMode));
+            setThemeMode(newMode);
           }
         } else {
           setSettings((prev) => ({
@@ -389,7 +388,7 @@ export default function Settings() {
       })
       .catch((err) => console.error('Failed to fetch settings', err))
       .finally(() => setLoading(false));
-  }, [localCompanyName, dispatch]);
+  }, [localCompanyName, setThemeMode]);
 
   const handleSaveSettings = async () => {
     // Client-side validation before making the API call (#356)
@@ -427,32 +426,6 @@ export default function Settings() {
       console.error(err);
       toast.error(err.response?.data?.message || 'Error saving settings.');
     }
-  };
-
-  const MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2 MB
-  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-
-  const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      toast.error('Please select an image file (JPEG, PNG, WebP, or GIF).');
-      e.target.value = '';
-      return;
-    }
-
-    if (file.size > MAX_AVATAR_SIZE) {
-      toast.error('File size must be less than 2 MB.');
-      e.target.value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setUserProfile((prev) => ({ ...prev, avatar: reader.result }));
-    };
-    reader.readAsDataURL(file);
   };
 
   const handlePasswordUpdate = async () => {
@@ -623,20 +596,12 @@ export default function Settings() {
                 <p className="text-sm text-gray-500 dark:text-slate-500 mb-4">
                   Payroll Administrator at {userProfile.companyName}
                 </p>
-                <div className="flex flex-wrap justify-center sm:justify-start gap-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-                    ref={fileInputRef}
-                    onChange={handleAvatarChange}
+                <div className="space-y-3">
+                  <AvatarUpload
+                    value={userProfile.avatar}
+                    onChange={(avatar) => setUserProfile((prev) => ({ ...prev, avatar }))}
+                    onError={toast.error}
                   />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700 transition"
-                  >
-                    Change Picture
-                  </button>
                   <button
                     onClick={() =>
                       setUserProfile({ ...userProfile, avatar: '' })
@@ -948,7 +913,7 @@ export default function Settings() {
                                 ? 'dark'
                                 : 'light'
                               : t;
-                          dispatch(setThemeMode(newMode));
+                          setThemeMode(newMode);
                         }}
                         className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                       />
@@ -1603,7 +1568,7 @@ export default function Settings() {
             </div>
             <button
               onClick={() => {
-                dispatch(logout());
+                logout();
                 localStorage.removeItem('companyName');
                 localStorage.removeItem('currency');
                 navigate('/auth');
