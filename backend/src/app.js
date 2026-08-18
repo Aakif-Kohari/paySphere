@@ -480,17 +480,15 @@ app.use((req, res, next) => {
 
 // ─── Error handlers ────────────────────────────────────────────────────────
 
-// CORS error handler — return 403 for blocked origins
+// CORS, Multer and JSON SyntaxError handler
 app.use((err, req, res, next) => {
+  // CORS error handler — return 403 for blocked origins
   if (err.message === 'Not allowed by CORS') {
     return res.status(403).json({ message: 'CORS not allowed' });
   }
-  next(err);
-});
 
-// Multer error handler — return 400 for file upload issues
-app.use((err, req, res, next) => {
-  if (err instanceof multer.MulterError) {
+  // Multer error handler — return 400 for file upload issues
+  if (err instanceof multer.MulterError || err.code === 'LIMIT_FILE_SIZE') {
     if (err.code === 'LIMIT_FILE_SIZE') {
       const maxMB = MAX_FILE_SIZE / (1024 * 1024);
       return res
@@ -499,6 +497,12 @@ app.use((err, req, res, next) => {
     }
     return res.status(400).json({ message: 'File upload error' });
   }
+
+  // JSON parse error handler — return 400 for invalid JSON
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ message: 'Invalid JSON payload format' });
+  }
+
   next(err);
 });
 
