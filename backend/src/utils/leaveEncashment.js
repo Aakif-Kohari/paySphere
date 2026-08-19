@@ -395,6 +395,57 @@ function buildEncashmentPayrollLines(closures) {
   );
 }
 
+/**
+ * Computes statutory daily rate restricted strictly to Basic + DA for encashment (Section 79 Factories Act).
+ *
+ * @param {object} employee
+ * @param {object} [policy={}]
+ * @returns {number}
+ */
+function computeStatutoryDailyRate(employee = {}, policy = {}) {
+  const basicSalary = Number(employee.basicSalary);
+  const monthlySalary = Number(employee.monthlySalary);
+  const basicPercent = Number(policy.basicPercentOfGross) || DEFAULT_BASIC_PERCENT_OF_GROSS;
+
+  const basic = Number.isFinite(basicSalary) && basicSalary > 0
+    ? basicSalary
+    : Number.isFinite(monthlySalary) && monthlySalary > 0
+      ? (monthlySalary * basicPercent) / 100
+      : 0;
+
+  return round2(basic / DEFAULT_MONTH_DAYS);
+}
+
+/**
+ * Transforms closed year balances with carried-forward days into opening balances for next year.
+ *
+ * @param {object[]} closures
+ * @param {number} nextYear
+ * @returns {object[]}
+ */
+function generateNextYearOpeningBalances(closures = [], nextYear) {
+  const operations = [];
+
+  for (const c of closures) {
+    if (!c || c.carriedForward <= 0) continue;
+
+    operations.push({
+      tenantId: c.tenantId,
+      employeeId: c.employeeId,
+      policyId: c.policyId,
+      leaveType: c.leaveType,
+      year: nextYear,
+      carriedForwardFromLastYear: c.carriedForward,
+      openingBalance: c.carriedForward,
+      accruedLeaves: 0,
+      usedLeaves: 0,
+      closingBalance: c.carriedForward,
+    });
+  }
+
+  return operations;
+}
+
 module.exports = {
   RATE_BASIS,
   DEFAULT_MONTH_DAYS,
@@ -406,4 +457,7 @@ module.exports = {
   isAlreadyClosed,
   computeClosureBatch,
   buildEncashmentPayrollLines,
+  computeStatutoryDailyRate,
+  generateNextYearOpeningBalances,
 };
+

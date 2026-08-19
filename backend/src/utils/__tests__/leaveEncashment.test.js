@@ -559,3 +559,44 @@ describe('buildEncashmentPayrollLines', () => {
     expect(buildEncashmentPayrollLines([])).toEqual([]);
   });
 });
+
+describe('computeStatutoryDailyRate & generateNextYearOpeningBalances', () => {
+  it('computes statutory daily rate based on Basic pay', () => {
+    const emp = { basicSalary: 30000, monthlySalary: 60000 };
+    const rate = computeStatutoryDailyRate(emp, {});
+    expect(rate).toBe(1000); // 30000 / 30
+  });
+
+  it('falls back to 50% of monthly salary when basicSalary is not explicitly stored', () => {
+    const emp = { monthlySalary: 60000 };
+    const rate = computeStatutoryDailyRate(emp, { basicPercentOfGross: 50 });
+    expect(rate).toBe(1000); // (60000 * 0.5) / 30 = 1000
+  });
+
+  it('generates next year opening balance records from carried forward days', () => {
+    const closures = [
+      {
+        tenantId: 'ten-1',
+        employeeId: 'emp-1',
+        policyId: 'pol-1',
+        leaveType: 'earned',
+        carriedForward: 15,
+      },
+      {
+        tenantId: 'ten-1',
+        employeeId: 'emp-2',
+        policyId: 'pol-1',
+        leaveType: 'earned',
+        carriedForward: 0, // no carry-forward
+      },
+    ];
+
+    const opening = generateNextYearOpeningBalances(closures, 2027);
+    expect(opening).toHaveLength(1);
+    expect(opening[0].employeeId).toBe('emp-1');
+    expect(opening[0].year).toBe(2027);
+    expect(opening[0].openingBalance).toBe(15);
+    expect(opening[0].carriedForwardFromLastYear).toBe(15);
+  });
+});
+
