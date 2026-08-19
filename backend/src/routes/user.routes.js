@@ -1,13 +1,34 @@
-const express = require("express");
-const { signup, login, getSettings, updateSettings, googleAuth } = require("../controllers/user.controller");
-const auth = require("../middlewares/auth.middleware");
-const { validateRequest } = require("../middlewares/validate.middleware");
-const { signupSchema, loginSchema } = require("../validations/schemas");
+const express = require('express');
+const {
+  signup,
+  login,
+  getSettings,
+  updateSettings,
+  googleAuth,
+  githubAuth,
+  forgotPassword,
+  resetPassword,
+  generate2FA,
+  verifyAndEnable2FA,
+  disable2FA,
+  validate2FALogin,
+  updatePassword,
+  disconnectGoogle,
+  deleteAccount,
+} = require('../controllers/user.controller');
+const auth = require('../middlewares/auth.middleware');
+const { validateRequest } = require('../middlewares/validate.middleware');
+const { signupSchema, loginSchema } = require('../validations/schemas');
+const {
+  authRateLimiter,
+  writeRateLimiter,
+} = require('../middlewares/rateLimiter.middleware');
+const validateRecaptcha = require('../middlewares/recaptcha.middleware');
 const router = express.Router();
 
-router.post("/signup", validateRequest(signupSchema), signup);
-router.post("/login", validateRequest(loginSchema), login);
-router.post("/google", googleAuth);
+router.post('/signup', validateRequest(signupSchema), signup);
+router.post('/login', validateRequest(loginSchema), login);
+router.post('/google', googleAuth);
 
 /**
  * @openapi
@@ -65,6 +86,10 @@ router.post(
 );
 router.post('/2fa/disable', auth, disable2FA);
 router.post('/2fa/validate-login', authRateLimiter, auth, validate2FALogin);
+
+const { setupMFA, verifyMFASetup } = require('../middlewares/mfa.middleware');
+router.post('/mfa/setup', auth, setupMFA);
+router.post('/mfa/verify', auth, verifyMFASetup);
 
 // Settings & Health
 router.get('/settings', auth, getSettings);

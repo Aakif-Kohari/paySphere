@@ -31,6 +31,37 @@ const { attachGraphQL } = require('./graphql');
 const logger = require('./utils/logger');
 const TelemetryService = require('./config/telemetry');
 
+let server;
+
+process.on('uncaughtException', (err) => {
+  logger.error('UNCAUGHT EXCEPTION! 💥 Shutting down...', {
+    name: err.name,
+    message: err.message,
+    stack: err.stack,
+  });
+  if (server) {
+    server.close(() => {
+      process.exit(1);
+    });
+  } else {
+    process.exit(1);
+  }
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('UNHANDLED REJECTION! 💥 Shutting down...', {
+    reason: reason instanceof Error ? reason.message : reason,
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+  if (server) {
+    server.close(() => {
+      process.exit(1);
+    });
+  } else {
+    process.exit(1);
+  }
+});
+
 const startServer = async () => {
   const { validateEnv } = require('./utils/envValidator');
   validateEnv();
@@ -118,7 +149,7 @@ const startServer = async () => {
   await attachGraphQL(app);
 
   const PORT = process.env.PORT || 5000;
-  const server = app.listen(PORT, () =>
+  server = app.listen(PORT, () =>
     logger.info(`Server running on port ${PORT}`),
   );
   require('./sockets/payroll.socket').init(server);

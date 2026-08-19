@@ -16,6 +16,7 @@ const express = require('express');
 const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
 const { writeRateLimiter } = require('../middlewares/rateLimiter.middleware');
+const { integrationSecurity } = require('../middlewares/integrationSecurity');
 const { PERMISSIONS } = require('../config/permissions');
 const {
   listProviders,
@@ -58,6 +59,12 @@ router.post(
   auth,
   requirePermission(PERMISSIONS.MANAGE_INTEGRATIONS),
   writeRateLimiter,
+  triggerSync,
+);
+
+router.post(
+  '/:provider/sync-receiver',
+  integrationSecurity,
   triggerSync,
 );
 
