@@ -1,6 +1,7 @@
 /**
  * @fileoverview Travel policy, request, advance and settlement endpoints.
- * @description Issue: #1077
+ * @description Handles both original grade-based travel management (#1077)
+ * and simplified corporate travel & per diem workflows (#1209).
  *
  * The order of operations is the feature: a trip is *requested*, then
  * *approved* against policy, then *funded* with an advance, then *settled*
@@ -22,6 +23,9 @@ const {
   TravelPolicy,
   TravelRequest,
   TravelSettlement,
+  PerDiemPolicy,
+  CorporateTravelRequest,
+  CorporateTravelSettlement,
 } = require('../models/travel.model');
 const Employee = require('../models/employee.model');
 const {
@@ -32,8 +36,14 @@ const {
   settleTrip,
   outstandingAdvances,
   rebalanceMultiCurrencyTravelSettlement,
+  calculatePerDiem,
+  reconcileSettlement,
 } = require('../utils/perDiemCalculator');
 const eventBus = require('../services/event.service');
+
+// ============================================================================
+// Original Travel Controllers (Issue #1077)
+// ============================================================================
 
 /**
  * A caller-supplied date, falling back to now.
@@ -59,7 +69,7 @@ async function policyForGrade(tenantId, grade) {
 }
 
 /**
- * POST /api/travel/policies
+ * POST /api/travel/original/policies
  */
 exports.upsertPolicy = async (req, res, next) => {
   try {
@@ -103,7 +113,7 @@ exports.upsertPolicy = async (req, res, next) => {
 };
 
 /**
- * GET /api/travel/policies
+ * GET /api/travel/original/policies
  */
 exports.getPolicies = async (req, res, next) => {
   try {
@@ -118,7 +128,7 @@ exports.getPolicies = async (req, res, next) => {
 };
 
 /**
- * POST /api/travel/requests
+ * POST /api/travel/original/requests
  *
  * The per-diem estimate is computed and returned but not stored: the trip has
  * not happened, the legs will move, and a stored estimate would be mistaken for
@@ -142,14 +152,14 @@ exports.createRequest = async (req, res, next) => {
     // makes the self-service path safe — there is nothing to substitute.
     const employee = employeeId
       ? await Employee.findOne({
-          _id: mongoose.isValidObjectId(employeeId) ? employeeId : null,
-          tenantId: req.tenantId,
-        })
-          .select('_id fullName grade role')
-          .lean()
+        _id: mongoose.isValidObjectId(employeeId) ? employeeId : null,
+        tenantId: req.tenantId,
+      })
+        .select('_id fullName grade role')
+        .lean()
       : await Employee.findOne({ userId: req.userId, tenantId: req.tenantId })
-          .select('_id fullName grade role')
-          .lean();
+        .select('_id fullName grade role')
+        .lean();
 
     if (!employee)
       return res.status(404).json({ message: 'Employee not found' });
@@ -186,7 +196,7 @@ exports.createRequest = async (req, res, next) => {
 };
 
 /**
- * GET /api/travel/requests
+ * GET /api/travel/original/requests
  */
 exports.getRequests = async (req, res, next) => {
   try {
@@ -210,7 +220,7 @@ exports.getRequests = async (req, res, next) => {
 };
 
 /**
- * POST /api/travel/requests/:id/approve
+ * POST /api/travel/original/requests/:id/approve
  *
  * Violations are reported, not silently accepted and not automatically refused.
  * An approver may knowingly authorise a business-class ticket; what they may not
@@ -286,7 +296,7 @@ exports.approveRequest = async (req, res, next) => {
 };
 
 /**
- * POST /api/travel/requests/:id/reject
+ * POST /api/travel/original/requests/:id/reject
  */
 exports.rejectRequest = async (req, res, next) => {
   try {
@@ -326,7 +336,7 @@ exports.rejectRequest = async (req, res, next) => {
 };
 
 /**
- * POST /api/travel/requests/:id/advance
+ * POST /api/travel/original/requests/:id/advance
  *
  * Releasing an advance creates a company receivable, which is why it is a
  * separate call from approval rather than a side effect of it.
@@ -398,7 +408,7 @@ exports.releaseAdvance = async (req, res, next) => {
 };
 
 /**
- * POST /api/travel/requests/:id/settle
+ * POST /api/travel/original/requests/:id/settle
  *
  * The per-diem is recomputed here from the policy and the itinerary rather than
  * taken from the request body. It is an entitlement, not a claim, and letting a
@@ -502,7 +512,7 @@ exports.settleRequest = async (req, res, next) => {
 };
 
 /**
- * GET /api/travel/advances/outstanding
+ * GET /api/travel/original/advances/outstanding
  *
  * The receivables ledger this feature exists for. An advance is a company asset
  * until the trip settles, and nothing in the product tracked one.
@@ -527,7 +537,7 @@ exports.getOutstandingAdvances = async (req, res, next) => {
 };
 
 /**
- * GET /api/travel/my-trips
+ * GET /api/travel/original/my-trips
  *
  * Self-service. The employee is resolved from `req.userId`, never a parameter.
  */
@@ -577,7 +587,7 @@ exports.getMyTrips = async (req, res, next) => {
 };
 
 /**
- * GET /api/travel/variance-report
+ * GET /api/travel/original/variance-report
  * Generates an executive summary of trip variances, budget adherence, and surplus recovery statuses.
  */
 exports.getTravelVarianceReport = async (req, res, next) => {
@@ -625,15 +635,18 @@ exports.getTravelVarianceReport = async (req, res, next) => {
         totalActuals: Math.round(totalActuals * 100) / 100,
         totalReimbursements: Math.round(totalReimbursements * 100) / 100,
         totalSurplusRecoveries: Math.round(totalSurplusRecoveries * 100) / 100,
-        netCompanyVariance: Math.round((totalActuals - totalAdvances) * 100) / 100,
+        netCompanyVariance:
+          Math.round((totalActuals - totalAdvances) * 100) / 100,
       },
       settlements: report,
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
 /**
- * POST /api/travel/requests/:id/multi-currency-settle
+ * POST /api/travel/original/requests/:id/multi-currency-settle
  * Settles international trip with multi-currency receipts against advance.
  */
 exports.settleMultiCurrencyTrip = async (req, res, next) => {
@@ -644,14 +657,17 @@ exports.settleMultiCurrencyTrip = async (req, res, next) => {
       _id: req.params.id,
       tenantId: req.tenantId,
     });
-    if (!request) return res.status(404).json({ message: 'Travel request not found' });
+    if (!request)
+      return res.status(404).json({ message: 'Travel request not found' });
 
     const existingSettlement = await TravelSettlement.findOne({
       tenantId: req.tenantId,
       requestId: request._id,
     });
     if (existingSettlement) {
-      return res.status(409).json({ message: 'This trip has already been settled' });
+      return res
+        .status(409)
+        .json({ message: 'This trip has already been settled' });
     }
 
     const rebalance = rebalanceMultiCurrencyTravelSettlement(
@@ -660,13 +676,15 @@ exports.settleMultiCurrencyTrip = async (req, res, next) => {
       forexRates,
     );
 
-    const settlementType = rebalance.settlementAction === 'REIMBURSEMENT_DUE'
-      ? 'reimbursement'
-      : rebalance.settlementAction === 'SURPLUS_RECOVERY_DUE'
-        ? 'recovery'
-        : 'nil';
+    const settlementType =
+      rebalance.settlementAction === 'REIMBURSEMENT_DUE'
+        ? 'reimbursement'
+        : rebalance.settlementAction === 'SURPLUS_RECOVERY_DUE'
+          ? 'recovery'
+          : 'nil';
 
-    const netPayable = rebalance.reimbursementPayable || rebalance.surplusToRecover || 0;
+    const netPayable =
+      rebalance.reimbursementPayable || rebalance.surplusToRecover || 0;
 
     const settlement = await TravelSettlement.create({
       tenantId: req.tenantId,
@@ -703,8 +721,183 @@ exports.settleMultiCurrencyTrip = async (req, res, next) => {
       settlement,
       rebalanceSummary: rebalance,
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
+
+// ============================================================================
+// Corporate Travel & Per Diem Controllers (Issue #1209)
+// ============================================================================
+
+/**
+ * GET /api/travel/corporate/policies
+ * Fetches active per diem policies by city tier.
+ */
+exports.getCorporatePolicies = async (req, res, next) => {
+  try {
+    const policies = await PerDiemPolicy.find({
+      tenantId: req.tenantId,
+      isActive: true,
+    });
+    res.status(200).json({ policies });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/travel/corporate/request
+ * Submits a simplified corporate travel request with automatic per diem calculation.
+ */
+exports.requestTravel = async (req, res, next) => {
+  try {
+    const {
+      destination,
+      cityTier,
+      purpose,
+      startDate,
+      endDate,
+      estimatedTravelCost,
+    } = req.body;
+    const employee = await Employee.findOne({
+      userId: req.userId,
+      tenantId: req.tenantId,
+    });
+    if (!employee)
+      return res.status(404).json({ message: 'Employee profile not found' });
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const durationDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+    const perDiem = await calculatePerDiem(req.tenantId, cityTier, durationDays);
+    const totalAdvance = perDiem.totalPerDiem + (estimatedTravelCost || 0);
+
+    const request = await CorporateTravelRequest.create({
+      tenantId: req.tenantId,
+      employeeId: employee._id,
+      destination,
+      cityTier,
+      purpose,
+      startDate: start,
+      endDate: end,
+      durationDays,
+      estimatedPerDiem: perDiem.totalPerDiem,
+      estimatedTravelCost: estimatedTravelCost || 0,
+      totalAdvanceRequested: totalAdvance,
+      status: 'Pending Approval',
+    });
+
+    res.status(201).json({
+      message: 'Travel request submitted',
+      request,
+      perDiemBreakdown: perDiem,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/travel/corporate/approve/:id
+ * Approves advance payment and initializes settlement record.
+ */
+exports.approveAdvance = async (req, res, next) => {
+  try {
+    const request = await CorporateTravelRequest.findById(req.params.id);
+    if (!request)
+      return res.status(404).json({ message: 'Request not found' });
+
+    request.status = 'Advance Paid';
+    request.approvedBy = req.userId;
+    request.advancePaidAt = new Date();
+    await request.save();
+
+    // Initialize settlement record
+    await CorporateTravelSettlement.create({
+      tenantId: req.tenantId,
+      requestId: request._id,
+      advancePaid: request.totalAdvanceRequested,
+      actualExpenses: 0,
+      balance: -request.totalAdvanceRequested,
+      status: 'Pending Submission',
+    });
+
+    res
+      .status(200)
+      .json({ message: 'Advance approved and marked as paid.', request });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/travel/corporate/settle
+ * Submits expense settlement with receipt reconciliation.
+ */
+exports.submitSettlement = async (req, res, next) => {
+  try {
+    const { requestId, expenseReceipts } = req.body;
+    const settlement = await CorporateTravelSettlement.findOne({
+      requestId,
+      tenantId: req.tenantId,
+    });
+    if (!settlement)
+      return res
+        .status(404)
+        .json({
+          message: 'Settlement record not found. Was the advance paid?',
+        });
+
+    const totalActuals = expenseReceipts.reduce(
+      (sum, r) => sum + Number(r.amount),
+      0,
+    );
+
+    settlement.actualExpenses = totalActuals;
+    settlement.expenseReceipts = expenseReceipts;
+
+    const reconciliation = reconcileSettlement(
+      settlement.advancePaid,
+      totalActuals,
+    );
+    settlement.balance = reconciliation.balance;
+    settlement.status = reconciliation.status;
+
+    await settlement.save();
+
+    res
+      .status(200)
+      .json({ message: 'Settlement submitted for finance review.', settlement });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/travel/corporate/my-travel
+ * Fetches employee's corporate travel requests.
+ */
+exports.getMyTravel = async (req, res, next) => {
+  try {
+    const employee = await Employee.findOne({
+      userId: req.userId,
+      tenantId: req.tenantId,
+    });
+    const requests = await CorporateTravelRequest.find({
+      employeeId: employee._id,
+      tenantId: req.tenantId,
+    }).sort({ createdAt: -1 });
+    res.status(200).json({ requests });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// Internal utilities (for testing)
+// ============================================================================
 
 exports._internals = { resolveAsOf, policyForGrade };
 
