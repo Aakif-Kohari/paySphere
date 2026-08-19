@@ -297,6 +297,10 @@ export const APP_ROUTES = [
     path: '/enterprise/benefits-compensation',
     component: lazy(() => import('../pages/benefits/EnterpriseBenefitsDashboardPage')),
   },
+  {
+    path: '/enterprise/travel-expense',
+    component: lazy(() => import('../pages/travel/EnterpriseTravelDashboardPage')),
+  },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
