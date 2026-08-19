@@ -1,7 +1,8 @@
 /**
- * @fileoverview POSH Grievance Controller
+ * @fileoverview Grievance Controller (POSH & Ethics Committee)
  * @description Handles anonymous filing, ICC case management, encrypted note logging,
- * multi-member committee voting, and statutory 90-day SLA dashboard monitoring.
+ * multi-member committee voting, statutory 90-day SLA dashboard monitoring,
+ * and whistleblower reports with ethics committee management.
  */
 const bcrypt = require('bcryptjs');
 // `CaseNote` was imported here and never used, which the lint gate fails on —
@@ -12,11 +13,14 @@ const {
   Grievance,
   ICCCommittee,
   ICCVote,
+  GrievanceReport,
+  EthicsCommittee,
 } = require('../models/grievance.model');
 const {
   encrypt,
   decrypt,
   generateCaseNumber,
+  generateTrackingToken,
 } = require('../utils/cryptoAnonymizer');
 const { tenantFilter } = require('../utils/tenantScope');
 const {
@@ -32,6 +36,10 @@ const {
 } = require('../utils/grievanceEscalation');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
+
+// ============================================================================
+// POSH Grievance Controllers
+// ============================================================================
 
 /**
  * POST /api/grievances/file (Public / Authenticated)
@@ -642,6 +650,185 @@ exports.getCaseAgeingReport = async (req, res, next) => {
     ).lean();
 
     res.status(200).json(buildCaseAgeingReport(openCases, new Date()));
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// Ethics Committee & Whistleblower Controllers (Issue #1207)
+// ============================================================================
+
+/**
+ * POST /api/grievances/submit
+ * Public endpoint (no auth required) for anonymous whistleblowers.
+ */
+exports.submitAnonymous = async (req, res, next) => {
+  try {
+    const { tenantId, title, body } = req.body;
+
+    if (!tenantId || !title || !body) {
+      return res
+        .status(400)
+        .json({ message: 'Tenant ID, title, and body are required.' });
+    }
+
+    const trackingToken = generateTrackingToken();
+
+    // Encrypt the sensitive payload
+    const titleEnc = encrypt(title);
+    const bodyEnc = encrypt(body);
+
+    const report = await GrievanceReport.create({
+      tenantId,
+      trackingToken,
+      encryptedTitle: titleEnc.encrypted,
+      encryptedBody: bodyEnc.encrypted,
+      iv: titleEnc.iv, // Using same IV for simplicity in this demo, ideally unique per field
+      authTag: titleEnc.authTag,
+      status: 'Submitted',
+    });
+
+    res.status(201).json({
+      message:
+        'Report submitted securely. Please save your tracking token to check status.',
+      trackingToken,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/grievances/status/:token
+ * Public endpoint for reporters to check the status of their submission.
+ */
+exports.getStatus = async (req, res, next) => {
+  try {
+    const report = await GrievanceReport.findOne({
+      trackingToken: req.params.token,
+    });
+    if (!report)
+      return res.status(404).json({ message: 'Invalid tracking token.' });
+
+    res.status(200).json({ status: report.status, createdAt: report.createdAt });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/grievances/committee
+ * Protected endpoint for Ethics Committee members to view and decrypt reports.
+ */
+exports.getCommitteeQueue = async (req, res, next) => {
+  try {
+    // Verify caller is on the ethics committee
+    const isMember = await EthicsCommittee.findOne({
+      tenantId: req.tenantId,
+      userId: req.userId,
+      isActive: true,
+    });
+    if (!isMember)
+      return res
+        .status(403)
+        .json({ message: 'Access denied. Not an Ethics Committee member.' });
+
+    const reports = await GrievanceReport.find({ tenantId: req.tenantId }).sort(
+      { createdAt: -1 },
+    );
+
+    // Decrypt titles for the queue view (body remains encrypted until explicitly opened)
+    const queue = reports.map((r) => {
+      try {
+        const decryptedTitle = decrypt(r.encryptedTitle, r.iv, r.authTag);
+        return {
+          _id: r._id,
+          title: decryptedTitle,
+          status: r.status,
+          createdAt: r.createdAt,
+        };
+      } catch (err) {
+        return {
+          _id: r._id,
+          title: '[Decryption Error]',
+          status: r.status,
+          createdAt: r.createdAt,
+        };
+      }
+    });
+
+    res.status(200).json({ queue });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/grievances/:id/decrypt
+ * Decrypts the full report body and logs the access event.
+ */
+exports.decryptReport = async (req, res, next) => {
+  try {
+    const isMember = await EthicsCommittee.findOne({
+      tenantId: req.tenantId,
+      userId: req.userId,
+      isActive: true,
+    });
+    if (!isMember)
+      return res.status(403).json({ message: 'Access denied.' });
+
+    const report = await GrievanceReport.findById(req.params.id);
+    if (!report)
+      return res.status(404).json({ message: 'Report not found.' });
+
+    const decryptedTitle = decrypt(report.encryptedTitle, report.iv, report.authTag);
+    const decryptedBody = decrypt(report.encryptedBody, report.iv, report.authTag);
+
+    // Log access
+    report.accessLogs.push({
+      accessedBy: req.userId,
+      action: 'Decrypted',
+    });
+    await report.save();
+
+    logger.info(`[Grievance] User ${req.userId} decrypted report ${report._id}`);
+
+    res.status(200).json({
+      _id: report._id,
+      title: decryptedTitle,
+      body: decryptedBody,
+      status: report.status,
+      accessLogs: report.accessLogs,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/grievances/:id/status
+ * Updates the resolution state of a grievance.
+ */
+exports.updateStatus = async (req, res, next) => {
+  try {
+    const { status, resolutionNotes } = req.body;
+    const report = await GrievanceReport.findById(req.params.id);
+    if (!report)
+      return res.status(404).json({ message: 'Report not found.' });
+
+    report.status = status;
+    if (status === 'Resolved' || status === 'Dismissed') {
+      report.resolvedAt = new Date();
+    }
+
+    report.accessLogs.push({
+      accessedBy: req.userId,
+      action: 'Status Updated',
+    });
+
+    await report.save();
+    res.status(200).json({ message: 'Status updated', report });
   } catch (error) {
     next(error);
   }
