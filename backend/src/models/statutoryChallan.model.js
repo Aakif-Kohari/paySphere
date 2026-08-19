@@ -14,10 +14,15 @@ const statutoryChallanSchema = new mongoose.Schema({
 
     status: {
         type: String,
-        enum: ['Validating', 'Generated', 'Uploaded to Portal', 'Paid', 'Failed Validation'],
+        enum: ['Validating', 'Generated', 'Uploaded to Portal', 'Paid', 'Failed Validation', 'reconciled', 'discrepancy'],
         default: 'Validating',
         index: true
     },
+
+    extractedChallanAmount: { type: Number, default: 0 },
+    extractedTaxId: { type: String, default: '' },
+    reconciliationNotes: { type: String, default: '' },
+    reconciledAt: { type: Date, default: null },
 
     // File Storage (S3/Local URLs)
     ecrFileUrl: { type: String, default: '' },

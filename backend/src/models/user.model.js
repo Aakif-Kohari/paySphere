@@ -84,6 +84,18 @@ password: {
       type: Boolean,
       default: false,
     },
+    mfaSecret: {
+      type: String,
+      default: null,
+    },
+    mfaPendingSecret: {
+      type: String,
+      default: null,
+    },
+    isMfaEnabled: {
+      type: Boolean,
+      default: false,
+    },
     defaultOvertimeRate: {
       type: Number,
       default: 0,

@@ -16,6 +16,7 @@ const Employee = require('../models/employee.model');
 const {
   computeClosureBatch,
   buildEncashmentPayrollLines,
+  generateNextYearOpeningBalances,
 } = require('../utils/leaveEncashment');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
@@ -208,6 +209,26 @@ exports.runClosure = async (req, res, next) => {
       await LeaveBalance.bulkWrite(operations);
     }
 
+    // Automatically initialize opening balances for the next financial year
+    const nextYearOpening = generateNextYearOpeningBalances(result.closures, parsed.year + 1);
+    if (nextYearOpening.length) {
+      const nextYearOps = nextYearOpening.map((b) => ({
+        updateOne: {
+          filter: {
+            tenantId: req.tenantId,
+            employeeId: b.employeeId,
+            leaveType: b.leaveType,
+            year: b.year,
+          },
+          update: {
+            $setOnInsert: b,
+          },
+          upsert: true,
+        },
+      }));
+      await LeaveBalance.bulkWrite(nextYearOps);
+    }
+
     const payrollLines = buildEncashmentPayrollLines(result.closures);
 
     eventBus.emit('AUDIT_LOG', {
@@ -301,3 +322,40 @@ exports.getClosureHistory = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * GET /api/leave-closure/summary?year=
+ * Executive breakdown of encashment liability, carried-forward and lapsed days.
+ */
+exports.getClosureSummary = async (req, res, next) => {
+  try {
+    const parsed = parseLeaveYear(req.query.year);
+    if (!parsed.ok) return res.status(400).json({ message: parsed.message });
+
+    const inputs = await loadClosureInputs(req, parsed.year);
+    const result = computeClosureBatch(
+      inputs.balances,
+      inputs.policies,
+      inputs.employees,
+      parsed.year,
+    );
+
+    const round2 = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+    res.status(200).json({
+      year: parsed.year,
+      totalEmployees: inputs.employees.length,
+      processedBalances: result.processedCount,
+      summary: {
+        totalCarriedForwardDays: round2(result.totals.carriedForward),
+        totalEncashedDays: round2(result.totals.encashedDays),
+        totalEncashedAmount: round2(result.totals.encashedAmount),
+        totalLapsedDays: round2(result.totals.lapsedDays),
+      },
+      encashmentLinesCount: buildEncashmentPayrollLines(result.closures).length,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

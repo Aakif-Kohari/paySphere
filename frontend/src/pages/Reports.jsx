@@ -23,6 +23,12 @@ import TurnoverMetrics from '../components/reports/TurnoverMetrics';
 import { formatCurrency } from "../utils/currency";
 
 // --- Month-Year Selector ---
+const REPORT_TABS = [
+  { id: 'analytics', label: 'Payroll Analytics' },
+  { id: 'hr', label: 'HR Metrics' },
+  { id: 'custom', label: 'Custom Report' },
+];
+
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -101,11 +107,12 @@ export default function Reports() {
   const [exportingType, setExportingType] = useState(null);
   const [reportData, setReportData] = useState(null);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-
-  // Multi-select department filter state
-  const [selectedDepartments, setSelectedDepartments] = useState([]);
-  const [availableDepartments, setAvailableDepartments] = useState([]);
-
+  // Three branches below switch on this, but nothing ever declared it, so every
+  // render of this page threw `ReferenceError: activeTab is not defined` and the
+  // Reports route was blank. 'analytics' is the default because it is the view
+  // the export bar and the month selector belong to.
+  const [activeTab, setActiveTab] = useState('analytics');
+  
   const companyName = localStorage.getItem('companyName') || 'PaySphere';
   const currency = localStorage.getItem('currency') || 'INR';
 
@@ -422,26 +429,44 @@ export default function Reports() {
               </button>
             </div>
 
-            {/* Department Filter */}
-            <div className="mb-6">
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                Filter by Department(s)
-              </label>
-              <Select
-                isMulti
-                options={availableDepartments}
-                value={selectedDepartments}
-                onChange={handleDepartmentChange}
-                styles={selectStyles}
-                placeholder="All Departments"
-                noOptionsMessage={() => 'No departments found'}
-                isClearable
-                className="max-w-md"
-              />
-              {selectedDepartments.length > 0 && (
-                <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
-                  Showing data for {selectedDepartments.length} department{selectedDepartments.length > 1 ? 's' : ''}
-                </p>
+          {/* View switcher. TurnoverMetrics and CustomReportBuilder are imported
+              and rendered by the branches further down, but with no control to
+              set `activeTab` there was no way to reach either of them. */}
+          <div className="flex flex-wrap gap-1 mb-6 border-b border-gray-200 dark:border-slate-800">
+            {REPORT_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                aria-current={activeTab === tab.id ? 'page' : undefined}
+                className={`px-4 py-2 -mb-px text-sm font-semibold border-b-2 transition ${
+                  activeTab === tab.id
+                    ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+                    : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Export Action Bar */}
+          {activeTab === 'analytics' && (
+          <div className="flex flex-wrap gap-3 mb-8 items-center">
+            <button
+              onClick={handleDownloadPDF}
+              disabled={Boolean(exportingType)}
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition-colors cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+            >
+              {exportingType === 'pdf' ? (
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
               )}
             </div>
 
