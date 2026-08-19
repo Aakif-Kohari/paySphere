@@ -378,6 +378,14 @@ const startCronJobs = () => {
     );
   });
   logger.info('Monthly database archival cron job registered.');
+
+  // 01:00 daily — Webhook log rotation.
+  cron.schedule('0 1 * * *', () => {
+    runLogRotationJob().catch((error) =>
+      logger.error('Webhook log rotation job threw', { error: error.message }),
+    );
+  });
+  logger.info('Daily webhook log rotation cron job registered.');
 };
 
 /**
@@ -419,6 +427,28 @@ async function runHrmsSyncJob() {
   }
 }
 
+async function runLogRotationJob() {
+  const now = new Date();
+  const lockId = `webhook_log_rotation_${now.getFullYear()}_${now.getMonth() + 1}_${now.getDate()}`;
+
+  const lock = await acquireLock(lockId);
+  if (!lock.acquired) {
+    logger.info('Webhook log rotation job skipped: lock is held elsewhere', { lockId });
+    return { ran: false, reason: lock.reason };
+  }
+
+  try {
+    const { rotateWebhookLogs } = require('../workers/logRotation.worker');
+    const result = await rotateWebhookLogs();
+    await releaseLock(lockId);
+    return { ran: true, ...result };
+  } catch (error) {
+    logger.error('Webhook log rotation job failed', { error: error.message });
+    await releaseLock(lockId);
+    return { ran: false, reason: 'error' };
+  }
+}
+
 module.exports = {
   startCronJobs,
   runMonthlyPayslipJob,
@@ -427,6 +457,7 @@ module.exports = {
   runDatabaseBackupJob,
   runDatabaseArchivalJob,
   runForexSyncJob,
+  runLogRotationJob,
   previousPeriod,
   acquireLock,
   releaseLock,
