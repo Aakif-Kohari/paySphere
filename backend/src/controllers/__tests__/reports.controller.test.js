@@ -3,15 +3,24 @@ const {
   downloadPDFReport,
   exportExcelReport,
   downloadPayslipsZip,
+  getTurnoverMetrics,
+  generateCustomReport,
 } = require('../reports.controller');
 const PayrollUpdate = require('../../models/payroll.model');
 const Employee = require('../../models/employee.model');
+const User = require('../../models/user.model');
 
 jest.mock('../../models/payroll.model');
 jest.mock('../../models/employee.model');
+jest.mock('../../models/user.model');
 jest.mock('../../services/audit.service', () => ({
   createAuditLog: jest.fn(),
 }));
+
+jest.mock('../../services/turnover.service', () => ({
+  getTurnoverMetrics: jest.fn(),
+}));
+const turnoverService = require('../../services/turnover.service');
 
 jest.mock('../../services/cache.service', () => ({
   get: jest.fn().mockResolvedValue(null),
@@ -211,6 +220,88 @@ describe('Reports Controller - getAnalytics', () => {
 
     expect(next).toHaveBeenCalledWith(error);
   });
+
+  test('should return 400 when startDate is after endDate (#527)', async () => {
+    req.query = { startDate: '2026-06-01', endDate: '2026-01-01' };
+
+    await getAnalytics(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'startDate must be on or before endDate',
+    });
+    expect(PayrollUpdate.find).not.toHaveBeenCalled();
+  });
+
+  test('should return 400 for an invalid startDate format (#527)', async () => {
+    req.query = { startDate: 'not-a-date' };
+
+    await getAnalytics(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Invalid startDate format',
+    });
+    expect(PayrollUpdate.find).not.toHaveBeenCalled();
+  });
+
+  test('should return 400 for an invalid endDate format (#527)', async () => {
+    req.query = { endDate: 'not-a-date' };
+
+    await getAnalytics(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Invalid endDate format',
+    });
+    expect(PayrollUpdate.find).not.toHaveBeenCalled();
+  });
+
+  test('should accept a valid date range and filter payrolls by period (#527)', async () => {
+    req.query = { startDate: '2026-01-01', endDate: '2026-06-30' };
+    PayrollUpdate.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
+    Employee.find.mockResolvedValue([]);
+
+    await getAnalytics(req, res, next);
+
+    const query = PayrollUpdate.find.mock.calls[0][0];
+    // Same-year range collapses to a single { year, month } filter.
+    expect(query.year).toBe(2026);
+    expect(query.month.$gte).toBe(1);
+    expect(query.month.$lte).toBe(6);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  test('should accept a date range spanning multiple years (#527)', async () => {
+    req.query = { startDate: '2025-11-01', endDate: '2026-02-28' };
+    PayrollUpdate.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
+    Employee.find.mockResolvedValue([]);
+
+    await getAnalytics(req, res, next);
+
+    const query = PayrollUpdate.find.mock.calls[0][0];
+    expect(query.$or).toEqual([
+      { year: { $gt: 2025, $lt: 2026 } },
+      { year: 2025, month: { $gte: 11 } },
+      { year: 2026, month: { $lte: 2 } },
+    ]);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  test('should accept a single-sided date range (#527)', async () => {
+    req.query = { startDate: '2026-01-01' };
+    PayrollUpdate.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([]) });
+    Employee.find.mockResolvedValue([]);
+
+    await getAnalytics(req, res, next);
+
+    const query = PayrollUpdate.find.mock.calls[0][0];
+    // startDate only: end defaults to "now". Both fall in the current year, so
+    // the range collapses to a single { year, month } filter.
+    expect(query.year).toBe(2026);
+    expect(query.month.$gte).toBe(1);
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
 });
 
 describe('Reports Controller - downloadPDFReport', () => {
@@ -233,6 +324,9 @@ describe('Reports Controller - downloadPDFReport', () => {
     };
     next = jest.fn();
     jest.clearAllMocks();
+    User.findById.mockResolvedValue({
+      settings: { payrollConfig: { currency: 'INR' }, companyInfo: {} },
+    });
   });
 
   test('should return 400 for invalid month', async () => {
@@ -307,7 +401,7 @@ describe('Reports Controller - downloadPDFReport', () => {
         resolve();
       });
       next = jest.fn((err) => reject(err));
-      
+
       downloadPDFReport(req, res, next).catch(reject);
     });
 
@@ -343,6 +437,33 @@ describe('Reports Controller - downloadPDFReport', () => {
     // Should not return 400 (invalid params) — should proceed to 404 (no data)
     expect(res.status).toHaveBeenCalledWith(404);
   });
+
+  test('should filter by departments query param without crashing (#656)', async () => {
+    req.query = { month: '6', year: '2026', departments: 'Engineering,Design' };
+    // getEmployeeIdsByDepartments calls Employee.find({...}).select('_id')
+    Employee.find.mockReturnValue({
+      select: jest.fn().mockResolvedValue([{ _id: 'emp1' }, { _id: 'emp2' }]),
+    });
+    PayrollUpdate.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue([]),
+    });
+
+    await downloadPDFReport(req, res, next);
+
+    // Employee lookup was called with the department filter
+    const empQuery = Employee.find.mock.calls[0][0];
+    expect(empQuery.$or).toEqual([
+      { department: { $in: ['Engineering', 'Design'] } },
+      { role: { $in: ['Engineering', 'Design'] } },
+    ]);
+    // Payroll query filtered by the resolved employee IDs
+    const payrollQuery = PayrollUpdate.find.mock.calls[0][0];
+    expect(payrollQuery.employeeId).toEqual({
+      $in: expect.any(Array),
+    });
+    // No crash: reached the 404 (no payrolls for filtered employees)
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
 });
 
 describe('Reports Controller - exportExcelReport', () => {
@@ -365,6 +486,9 @@ describe('Reports Controller - exportExcelReport', () => {
     };
     next = jest.fn();
     jest.clearAllMocks();
+    User.findById.mockResolvedValue({
+      settings: { payrollConfig: { currency: 'INR' } },
+    });
   });
 
   test('should return 400 for invalid month', async () => {
@@ -435,6 +559,9 @@ describe('Reports Controller - downloadPayslipsZip', () => {
     };
     next = jest.fn();
     jest.clearAllMocks();
+    User.findById.mockResolvedValue({
+      settings: { payrollConfig: { currency: 'INR' } },
+    });
   });
 
   test('should return 400 for invalid month', async () => {
@@ -490,5 +617,205 @@ describe('Reports Controller - downloadPayslipsZip', () => {
       'Content-Disposition',
       expect.stringContaining('payslips-June-2026.zip'),
     );
+  });
+});
+
+describe('Reports Controller - getTurnoverMetrics', () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    req = {
+      userId: '507f1f77bcf86cd799439011',
+      tenantId: '507f1f77bcf86cd799439011',
+      query: {},
+    };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+      setHeader: jest.fn(),
+      send: jest.fn(),
+      end: jest.fn(),
+      write: jest.fn(),
+      on: jest.fn(),
+      emit: jest.fn(),
+    };
+    next = jest.fn();
+    jest.clearAllMocks();
+    Employee.find.mockReset();
+    PayrollUpdate.find.mockReset();
+  });
+
+  test('should compute turnover metrics from employee data', async () => {
+    const now = new Date();
+    Employee.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([
+        {
+          joinDate: new Date(now.getFullYear() - 2, 0, 15),
+          deletedAt: null,
+        },
+        {
+          joinDate: new Date(now.getFullYear() - 1, 6, 1),
+          deletedAt: null,
+        },
+      ]),
+    });
+    turnoverService.getTurnoverMetrics.mockResolvedValue({
+      departuresByReason: { voluntary: 1 },
+    });
+
+    await getTurnoverMetrics(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const body = res.json.mock.calls[0][0];
+    expect(body.trends).toHaveLength(12);
+    expect(body.totalTerminated).toBe(0);
+    expect(body.departuresByReason).toEqual({ voluntary: 1 });
+    expect(body.averageTenureDays).toBe(0);
+  });
+
+  test('should count terminated employees and tenure in the trend window', async () => {
+    const now = new Date();
+    const joinDate = new Date(now.getFullYear() - 1, 0, 15);
+    const termDate = new Date(now.getFullYear(), now.getMonth(), 10);
+    Employee.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([{ joinDate, deletedAt: termDate }]),
+    });
+    turnoverService.getTurnoverMetrics.mockResolvedValue({
+      departuresByReason: { resignation: 1 },
+    });
+
+    await getTurnoverMetrics(req, res, next);
+
+    const body = res.json.mock.calls[0][0];
+    expect(body.totalTerminated).toBe(1);
+    expect(body.trends[body.trends.length - 1].terminated).toBe(1);
+    expect(body.averageTenureDays).toBeGreaterThan(0);
+    expect(body.averageTenureMonths).toBeGreaterThan(0);
+  });
+
+  test('should call next(error) when employee lookup fails', async () => {
+    const error = new Error('DB failure');
+    Employee.find.mockReturnValue({
+      lean: jest.fn().mockRejectedValue(error),
+    });
+
+    await getTurnoverMetrics(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(error);
+  });
+});
+
+describe('Reports Controller - generateCustomReport', () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    req = {
+      userId: '507f1f77bcf86cd799439011',
+      tenantId: '507f1f77bcf86cd799439011',
+      body: {},
+    };
+    res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+      setHeader: jest.fn(),
+      send: jest.fn(),
+      end: jest.fn(),
+      write: jest.fn(),
+      on: jest.fn(),
+      emit: jest.fn(),
+    };
+    next = jest.fn();
+    jest.clearAllMocks();
+    Employee.find.mockReset();
+    PayrollUpdate.find.mockReset();
+  });
+
+  test('should return 400 for an invalid dataset', async () => {
+    req.body = { dataset: 'invoices', columns: ['fullName'] };
+
+    await generateCustomReport(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Invalid dataset' });
+    expect(PayrollUpdate.find).not.toHaveBeenCalled();
+    expect(Employee.find).not.toHaveBeenCalled();
+  });
+
+  test('should return 400 when columns are missing', async () => {
+    req.body = { dataset: 'employees', columns: [] };
+
+    await generateCustomReport(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Columns are required' });
+  });
+
+  test('should build a scoped query and return employee results', async () => {
+    req.body = {
+      dataset: 'employees',
+      columns: ['fullName', 'department'],
+      filters: [
+        { field: 'role', operator: 'equals', value: 'Manager' },
+        { field: 'department', operator: 'contains', value: 'Eng' },
+      ],
+    };
+    Employee.find.mockReturnValue({
+      lean: jest
+        .fn()
+        .mockResolvedValue([
+          { _id: 'emp1', fullName: 'Alice', department: 'Engineering' },
+        ]),
+    });
+
+    await generateCustomReport(req, res, next);
+
+    const query = Employee.find.mock.calls[0][0];
+    expect(query.tenantId).toBe(req.tenantId);
+    expect(query.role).toBe('Manager');
+    expect(query.department).toEqual({ $regex: 'Eng', $options: 'i' });
+    const projection = Employee.find.mock.calls[0][1];
+    expect(projection.fullName).toBe(1);
+    expect(projection.department).toBe(1);
+    // Disallowed column is not projected (projection injection prevention)
+    expect(projection.password).toBeUndefined();
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const body = res.json.mock.calls[0][0];
+    expect(body.results).toHaveLength(1);
+    expect(body.columns).toEqual(['fullName', 'department']);
+  });
+
+  test('should ignore disallowed filter fields (NoSQL injection prevention)', async () => {
+    req.body = {
+      dataset: 'payroll',
+      columns: ['employeeName', 'netSalary'],
+      filters: [
+        { field: 'employeeName', operator: 'equals', value: 'Bob' },
+        { field: 'netSalary', operator: 'gt', value: '50000' },
+        { field: '$where', operator: 'equals', value: 'dangerous' },
+      ],
+    };
+    PayrollUpdate.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([]),
+    });
+
+    await generateCustomReport(req, res, next);
+
+    const query = PayrollUpdate.find.mock.calls[0][0];
+    expect(query.employeeName).toBe('Bob');
+    expect(query.netSalary).toEqual({ $gt: 50000 });
+    expect(query.$where).toBeUndefined();
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  test('should call next(error) when the model query fails', async () => {
+    req.body = { dataset: 'payroll', columns: ['employeeName'] };
+    const error = new Error('DB failure');
+    PayrollUpdate.find.mockReturnValue({
+      lean: jest.fn().mockRejectedValue(error),
+    });
+
+    await generateCustomReport(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(error);
   });
 });

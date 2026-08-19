@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
+import zxcvbn from "../utils/zxcvbn";
 
 export default function ResetPassword() {
   const { token } = useParams();
@@ -28,6 +29,11 @@ export default function ResetPassword() {
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
     if (!passwordRegex.test(password)) {
       return setError("Password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character.");
+    }
+
+    const strength = zxcvbn(password);
+    if (strength.score < 3) {
+      return setError(`Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`);
     }
 
     setLoading(true);
@@ -126,6 +132,7 @@ export default function ResetPassword() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
+                      aria-label="New Password"
                       className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-slate-950 text-gray-950 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 border border-transparent dark:border-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:border-blue-500 dark:focus:border-blue-500 outline-none transition-colors"
                     />
                   </div>
@@ -137,11 +144,12 @@ export default function ResetPassword() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
+                      aria-label="Confirm New Password"
                       className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-slate-950 text-gray-950 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 border border-transparent dark:border-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:border-blue-500 dark:focus:border-blue-500 outline-none transition-colors"
                     />
                   </div>
 
-                  {error && <p className="text-red-500 text-xs mb-4">{error}</p>}
+                  {error && <p className="text-red-500 text-xs mb-4" role="alert">{error}</p>}
 
                   <button
                     type="submit"

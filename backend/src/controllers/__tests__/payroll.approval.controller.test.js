@@ -16,6 +16,7 @@ jest.mock("../../models/employee.model");
 jest.mock("../../models/user.model");
 jest.mock("../../services/cache.service", () => ({
   invalidateAnalytics: jest.fn().mockResolvedValue(undefined),
+  invalidateDashboardSummary: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock("../../services/email.service", () => ({
   sendPayslipEmail: jest.fn().mockResolvedValue(undefined),
@@ -26,6 +27,10 @@ const { sendPayslipEmail } = require("../../services/email.service");
 
 const OWNER = "507f1f77bcf86cd799439011";
 const OTHER_OWNER = "507f1f77bcf86cd799439099";
+// The companies. Deliberately distinct from the owner ids: since #613 the scope
+// is the tenant, not the account that created the row.
+const TENANT = "507f1f77bcf86cd799439021";
+const OTHER_TENANT = "507f1f77bcf86cd799439022";
 
 const oid = (hex) => new mongoose.Types.ObjectId(hex);
 
@@ -70,7 +75,7 @@ describe("getPendingApprovals — tenant scoping (#458)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    req = { userId: OWNER, query: {} };
+    req = { userId: OWNER, tenantId: TENANT, query: {} };
     res = makeRes();
     next = jest.fn();
 
@@ -85,7 +90,7 @@ describe("getPendingApprovals — tenant scoping (#458)", () => {
     expect(next).not.toHaveBeenCalled();
     expect(PayrollUpdate.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        createdBy: OWNER,
+        tenantId: TENANT,
         status: "pending_approval",
       }),
     );
@@ -153,7 +158,7 @@ describe("approvePayroll — ownership and transitions (#458)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    req = { userId: OWNER, body: {} };
+    req = { userId: OWNER, tenantId: TENANT, body: {} };
     res = makeRes();
     next = jest.fn();
     PayrollUpdate.updateMany.mockResolvedValue({ modifiedCount: 1 });
@@ -188,7 +193,7 @@ describe("approvePayroll — ownership and transitions (#458)", () => {
     expect(res.json.mock.calls[0][0].message).toContain("more than 200");
   });
 
-  test("always scopes the ownership read by createdBy", async () => {
+  test("always scopes the ownership read by tenant", async () => {
     PayrollUpdate.find.mockImplementation(() =>
       selectMock([payrollRow(ID_A, "pending_approval")]),
     );
@@ -198,7 +203,7 @@ describe("approvePayroll — ownership and transitions (#458)", () => {
 
     expect(PayrollUpdate.find).toHaveBeenCalledWith({
       _id: { $in: [ID_A] },
-      createdBy: OWNER,
+      tenantId: TENANT,
     });
   });
 
@@ -225,7 +230,7 @@ describe("approvePayroll — ownership and transitions (#458)", () => {
     await approvePayroll(req, res, next);
 
     const writeFilter = PayrollUpdate.updateMany.mock.calls[0][0];
-    expect(writeFilter.createdBy).toBe(OWNER);
+    expect(writeFilter.tenantId).toBe(TENANT);
     expect(writeFilter._id.$in.map(String)).toEqual([ID_A]);
 
     const payload = res.json.mock.calls[0][0];
@@ -356,6 +361,19 @@ describe("approvePayroll — ownership and transitions (#458)", () => {
     expect(auditCall[1].result).toBe("partial");
     emitSpy.mockRestore();
   });
+
+  test("returns 409 Conflict when a concurrent update causes a version mismatch", async () => {
+    PayrollUpdate.find.mockImplementation(() =>
+      selectMock([payrollRow(ID_A, "pending_approval", { __v: 0 })]),
+    );
+    req.body = { payrollIds: [ID_A] };
+    PayrollUpdate.updateMany.mockResolvedValue({ matchedCount: 0, modifiedCount: 0 });
+
+    await approvePayroll(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json.mock.calls[0][0].message).toContain("concurrent update");
+  });
 });
 
 describe("rejectPayroll — reason handling (#458)", () => {
@@ -363,7 +381,7 @@ describe("rejectPayroll — reason handling (#458)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    req = { userId: OWNER, body: {} };
+    req = { userId: OWNER, tenantId: TENANT, body: {} };
     res = makeRes();
     next = jest.fn();
     PayrollUpdate.updateMany.mockResolvedValue({ modifiedCount: 1 });
@@ -408,19 +426,24 @@ describe("rejectPayroll — reason handling (#458)", () => {
 
     await rejectPayroll(req, res, next);
 
-    const update = PayrollUpdate.updateMany.mock.calls[0][1].$set;
-    expect(update.approvedBy).toBeUndefined();
-    expect(update.approvedAt).toBeUndefined();
+    // The controller passes `approvedBy: undefined` to mean "clear this".
+    // Mongoose strips undefined values out of a $set, so that never actually
+    // cleared anything — a row rejected after an approval kept the old
+    // approver. Explicitly cleared fields belong in $unset (#559).
+    const [, update] = PayrollUpdate.updateMany.mock.calls[0];
+    expect(update.$set.approvedBy).toBeUndefined();
+    expect(update.$set.approvedAt).toBeUndefined();
+    expect(update.$unset).toEqual({ approvedBy: "", approvedAt: "" });
   });
 
-  test("scopes the read by createdBy so another company's run cannot be rejected", async () => {
+  test("scopes the read by tenant so another company's run cannot be rejected", async () => {
     req.body = { payrollIds: [ID_A], reason: "Not mine" };
 
     await rejectPayroll(req, res, next);
 
     expect(PayrollUpdate.find).toHaveBeenCalledWith({
       _id: { $in: [ID_A] },
-      createdBy: OWNER,
+      tenantId: TENANT,
     });
   });
 
@@ -442,7 +465,7 @@ describe("markPayrollPaid — reaching the terminal state (#458)", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    req = { userId: OWNER, body: {} };
+    req = { userId: OWNER, tenantId: TENANT, body: {} };
     res = makeRes();
     next = jest.fn();
     PayrollUpdate.updateMany.mockResolvedValue({ modifiedCount: 1 });
@@ -485,7 +508,7 @@ describe("markPayrollPaid — reaching the terminal state (#458)", () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  test("scopes the read by createdBy", async () => {
+  test("scopes the read by tenant", async () => {
     PayrollUpdate.find.mockImplementation(() =>
       selectMock([payrollRow(ID_A, "approved")]),
     );
@@ -493,7 +516,7 @@ describe("markPayrollPaid — reaching the terminal state (#458)", () => {
 
     await markPayrollPaid(req, res, next);
 
-    expect(PayrollUpdate.find.mock.calls[0][0].createdBy).toBe(OWNER);
+    expect(PayrollUpdate.find.mock.calls[0][0].tenantId).toBe(TENANT);
   });
 });
 
@@ -507,7 +530,7 @@ describe("payslip dispatch is gated on approval (#458)", () => {
   });
 
   test("refuses to email a payslip for a pending row", async () => {
-    req = { userId: OWNER, params: { id: ID_A } };
+    req = { userId: OWNER, tenantId: TENANT, params: { id: ID_A } };
     PayrollUpdate.findOne.mockResolvedValue({
       _id: oid(ID_A),
       employeeId: oid(ID_B),
@@ -529,7 +552,7 @@ describe("payslip dispatch is gated on approval (#458)", () => {
   });
 
   test("refuses to email a payslip for a rejected row", async () => {
-    req = { userId: OWNER, params: { id: ID_A } };
+    req = { userId: OWNER, tenantId: TENANT, params: { id: ID_A } };
     PayrollUpdate.findOne.mockResolvedValue({
       _id: oid(ID_A),
       employeeId: oid(ID_B),
@@ -548,7 +571,7 @@ describe("payslip dispatch is gated on approval (#458)", () => {
   });
 
   test("sends for an approved row", async () => {
-    req = { userId: OWNER, params: { id: ID_A } };
+    req = { userId: OWNER, tenantId: TENANT, params: { id: ID_A } };
     PayrollUpdate.findOne.mockResolvedValue({
       _id: oid(ID_A),
       employeeId: oid(ID_B),
@@ -570,7 +593,7 @@ describe("payslip dispatch is gated on approval (#458)", () => {
   });
 
   test("bulk dispatch filters on payable statuses at the query level", async () => {
-    req = { userId: OWNER, body: { month: 7, year: 2026 }, query: {} };
+    req = { userId: OWNER, tenantId: TENANT, body: { month: 7, year: 2026 }, query: {} };
     PayrollUpdate.find.mockResolvedValue([]);
 
     await sendAllPayslipsEmailHandler(req, res, next);
@@ -592,20 +615,21 @@ describe("cross-tenant isolation, end to end (#458)", () => {
     // Account A's row exists in the collection...
     const accountARow = payrollRow(ID_A, "pending_approval", {
       createdBy: oid(OWNER),
+      tenantId: oid(TENANT),
       employeeName: "A's employee",
       netSalary: 999999,
     });
 
     // ...but the scoped read on behalf of B returns nothing, because the
-    // controller now includes `createdBy: B` in the filter.
+    // controller now includes `tenantId: B` in the filter.
     PayrollUpdate.find.mockImplementation((filter) => {
       const matches =
-        String(filter.createdBy) === OWNER ? [accountARow] : [];
+        String(filter.tenantId) === TENANT ? [accountARow] : [];
       return selectMock(matches);
     });
     PayrollUpdate.updateMany.mockResolvedValue({ modifiedCount: 0 });
 
-    const req = { userId: OTHER_OWNER, body: { payrollIds: [ID_A] } };
+    const req = { userId: OTHER_OWNER, tenantId: OTHER_TENANT, body: { payrollIds: [ID_A] } };
     const res = makeRes();
 
     await approvePayroll(req, res, jest.fn());
@@ -619,5 +643,91 @@ describe("cross-tenant isolation, end to end (#458)", () => {
     // echoed back to B.
     expect(JSON.stringify(payload)).not.toContain("A's employee");
     expect(JSON.stringify(payload)).not.toContain("999999");
+  });
+});
+
+describe("the approval trail is actually persisted (#559)", () => {
+  let req, res, next;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    req = { userId: OWNER, tenantId: TENANT, body: {} };
+    res = makeRes();
+    next = jest.fn();
+    PayrollUpdate.updateMany.mockResolvedValue({ modifiedCount: 1 });
+    PayrollUpdate.find.mockImplementation(() =>
+      selectMock([payrollRow(ID_A, "pending_approval")]),
+    );
+    PayrollUpdate.countDocuments.mockResolvedValue(0);
+    PayrollUpdate.aggregate.mockResolvedValue([]);
+  });
+
+  test("the approvals queue populates the submitter without throwing", async () => {
+    // `.populate("submittedBy", …)` used to raise StrictPopulateError, because
+    // the path was not on the schema — a 500 on every request to the queue.
+    const chain = listMock([]);
+    PayrollUpdate.find.mockReturnValue(chain);
+
+    await getPendingApprovals({ userId: OWNER, tenantId: TENANT, query: {} }, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(chain.populate).toHaveBeenCalledWith("submittedBy", "fullName email");
+  });
+
+  test("approving records who approved it and when", async () => {
+    req.body = { payrollIds: [ID_A] };
+
+    await approvePayroll(req, res, next);
+
+    const [, update] = PayrollUpdate.updateMany.mock.calls[0];
+    expect(update.$set.status).toBe("approved");
+    expect(update.$set.approvedBy).toBe(OWNER);
+    expect(update.$set.approvedAt).toBeInstanceOf(Date);
+  });
+
+  test("approving clears any stale rejection rather than silently keeping it", async () => {
+    req.body = { payrollIds: [ID_A] };
+
+    await approvePayroll(req, res, next);
+
+    const [, update] = PayrollUpdate.updateMany.mock.calls[0];
+    expect(update.$unset).toEqual({
+      rejectionReason: "",
+      rejectedBy: "",
+      rejectedAt: "",
+    });
+  });
+
+  test("a transition with nothing to clear sends no $unset", async () => {
+    req.body = { payrollIds: [ID_A] };
+    PayrollUpdate.find.mockImplementation(() =>
+      selectMock([payrollRow(ID_A, "approved")]),
+    );
+
+    await markPayrollPaid(req, res, next);
+
+    const [, update] = PayrollUpdate.updateMany.mock.calls[0];
+    expect(update.$unset).toBeUndefined();
+  });
+
+  test("every field the model writes exists on the schema", () => {
+    // The root cause: the controller and the schema disagreed about which
+    // fields exist, and mongoose reports that disagreement by dropping the
+    // write. Anything the approval handlers set has to be declared.
+    const written = [
+      "submittedBy",
+      "submittedAt",
+      "approvedBy",
+      "approvedAt",
+      "rejectedBy",
+      "rejectedAt",
+      "rejectionReason",
+    ];
+
+    const RealPayrollUpdate = jest.requireActual("../../models/payroll.model");
+
+    written.forEach((field) => {
+      expect(RealPayrollUpdate.schema.path(field)).toBeDefined();
+    });
   });
 });

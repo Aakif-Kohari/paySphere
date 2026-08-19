@@ -19,6 +19,10 @@ jest.mock('../../models/loan.model');
 jest.mock('../../models/employee.model');
 
 const OWNER = '507f1f77bcf86cd799439011';
+// The company. Deliberately a different id from OWNER: since #613 the scope is
+// the tenant, not the account that created the row, and a test that reused one
+// id for both could not tell the two apart.
+const TENANT = '507f1f77bcf86cd799439099';
 const EMP_A = '607f1f77bcf86cd7994390a1';
 const LOAN_ID = '707f1f77bcf86cd7994390b1';
 
@@ -84,6 +88,7 @@ describe('createLoan — ownership and terms (#460)', () => {
   beforeEach(() => {
     req = {
       userId: OWNER,
+      tenantId: TENANT,
       body: {
         employeeId: EMP_A,
         principal: 12000,
@@ -109,13 +114,23 @@ describe('createLoan — ownership and terms (#460)', () => {
     expect(created.outstanding).toBe(12000);
   });
 
-  test('scopes the employee lookup by createdBy', async () => {
+  test('scopes the employee lookup by tenant', async () => {
     await createLoan(req, res, next);
 
     expect(Employee.findOne).toHaveBeenCalledWith({
       _id: EMP_A,
-      createdBy: OWNER,
+      tenantId: TENANT,
     });
+  });
+
+  test('records who issued the loan as well as which company owns it', async () => {
+    await createLoan(req, res, next);
+
+    // #585 stopped writing `createdBy` while the schema still required it, so
+    // create() threw a ValidationError on every call (#613). Both are written.
+    const created = Loan.create.mock.calls[0][0];
+    expect(String(created.createdBy)).toBe(OWNER);
+    expect(String(created.tenantId)).toBe(TENANT);
   });
 
   test("another company's employee cannot be lent to", async () => {
@@ -173,7 +188,7 @@ describe('createLoan — ownership and terms (#460)', () => {
     await createLoan(req, res, next);
 
     const filter = Loan.find.mock.calls[0][0];
-    expect(filter.createdBy).toBe(OWNER);
+    expect(filter.tenantId).toBe(TENANT);
     expect(filter.status.$in).toEqual(
       expect.arrayContaining([LOAN_STATUS.ACTIVE, LOAN_STATUS.ON_HOLD]),
     );
@@ -221,15 +236,15 @@ describe('getLoans — listing (#460)', () => {
   let req, res, next;
 
   beforeEach(() => {
-    req = { userId: OWNER, query: {} };
+    req = { userId: OWNER, tenantId: TENANT, query: {} };
     res = makeRes();
     next = jest.fn();
     Loan.find.mockImplementation(() => listMock([]));
   });
 
-  test('scopes by createdBy', async () => {
+  test('scopes by tenant', async () => {
     await getLoans(req, res, next);
-    expect(Loan.find).toHaveBeenCalledWith({ createdBy: OWNER });
+    expect(Loan.find).toHaveBeenCalledWith({ tenantId: TENANT });
   });
 
   test('filters by status and employee', async () => {
@@ -238,7 +253,7 @@ describe('getLoans — listing (#460)', () => {
     await getLoans(req, res, next);
 
     expect(Loan.find).toHaveBeenCalledWith({
-      createdBy: OWNER,
+      tenantId: TENANT,
       status: LOAN_STATUS.ACTIVE,
       employeeId: EMP_A,
     });
@@ -282,17 +297,17 @@ describe('getLoanById and getLoanSchedule (#460)', () => {
   let req, res, next;
 
   beforeEach(() => {
-    req = { userId: OWNER, params: { id: LOAN_ID } };
+    req = { userId: OWNER, tenantId: TENANT, params: { id: LOAN_ID } };
     res = makeRes();
     next = jest.fn();
   });
 
-  test('scopes the lookup by createdBy', async () => {
+  test('scopes the lookup by tenant', async () => {
     Loan.findOne.mockResolvedValue(loanDoc());
 
     await getLoanById(req, res, next);
 
-    expect(Loan.findOne).toHaveBeenCalledWith({ _id: LOAN_ID, createdBy: OWNER });
+    expect(Loan.findOne).toHaveBeenCalledWith({ _id: LOAN_ID, tenantId: TENANT });
   });
 
   test("another company's loan is a 404", async () => {
@@ -380,7 +395,7 @@ describe('updateLoanStatus — transitions (#460)', () => {
   let req, res, next;
 
   beforeEach(() => {
-    req = { userId: OWNER, params: { id: LOAN_ID }, body: {} };
+    req = { userId: OWNER, tenantId: TENANT, params: { id: LOAN_ID }, body: {} };
     res = makeRes();
     next = jest.fn();
   });
@@ -460,6 +475,7 @@ describe('recordManualRepayment (#460)', () => {
   beforeEach(() => {
     req = {
       userId: OWNER,
+      tenantId: TENANT,
       params: { id: LOAN_ID },
       body: { amount: 3000, month: 3, year: 2026 },
     };
@@ -549,7 +565,7 @@ describe('getLoanSummary (#460)', () => {
       { _id: LOAN_STATUS.COMPLETED, count: 3, outstanding: 0, principal: 30000 },
     ]);
 
-    const req = { userId: OWNER };
+    const req = { userId: OWNER, tenantId: TENANT };
     const res = makeRes();
 
     await getLoanSummary(req, res, jest.fn());
@@ -562,9 +578,9 @@ describe('getLoanSummary (#460)', () => {
 
   test('scopes the aggregation to the caller', async () => {
     const res = makeRes();
-    await getLoanSummary({ userId: OWNER }, res, jest.fn());
+    await getLoanSummary({ userId: OWNER, tenantId: TENANT }, res, jest.fn());
 
     const pipeline = Loan.aggregate.mock.calls[0][0];
-    expect(String(pipeline[0].$match.createdBy)).toBe(OWNER);
+    expect(String(pipeline[0].$match.tenantId)).toBe(TENANT);
   });
 });

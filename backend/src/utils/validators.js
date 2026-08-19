@@ -10,13 +10,29 @@ const MAX_SAFE_PAYROLL = 10000000000;
 const FULLNAME_MAX_LENGTH = 100;
 const ROLE_MAX_LENGTH = 100;
 
+// Accept international phone numbers with an optional leading "+" and
+// a local national number of 7-15 digits. We also tolerate common separators
+// such as spaces, parentheses, and hyphens in the incoming request payload.
+const PHONE_REGEX = /^\+?[1-9]\d{6,14}$/;
+
+// Shared with the Mongoose schema-level `match` validators on User.email and
+// Employee.email (#729), so the request-layer check here and the DB-layer
+// check there can never drift apart.
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const isNonEmptyString = (val) => typeof val === "string" && val.trim().length > 0;
 
 // Check valid email format and type
 const isValidEmail = (val) => {
   if (typeof val !== "string") return false;
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(val.trim());
+  return EMAIL_REGEX.test(val.trim());
+};
+// Check valid phone number format and type (international format, optional
+// leading + and common separators accepted before normalization)
+const isValidPhone = (val) => {
+  if (typeof val !== "string") return false;
+  const normalized = val.trim().replace(/[()\s-]/g, "");
+  return PHONE_REGEX.test(normalized);
 };
 
 // Check valid positive number (rejects NaN, Infinity, strings, <= 0)
@@ -57,6 +73,7 @@ const sanitizeText = (val) => {
 module.exports = {
   isNonEmptyString,
   isValidEmail,
+  isValidPhone,
   isPositiveNumber,
   isNonNegativeNumber,
   sanitizeString,
@@ -70,4 +87,6 @@ module.exports = {
   MAX_SAFE_PAYROLL,
   FULLNAME_MAX_LENGTH,
   ROLE_MAX_LENGTH,
+PHONE_REGEX,
+  EMAIL_REGEX,
 };

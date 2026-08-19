@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
-import { useSelector, useDispatch } from "react-redux";
-import { logoutUser } from "../features/auth/authSlice";import ThemeToggle from "../components/ThemeToggle";
+import { useAppStore } from "../store/useAppStore";
+import ThemeToggle from "../components/ThemeToggle";
 import api from "../services/api";
-import AttendanceCalendarModal from "../components/AttendanceCalendarModal";
-import { Snackbar, Alert } from '@mui/material';
+import { useJobProgress } from "../hooks/useJobProgress";
+
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 const PayrollIcon = () => (
@@ -106,15 +106,16 @@ const Avatar = ({ name, color, size = 36 }) => {
 };
 
 // ── Quick Actions ──────────────────────────────────────────────────────────
-const QUICK_ACTIONS = [
+const getQuickActions = (currency) => [
   { icon: "📋", label: "2 days leave", template: " took 2 days leave" },
   { icon: "⚡", label: "5 hrs overtime", template: " logged 5 hours overtime" },
-  { icon: "🎁", label: "₹2,000 bonus", template: " got ₹2,000 bonus" },
-  { icon: "💸", label: "₹500 deduction", template: " had ₹500 deduction" },
+  { icon: "🎁", label: `${formatCurrency(2000, currency)} bonus`, template: ` got ${formatCurrency(2000, currency)} bonus` },
+  { icon: "💸", label: `${formatCurrency(500, currency)} deduction`, template: ` had ${formatCurrency(500, currency)} deduction` },
 ];
 
-function parseInput(text, employeeList) {
+function parseInput(text, employeeList, currency = 'INR') {
   const lower = text.toLowerCase();
+  const symbol = getCurrencySymbol(currency);
 
   // Parse tags early so they're available even in ambiguous cases
   const tags = [];
@@ -122,10 +123,10 @@ function parseInput(text, employeeList) {
   if (leaveMatch) tags.push({ label: `\u2013 ${leaveMatch[1]} day${leaveMatch[1]>1?"s":""} leave`, bg: "#FEF2F2", color: "#DC2626" });
   const overtimeMatch = lower.match(/(\d+)\s*hour[s]?\s*overtime/);
   if (overtimeMatch) tags.push({ label: `+ ${overtimeMatch[1]} hr overtime`, bg: "#EFF6FF", color: "#2563EB" });
-  const bonusMatch = lower.match(/\u20b9?([\d,]+)\s*bonus/);
-  if (bonusMatch) tags.push({ label: `+ \u20b9${bonusMatch[1]} bonus`, bg: "#F0FDF4", color: "#16A34A" });
-  const dedMatch = lower.match(/\u20b9?([\d,]+)\s*deduction/);
-  if (dedMatch) tags.push({ label: `\u2013 \u20b9${dedMatch[1]} deduction`, bg: "#FEF2F2", color: "#DC2626" });
+  const bonusMatch = lower.match(/(?:[\u20b9$€£])?([\d,]+)\s*bonus/);
+  if (bonusMatch) tags.push({ label: `+ ${symbol}${bonusMatch[1]} bonus`, bg: "#F0FDF4", color: "#16A34A" });
+  const dedMatch = lower.match(/(?:[\u20b9$€£])?([\d,]+)\s*deduction/);
+  if (dedMatch) tags.push({ label: `\u2013 ${symbol}${dedMatch[1]} deduction`, bg: "#FEF2F2", color: "#DC2626" });
   if (tags.length === 0) tags.push({ label: text.slice(0,30), bg: "#F3F4F6", color: "#374151" });
 
   // 1. Try exact full-name match
@@ -171,9 +172,11 @@ const COLORS = ["#818CF8","#34D399","#FB7185","#FBBF24","#60A5FA","#A78BFA"];
 
 export default function MonthlyUpdates() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const themeMode = useSelector((state) => state.ui.themeMode);
+  const themeMode = useAppStore((state) => state.themeMode);
+  const logoutUser = useAppStore((state) => state.logoutUser);
   const isDark = themeMode === "dark";
+
+  const [isMobile] = useState(() => window.innerWidth <= 480);
 
   const [activePage, setActivePage]   = useState("employees");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -187,29 +190,13 @@ export default function MonthlyUpdates() {
   const [showResults, setShowResults] = useState(false);
   const [payrollResults, setPayrollResults] = useState(null);
   const [finalizeError, setFinalizeError] = useState("");
-
-
-  // Attendance Calendar Modal states (#137)
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [selectedCalendarEmp, setSelectedCalendarEmp] = useState(null);
-  const [showEmpPicker, setShowEmpPicker] = useState(false);
-
-  // Bulk Email Dispatch states (#140)
-  const [sendingBulkEmail, setSendingBulkEmail] = useState(false);
-  const [emailStatuses, setEmailStatuses] = useState({});
-  const [bulkEmailMsg, setBulkEmailMsg] = useState("");
-
-  // Copy Payroll Summary state (#184)
-  const [copiedSummary, setCopiedSummary] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
-
-  // Disambiguation state for first-name collision (#274)
-  const [disambiguationMatches, setDisambiguationMatches] = useState([]);
-  const [pendingParsed, setPendingParsed] = useState(null);
-
+  const { progress, startJob } = useJobProgress('payroll_finalize');
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState({ defaultOvertimeRate: 0, defaultDailyRate: 0 });
+  const [updatingSettings, setUpdatingSettings] = useState(false);
   const companyName = localStorage.getItem("companyName") || "Acme Corp";
-  const reduxToken = useSelector((state) => state.auth.token);
-  const token = reduxToken || localStorage.getItem("token");
+  const token = useAppStore((state) => state.token) || localStorage.getItem("token");
+  const currency = localStorage.getItem("currency") || "INR";
 
   useEffect(() => {
     if (!token) {
@@ -260,7 +247,7 @@ export default function MonthlyUpdates() {
 
   const handleSubmit = () => {
     if (!input.trim()) return;
-    const parsed = parseInput(input.trim(), employees);
+    const parsed = parseInput(input.trim(), employees, currency);
     if (parsed.ambiguousMatches && parsed.ambiguousMatches.length > 1) {
       setDisambiguationMatches(parsed.ambiguousMatches);
       setPendingParsed(parsed);
@@ -308,9 +295,6 @@ export default function MonthlyUpdates() {
 
   const pendingCount = activity.filter(a => a.pending).length;
 
-  const fmt = (n, c = "INR") => new Intl.NumberFormat('en-IN', { style: 'currency', currency: c }).format(n);
-
-  // Finalize payroll
   const handleFinalize = async () => {
     if (activity.length === 0) return;
     setFinalizing(true);
@@ -318,108 +302,33 @@ export default function MonthlyUpdates() {
 
     try {
       const now = new Date();
-      const res = await api.post(
-        `/api/payroll/finalize`,
-        {
-          activities: activity.map(a => ({ employeeId: a.employeeId, name: a.name, tags: a.tags })),
-          month: now.getMonth() + 1,
-          year: now.getFullYear(),
-        }
-      );
-
-      setPayrollResults(res.data);
-      setShowResults(true);
-
-      // Mark all activities as no longer pending
-      setActivity(prev => prev.map(a => ({ ...a, pending: false })));
+      // Use WebSocket job starting instead of regular API call
+      startJob({
+        activities: activity.map(a => ({ name: a.name, tags: a.tags })),
+        month: now.getMonth() + 1,
+        year: now.getFullYear(),
+      });
     } catch (err) {
-      setFinalizeError(err.response?.data?.message || "Failed to finalize payroll.");
-    } finally {
+      setFinalizeError(err.message || "Failed to start payroll process.");
       setFinalizing(false);
     }
   };
 
-  // Handle Bulk Send Email (#140)
-  const handleSendAllEmails = async () => {
-    setSendingBulkEmail(true);
-    setBulkEmailMsg("");
-    try {
-      const now = new Date();
-      const res = await api.post("/api/payroll/send-all-emails", {
-        month: now.getMonth() + 1,
-        year: now.getFullYear(),
-      });
-      const statusMap = { ...emailStatuses };
-      if (res.data.results && Array.isArray(res.data.results)) {
-        res.data.results.forEach((r) => {
-          statusMap[r.employeeName] = r.status;
-        });
-      }
-      setEmailStatuses(statusMap);
-      setBulkEmailMsg(res.data.message || "Payslip emails dispatched!");
-    } catch (err) {
-      setBulkEmailMsg(err.response?.data?.message || "Failed to dispatch payslip emails.");
-    } finally {
-      setSendingBulkEmail(false);
+  // Watch for job completion
+  useEffect(() => {
+    if (progress.status === 'completed' && progress.message) {
+      try {
+        const results = JSON.parse(progress.message);
+        setPayrollResults(results);
+        setShowResults(true);
+        setActivity(prev => prev.map(a => ({ ...a, pending: false })));
+        setFinalizing(false);
+      } catch (e) {}
+    } else if (progress.status === 'error') {
+      setFinalizeError(progress.message || "Error processing payroll");
+      setFinalizing(false);
     }
-  };
-
-  // Handle Copy Payroll Summary to Clipboard (#184)
-  const handleCopySummary = () => {
-    if (!payrollResults || !payrollResults.results) return;
-    const now = new Date();
-    const monthName = now.toLocaleString("default", { month: "long" });
-    const year = now.getFullYear();
-    const totalPayout = payrollResults.results.reduce((sum, r) => sum + (r.netSalary || 0), 0);
-
-    let summaryText = `💰 PaySphere Payroll Summary (${monthName} ${year})\n`;
-    summaryText += `-----------------------------------\n`;
-    summaryText += `👥 Total Employees: ${payrollResults.results.length}\n`;
-    summaryText += `💵 Total Payout: ${fmt(totalPayout, 'INR')} (Base Currency)\n`;
-    summaryText += `-----------------------------------\n`;
-
-    payrollResults.results.forEach((r) => {
-      summaryText += `• ${r.employeeName}: ${fmt(r.netSalary, r.currency)}\n`;
-    });
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(summaryText);
-    } else {
-      const textarea = document.createElement("textarea");
-      textarea.value = summaryText;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-    }
-
-    setCopiedSummary(true);
-    setTimeout(() => setCopiedSummary(false), 2000);
-  };
-
-  const handleExportCsv = async () => {
-    try {
-      const now = new Date();
-      const response = await api.get(`/api/payroll/export-csv?month=${now.getMonth() + 1}&year=${now.getFullYear()}`, {
-        responseType: 'blob',
-      });
-      const blob = response.data;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `payroll-${now.getMonth() + 1}-${now.getFullYear()}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-} catch {
-      setSnackbar({ open: true, message: 'No data to export', severity: 'error' });
-    }  };
-
-  const handleCloseSnackbar = (event, reason) => {
-    if (reason === 'clickaway') return;
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
+  }, [progress.status, progress.message]);
 
   return (
     <div style={{ minHeight: "100vh", background: isDark ? "#090d16" : "#F3F4F6", fontFamily: "'DM Sans','Segoe UI',sans-serif", display: "flex", overflowX: "hidden", transition: "background 0.2s" }}>
@@ -427,49 +336,7 @@ export default function MonthlyUpdates() {
         <title>Monthly Updates | PaySphere</title>
         <meta name="description" content="Log employee earnings, deductions, and leave updates for the current payroll cycle." />
       </Helmet>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=DM+Serif+Display&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        .nav-btn { width:100%; display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:10px; border:none; font-family:'DM Sans',sans-serif; font-size:14.5px; cursor:pointer; margin-bottom:2px; text-align:left; transition:background 0.15s, color 0.15s; }
-        .chip-btn { display:inline-flex; align-items:center; gap:7px; padding:9px 16px; background:white; border:1.5px solid #E5E7EB; border-radius:99px; font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:500; color:#374151; cursor:pointer; transition:border-color 0.15s, background 0.15s, box-shadow 0.15s; }
-        .chip-btn:hover { border-color:#9CA3AF; background:#F9FAFB; box-shadow:0 2px 6px rgba(0,0,0,0.06); }
-        .icon-btn { background:none; border:none; cursor:pointer; display:flex; align-items:center; padding:6px; border-radius:8px; transition:background 0.15s; }
-        .icon-btn:hover { background:#F3F4F6; }
-        .activity-row { display:flex; align-items:center; gap:14px; padding:16px 20px; background:white; border-bottom:1px solid #F0F1F3; transition:background 0.15s; }
-        .activity-row:last-child { border-bottom:none; }
-        .activity-row:hover { background:#FAFAFA; }
-        .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:100; backdrop-filter:blur(4px); }
-        .modal-box { background:white; border-radius:20px; width:92%; max-width:600px; max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.2); }
-        
-        /* Dark Mode Overrides */
-        .dark .chip-btn { background: #111827; border-color: #1e293b; color: #cbd5e1; }
-        .dark .chip-btn:hover { border-color: #475569; background: #1e293b; }
-        .dark .icon-btn:hover { background: #1e293b; }
-        .dark .activity-row { background: #111827; border-bottom: 1px solid #1e293b; }
-        .dark .activity-row:hover { background: #1e293b; }
-        .dark .modal-box { background: #111827; border: 1.5px solid #1e293b; color: white; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
-        .dark .modal-overlay { background: rgba(0,0,0,0.7); }
-        
-        @media (min-width: 768px) {
-          .desktop-ml { margin-left: 236px !important; }
-          aside { transform: translateX(0) !important; }
-          .desktop-p { padding: 44px 48px 80px !important; }
-          .desktop-flex-row { flex-direction: row !important; }
-          .desktop-bottom-left { left: 236px !important; }
-          .desktop-row-padding { padding: 16px 36px !important; }
-        }
-        
-        @media (max-width: 480px) {
-          .activity-row { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
-          .chip-btn { padding: 7px 12px !important; font-size: 12px !important; }
-        }
-        
-        @media (max-width: 640px) {
-          .bottom-cta-inner { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; text-align: center !important; }
-          .bottom-cta-btn { width: 100% !important; }
-          .modal-box { width: 96% !important; margin: 10px !important; }
-        }
-      `}</style>
+
 
       {/* ── Sidebar Backdrop ── */}
       {isSidebarOpen && (
@@ -597,7 +464,7 @@ export default function MonthlyUpdates() {
             </div>
             <button
               onClick={() => {
-                dispatch(logoutUser());
+                logoutUser();
                 localStorage.removeItem("companyName");
                 navigate("/auth");
               }}
@@ -616,7 +483,10 @@ export default function MonthlyUpdates() {
         </header>
 
         {/* Page */}
-        <main className="desktop-p" style={{ flex:1, padding:"30px 20px 100px", display:"flex", flexDirection:"column", alignItems:"center" }}>
+        {isMobile ? (
+          <PayrollWizard />
+        ) : (
+          <main className="desktop-p" style={{ flex:1, padding:"30px 20px 100px", display:"flex", flexDirection:"column", alignItems:"center" }}>
 
           {/* Title */}
           <div style={{ textAlign:"center", marginBottom:30, width:"100%", maxWidth:760 }}>
@@ -694,9 +564,9 @@ export default function MonthlyUpdates() {
             >
               📅 Open Attendance Calendar
             </button>
-            {QUICK_ACTIONS.map(a => (
-              <button key={a.label} className="chip-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => insertTemplate(a.template)}>
-                {a.icon} {a.label}
+            {getQuickActions(currency).map((action) => (
+              <button key={action.label} className="chip-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900" onClick={() => insertTemplate(action.template)}>
+                {action.icon} {action.label}
               </button>
             ))}
           </div>
@@ -841,7 +711,7 @@ export default function MonthlyUpdates() {
               <button
                 className="bottom-cta-btn focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 onClick={handleFinalize}
-                disabled={finalizing || activity.length === 0}
+                disabled={finalizing || activity.length === 0 || progress.status === 'starting' || progress.status === 'running'}
                 style={{
                   padding:"13px 28px",
                   background: activity.length === 0 ? (isDark ? "#334155" : "#9CA3AF") : finalizing ? (isDark ? "#475569" : "#6B7280") : (isDark ? "#3b82f6" : "#1E3A8A"),
@@ -853,9 +723,20 @@ export default function MonthlyUpdates() {
                   transition:"background 0.15s, transform 0.12s",
                   opacity: finalizing ? 0.7 : 1,
                 }}
-                onMouseEnter={e => { if (activity.length > 0 && !finalizing) { e.currentTarget.style.background=isDark ? "#2563EB" : "#1E40AF"; e.currentTarget.style.transform="translateY(-1px)"; }}}
-                onMouseLeave={e => { if (activity.length > 0 && !finalizing) { e.currentTarget.style.background=isDark ? "#3b82f6" : "#1E3A8A"; e.currentTarget.style.transform="none"; }}}
-              >{finalizing ? "Processing..." : "Review & Finalize"}</button>
+                onMouseEnter={e => { if (activity.length > 0 && !finalizing) { e.currentTarget.style.background="#1E40AF"; e.currentTarget.style.transform="translateY(-1px)"; }}}
+                onMouseLeave={e => { if (activity.length > 0 && !finalizing) { e.currentTarget.style.background="#1E3A8A"; e.currentTarget.style.transform="none"; }}}
+              >
+                {finalizing 
+                  ? (progress.status === 'running' ? `Processing... ${progress.percent}%` : "Processing...") 
+                  : "Review & Finalize"}
+              </button>
+              
+              {/* Progress bar container */}
+              {finalizing && progress.status === 'running' && (
+                <div style={{ position: "absolute", top: 0, left: 0, height: 3, width: "100%", background: "#E5E7EB" }}>
+                  <div style={{ height: "100%", background: "#2563EB", width: `${progress.percent}%`, transition: "width 0.3s ease" }} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -1049,6 +930,7 @@ export default function MonthlyUpdates() {
                     <button
                       key={emp._id}
                       onClick={() => handleDisambiguationSelect(emp)}
+                      aria-label={`Select ${emp.fullName}`}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -1072,6 +954,7 @@ export default function MonthlyUpdates() {
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <button
                     onClick={handleDisambiguationCancel}
+                    aria-label="Cancel employee selection"
                     style={{
                       padding: "8px 16px",
                       borderRadius: "8px",
@@ -1091,7 +974,7 @@ export default function MonthlyUpdates() {
 
           {/* Employee Picker Modal for Calendar (#137) */}
           {showEmpPicker && (
-            <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-overlay" onClick={() => setShowEmpPicker(false)}>
+            <div role="dialog" aria-modal="true" aria-label="Select Employee for Calendar" className="modal-overlay" onClick={() => setShowEmpPicker(false)}>
               <div role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && e.target.click()} className="modal-box" onClick={e => e.stopPropagation()} style={{ padding: "24px" }}>
                 <h3 style={{ fontSize: "18px", fontWeight: 700, marginBottom: "6px" }}>Select Employee for Calendar</h3>
                 <p style={{ fontSize: "13.5px", color: isDark ? "#9CA3AF" : "#6B7280", marginBottom: "18px" }}>
@@ -1160,13 +1043,8 @@ export default function MonthlyUpdates() {
           />
 
         </main>
+        )}
       </div>
-
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%', variant: 'filled' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
     </div>
   );
 }

@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
+import Sidebar from '../components/Sidebar';
+import EmployeePortalSkeleton from '../components/common/skeleton/EmployeePortalSkeleton';
 import api from '../services/api';
+import { useAppStore } from '../store/useAppStore';
 
 export default function EmployeePortal() {
   const navigate = useNavigate();
@@ -10,6 +13,9 @@ export default function EmployeePortal() {
   const [employee, setEmployee] = useState(null);
   const [payslips, setPayslips] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const logout = useAppStore((state) => state.logout);
+  const companyName = localStorage.getItem('companyName') || 'PaySphere';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -32,10 +38,8 @@ export default function EmployeePortal() {
   }, []);
 
   const handleSignOut = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('companyName');
-    localStorage.removeItem('userRole');
-    navigate('/');
+    logout();
+    navigate('/auth');
   };
 
   const getMonthName = (monthNum) => {
@@ -48,13 +52,35 @@ export default function EmployeePortal() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
       <Helmet>
         <title>Employee Self-Service Portal | PaySphere</title>
-        <meta name="description" content="View your profile, payslips, and attendance history." />
+        <meta
+          name="description"
+          content="View your profile, payslips, and attendance history."
+        />
       </Helmet>
 
+      <Sidebar
+        companyName={companyName}
+        activePage="My portal"
+        setActivePage={() => {}}
+        isSidebarOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        onLogout={handleSignOut}
+      />
+
       {/* Top Bar */}
-      <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-6 flex items-center justify-between sticky top-0 z-30 transition-colors">
+      <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-4 sm:px-6 md:ml-56 flex items-center justify-between sticky top-0 z-30 transition-colors">
         <div className="flex items-center gap-3">
-          <span className="font-bold text-xl text-blue-600 dark:text-blue-400">PaySphere</span>
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(true)}
+            aria-label="Open sidebar"
+            className="md:hidden p-2 -ml-2 text-gray-600 dark:text-slate-300 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800"
+          >
+            ☰
+          </button>
+          <span className="font-bold text-xl text-blue-600 dark:text-blue-400">
+            PaySphere
+          </span>
           <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-semibold uppercase tracking-wider">
             Employee Portal
           </span>
@@ -63,7 +89,15 @@ export default function EmployeePortal() {
         <div className="flex items-center gap-4">
           <ThemeToggle />
           <button
+            onClick={() => navigate('/profile')}
+            aria-label="Profile Settings"
+            className="px-3.5 py-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition"
+          >
+            Profile Settings
+          </button>
+          <button
             onClick={handleSignOut}
+            aria-label="Sign Out"
             className="px-3.5 py-1.5 text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"
           >
             Sign Out
@@ -72,12 +106,9 @@ export default function EmployeePortal() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-8 space-y-8">
+      <main className="flex-1 w-full md:w-[calc(100%-14rem)] md:ml-56 p-4 sm:p-8 space-y-8">
         {loading ? (
-          <div className="animate-pulse space-y-6">
-            <div className="h-32 bg-gray-200 dark:bg-slate-800 rounded-2xl"></div>
-            <div className="h-64 bg-gray-200 dark:bg-slate-800 rounded-2xl"></div>
-          </div>
+          <EmployeePortalSkeleton />
         ) : (
           <>
             {/* Header Card */}
@@ -90,22 +121,26 @@ export default function EmployeePortal() {
                   {profile?.fullName || 'Employee'}
                 </h1>
                 <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                  {employee?.role ? `${employee.role} • ` : ''}{profile?.companyName || 'PaySphere'}
+                  {employee?.role ? `${employee.role} ? ` : ''}{profile?.companyName || 'PaySphere'}
                 </p>
               </div>
 
               {employee && (
                 <div className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-xl border border-gray-100 dark:border-slate-800 flex gap-6">
                   <div>
-                    <p className="text-xs uppercase text-gray-400 font-bold">Base Monthly Salary</p>
+                    <p className="text-xs uppercase text-gray-400 font-bold">
+                      Base Monthly Salary
+                    </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
-                      ₹{employee.monthlySalary?.toLocaleString('en-IN') || 0}
+                      ,1{employee.monthlySalary?.toLocaleString('en-IN') || 0}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase text-gray-400 font-bold">Overtime Rate</p>
+                    <p className="text-xs uppercase text-gray-400 font-bold">
+                      Overtime Rate
+                    </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
-                      ₹{employee.overtimeRate || 0}/hr
+                      ,1{employee.overtimeRate || 0}/hr
                     </p>
                   </div>
                 </div>
@@ -124,20 +159,25 @@ export default function EmployeePortal() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
+                  <table aria-label="Payslip History Table" className="w-full text-left text-sm">
                     <thead>
                       <tr className="border-b border-gray-200 dark:border-slate-800 text-gray-400 dark:text-slate-400 uppercase text-xs">
                         <th className="py-3 px-4">Period</th>
                         <th className="py-3 px-4">Base Salary</th>
                         <th className="py-3 px-4">Overtime Pay</th>
                         <th className="py-3 px-4">Leave Deductions</th>
-                        <th className="py-3 px-4 font-bold text-slate-900 dark:text-white">Net Payout</th>
+                        <th className="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                          Net Payout
+                        </th>
                         <th className="py-3 px-4">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-slate-800/60">
                       {payslips.map((pay) => (
-                        <tr key={pay._id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                        <tr
+                          key={pay._id}
+                          className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition"
+                        >
                           <td className="py-4 px-4 font-semibold text-slate-900 dark:text-white">
                             {getMonthName(pay.month)} {pay.year}
                           </td>

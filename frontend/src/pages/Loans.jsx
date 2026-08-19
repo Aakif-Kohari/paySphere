@@ -1,10 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Snackbar } from '@mui/material';
+import LoansSkeleton from '../components/common/skeleton/LoansSkeleton';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const MONTH_NAMES = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 const INTEREST_METHODS = [
@@ -14,8 +25,10 @@ const INTEREST_METHODS = [
 ];
 
 const STATUS_STYLES = {
-  active: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
-  on_hold: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  active:
+    'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+  on_hold:
+    'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
   completed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
   cancelled: 'bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-500',
 };
@@ -82,12 +95,14 @@ const Loans = () => {
   // before committing to a deduction that runs for months.
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState('');
-
-  const [toast, setToast] = useState({ open: false, severity: 'success', message: '' });
+  const { toast: globalToast } = useToast();
 
   const notify = useCallback((severity, message) => {
-    setToast({ open: true, severity, message });
-  }, []);
+    if (severity === 'success') globalToast.success(message);
+    else if (severity === 'error') globalToast.error(message);
+    else if (severity === 'warning') globalToast.warning(message);
+    else globalToast.info(message);
+  }, [globalToast]);
 
   const fetchLoans = useCallback(async () => {
     setLoading(true);
@@ -168,7 +183,10 @@ const Loans = () => {
         reason: form.reason,
       });
 
-      notify('success', 'Advance issued. It will be recovered from the next payroll run.');
+      notify(
+        'success',
+        'Advance issued. It will be recovered from the next payroll run.',
+      );
       setShowForm(false);
       setPreview(null);
       setForm({
@@ -194,7 +212,10 @@ const Loans = () => {
     setBusy(true);
     try {
       await api.patch(`/api/loans/${loanId}/status`, { status });
-      notify('success', `Advance ${STATUS_LABELS[status]?.toLowerCase() || status}.`);
+      notify(
+        'success',
+        `Advance ${STATUS_LABELS[status]?.toLowerCase() || status}.`,
+      );
       await fetchLoans();
     } catch (error) {
       notify('error', describeError(error, 'Could not update the advance.'));
@@ -206,7 +227,10 @@ const Loans = () => {
   const progressFor = (loan) => {
     const total = Number(loan.totalPayable) || 0;
     if (total <= 0) return 0;
-    return Math.min(100, Math.round(((Number(loan.totalRepaid) || 0) / total) * 100));
+    return Math.min(
+      100,
+      Math.round(((Number(loan.totalRepaid) || 0) / total) * 100),
+    );
   };
 
   return (
@@ -223,6 +247,8 @@ const Loans = () => {
 
         <button
           onClick={() => setShowForm((v) => !v)}
+          aria-expanded={showForm}
+          aria-label={showForm ? 'Close advance form' : 'Issue an advance'}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition"
         >
           {showForm ? 'Close' : 'Issue an advance'}
@@ -389,10 +415,12 @@ const Loans = () => {
                   <strong>{formatCurrency(preview.installmentAmount)}</strong>
                 </span>
                 <span className="text-gray-700 dark:text-slate-300">
-                  Total payable: <strong>{formatCurrency(preview.totalPayable)}</strong>
+                  Total payable:{' '}
+                  <strong>{formatCurrency(preview.totalPayable)}</strong>
                 </span>
                 <span className="text-gray-700 dark:text-slate-300">
-                  Interest: <strong>{formatCurrency(preview.totalInterest)}</strong>
+                  Interest:{' '}
+                  <strong>{formatCurrency(preview.totalInterest)}</strong>
                 </span>
               </div>
 
@@ -415,14 +443,18 @@ const Loans = () => {
                         <td className="py-1 pr-4">
                           {MONTH_NAMES[row.month - 1]} {row.year}
                         </td>
-                        <td className="py-1 pr-4">{formatCurrency(row.amount)}</td>
+                        <td className="py-1 pr-4">
+                          {formatCurrency(row.amount)}
+                        </td>
                         <td className="py-1 pr-4">
                           {formatCurrency(row.principalComponent)}
                         </td>
                         <td className="py-1 pr-4">
                           {formatCurrency(row.interestComponent)}
                         </td>
-                        <td className="py-1">{formatCurrency(row.closingBalance)}</td>
+                        <td className="py-1">
+                          {formatCurrency(row.closingBalance)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -438,6 +470,7 @@ const Loans = () => {
           <button
             key={status || 'all'}
             onClick={() => setStatusFilter(status)}
+            aria-label={`Filter by ${status ? STATUS_LABELS[status] : 'All'} status`}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
               statusFilter === status
                 ? 'bg-blue-600 text-white'
@@ -454,7 +487,10 @@ const Loans = () => {
           severity="error"
           className="mb-4"
           action={
-            <button onClick={fetchLoans} className="px-3 py-1 text-sm font-semibold underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
+            <button
+              onClick={fetchLoans}
+              className="px-3 py-1 text-sm font-semibold underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+            >
               Retry
             </button>
           }
@@ -464,14 +500,7 @@ const Loans = () => {
       )}
 
       {loading ? (
-        <div className="space-y-3">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-24 rounded-xl bg-gray-100 dark:bg-slate-800/60 animate-pulse"
-            />
-          ))}
-        </div>
+        <LoansSkeleton />
       ) : loans.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
           <p className="text-gray-500 dark:text-slate-500">
@@ -500,8 +529,8 @@ const Loans = () => {
                     </span>
                   </div>
                   <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">
-                    {formatCurrency(loan.principal)} over {loan.tenureMonths} months ·{' '}
-                    {formatCurrency(loan.installmentAmount)}/month
+                    {formatCurrency(loan.principal)} over {loan.tenureMonths}{' '}
+                    months · {formatCurrency(loan.installmentAmount)}/month
                   </p>
                   <p className="text-sm font-medium text-gray-700 dark:text-slate-300 mt-1">
                     Outstanding: {formatCurrency(loan.outstanding)}
@@ -514,6 +543,7 @@ const Loans = () => {
                       <button
                         disabled={busy}
                         onClick={() => handleStatusChange(loan._id, 'on_hold')}
+                        aria-label={`Pause advance for ${loan.employeeName}`}
                         className="px-3 py-1.5 border border-amber-500 text-amber-600 dark:text-amber-400 rounded-lg text-sm font-semibold disabled:opacity-50"
                       >
                         Pause
@@ -522,6 +552,7 @@ const Loans = () => {
                       <button
                         disabled={busy}
                         onClick={() => handleStatusChange(loan._id, 'active')}
+                        aria-label={`Resume advance for ${loan.employeeName}`}
                         className="px-3 py-1.5 border border-green-500 text-green-600 dark:text-green-400 rounded-lg text-sm font-semibold disabled:opacity-50"
                       >
                         Resume
@@ -530,6 +561,7 @@ const Loans = () => {
                     <button
                       disabled={busy}
                       onClick={() => handleStatusChange(loan._id, 'cancelled')}
+                      aria-label={`Cancel advance for ${loan.employeeName}`}
                       className="px-3 py-1.5 border border-red-500 text-red-600 dark:text-red-400 rounded-lg text-sm font-semibold disabled:opacity-50"
                     >
                       Cancel
@@ -547,28 +579,14 @@ const Loans = () => {
                 </div>
                 <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
                   {formatCurrency(loan.totalRepaid)} of{' '}
-                  {formatCurrency(loan.totalPayable)} repaid ({progressFor(loan)}%)
+                  {formatCurrency(loan.totalPayable)} repaid (
+                  {progressFor(loan)}%)
                 </p>
               </div>
             </div>
           ))}
         </div>
       )}
-
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={5000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          severity={toast.severity}
-          onClose={() => setToast((t) => ({ ...t, open: false }))}
-          variant="filled"
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </div>
   );
 };

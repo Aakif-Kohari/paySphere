@@ -5,6 +5,7 @@ const PayrollUpdate = require('../models/payroll.model');
 const User = require('../models/user.model');
 const { calculateNetSalary } = require('../utils/salaryCalculator');
 const { connection } = require('../jobs/queue.service');
+const { acquireLock, releaseLock } = require('../utils/lockManager');
 const logger = require('../utils/logger');
 
 // Helper: parse tag labels back into structured numbers
@@ -20,12 +21,26 @@ const payrollWorker = new Worker(
   'payroll-processing',
   async (job) => {
     let session = null;
+    let lock = false;
     try {
       logger.info(
         `Starting payroll processing job ${job.id} for user ${job.data.userId}`,
       );
 
       const { activities, currentMonth, currentYear, userId } = job.data;
+
+      // ── Idempotency Guard ────────────────────────────────────────────────
+      // Prevent double-processing the same payroll period if two BullMQ workers
+      // pick up the same job, or the job is retried after a crash mid-run.
+      const lockName = `payroll_${userId}_${currentYear}_${String(currentMonth).padStart(2, '0')}`;
+      lock = await acquireLock(lockName, 10 * 60 * 1000);
+      if (!lock) {
+        logger.warn('Payroll job skipped — period already locked or processing', {
+          userId, currentMonth, currentYear,
+        });
+        return { skipped: true, reason: 'lock_held' };
+      }
+      // ────────────────────────────────────────────────────────────────────
 
       const employees = await Employee.find({ createdBy: userId, deletedAt: null });
       const user = await User.findById(userId);
@@ -173,6 +188,16 @@ const payrollWorker = new Worker(
       }
       logger.error(`Error processing payroll job ${job.id}:`, error);
       throw error;
+    } finally {
+      // release lock if it was acquired by us
+      if (typeof lock !== 'undefined' && lock) {
+        try {
+          const lockName = `payroll_${job.data.userId}_${job.data.currentYear}_${String(job.data.currentMonth).padStart(2, '0')}`;
+          await releaseLock(lockName);
+        } catch (err) {
+          logger.warn('Failed to release payroll lock:', err.message);
+        }
+      }
     }
   },
   { connection },

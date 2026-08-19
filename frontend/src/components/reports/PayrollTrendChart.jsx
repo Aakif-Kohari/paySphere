@@ -1,14 +1,23 @@
+import { useAppStore } from '../../store/useAppStore';
 import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
+    CartesianGrid,
+    Line,
+    LineChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
 } from "recharts";
+import { createChartTooltip, formatTooltipValue } from './chartTooltip';
 
-export default function PayrollTrendChart({ data }) {
+export default function PayrollTrendChart({ data = [] }) {
+  const themeMode = useAppStore((state) => state.themeMode);
+  const isDark = themeMode === 'dark';
+  const tooltipContent = createChartTooltip({
+    isDark,
+    formatValue: formatTooltipValue,
+  });
+
   return (
     <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm p-6">
       <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-5">
@@ -24,7 +33,10 @@ export default function PayrollTrendChart({ data }) {
 
             <YAxis />
 
-            <Tooltip />
+            <Tooltip
+              cursor={{ fill: isDark ? 'rgba(30, 41, 59, 0.12)' : 'rgba(148, 163, 184, 0.16)' }}
+              content={tooltipContent}
+            />
 
             <Line
               type="monotone"

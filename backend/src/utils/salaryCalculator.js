@@ -4,6 +4,8 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+const ASTEvaluator = require("../services/astEvaluator.service");
+
 function calculateNetSalary(employee, user, adjustments = {}) {
   let { leaveDays = 0, overtimeHours = 0, bonus = 0, deductions = 0, customDeductions = [] } = adjustments || {};
 

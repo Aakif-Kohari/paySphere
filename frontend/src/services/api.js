@@ -46,6 +46,12 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
+/**
+ * Tear the session down: the server no longer accepts who we claim to be.
+ *
+ * Reserved for 401 and for a refresh that itself fails. A 403 must never come
+ * here — see the note in the interceptor below.
+ */
 const handleAuthFailure = () => {
   localStorage.removeItem('token');
   window.dispatchEvent(new Event('auth:logout'));
@@ -85,8 +91,21 @@ api.interceptors.response.use(
     }
 
     if (error.response.status === 401) {
+      const isBackground = originalRequest.isBackground || originalRequest.headers?.['X-Background-Request'] === 'true' || originalRequest.headers?.['x-background-request'] === 'true';
+
       if (originalRequest._retry) {
-        // Retried request failed with 401 again -> clear session & redirect
+        // Retried request failed with 401 again -> clear session & redirect (or handle background)
+        if (isBackground) {
+          window.dispatchEvent(
+            new CustomEvent("toast:show", {
+              detail: {
+                message: "Auto-save failed: Session expired. Please login again to save your work.",
+                severity: "warning",
+              },
+            })
+          );
+          return Promise.resolve({ data: { success: false, error: "Session expired" } });
+        }
         handleAuthFailure();
         return Promise.reject(error);
       }
@@ -100,6 +119,17 @@ api.interceptors.response.use(
             return api(originalRequest);
           })
           .catch((err) => {
+            if (isBackground) {
+              window.dispatchEvent(
+                new CustomEvent("toast:show", {
+                  detail: {
+                    message: "Auto-save failed: Session expired. Please login again to save your work.",
+                    severity: "warning",
+                  },
+                })
+              );
+              return Promise.resolve({ data: { success: false, error: "Session expired" } });
+            }
             handleAuthFailure();
             return Promise.reject(err);
           });
@@ -123,6 +153,17 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (err) {
         processQueue(err, null);
+        if (isBackground) {
+          window.dispatchEvent(
+            new CustomEvent("toast:show", {
+              detail: {
+                message: "Auto-save failed: Session expired. Please login again to save your work.",
+                severity: "warning",
+              },
+            })
+          );
+          return Promise.resolve({ data: { success: false, error: "Session expired" } });
+        }
         handleAuthFailure();
         return Promise.reject(err);
       } finally {
@@ -130,10 +171,24 @@ api.interceptors.response.use(
       }
     }
 
-    if (error.response.status === 403) {
-      handleAuthFailure();
-    }
-
+    // A 403 is deliberately *not* an auth failure.
+    //
+    // 401 means "I do not know who you are" — clearing the token is right.
+    // 403 means "I know exactly who you are, and you may not do this", and the
+    // session is perfectly valid. Logging the user out here meant a permission
+    // denial destroyed their session: `config/permissions.js` gives HRManager
+    // payroll write but deliberately not APPROVE_PAYROLL, so opening the
+    // Approvals page returned 403 and bounced them to /auth with no
+    // explanation. Log back in, click it again, thrown out again.
+    //
+    // The same applied to the CORS rejection in `app.js`, which answers 403 —
+    // a deployment where FRONTEND_URL does not match the served origin logged
+    // every visitor out on their first XHR, reading as "login is broken".
+    //
+    // The rejection is passed through so the caller can render the server's
+    // message. Approvals.jsx already has the right copy for it; it was simply
+    // unreachable. A refresh call that 403s is still treated as a failure, in
+    // the auth-endpoint branch above, because that genuinely is a dead session.
     return Promise.reject(error);
   },
 );

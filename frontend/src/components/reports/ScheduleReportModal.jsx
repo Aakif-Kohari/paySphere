@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/label-has-associated-control, jsx-a11y/anchor-is-valid */
 import React, { useState } from 'react';
 import api from '../../services/api';
 
@@ -38,11 +39,11 @@ const ScheduleReportModal = ({ isOpen, onClose, defaultType = 'analytics', onSch
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+    <div role="dialog" aria-modal="true" aria-label="Schedule Report" className="fixed inset-0 z-50 flex items-center justify-center h-screen bg-black/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md border border-gray-200 dark:border-slate-800">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-800">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">Schedule Report</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+          <button onClick={onClose} aria-label="Close dialog" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -50,11 +51,12 @@ const ScheduleReportModal = ({ isOpen, onClose, defaultType = 'analytics', onSch
         </div>
         
         <form onSubmit={handleSubmit} className="p-6">
-          {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">{error}</div>}
+          {error && <div role="alert" className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">{error}</div>}
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Report Type</label>
+            <label htmlFor="schedule-report-type" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Report Type</label>
             <select
+              id="schedule-report-type"
               value={reportType}
               onChange={(e) => setReportType(e.target.value)}
               className="w-full p-2.5 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
@@ -66,8 +68,9 @@ const ScheduleReportModal = ({ isOpen, onClose, defaultType = 'analytics', onSch
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Frequency</label>
+            <label htmlFor="schedule-frequency" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Frequency</label>
             <select
+              id="schedule-frequency"
               value={frequency}
               onChange={(e) => setFrequency(e.target.value)}
               className="w-full p-2.5 border border-gray-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
@@ -79,8 +82,9 @@ const ScheduleReportModal = ({ isOpen, onClose, defaultType = 'analytics', onSch
           </div>
 
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Recipients (comma separated)</label>
+            <label htmlFor="schedule-emails" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Recipients (comma separated)</label>
             <input
+              id="schedule-emails"
               type="text"
               value={emails}
               onChange={(e) => setEmails(e.target.value)}

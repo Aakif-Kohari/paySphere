@@ -1,7 +1,6 @@
 /* eslint-disable */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
 import { Command } from 'cmdk';
 import SearchIcon from '@mui/icons-material/Search';
 import GridViewIcon from '@mui/icons-material/GridView';
@@ -16,8 +15,7 @@ import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LogoutIcon from '@mui/icons-material/Logout';
 import api from '../../services/api';
-import { toggleTheme } from '../../features/ui/uiSlice';
-import { logout } from '../../features/auth/authSlice';
+import { useAppStore } from '../../store/useAppStore';
 
 const NAV_COMMANDS = [
   {
@@ -88,19 +86,18 @@ const NAV_COMMANDS = [
 
 const CommandPalette = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const toggleTheme = useAppStore((state) => state.toggleTheme);
+  const logout = useAppStore((state) => state.logout);
 
   const [open, setOpen] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [search, setSearch] = useState('');
 
-  const token = localStorage.getItem('token');
+  const token = useAppStore((state) => state.token) || localStorage.getItem('token');
 
   // Open on Cmd/Ctrl+K and index employees fresh each time
   useEffect(() => {
-    if (!token) return undefined;
-
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -109,20 +106,30 @@ const CommandPalette = () => {
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    if (token) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      if (token) {
+        document.removeEventListener('keydown', handleKeyDown);
+      }
+    };
   }, [token]);
 
   // Close on Escape
   useEffect(() => {
-    if (!open) return undefined;
-
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') setOpen(false);
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    if (open) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      if (open) {
+        document.removeEventListener('keydown', handleKeyDown);
+      }
+    };
   }, [open]);
 
   // Index employee names each time the palette opens so search stays fresh
@@ -171,7 +178,7 @@ const CommandPalette = () => {
         label: 'Toggle Theme',
         keywords: 'dark light mode appearance',
         icon: <DarkModeIcon fontSize="small" />,
-        action: () => dispatch(toggleTheme()),
+        action: toggleTheme,
       },
       {
         id: 'sign-out',
@@ -179,13 +186,13 @@ const CommandPalette = () => {
         keywords: 'logout exit',
         icon: <LogoutIcon fontSize="small" />,
         action: () => {
-          dispatch(logout());
+          logout();
           localStorage.removeItem('companyName');
           navigate('/');
         },
       },
     ],
-    [dispatch, navigate],
+    [logout, navigate, toggleTheme],
   );
 
   if (!token) return null;
@@ -194,6 +201,9 @@ const CommandPalette = () => {
     open && (
       <div
         className="fixed inset-0 z-[1000] flex items-start justify-center bg-black/50 backdrop-blur-sm pt-[12vh] px-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
         onMouseDown={() => setOpen(false)}
       >
         <Command
@@ -209,6 +219,7 @@ const CommandPalette = () => {
               // eslint-disable-next-line jsx-a11y/no-autofocus
               autoFocus
               placeholder="Type a command or search employees…"
+              aria-label="Search commands and employees"
               className="w-full bg-transparent py-3.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none"
             />
             <kbd className="hidden sm:inline-flex px-1.5 py-0.5 text-[10px] font-mono text-gray-400 dark:text-slate-500 border border-gray-200 dark:border-slate-700 rounded">

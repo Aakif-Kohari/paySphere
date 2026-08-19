@@ -8,6 +8,8 @@ const User = require('../../models/user.model');
 const Employee = require('../../models/employee.model');
 const PayrollUpdate = require('../../models/payroll.model');
 const AuditLog = require('../../models/auditLog.model');
+const Tenant = require('../../models/tenant.model');
+jest.mock('../../models/tenant.model');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
@@ -98,10 +100,14 @@ describe('Google Authentication Controller tests', () => {
     await googleAuth(req, res);
 
     expect(User.findOne).toHaveBeenCalledWith({ email: 'newuser@example.com' });
-    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.status).toHaveBeenCalledWith(201);
+    // The Google path returns the account type and employee link too, so the
+    // client gets the same shape from every sign-in route (#558).
     expect(res.json).toHaveBeenCalledWith({
       token: 'dummy_jwt_token',
       companyName: 'Test Company',
+      role: 'ADMIN',
+      employeeId: undefined,
       message: 'Account created successfully',
     });
   });
@@ -124,6 +130,8 @@ describe('Google Authentication Controller tests', () => {
     expect(res.json).toHaveBeenCalledWith({
       token: 'dummy_jwt_token',
       companyName: 'Test Company',
+      role: 'ADMIN',
+      employeeId: undefined,
       message: 'Logged in successfully',
     });
   });
@@ -159,7 +167,7 @@ describe('Google Authentication Controller tests', () => {
     expect(User.findOne).toHaveBeenCalledWith({
       email: 'tokenuser@example.com',
     });
-    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.status).toHaveBeenCalledWith(201);
     delete process.env.GOOGLE_CLIENT_ID;
   });
 
@@ -438,10 +446,58 @@ describe('Delete Account Controller tests', () => {
     });
   });
 
-  test('should delete account atomically within a transaction', async () => {
+  test('should delete account and company-wide employee/payroll data when caller is the tenant owner', async () => {
+    req.tenantId = 'tenant123';
     User.findById.mockResolvedValue({
       _id: 'user123',
       password: 'hashedPassword',
+    });
+    Tenant.findById.mockResolvedValue({
+      _id: 'tenant123',
+      ownerId: 'user123',
+    });
+    Employee.deleteMany.mockResolvedValue({});
+    PayrollUpdate.deleteMany.mockResolvedValue({});
+    Tenant.findByIdAndUpdate.mockResolvedValue({});
+    AuditLog.deleteMany.mockResolvedValue({});
+    User.findByIdAndDelete.mockResolvedValue({});
+
+    await deleteAccount(req, res, next);
+
+    expect(Tenant.findById).toHaveBeenCalledWith('tenant123');
+    expect(Employee.deleteMany).toHaveBeenCalledWith(
+      { tenantId: 'tenant123' },
+      expect.any(Object),
+    );
+    expect(PayrollUpdate.deleteMany).toHaveBeenCalledWith(
+      { tenantId: 'tenant123' },
+      expect.any(Object),
+    );
+    expect(Tenant.findByIdAndUpdate).toHaveBeenCalledWith(
+      'tenant123',
+      { $set: { isActive: false } },
+      expect.any(Object),
+    );
+    expect(AuditLog.deleteMany).toHaveBeenCalledWith(
+      { userId: 'user123' },
+      expect.any(Object),
+    );
+    expect(User.findByIdAndDelete).toHaveBeenCalledWith(
+      'user123',
+      expect.any(Object),
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  test('should delete only user account and personal audit logs when caller is not the tenant owner', async () => {
+    req.tenantId = 'tenant123';
+    User.findById.mockResolvedValue({
+      _id: 'user123',
+      password: 'hashedPassword',
+    });
+    Tenant.findById.mockResolvedValue({
+      _id: 'tenant123',
+      ownerId: 'different_user',
     });
     Employee.deleteMany.mockResolvedValue({});
     PayrollUpdate.deleteMany.mockResolvedValue({});
@@ -450,14 +506,18 @@ describe('Delete Account Controller tests', () => {
 
     await deleteAccount(req, res, next);
 
-    expect(mongoose.startSession).toHaveBeenCalled();
-    expect(mockSession.startTransaction).toHaveBeenCalled();
-    expect(mockSession.commitTransaction).toHaveBeenCalled();
-    expect(mockSession.endSession).toHaveBeenCalled();
+    expect(Tenant.findById).toHaveBeenCalledWith('tenant123');
+    expect(Employee.deleteMany).not.toHaveBeenCalled();
+    expect(PayrollUpdate.deleteMany).not.toHaveBeenCalled();
+    expect(AuditLog.deleteMany).toHaveBeenCalledWith(
+      { userId: 'user123' },
+      expect.any(Object),
+    );
+    expect(User.findByIdAndDelete).toHaveBeenCalledWith(
+      'user123',
+      expect.any(Object),
+    );
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({
-      message: 'Account and associated data deleted successfully.',
-    });
   });
 
   test('should return 404 if user not found', async () => {
@@ -472,9 +532,14 @@ describe('Delete Account Controller tests', () => {
 
   test('should abort transaction and call next(error) on failure', async () => {
     const error = new Error('Database failure');
+    req.tenantId = 'tenant123';
     User.findById.mockResolvedValue({
       _id: 'user123',
       password: 'hashedPassword',
+    });
+    Tenant.findById.mockResolvedValue({
+      _id: 'tenant123',
+      ownerId: 'user123',
     });
     Employee.deleteMany.mockImplementation(() => {
       throw error;
@@ -493,23 +558,29 @@ describe('Delete Account Controller tests', () => {
       .spyOn(mongoose, 'startSession')
       .mockRejectedValue(new Error('Transactions not supported'));
 
+    req.tenantId = 'tenant123';
     User.findById.mockResolvedValue({
       _id: 'user123',
       password: 'hashedPassword',
     });
+    Tenant.findById.mockResolvedValue({
+      _id: 'tenant123',
+      ownerId: 'user123',
+    });
     Employee.deleteMany.mockResolvedValue({ deletedCount: 3 });
     PayrollUpdate.deleteMany.mockResolvedValue({ deletedCount: 5 });
+    Tenant.findByIdAndUpdate.mockResolvedValue({});
     AuditLog.deleteMany.mockResolvedValue({ deletedCount: 1 });
     User.findByIdAndDelete.mockResolvedValue({ deletedCount: 1 });
 
     await deleteAccount(req, res, next);
 
     expect(Employee.deleteMany).toHaveBeenCalledWith(
-      { createdBy: 'user123' },
+      { tenantId: 'tenant123' },
       {},
     );
     expect(PayrollUpdate.deleteMany).toHaveBeenCalledWith(
-      { createdBy: 'user123' },
+      { tenantId: 'tenant123' },
       {},
     );
     expect(AuditLog.deleteMany).toHaveBeenCalledWith({ userId: 'user123' }, {});

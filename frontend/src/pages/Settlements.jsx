@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Snackbar } from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Pagination from '../components/common/Pagination';
+import SettlementsSkeleton from '../components/common/skeleton/SettlementsSkeleton';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const STATUS_LABELS = {
   draft: 'Draft',
@@ -12,7 +15,8 @@ const STATUS_LABELS = {
 
 const STATUS_STYLES = {
   draft: 'bg-gray-200 text-gray-700 dark:bg-slate-800 dark:text-slate-300',
-  pending_approval: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  pending_approval:
+    'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
   approved: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
   paid: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
   cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
@@ -72,6 +76,12 @@ const Settlements = () => {
   const [busy, setBusy] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
 
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const limit = 10;
+
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     employeeId: '',
@@ -87,35 +97,50 @@ const Settlements = () => {
     allowNegative: false,
   });
 
-  // Preview writes nothing, so the number can be modelled before committing.
   const [preview, setPreview] = useState(null);
   const [formError, setFormError] = useState('');
-
-  const [toast, setToast] = useState({ open: false, severity: 'success', message: '' });
+  const { toast: globalToast } = useToast();
 
   const notify = useCallback((severity, message) => {
-    setToast({ open: true, severity, message });
-  }, []);
+    if (severity === 'success') globalToast.success(message);
+    else if (severity === 'error') globalToast.error(message);
+    else if (severity === 'warning') globalToast.warning(message);
+    else globalToast.info(message);
+  }, [globalToast]);
 
   const fetchSettlements = useCallback(async () => {
     setLoading(true);
     setLoadError('');
 
     try {
-      const params = statusFilter ? { status: statusFilter } : {};
+      const params = {
+        page,
+        limit,
+        ...(statusFilter ? { status: statusFilter } : {}),
+      };
+
       const res = await api.get('/api/settlements', { params });
+
       setSettlements(res.data?.settlements || []);
+      setTotalPages(res.data?.totalPages || 1);
+      setTotalCount(res.data?.totalCount || 0);
     } catch (error) {
       setSettlements([]);
       setLoadError(describeError(error, 'Could not load settlements.'));
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, page, limit]);
 
   useEffect(() => {
     fetchSettlements();
   }, [fetchSettlements]);
+
+  // Reset to page 1 whenever status filter changes
+  const handleFilterChange = (status) => {
+    setStatusFilter(status);
+    setPage(1);
+  };
 
   useEffect(() => {
     if (!showForm || employees.length > 0) return;
@@ -128,7 +153,9 @@ const Settlements = () => {
 
   const setField = (field) => (event) => {
     const value =
-      event.target.type === 'checkbox' ? event.target.checked : event.target.value;
+      event.target.type === 'checkbox'
+        ? event.target.checked
+        : event.target.value;
     setForm((prev) => ({ ...prev, [field]: value }));
     setPreview(null);
     setFormError('');
@@ -143,10 +170,13 @@ const Settlements = () => {
     if (!canPreview) return;
 
     try {
+      const lastWorkingDayDate = form.lastWorkingDay
+        ? new Date(form.lastWorkingDay + 'T12:00:00.000Z')
+        : undefined;
       const res = await api.get('/api/settlements/preview', {
         params: {
           employeeId: form.employeeId,
-          lastWorkingDay: form.lastWorkingDay,
+          lastWorkingDay: lastWorkingDayDate,
           unusedLeaveDays: form.unusedLeaveDays || undefined,
           noticePeriodDays: form.noticePeriodDays || undefined,
           noticeServedDays: form.noticeServedDays || undefined,
@@ -171,11 +201,13 @@ const Settlements = () => {
     setFormError('');
 
     try {
-      // Record the exit first, so the employee moves onto notice and stays
-      // payable up to their last day.
+      const lastWorkingDayDate = form.lastWorkingDay
+        ? new Date(form.lastWorkingDay + 'T12:00:00.000Z')
+        : undefined;
+
       await api.post('/api/settlements/initiate', {
         employeeId: form.employeeId,
-        lastWorkingDay: form.lastWorkingDay,
+        lastWorkingDay: lastWorkingDayDate,
         exitType: form.exitType,
         noticePeriodDays: form.noticePeriodDays || undefined,
         noticeServedDays: form.noticeServedDays || undefined,
@@ -183,10 +215,14 @@ const Settlements = () => {
 
       await api.post('/api/settlements', {
         employeeId: form.employeeId,
-        lastWorkingDay: form.lastWorkingDay,
+        lastWorkingDay: lastWorkingDayDate,
         unusedLeaveDays: Number(form.unusedLeaveDays) || 0,
-        noticePeriodDays: form.noticePeriodDays ? Number(form.noticePeriodDays) : undefined,
-        noticeServedDays: form.noticeServedDays ? Number(form.noticeServedDays) : undefined,
+        noticePeriodDays: form.noticePeriodDays
+          ? Number(form.noticePeriodDays)
+          : undefined,
+        noticeServedDays: form.noticeServedDays
+          ? Number(form.noticeServedDays)
+          : undefined,
         assetRecovery: Number(form.assetRecovery) || 0,
         advanceRecovery: Number(form.advanceRecovery) || 0,
         bonus: Number(form.bonus) || 0,
@@ -197,6 +233,7 @@ const Settlements = () => {
       notify('success', 'Settlement drafted.');
       setShowForm(false);
       setPreview(null);
+      setPage(1);
       await fetchSettlements();
     } catch (error) {
       setFormError(describeError(error, 'Could not create the settlement.'));
@@ -214,7 +251,10 @@ const Settlements = () => {
       notify('success', `Settlement ${action.replace('-', ' ')}.`);
       await fetchSettlements();
     } catch (error) {
-      notify('error', describeError(error, `Could not ${action} the settlement.`));
+      notify(
+        'error',
+        describeError(error, `Could not ${action} the settlement.`),
+      );
     } finally {
       setBusy(false);
     }
@@ -243,6 +283,8 @@ const Settlements = () => {
 
         <button
           onClick={() => setShowForm((v) => !v)}
+          aria-expanded={showForm}
+          aria-label={showForm ? 'Close exit form' : 'Start an exit'}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition"
         >
           {showForm ? 'Close' : 'Start an exit'}
@@ -306,7 +348,10 @@ const Settlements = () => {
               ['advanceRecovery', 'Advance recovery'],
               ['assetRecovery', 'Asset recovery'],
             ].map(([field, label]) => (
-              <label key={field} className="text-sm text-gray-700 dark:text-slate-300">
+              <label
+                key={field}
+                className="text-sm text-gray-700 dark:text-slate-300"
+              >
                 {label}
                 <input
                   type="number"
@@ -341,8 +386,16 @@ const Settlements = () => {
                     Earnings
                   </p>
                   {[
-                    ['Prorated salary', s.earnings.proratedSalary, s.explanations.proratedSalary],
-                    ['Leave encashment', s.earnings.leaveEncashment, s.explanations.leaveEncashment],
+                    [
+                      'Prorated salary',
+                      s.earnings.proratedSalary,
+                      s.explanations.proratedSalary,
+                    ],
+                    [
+                      'Leave encashment',
+                      s.earnings.leaveEncashment,
+                      s.explanations.leaveEncashment,
+                    ],
                     ['Gratuity', s.earnings.gratuity, s.explanations.gratuity],
                     ['Bonus / ex-gratia', s.earnings.bonus, null],
                   ].map(([label, amount, explanation]) => (
@@ -365,7 +418,11 @@ const Settlements = () => {
                     Deductions
                   </p>
                   {[
-                    ['Notice shortfall', s.deductions.noticeShortfall, s.explanations.noticeShortfall],
+                    [
+                      'Notice shortfall',
+                      s.deductions.noticeShortfall,
+                      s.explanations.noticeShortfall,
+                    ],
                     ['Advance recovery', s.deductions.advanceRecovery, null],
                     ['Asset recovery', s.deductions.assetRecovery, null],
                   ].map(([label, amount, explanation]) => (
@@ -437,12 +494,14 @@ const Settlements = () => {
         </form>
       )}
 
+      {/* Status Filters */}
       <div className="flex flex-wrap gap-2 mb-4">
         {['', 'draft', 'pending_approval', 'approved', 'paid', 'cancelled'].map(
           (status) => (
             <button
               key={status || 'all'}
-              onClick={() => setStatusFilter(status)}
+              onClick={() => handleFilterChange(status)}
+              aria-label={`Filter by ${status ? STATUS_LABELS[status] : 'All'} status`}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
                 statusFilter === status
                   ? 'bg-blue-600 text-white'
@@ -473,14 +532,7 @@ const Settlements = () => {
       )}
 
       {loading ? (
-        <div className="space-y-3">
-          {[0, 1].map((i) => (
-            <div
-              key={i}
-              className="h-28 rounded-xl bg-gray-100 dark:bg-slate-800/60 animate-pulse"
-            />
-          ))}
-        </div>
+        <SettlementsSkeleton />
       ) : settlements.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
           <p className="text-gray-500 dark:text-slate-400">
@@ -488,116 +540,119 @@ const Settlements = () => {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {settlements.map((item) => (
-            <div
-              key={item._id}
-              className="p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl"
-            >
-              <div className="flex flex-wrap justify-between items-start gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-lg text-gray-900 dark:text-white">
-                      {item.employeeName}
+        <div className="space-y-4">
+          <div className="grid gap-4">
+            {settlements.map((item) => (
+              <div
+                key={item._id}
+                className="p-5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl"
+              >
+                <div className="flex flex-wrap justify-between items-start gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-lg text-gray-900 dark:text-white">
+                        {item.employeeName}
+                      </p>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          STATUS_STYLES[item.status] || STATUS_STYLES.draft
+                        }`}
+                      >
+                        {STATUS_LABELS[item.status] || item.status}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                      Last working day {formatDate(item.lastWorkingDay)}
                     </p>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                        STATUS_STYLES[item.status] || STATUS_STYLES.draft
-                      }`}
-                    >
-                      {STATUS_LABELS[item.status] || item.status}
-                    </span>
+                    <p className="text-sm text-gray-700 dark:text-slate-300 mt-1">
+                      Gross {formatCurrency(item.grossEarnings)} − deductions{' '}
+                      {formatCurrency(item.totalDeductions)} ={' '}
+                      <strong
+                        className={
+                          item.netSettlement < 0
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-gray-900 dark:text-white'
+                        }
+                      >
+                        {formatCurrency(item.netSettlement)}
+                      </strong>
+                    </p>
+                    {item.rejectionReason && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        Sent back: {item.rejectionReason}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                    Last working day {formatDate(item.lastWorkingDay)}
-                  </p>
-                  <p className="text-sm text-gray-700 dark:text-slate-300 mt-1">
-                    Gross {formatCurrency(item.grossEarnings)} − deductions{' '}
-                    {formatCurrency(item.totalDeductions)} ={' '}
-                    <strong
-                      className={
-                        item.netSettlement < 0
-                          ? 'text-red-600 dark:text-red-400'
-                          : 'text-gray-900 dark:text-white'
-                      }
-                    >
-                      {formatCurrency(item.netSettlement)}
-                    </strong>
-                  </p>
-                  {item.rejectionReason && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      Sent back: {item.rejectionReason}
-                    </p>
-                  )}
-                </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {item.status === 'draft' && (
-                    <button
-                      disabled={busy}
-                      onClick={() => runAction(item._id, 'submit')}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
-                    >
-                      Submit for approval
-                    </button>
-                  )}
-                  {item.status === 'pending_approval' && (
-                    <>
+                  <div className="flex flex-wrap gap-2">
+                    {item.status === 'draft' && (
                       <button
                         disabled={busy}
-                        onClick={() => runAction(item._id, 'approve')}
+                        onClick={() => runAction(item._id, 'submit')}
+                        aria-label={`Submit settlement for ${item.employeeName}`}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
+                      >
+                        Submit for approval
+                      </button>
+                    )}
+                    {item.status === 'pending_approval' && (
+                      <>
+                        <button
+                          disabled={busy}
+                          onClick={() => runAction(item._id, 'approve')}
+                          aria-label={`Approve settlement for ${item.employeeName}`}
+                          className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          disabled={busy}
+                          onClick={() => handleReject(item._id)}
+                          aria-label={`Send back settlement for ${item.employeeName}`}
+                          className="px-3 py-1.5 border border-red-500 text-red-600 dark:text-red-400 rounded-lg text-sm font-semibold disabled:opacity-50"
+                        >
+                          Send back
+                        </button>
+                      </>
+                    )}
+                    {item.status === 'approved' && (
+                      <button
+                        disabled={busy}
+                        onClick={() => runAction(item._id, 'mark-paid')}
+                        aria-label={`Mark paid and offboard ${item.employeeName}`}
                         className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
                       >
-                        Approve
+                        Mark paid &amp; offboard
                       </button>
+                    )}
+                    {['draft', 'pending_approval', 'approved'].includes(
+                      item.status,
+                    ) && (
                       <button
                         disabled={busy}
-                        onClick={() => handleReject(item._id)}
-                        className="px-3 py-1.5 border border-red-500 text-red-600 dark:text-red-400 rounded-lg text-sm font-semibold disabled:opacity-50"
+                        onClick={() => runAction(item._id, 'cancel')}
+                        aria-label={`Cancel settlement for ${item.employeeName}`}
+                        className="px-3 py-1.5 border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-400 rounded-lg text-sm font-semibold disabled:opacity-50"
                       >
-                        Send back
+                        Cancel
                       </button>
-                    </>
-                  )}
-                  {item.status === 'approved' && (
-                    <button
-                      disabled={busy}
-                      onClick={() => runAction(item._id, 'mark-paid')}
-                      className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
-                    >
-                      Mark paid &amp; offboard
-                    </button>
-                  )}
-                  {['draft', 'pending_approval', 'approved'].includes(item.status) && (
-                    <button
-                      disabled={busy}
-                      onClick={() => runAction(item._id, 'cancel')}
-                      className="px-3 py-1.5 border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-400 rounded-lg text-sm font-semibold disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+
+          {/* Reusable Standardized Pagination Component */}
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={totalCount}
+            itemsPerPage={limit}
+            onPageChange={(newPage) => setPage(newPage)}
+          />
         </div>
       )}
-
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={5000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          severity={toast.severity}
-          onClose={() => setToast((t) => ({ ...t, open: false }))}
-          variant="filled"
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </div>
   );
 };

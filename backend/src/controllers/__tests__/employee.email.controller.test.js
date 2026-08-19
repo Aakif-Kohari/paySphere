@@ -2,6 +2,10 @@ const { addEmployee, updateEmployee } = require('../employee.controller');
 const Employee = require('../../models/employee.model');
 const User = require('../../models/user.model');
 
+// The company. A different value from the user id on purpose: since #613 the
+// scope is the tenant, not the account that created the row.
+const TENANT = '507f1f77bcf86cd799439099';
+
 jest.mock('../../models/payroll.model', () => ({
   updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
   exists: jest.fn().mockResolvedValue(false),
@@ -30,6 +34,7 @@ let constructed;
 jest.mock('../../models/employee.model', () => {
   const mockConstructor = jest.fn().mockImplementation(function (data) {
     Object.assign(this, data);
+
     this._id = 'emp-1';
     this.save = jest.fn().mockResolvedValue(this);
     return this;
@@ -47,6 +52,7 @@ describe('addEmployee — email persistence (#414)', () => {
     jest.clearAllMocks();
     req = {
       userId: 'user123',
+      tenantId: TENANT,
       body: {
         fullName: 'Asha R',
         role: 'Designer',
@@ -109,6 +115,26 @@ describe('addEmployee — email persistence (#414)', () => {
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
+  test('accepts international phone numbers with a country code', async () => {
+    req.body.phone = '+1 (415) 555-1234';
+
+    await addEmployee(req, res, next);
+
+    expect(constructed.phone).toBe('+1 (415) 555-1234');
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+  test('rejects malformed phone numbers with 400', async () => {
+    req.body.phone = '91-12345';
+
+    await addEmployee(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Phone number must be a valid international phone number',
+    });
+  });
+
   test('omits the field entirely when no email is given', async () => {
     // Storing "" would put every email-less employee into the same bucket of
     // the unique index and re-create the collision.
@@ -131,7 +157,7 @@ describe('addEmployee — email persistence (#414)', () => {
     req.body.email = 'asha@acme.com';
     const duplicateError = Object.assign(new Error('E11000'), {
       code: 11000,
-      keyPattern: { email: 1, createdBy: 1 },
+      keyPattern: { email: 1, tenantId: 1 },
     });
     Employee.mockImplementation(function (data) {
       Object.assign(this, data);
@@ -151,7 +177,7 @@ describe('addEmployee — email persistence (#414)', () => {
   test('forwards a duplicate violation on a different index to next()', async () => {
     const nameClash = Object.assign(new Error('E11000'), {
       code: 11000,
-      keyPattern: { createdBy: 1, fullName: 1, role: 1 },
+      keyPattern: { tenantId: 1, fullName: 1, role: 1 },
     });
     Employee.mockImplementation(function (data) {
       Object.assign(this, data);
@@ -195,12 +221,13 @@ describe('updateEmployee — email persistence (#414)', () => {
       monthlySalary: 40000,
       email: 'asha@acme.com',
       createdBy: { toString: () => 'user123' },
+    tenantId: { toString: () => TENANT },
       bankDetails: {},
       save: jest.fn().mockResolvedValue(true),
       markModified: jest.fn(),
     };
 
-    req = { userId: 'user123', params: { id: 'emp-1' }, body: {} };
+    req = { userId: 'user123', tenantId: TENANT, params: { id: 'emp-1' }, body: {} };
     res = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis(),
@@ -255,6 +282,27 @@ describe('updateEmployee — email persistence (#414)', () => {
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
+  test('accepts an international phone number on update', async () => {
+    req.body.phone = '+44 20 7946 0958';
+
+    await updateEmployee(req, res, next);
+
+    expect(employee.phone).toBe('+44 20 7946 0958');
+    expect(employee.markModified).toHaveBeenCalledWith('phone');
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+
+  test('rejects a malformed phone number with 400', async () => {
+    req.body.phone = '12345';
+
+    await updateEmployee(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      message: 'Phone number must be a valid international phone number',
+    });
+  });
+
   test('leaves the existing address untouched when email is omitted', async () => {
     req.body = { role: 'Senior Designer' };
 
@@ -269,7 +317,7 @@ describe('updateEmployee — email persistence (#414)', () => {
     employee.save.mockRejectedValue(
       Object.assign(new Error('E11000'), {
         code: 11000,
-        keyPattern: { email: 1, createdBy: 1 },
+        keyPattern: { email: 1, tenantId: 1 },
       }),
     );
 
@@ -279,7 +327,7 @@ describe('updateEmployee — email persistence (#414)', () => {
   });
 
   test('still enforces ownership before touching the email', async () => {
-    employee.createdBy = { toString: () => 'someone-else' };
+    employee.tenantId = { toString: () => 'someone-elses-company' };
     req.body.email = 'attacker@evil.com';
 
     await updateEmployee(req, res, next);

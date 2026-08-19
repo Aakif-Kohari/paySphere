@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const softDeletePlugin = require('../utils/softDelete.plugin');
 const {
   ALL_SETTLEMENT_STATUSES,
   SETTLEMENT_STATUS,
@@ -21,9 +22,30 @@ const settlementSchema = new mongoose.Schema(
       required: true,
     },
     employeeName: { type: String, required: true },
+    /**
+     * Who created this row. An audit fact, not a scoping key.
+     *
+     * #585's codemod rewrote every `createdBy: req.userId` in the controllers
+     * to `tenantId: req.tenantId` while leaving this field `required: true`, so
+     * every insert omitted a field the schema demanded and `create()` threw
+     * before reaching Mongo (#613). Both fields are written now: this one
+     * records the actor, `tenantId` below decides who can see the row.
+     */
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
+      required: true,
+    },
+
+    /**
+     * Which company this row belongs to — the field every read filters on.
+     *
+     * Separate from `createdBy` because a company can have more than one admin,
+     * and a row created by one of them has to stay visible to the others.
+     */
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
       required: true,
     },
 
@@ -111,9 +133,11 @@ const settlementSchema = new mongoose.Schema(
 );
 
 // One live settlement per employee. A cancelled one does not block a new
-// attempt, so the partial index excludes it.
+// attempt, so the partial index excludes it. Scoped to the company rather than
+// the admin who opened it, so a second admin cannot open a parallel settlement
+// for the same exit (#613).
 settlementSchema.index(
-  { employeeId: 1, createdBy: 1 },
+  { employeeId: 1, tenantId: 1 },
   {
     unique: true,
     partialFilterExpression: {
@@ -122,6 +146,8 @@ settlementSchema.index(
   },
 );
 
-settlementSchema.index({ createdBy: 1, status: 1, createdAt: -1 });
+// Leads with `tenantId` to match what the settlements list filters on (#613).
+settlementSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
 
+settlementSchema.plugin(softDeletePlugin);
 module.exports = mongoose.model('Settlement', settlementSchema);

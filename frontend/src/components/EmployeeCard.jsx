@@ -90,6 +90,7 @@ const CardHeader = ({ emp, finalized, onEdit }) => (
           onClick={onEdit}
           className="pt-2 px-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 bg-gray-50 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           title="Edit Employee"
+          aria-label={`Edit ${emp.fullName}`}
         >
           <EditOutlinedIcon fontSize="small" className='mb-2'/>
         </button>
@@ -206,6 +207,8 @@ export default function EmployeeCard({
         {/* Salary package & revision history (#461) */}
         <button
           onClick={() => setShowSalaryHistory((v) => !v)}
+          aria-expanded={showSalaryHistory}
+          aria-label={showSalaryHistory ? `Hide salary history for ${emp.fullName}` : `View salary package and history for ${emp.fullName}`}
           className="mt-4 w-full py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors text-sm font-medium"
         >
           {showSalaryHistory ? 'Hide salary history' : 'Salary package & history'}
@@ -225,6 +228,7 @@ export default function EmployeeCard({
         {onDeleteEmployee && (
           <button
             onClick={() => onDeleteEmployee(emp)}
+            aria-label={`Delete ${emp.fullName}`}
             className="mt-4 w-full py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400 transition-colors"
           >
             Delete Employee
@@ -259,6 +263,7 @@ export default function EmployeeCard({
       {/* Button */}
       <button
         onClick={onAddUpdate}
+        aria-label={p ? `Edit updates for ${emp.fullName}` : `Add update for ${emp.fullName}`}
         className="border border-gray-200 dark:border-slate-800 rounded-lg py-2 text-blue-600 dark:text-blue-400 font-semibold hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
       >
         {p ? 'Edit Updates' : '+ Add Update'}

@@ -17,6 +17,27 @@ const Attendance = require('../../models/attendance.model');
 jest.mock('../../models/employee.model');
 jest.mock('../../models/payroll.model');
 jest.mock('../../models/user.model');
+// Read once per employee in a run, to bundle anything owed from a backdated
+// salary revision (#931). Mocked as a factory rather than automocked so the
+// query never reaches Mongoose: unmocked, it buffers against a database this
+// suite never connects to and every test in the file times out (#950).
+jest.mock('../../models/arrearsLedger.model', () => ({
+  find: jest.fn(() => ({
+    sort: jest.fn().mockReturnThis(),
+    lean: jest.fn().mockResolvedValue([]),
+  })),
+  updateMany: jest.fn().mockResolvedValue({ modifiedCount: 0 }),
+  insertMany: jest.fn().mockResolvedValue([]),
+}));
+// Expense claims are read for every employee in a run since #719. Same reason
+// as the mock above: unmocked it buffers and the whole suite times out.
+jest.mock('../../models/expenseClaim.model', () => ({
+  find: jest.fn(() => ({
+    populate: jest.fn().mockReturnThis(),
+    lean: jest.fn().mockResolvedValue([]),
+  })),
+  bulkWrite: jest.fn().mockResolvedValue({}),
+}));
 jest.mock('../../models/attendance.model');
 // Payroll also recovers loan instalments (#460); stubbed so this suite stays
 // focused on the attendance ledger.
@@ -31,9 +52,13 @@ jest.mock('../../models/salaryStructure.model', () => ({
 }));
 jest.mock('../../services/cache.service', () => ({
   invalidateAnalytics: jest.fn().mockResolvedValue(undefined),
+  invalidateDashboardSummary: jest.fn().mockResolvedValue(undefined),
 }));
 
 const OWNER = '507f1f77bcf86cd799439011';
+// The company. A different id from OWNER on purpose: since #613 the scope is
+// the tenant, not the account that created the row.
+const TENANT = '507f1f77bcf86cd799439099';
 const EMP_A = '607f1f77bcf86cd7994390a1';
 
 const oid = (hex) => new mongoose.Types.ObjectId(hex);
@@ -80,6 +105,7 @@ beforeEach(() => {
 
   req = {
     userId: OWNER,
+    tenantId: TENANT,
     body: {
       month: 7,
       year: 2026,
@@ -222,7 +248,7 @@ describe('payroll prefers the attendance ledger over parsed tags', () => {
     await submitPayrollForReview(req, res, next);
 
     expect(Attendance.find).toHaveBeenCalledWith({
-      createdBy: OWNER,
+      tenantId: TENANT,
       year: 2026,
       month: 7,
     });
