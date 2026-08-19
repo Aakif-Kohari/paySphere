@@ -1,6 +1,8 @@
 /**
- * @fileoverview Travel policy, request and settlement schemas.
- * @description Issue: #1077
+ * @fileoverview Travel Policy, Request, Settlement & Per Diem Schemas
+ * @description Manages travel requests, per diem policies, advance settlements,
+ * and corporate travel workflows.
+ * Issues: #1077 (Original Travel), #1209 (Corporate Travel & Per Diem)
  *
  * `advanceReleased` on the request is the field this whole feature turns on. It
  * is a company receivable — the same class of asset as a `loan.model.js` balance
@@ -22,6 +24,10 @@ const {
   REQUEST_STATUS,
   SETTLEMENT_TYPE,
 } = require('../utils/perDiemCalculator');
+
+// ============================================================================
+// Original Travel Policy Schemas (Issue #1077)
+// ============================================================================
 
 const travelPolicySchema = new mongoose.Schema(
   {
@@ -258,4 +264,150 @@ const TravelSettlement = mongoose.model(
   travelSettlementSchema,
 );
 
-module.exports = { TravelPolicy, TravelRequest, TravelSettlement };
+// ============================================================================
+// Corporate Travel & Per Diem Schemas (Issue #1209)
+// ============================================================================
+
+const perDiemPolicySchema = new mongoose.Schema(
+  {
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: true,
+      index: true,
+    },
+    cityTier: {
+      type: String,
+      enum: ['Metro', 'Tier-2', 'International', 'Remote'],
+      required: true,
+    },
+    dailyAllowance: { type: Number, required: true, min: 0 },
+    hotelLimit: { type: Number, default: 0, min: 0 },
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true },
+);
+
+const PerDiemPolicy = mongoose.model('PerDiemPolicy', perDiemPolicySchema);
+
+const corporateTravelRequestSchema = new mongoose.Schema(
+  {
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: true,
+      index: true,
+    },
+    employeeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Employee',
+      required: true,
+      index: true,
+    },
+
+    destination: { type: String, required: true },
+    cityTier: { type: String, required: true }, // Linked to policy
+    purpose: { type: String, required: true },
+
+    startDate: { type: Date, required: true },
+    endDate: { type: Date, required: true },
+    durationDays: { type: Number, required: true },
+
+    // Advance Calculations
+    estimatedPerDiem: { type: Number, default: 0 },
+    estimatedTravelCost: { type: Number, default: 0 }, // Flights/Trains
+    totalAdvanceRequested: { type: Number, default: 0 },
+
+    status: {
+      type: String,
+      enum: [
+        'Draft',
+        'Pending Approval',
+        'Approved',
+        'Advance Paid',
+        'Settled',
+        'Rejected',
+      ],
+      default: 'Draft',
+      index: true,
+    },
+
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    advancePaidAt: { type: Date, default: null },
+  },
+  { timestamps: true },
+);
+
+const CorporateTravelRequest = mongoose.model(
+  'CorporateTravelRequest',
+  corporateTravelRequestSchema,
+);
+
+const corporateTravelSettlementSchema = new mongoose.Schema(
+  {
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: true,
+      index: true,
+    },
+    requestId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'CorporateTravelRequest',
+      required: true,
+      unique: true,
+    },
+
+    advancePaid: { type: Number, required: true },
+    actualExpenses: { type: Number, required: true },
+
+    balance: {
+      type: Number,
+      required: true,
+    }, // Positive = Company owes employee, Negative = Employee owes company
+    status: {
+      type: String,
+      enum: [
+        'Pending Submission',
+        'Under Review',
+        'Settled (Payable)',
+        'Settled (Recovery)',
+      ],
+      default: 'Pending Submission',
+    },
+
+    expenseReceipts: [
+      {
+        category: String,
+        amount: Number,
+        description: String,
+        receiptUrl: String,
+      },
+    ],
+  },
+  { timestamps: true },
+);
+
+const CorporateTravelSettlement = mongoose.model(
+  'CorporateTravelSettlement',
+  corporateTravelSettlementSchema,
+);
+
+// ============================================================================
+// Exports
+// ============================================================================
+
+module.exports = {
+  // Original Travel Schemas (Issue #1077)
+  TravelPolicy,
+  TravelRequest,
+  TravelSettlement,
+  // Corporate Travel & Per Diem Schemas (Issue #1209)
+  PerDiemPolicy,
+  CorporateTravelRequest,
+  CorporateTravelSettlement,
+};

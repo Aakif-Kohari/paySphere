@@ -107,3 +107,62 @@ exports.approveRequest = async (req, res, next) => {
         res.status(200).json({ message: `Request ${status}`, request });
     } catch (error) { next(error); }
 };
+
+exports.getUpcomingExpirationsByDepartment = async (req, res, next) => {
+    try {
+        const now = new Date();
+        const days = parseInt(req.query.days, 10) || 30;
+        const limitDate = new Date(now);
+        limitDate.setDate(limitDate.getDate() + days);
+
+        const accruals = await ToilLedger.find({
+            tenantId: req.tenantId,
+            transactionType: 'Accrual',
+            expiresAt: { $gte: now, $lte: limitDate }
+        }).populate({
+            path: 'employeeId',
+            select: 'fullName email department'
+        });
+
+        const departmentsMap = {};
+
+        for (const accrual of accruals) {
+            if (!accrual.employeeId) continue;
+            
+            const usedFromThisAccrual = await ToilLedger.aggregate([
+                {
+                    $match: {
+                        tenantId: req.tenantId,
+                        employeeId: accrual.employeeId._id,
+                        transactionType: 'Usage',
+                        createdAt: { $gt: accrual.createdAt, $lt: now }
+                    }
+                },
+                { $group: { _id: null, totalUsed: { $sum: { $abs: '$days' } } } }
+            ]);
+
+            const totalUsed = usedFromThisAccrual.length > 0 ? usedFromThisAccrual[0].totalUsed : 0;
+            const remainingDays = accrual.days - totalUsed;
+
+            if (remainingDays <= 0) continue;
+
+            const dept = accrual.employeeId.department || 'Unassigned';
+            if (!departmentsMap[dept]) {
+                departmentsMap[dept] = [];
+            }
+
+            departmentsMap[dept].push({
+                accrualId: accrual._id,
+                employeeId: accrual.employeeId._id,
+                employeeName: accrual.employeeId.fullName,
+                employeeEmail: accrual.employeeId.email,
+                accruedDays: accrual.days,
+                remainingDays,
+                expiresAt: accrual.expiresAt,
+                createdAt: accrual.createdAt
+            });
+        }
+
+        res.status(200).json({ success: true, departments: departmentsMap });
+    } catch (error) { next(error); }
+};
