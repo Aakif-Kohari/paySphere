@@ -288,6 +288,12 @@ export const APP_ROUTES = [
     employee: true,
   },
 
+  // ── Enterprise Suites (routed, sidebar-hidden) ──────────────────────────────
+  {
+    path: '/enterprise/vendor-management',
+    component: lazy(() => import('../pages/vendor/EnterpriseVendorDashboardPage')),
+  },
+
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
   // No `label`, so they get a route and no nav entry. Settings and the profile
