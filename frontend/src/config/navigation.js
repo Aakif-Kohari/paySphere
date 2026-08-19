@@ -301,6 +301,10 @@ export const APP_ROUTES = [
     path: '/enterprise/travel-expense',
     component: lazy(() => import('../pages/travel/EnterpriseTravelDashboardPage')),
   },
+  {
+    path: '/enterprise/asset-inventory',
+    component: lazy(() => import('../pages/assets/EnterpriseAssetDashboardPage')),
+  },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
