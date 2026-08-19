@@ -306,6 +306,12 @@ export const APP_ROUTES = [
   //
   // No `label`, so they get a route and no nav entry. Settings and the profile
   // page live in the sidebar footer; system health is a link inside settings.
+  // ── Enterprise (routed but sidebar entry managed separately) ─────────────
+  {
+    path: '/enterprise/time-attendance',
+    component: lazy(() => import('../pages/timeattendance/EnterpriseTimeAttendanceDashboardPage')),
+  },
+
   {
     path: '/settings',
     component: lazy(() => import('../pages/Settings')),

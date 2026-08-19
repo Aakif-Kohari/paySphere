@@ -72,12 +72,41 @@ exports.uploadPaymentReceipt = async (req, res, next) => {
         const challan = await StatutoryChallan.findOne({ _id: challanId, tenantId: req.tenantId });
         if (!challan) return res.status(404).json({ message: 'Challan not found' });
 
-        challan.paymentReceiptUrl = receiptUrl;
-        challan.status = 'Paid';
+        let parsed = null;
+        if (req.file) {
+            const { parseChallanPdf } = require('../utils/challanParser.utils');
+            parsed = await parseChallanPdf(req.file.buffer);
+        } else if (req.body.receiptText) {
+            const { parseChallanPdf } = require('../utils/challanParser.utils');
+            parsed = await parseChallanPdf(Buffer.from(req.body.receiptText, 'utf8'));
+        }
+
+        challan.paymentReceiptUrl = receiptUrl || (req.file ? `mock://receipts/${req.file.originalname}` : '');
         challan.paidAt = new Date();
+
+        if (parsed) {
+            challan.extractedChallanAmount = parsed.amount;
+            challan.extractedTaxId = parsed.taxId;
+            challan.reconciliationNotes = parsed.notes;
+            challan.reconciledAt = new Date();
+
+            if (Math.abs(parsed.amount - challan.totalChallanAmount) < 0.01) {
+                challan.status = 'reconciled';
+            } else {
+                challan.status = 'discrepancy';
+            }
+        } else {
+            challan.status = 'Paid';
+        }
+
         await challan.save();
 
-        res.status(200).json({ message: 'Payment receipt uploaded and challan marked as Paid.', challan });
+        res.status(200).json({
+            message: parsed 
+                ? `Payment receipt processed. Reconciliation status: ${challan.status}`
+                : 'Payment receipt uploaded and challan marked as Paid.',
+            challan
+        });
     } catch (error) { next(error); }
 };
 
