@@ -129,4 +129,6 @@ expenseClaimSchema.index({
   expenseDate: 1,
 });
 
-module.exports = mongoose.model('ExpenseClaim', expenseClaimSchema);
+module.exports =
+  mongoose.models.ExpenseClaim ||
+  mongoose.model('ExpenseClaim', expenseClaimSchema);

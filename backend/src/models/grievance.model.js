@@ -1,9 +1,14 @@
 /**
- * @fileoverview POSH Grievance & ICC Schemas
+ * @fileoverview POSH Grievance, ICC & Ethics Committee Schemas
  * @description Cryptographically secure schemas for anonymous reporting,
- * Internal Complaints Committee (ICC) case management, votes, and SLA tracking.
+ * Internal Complaints Committee (ICC) case management, votes, SLA tracking,
+ * and whistleblower reports with ethics committee management.
  */
 const mongoose = require('mongoose');
+
+// ============================================================================
+// ICC Committee Schema
+// ============================================================================
 
 const iccCommitteeSchema = new mongoose.Schema(
   {
@@ -41,6 +46,10 @@ const iccCommitteeSchema = new mongoose.Schema(
 
 iccCommitteeSchema.index({ tenantId: 1, userId: 1 }, { unique: true });
 const ICCCommittee = mongoose.model('ICCCommittee', iccCommitteeSchema);
+
+// ============================================================================
+// Grievance Schema (POSH)
+// ============================================================================
 
 const grievanceSchema = new mongoose.Schema(
   {
@@ -162,6 +171,10 @@ const grievanceSchema = new mongoose.Schema(
 grievanceSchema.index({ tenantId: 1, status: 1 });
 const Grievance = mongoose.model('Grievance', grievanceSchema);
 
+// ============================================================================
+// Case Note Schema
+// ============================================================================
+
 const caseNoteSchema = new mongoose.Schema(
   {
     tenantId: {
@@ -193,6 +206,10 @@ const caseNoteSchema = new mongoose.Schema(
 );
 
 const CaseNote = mongoose.model('CaseNote', caseNoteSchema);
+
+// ============================================================================
+// ICC Vote Schema
+// ============================================================================
 
 const iccVoteSchema = new mongoose.Schema(
   {
@@ -227,4 +244,97 @@ const iccVoteSchema = new mongoose.Schema(
 iccVoteSchema.index({ grievanceId: 1, voterId: 1 }, { unique: true });
 const ICCVote = mongoose.model('ICCVote', iccVoteSchema);
 
-module.exports = { ICCCommittee, Grievance, CaseNote, ICCVote };
+// ============================================================================
+// Grievance Report Schema (Whistleblower - Issue #1207)
+// ============================================================================
+
+const grievanceReportSchema = new mongoose.Schema(
+  {
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: true,
+      index: true,
+    },
+
+    // Anonymous tracking token (generated for the reporter to check status later)
+    trackingToken: { type: String, required: true, unique: true, index: true },
+
+    // Encrypted Payloads (AES-256-GCM)
+    encryptedTitle: { type: String, required: true },
+    encryptedBody: { type: String, required: true },
+    encryptedAttachments: [{ type: String }], // Array of encrypted file URLs/paths
+
+    // Encryption metadata (IV and AuthTag for AES-GCM)
+    iv: { type: String, required: true },
+    authTag: { type: String, required: true },
+
+    status: {
+      type: String,
+      enum: ['Submitted', 'Under Investigation', 'Resolved', 'Dismissed'],
+      default: 'Submitted',
+      index: true,
+    },
+
+    // Audit trail for decryption access
+    accessLogs: [
+      {
+        accessedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        accessedAt: { type: Date, default: Date.now },
+        action: {
+          type: String,
+          enum: ['Decrypted', 'Status Updated', 'Comment Added'],
+        },
+      },
+    ],
+
+    resolutionNotes: { type: String, default: '' }, // Also encrypted in production
+    resolvedAt: { type: Date, default: null },
+  },
+  { timestamps: true },
+);
+
+const GrievanceReport = mongoose.model('GrievanceReport', grievanceReportSchema);
+
+// ============================================================================
+// Ethics Committee Schema (Issue #1207)
+// ============================================================================
+
+const ethicsCommitteeSchema = new mongoose.Schema(
+  {
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: true,
+      index: true,
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    role: {
+      type: String,
+      enum: ['Chairperson', 'Member', 'Legal Counsel'],
+      default: 'Member',
+    },
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true },
+);
+
+ethicsCommitteeSchema.index({ tenantId: 1, userId: 1 }, { unique: true });
+const EthicsCommittee = mongoose.model('EthicsCommittee', ethicsCommitteeSchema);
+
+// ============================================================================
+// Exports
+// ============================================================================
+
+module.exports = {
+  ICCCommittee,
+  Grievance,
+  CaseNote,
+  ICCVote,
+  GrievanceReport,
+  EthicsCommittee,
+};

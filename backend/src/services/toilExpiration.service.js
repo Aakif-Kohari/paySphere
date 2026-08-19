@@ -87,4 +87,65 @@ async function processToilExpirations(tenantId = null) {
     return { expiredCount, daysExpired };
 }
 
-module.exports = { processToilExpirations };
+async function sendToilExpiryWarnings(tenantId = null) {
+    const { enqueueEmail } = require('../jobs/email.queue');
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const targetDateMin = new Date();
+    targetDateMin.setDate(targetDateMin.getDate() + 15);
+    targetDateMin.setHours(0, 0, 0, 0);
+
+    const targetDateMax = new Date(targetDateMin);
+    targetDateMax.setDate(targetDateMax.getDate() + 1);
+
+    const query = {
+        transactionType: 'Accrual',
+        expiresAt: { $gte: targetDateMin, $lt: targetDateMax },
+        days: { $gt: 0 }
+    };
+
+    if (tenantId) query.tenantId = tenantId;
+
+    const warnings = await ToilLedger.find(query).populate('employeeId', 'fullName email');
+
+    let warningCount = 0;
+
+    for (const accrual of warnings) {
+        const usedFromThisAccrual = await ToilLedger.aggregate([
+            {
+                $match: {
+                    tenantId: accrual.tenantId,
+                    employeeId: accrual.employeeId._id,
+                    transactionType: 'Usage',
+                    createdAt: { $gt: accrual.createdAt, $lt: now }
+                }
+            },
+            { $group: { _id: null, totalUsed: { $sum: { $abs: '$days' } } } }
+        ]);
+
+        const totalUsed = usedFromThisAccrual.length > 0 ? usedFromThisAccrual[0].totalUsed : 0;
+        const remainingDays = accrual.days - totalUsed;
+
+        if (remainingDays > 0 && accrual.employeeId && accrual.employeeId.email) {
+            try {
+                await enqueueEmail({
+                    to: accrual.employeeId.email,
+                    subject: 'Compensatory Off (TOIL) Expiration Warning',
+                    html: `<p>Dear ${accrual.employeeId.fullName},</p>
+                           <p>You have <strong>${remainingDays} days</strong> of accrued Time Off In Lieu (TOIL) that will expire on <strong>${accrual.expiresAt.toLocaleDateString()}</strong>.</p>
+                           <p>Please utilize this balance before it lapses.</p>
+                           <p>Sincerely,<br/>PaySphere Team</p>`
+                });
+                warningCount++;
+                logger.info(`[TOIL] Dispatched 15-day expiration warning email to ${accrual.employeeId.email} for ${remainingDays} days.`);
+            } catch (err) {
+                logger.error('Failed to send TOIL expiration warning email', { error: err.message });
+            }
+        }
+    }
+
+    return { warningCount };
+}
+
+module.exports = { processToilExpirations, sendToilExpiryWarnings };

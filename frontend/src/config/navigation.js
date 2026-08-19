@@ -288,10 +288,38 @@ export const APP_ROUTES = [
     employee: true,
   },
 
+  // ── Enterprise Suites (routed, sidebar-hidden) ──────────────────────────────
+  {
+    path: '/enterprise/vendor-management',
+    component: lazy(() => import('../pages/vendor/EnterpriseVendorDashboardPage')),
+  },
+  {
+    path: '/enterprise/benefits-compensation',
+    component: lazy(() => import('../pages/benefits/EnterpriseBenefitsDashboardPage')),
+  },
+  {
+    path: '/enterprise/travel-expense',
+    component: lazy(() => import('../pages/travel/EnterpriseTravelDashboardPage')),
+  },
+  {
+    path: '/enterprise/asset-inventory',
+    component: lazy(() => import('../pages/assets/EnterpriseAssetDashboardPage')),
+  },
+  {
+    path: '/enterprise/compliance-audit',
+    component: lazy(() => import('../pages/compliance/EnterpriseComplianceDashboardPage')),
+  },
+
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
   // No `label`, so they get a route and no nav entry. Settings and the profile
   // page live in the sidebar footer; system health is a link inside settings.
+  // ── Enterprise (routed but sidebar entry managed separately) ─────────────
+  {
+    path: '/enterprise/time-attendance',
+    component: lazy(() => import('../pages/timeattendance/EnterpriseTimeAttendanceDashboardPage')),
+  },
+
   {
     path: '/settings',
     component: lazy(() => import('../pages/Settings')),
