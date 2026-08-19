@@ -87,6 +87,10 @@ router.post(
 router.post('/2fa/disable', auth, disable2FA);
 router.post('/2fa/validate-login', authRateLimiter, auth, validate2FALogin);
 
+const { setupMFA, verifyMFASetup } = require('../middlewares/mfa.middleware');
+router.post('/mfa/setup', auth, setupMFA);
+router.post('/mfa/verify', auth, verifyMFASetup);
+
 // Settings & Health
 router.get('/settings', auth, getSettings);
 router.patch('/settings', auth, writeRateLimiter, updateSettings);
