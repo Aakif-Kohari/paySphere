@@ -378,6 +378,14 @@ const startCronJobs = () => {
     );
   });
   logger.info('Monthly database archival cron job registered.');
+
+  // 04:00 daily — TOIL Expirations and Warnings.
+  cron.schedule('0 4 * * *', () => {
+    runToilExpirationJob().catch((error) =>
+      logger.error('TOIL expiration job threw', { error: error.message }),
+    );
+  });
+  logger.info('Daily TOIL expiration cron job registered.');
 };
 
 /**
@@ -419,6 +427,29 @@ async function runHrmsSyncJob() {
   }
 }
 
+async function runToilExpirationJob() {
+  const now = new Date();
+  const lockId = `toil_expiration_${now.getFullYear()}_${now.getMonth() + 1}_${now.getDate()}`;
+
+  const lock = await acquireLock(lockId);
+  if (!lock.acquired) {
+    logger.info('TOIL expiration job skipped: lock is held elsewhere', { lockId });
+    return { ran: false, reason: lock.reason };
+  }
+
+  try {
+    const { processToilExpirations, sendToilExpiryWarnings } = require('../services/toilExpiration.service');
+    const expirationResult = await processToilExpirations();
+    const warningResult = await sendToilExpiryWarnings();
+    await releaseLock(lockId);
+    return { ran: true, ...expirationResult, ...warningResult };
+  } catch (error) {
+    logger.error('TOIL expiration job failed', { error: error.message });
+    await releaseLock(lockId);
+    return { ran: false, reason: 'error' };
+  }
+}
+
 module.exports = {
   startCronJobs,
   runMonthlyPayslipJob,
@@ -427,6 +458,7 @@ module.exports = {
   runDatabaseBackupJob,
   runDatabaseArchivalJob,
   runForexSyncJob,
+  runToilExpirationJob,
   previousPeriod,
   acquireLock,
   releaseLock,
