@@ -415,8 +415,8 @@ export const APP_ROUTES = [
     component: lazy(() => import('../pages/learning/EnterpriseLearningDevelopmentPage')),
   },
   {
-    path: '/enterprise/workforce-intelligence',
-    component: lazy(() => import('../pages/workforce/EnterpriseWorkforceIntelligencePage')),
+    path: '/enterprise/onboarding-lifecycle',
+    component: lazy(() => import('../pages/onboarding/EnterpriseOnboardingLifecyclePage')),
   },
 
   {
