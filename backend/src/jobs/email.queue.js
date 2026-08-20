@@ -19,6 +19,10 @@ const emailQueue = new Queue('email-processing', {
   },
 });
 
+emailQueue.on('error', () => {
+  // Suppress unhandled error crashes when Redis is offline. config/redis.js already logs this.
+});
+
 /**
  * Enqueues an email for background delivery.
  * @param {'payslip'|'generic'} type - Which processor in workers/email.worker.js handles this job
