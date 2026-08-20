@@ -55,6 +55,57 @@ export class MultiCurrencyTreasuryService {
     const convertedUSD = amount * vault.fxRateToUSD;
     return { success: true, convertedUSD };
   }
+
+  public async getDbVaults(tenantId: string): Promise<CurrencyVaultDTO[]> {
+    const Treasury = require('../models/treasury.model');
+    let record = await Treasury.findOne({ tenantId });
+    if (!record) {
+      record = await Treasury.create({
+        tenantId,
+        baseCurrency: 'USD',
+        balances: { 'USD': 8450000.50, 'EUR': 3200000.00, 'GBP': 1950000.75 },
+      });
+    }
+
+    const rates: { [key: string]: number } = { 'USD': 1.0, 'EUR': 1.085, 'GBP': 1.272 };
+    const hedged: { [key: string]: number } = { 'USD': 100, 'EUR': 85, 'GBP': 90 };
+
+    const list: CurrencyVaultDTO[] = [];
+    for (const [code, val] of record.balances.entries()) {
+      list.push({
+        id: `vlt-${code.toLowerCase()}`,
+        currencyCode: code,
+        totalBalance: val,
+        fxRateToUSD: rates[code] || 1.0,
+        hedgedPercentage: hedged[code] || 80,
+        status: 'ACTIVE',
+      });
+    }
+    return list;
+  }
+
+  public async executeDbLiquiditySwap(tenantId: string, fromCurrency: string, toCurrency: string, amount: number): Promise<{ success: boolean; convertedUSD: number }> {
+    const Treasury = require('../models/treasury.model');
+    const record = await Treasury.findOne({ tenantId });
+    if (!record) return { success: false, convertedUSD: 0 };
+
+    const fromBalance = record.balances.get(fromCurrency) || 0;
+    if (fromBalance < amount) return { success: false, convertedUSD: 0 };
+
+    const rates: { [key: string]: number } = { 'USD': 1.0, 'EUR': 1.085, 'GBP': 1.272 };
+    const fromRate = rates[fromCurrency.toUpperCase()] || 1.0;
+    const toRate = rates[toCurrency.toUpperCase()] || 1.0;
+
+    const convertedUSD = amount * fromRate;
+    const addedAmount = convertedUSD / toRate;
+
+    record.balances.set(fromCurrency, fromBalance - amount);
+    record.balances.set(toCurrency, (record.balances.get(toCurrency) || 0) + addedAmount);
+
+    await record.save();
+
+    return { success: true, convertedUSD };
+  }
 }
 
 const treasuryService = new MultiCurrencyTreasuryService();
