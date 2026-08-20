@@ -100,12 +100,31 @@ const payrollWorker = new Worker(
           }
         }
 
+        const customDeductions = [];
+
+        const { EsopExercise } = require('../models/esop.model');
+        const exercises = await EsopExercise.find({
+          employeeId: employee._id,
+          tenantId: employee.tenantId || employee.createdBy,
+          payrollMonth: currentMonth,
+          payrollYear: currentYear,
+        });
+
+        const esopTds = exercises.reduce((sum, e) => sum + (e.tdsWithheld || 0), 0);
+        if (esopTds > 0) {
+          customDeductions.push({
+            name: 'ESOP Option Exercise Tax (TDS)',
+            amount: esopTds,
+          });
+        }
+
         const { baseSalary, leaveDeduction, overtimePay, netSalary } =
           calculateNetSalary(employee, user, {
             leaveDays,
             overtimeHours,
             bonus,
             deductions,
+            customDeductions,
           });
 
         preparedItems.push({
@@ -115,6 +134,7 @@ const payrollWorker = new Worker(
           overtimeHours,
           bonus,
           deductions,
+          customDeductions,
           leaveDeduction,
           overtimePay,
           netSalary,
@@ -159,6 +179,7 @@ const payrollWorker = new Worker(
           overtimeHours: item.overtimeHours,
           bonus: item.bonus,
           deductions: item.deductions,
+          customDeductions: item.customDeductions,
           leaveDeduction: item.leaveDeduction,
           overtimePay: item.overtimePay,
           netSalary: item.netSalary,

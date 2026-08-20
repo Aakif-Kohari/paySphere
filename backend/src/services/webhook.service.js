@@ -6,12 +6,12 @@
  * Issue: #645, completed in #474.
  */
 
-const { Queue } = require("bullmq");
-const redisConnection = require("../config/redis");
-const { isRedisAvailable } = require("../config/redis");
-const WebhookEndpoint = require("../models/webhookEndpoint.model");
-const logger = require("../utils/logger");
-const eventBus = require("./event.service");
+const { Queue } = require('bullmq');
+const redisConnection = require('../config/redis');
+const { isRedisAvailable } = require('../config/redis');
+const WebhookEndpoint = require('../models/webhookEndpoint.model');
+const logger = require('../utils/logger');
+const eventBus = require('./event.service');
 
 const { AUDIT_LOG_EVENT } = eventBus;
 
@@ -25,18 +25,30 @@ const { AUDIT_LOG_EVENT } = eventBus;
  *
  * Configured with exponential backoff for failed deliveries.
  */
-const webhookQueue = new Queue("webhook-deliveries", {
-  connection: redisConnection,
-  defaultJobOptions: {
-    removeOnComplete: { count: 1000 }, // Keep last 1000 successful jobs
-    removeOnFail: { count: 5000 }, // Keep last 5000 failed jobs
-    attempts: 5, // Max 5 attempts
-    backoff: {
-      type: "exponential",
-      delay: 60000, // Base delay; the worker's custom strategy shapes it further
+let webhookQueue;
+if (process.env.REDIS_URL) {
+  webhookQueue = new Queue('webhook-deliveries', {
+    connection: redisConnection,
+    defaultJobOptions: {
+      removeOnComplete: { count: 1000 },
+      removeOnFail: { count: 5000 },
+      attempts: 5,
+      backoff: {
+        type: 'exponential',
+        delay: 60000,
+      },
     },
-  },
-});
+  });
+
+  webhookQueue.on('error', () => {
+    // Suppress unhandled error crashes when Redis is offline. config/redis.js already logs this.
+  });
+} else {
+  webhookQueue = {
+    add: async () => ({ id: 'mock-webhook-job-id' }),
+    on: () => {},
+  };
+}
 
 /**
  * Maps internal event bus actions to webhook event names.
@@ -46,13 +58,13 @@ const webhookQueue = new Queue("webhook-deliveries", {
  * that is not here (e.g. `LOAN_ISSUE`) is audited but never dispatched.
  */
 const EVENT_MAPPING = {
-  EMPLOYEE_CREATE: "EMPLOYEE_CREATE",
-  EMPLOYEE_UPDATE: "EMPLOYEE_UPDATE",
-  EMPLOYEE_DELETE: "EMPLOYEE_DELETE",
-  PAYROLL_FINALIZE: "PAYROLL_FINALIZE",
-  PAYROLL_APPROVE: "PAYROLL_APPROVE",
-  PAYROLL_REJECT: "PAYROLL_REJECT",
-  PAYROLL_PAID: "PAYROLL_PAID",
+  EMPLOYEE_CREATE: 'EMPLOYEE_CREATE',
+  EMPLOYEE_UPDATE: 'EMPLOYEE_UPDATE',
+  EMPLOYEE_DELETE: 'EMPLOYEE_DELETE',
+  PAYROLL_FINALIZE: 'PAYROLL_FINALIZE',
+  PAYROLL_APPROVE: 'PAYROLL_APPROVE',
+  PAYROLL_REJECT: 'PAYROLL_REJECT',
+  PAYROLL_PAID: 'PAYROLL_PAID',
 };
 
 /** Idempotence guard: requiring twice must not double-subscribe. */
@@ -79,7 +91,7 @@ async function handleAuditEvent(eventData) {
 
     const tenantId = eventData.tenantId || eventData.req?.tenantId;
     if (!tenantId) {
-      logger.warn("Webhook dispatch skipped: Missing tenantId in event", {
+      logger.warn('Webhook dispatch skipped: Missing tenantId in event', {
         action: internalAction,
       });
       return;
@@ -90,7 +102,7 @@ async function handleAuditEvent(eventData) {
       // quiet skip beats five attempts to `add()` that each fail and log an
       // error that reads like a crash.
       logger.warn(
-        "Webhook dispatch skipped: Redis is not available. Deliveries will resume when Redis is reachable.",
+        'Webhook dispatch skipped: Redis is not available. Deliveries will resume when Redis is reachable.',
         { action: internalAction, tenantId: String(tenantId) },
       );
       return;
@@ -115,7 +127,7 @@ async function handleAuditEvent(eventData) {
 
     for (const endpoint of endpoints) {
       await webhookQueue.add(
-        "deliver",
+        'deliver',
         {
           endpointId: endpoint._id.toString(),
           tenantId: tenantId.toString(),
@@ -135,7 +147,7 @@ async function handleAuditEvent(eventData) {
     );
   } catch (error) {
     // Never let webhook dispatch crash the main event bus.
-    logger.error("Webhook dispatch listener failed", {
+    logger.error('Webhook dispatch listener failed', {
       action: eventData.action,
       error: error.message,
     });
@@ -154,7 +166,9 @@ function initializeWebhookService() {
   eventBus.on(AUDIT_LOG_EVENT, handleAuditEvent);
   registered = true;
 
-  logger.info("Webhook dispatch service initialized", { event: AUDIT_LOG_EVENT });
+  logger.info('Webhook dispatch service initialized', {
+    event: AUDIT_LOG_EVENT,
+  });
   return true;
 }
 
@@ -178,31 +192,35 @@ function unregisterWebhookService() {
 }
 
 async function retryDlqJob(deliveryLogId, tenantId) {
-  const WebhookDelivery = require("../models/webhookDelivery.model");
-  const delivery = await WebhookDelivery.findOne({ _id: deliveryLogId, tenantId });
+  const WebhookDelivery = require('../models/webhookDelivery.model');
+  const delivery = await WebhookDelivery.findOne({
+    _id: deliveryLogId,
+    tenantId,
+  });
   if (!delivery) {
-    throw new Error("Webhook delivery log not found.");
+    throw new Error('Webhook delivery log not found.');
   }
 
-  const endpoint = await WebhookEndpoint.findOne({ _id: delivery.endpointId, tenantId, isActive: true });
+  const endpoint = await WebhookEndpoint.findOne({
+    _id: delivery.endpointId,
+    tenantId,
+    isActive: true,
+  });
   if (!endpoint) {
-    throw new Error("Webhook endpoint is inactive or not found.");
+    throw new Error('Webhook endpoint is inactive or not found.');
   }
 
-  await webhookQueue.add(
-    "deliver",
-    {
-      endpointId: endpoint._id.toString(),
-      tenantId: tenantId.toString(),
-      url: endpoint.url,
-      secret: endpoint.secret,
-      eventName: delivery.eventName,
-      payload: delivery.payload,
-    }
-  );
+  await webhookQueue.add('deliver', {
+    endpointId: endpoint._id.toString(),
+    tenantId: tenantId.toString(),
+    url: endpoint.url,
+    secret: endpoint.secret,
+    eventName: delivery.eventName,
+    payload: delivery.payload,
+  });
 
   delivery.isDlq = false;
-  delivery.errorMessage = "Retried manually by admin";
+  delivery.errorMessage = 'Retried manually by admin';
   await delivery.save();
 
   return delivery;

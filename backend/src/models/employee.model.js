@@ -51,6 +51,65 @@ const employeeSchema = new mongoose.Schema(
     },
 
     /**
+     * Pay equity attributes (#1347).
+     *
+     * All three are optional and all three are absent by default, which is the
+     * only version of this that is defensible. A tenant that does not collect
+     * them gets the compa-ratio analysis and a clearly-labelled
+     * "insufficient data" on the demographic one — never a crash, and never a
+     * fabricated zero gap.
+     *
+     * `gender` is deliberately free text with a short list of conventional
+     * values rather than a two-value enum. It is self-declared, it is not the
+     * product's business to decide what the valid answers are, and a schema
+     * that rejects an employee's own description of themselves is a bug that
+     * surfaces as a 500 on a profile save. The analysis groups by whatever
+     * string is here and suppresses any group too small to report on, so an
+     * open vocabulary costs nothing.
+     *
+     * `ethnicity` is here for the same reporting reason and is not read by
+     * anything today; it is the second axis the pay gap regulations in several
+     * jurisdictions are moving towards, and adding the column later would mean
+     * a backfill nobody can do retrospectively.
+     */
+    gender: {
+      type: String,
+      default: undefined,
+      trim: true,
+      maxlength: [60, 'Gender cannot exceed 60 characters'],
+    },
+    ethnicity: {
+      type: String,
+      default: undefined,
+      trim: true,
+      maxlength: [60, 'Ethnicity cannot exceed 60 characters'],
+    },
+    /**
+     * The grade this employee sits at, which is what makes a like-for-like
+     * comparison possible at all. `role` is a job title and two people with the
+     * same title can be three grades apart, so it cannot stand in for this.
+     */
+    jobLevel: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: [40, 'Job level cannot exceed 40 characters'],
+    },
+    /**
+     * Contracted hours a month, where they differ from a standard month.
+     *
+     * The gap regulations compute on *hourly* pay so that part-time and
+     * full-time employees are comparable; without this, a part-time workforce
+     * shows a pay gap that is really a hours gap.
+     */
+    contractedMonthlyHours: {
+      type: Number,
+      default: undefined,
+      min: [1, 'Contracted hours must be positive'],
+      max: [400, 'Contracted hours cannot exceed 400 a month'],
+    },
+
+    /**
      * Where this record came from, when it came from an external HRMS (#954).
      *
      * The adapters in `src/integrations/` have always returned an `externalId`
@@ -138,6 +197,11 @@ const employeeSchema = new mongoose.Schema(
     currency: {
       type: String,
       default: 'INR',
+    },
+    language: {
+      type: String,
+      enum: ['en', 'es', 'hi'],
+      default: 'en',
     },
 
     /**

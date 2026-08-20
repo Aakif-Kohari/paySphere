@@ -1,5 +1,5 @@
 const auditLogRepository = require('../repositories/auditLog.repository');
-const { AUDIT_ACTIONS } = require('../models/auditLog.model');
+const { AUDIT_ACTIONS, AUDIT_RESOURCE_TYPES } = require('../models/auditLog.model');
 const { tenantFilter } = require('../utils/tenantScope');
 const cacheService = require('../services/cache.service');
 
@@ -111,6 +111,30 @@ function buildQuery(req) {
       return { ok: false, message: `Unknown action: ${req.query.action}` };
     }
     query.action = req.query.action;
+  }
+
+  if (req.query.resourceType) {
+    if (!AUDIT_RESOURCE_TYPES.includes(req.query.resourceType)) {
+      return { ok: false, message: `Unknown resourceType: ${req.query.resourceType}` };
+    }
+    query.resourceType = req.query.resourceType;
+  }
+
+  if (req.query.result) {
+    if (!['success', 'failure', 'partial'].includes(req.query.result)) {
+      return { ok: false, message: `Invalid result filter: ${req.query.result}` };
+    }
+    query.result = req.query.result;
+  }
+
+  if (req.query.search && typeof req.query.search === 'string' && req.query.search.trim() !== '') {
+    const searchRegex = new RegExp(req.query.search.trim(), 'i');
+    query.$or = [
+      { action: searchRegex },
+      { resourceType: searchRegex },
+      { ipAddress: searchRegex },
+      { userAgent: searchRegex },
+    ];
   }
 
   return { ok: true, query };

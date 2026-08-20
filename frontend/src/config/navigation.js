@@ -133,6 +133,21 @@ export const APP_ROUTES = [
     employee: true,
   },
   {
+    // In People rather than Payroll: the question is about how the workforce is
+    // paid relative to itself, which is a people decision that happens to be
+    // denominated in money (#1347).
+    //
+    // No `employee: true`. The gap analysis is computed from declared gender
+    // and the page is for the small population that holds READ_PAY_EQUITY;
+    // advertising it to everyone would be advertising a 403.
+    path: '/pay-equity',
+    component: lazy(() => import('../pages/PayEquityDashboard')),
+    appShell: true,
+    label: 'Pay equity',
+    group: 'people',
+    icon: 'chart',
+  },
+  {
     path: '/offer-letters',
     component: lazy(() => import('../pages/OfferLetterBuilder')),
     label: 'Offer letters',
@@ -166,6 +181,17 @@ export const APP_ROUTES = [
     icon: 'exit',
   },
   {
+    // Next to Settlements, because the two are the same statute from opposite
+    // ends: Settlements pays gratuity to a leaver, this measures what is still
+    // owed to everybody who has not left (#1344).
+    path: '/gratuity',
+    component: lazy(() => import('../pages/GratuityProvisioning')),
+    appShell: true,
+    label: 'Gratuity provision',
+    group: 'payroll',
+    icon: 'shield',
+  },
+  {
     path: '/reports',
     component: lazy(() => import('../pages/Reports')),
     label: 'Reports',
@@ -178,6 +204,17 @@ export const APP_ROUTES = [
     label: 'Budget planner',
     group: 'payroll',
     icon: 'target',
+  },
+  {
+    // In Payroll rather than Compliance because it is money paid to employees,
+    // and separate from the payroll run because the amount is fixed by the
+    // Payment of Bonus Act rather than by the company (#1346).
+    path: '/statutory-bonus',
+    component: lazy(() => import('../pages/StatutoryBonusRegister')),
+    appShell: true,
+    label: 'Statutory bonus',
+    group: 'payroll',
+    icon: 'book',
   },
 
   // ── Finance ──────────────────────────────────────────────────────────────
@@ -201,6 +238,14 @@ export const APP_ROUTES = [
     label: 'Client invoices',
     group: 'finance',
     icon: 'receipt',
+  },
+  {
+    path: '/expense-reports',
+    component: lazy(() => import('../pages/CustomExpenseReports')),
+    label: 'Expense reports',
+    group: 'finance',
+    icon: 'wallet',
+    employee: true,
   },
   {
     path: '/accounting',
@@ -227,6 +272,18 @@ export const APP_ROUTES = [
     icon: 'checkShield',
   },
   {
+    // Sits with the tax proofs because it is the same act from the employee's
+    // side — file a document, get an exemption — and a four-year statutory
+    // block rather than a financial year behind it (#1345).
+    path: '/lta',
+    component: lazy(() => import('../pages/LtaClaimPortal')),
+    appShell: true,
+    label: 'Travel allowance',
+    group: 'compliance',
+    icon: 'document',
+    employee: true,
+  },
+  {
     path: '/grievances',
     component: lazy(() => import('../pages/GrievancePortal')),
     appShell: true,
@@ -234,6 +291,13 @@ export const APP_ROUTES = [
     group: 'compliance',
     icon: 'alert',
     employee: true,
+  },
+  {
+    path: '/audit-logs',
+    component: lazy(() => import('../pages/AuditLogs')),
+    label: 'Audit logs',
+    group: 'compliance',
+    icon: 'shield',
   },
 
   // ── Workplace ────────────────────────────────────────────────────────────
@@ -244,6 +308,17 @@ export const APP_ROUTES = [
     group: 'workplace',
     icon: 'calendar',
     employee: true,
+  },
+  {
+    // In Workplace rather than Payroll: the desk is about where people are
+    // working and under what arrangement, and the money follows from that
+    // rather than the other way round (#1348).
+    path: '/mobility',
+    component: lazy(() => import('../pages/GlobalMobilityDesk')),
+    appShell: true,
+    label: 'Global mobility',
+    group: 'workplace',
+    icon: 'truck',
   },
   {
     path: '/monthly-updates',
@@ -260,6 +335,14 @@ export const APP_ROUTES = [
     label: 'Workflows',
     group: 'workplace',
     icon: 'flow',
+  },
+  {
+    path: '/announcements',
+    component: lazy(() => import('../pages/CompanyAnnouncements')),
+    label: 'Announcements',
+    group: 'workplace',
+    icon: 'megaphone',
+    employee: true,
   },
 
   // ── Learning ─────────────────────────────────────────────────────────────
@@ -288,6 +371,36 @@ export const APP_ROUTES = [
     employee: true,
   },
 
+  // ── Enterprise Suites (routed, sidebar-hidden) ──────────────────────────────
+  {
+    path: '/enterprise/vendor-management',
+    component: lazy(() => import('../pages/vendor/EnterpriseVendorDashboardPage')),
+  },
+  {
+    path: '/enterprise/benefits-compensation',
+    component: lazy(() => import('../pages/benefits/EnterpriseBenefitsDashboardPage')),
+  },
+  {
+    path: '/enterprise/travel-expense',
+    component: lazy(() => import('../pages/travel/EnterpriseTravelDashboardPage')),
+  },
+  {
+    path: '/enterprise/asset-inventory',
+    component: lazy(() => import('../pages/assets/EnterpriseAssetDashboardPage')),
+  },
+  {
+    path: '/enterprise/compliance-audit',
+    component: lazy(() => import('../pages/compliance/EnterpriseComplianceDashboardPage')),
+  },
+  {
+    path: '/enterprise/cybersecurity-soc',
+    component: lazy(() => import('../pages/security/EnterpriseCybersecuritySOCPage')),
+  },
+  {
+    path: '/enterprise/engagement-sentiment',
+    component: lazy(() => import('../pages/engagement/EnterpriseEngagementSentimentPage')),
+  },
+
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
   // No `label`, so they get a route and no nav entry. Settings and the profile
@@ -296,6 +409,14 @@ export const APP_ROUTES = [
   {
     path: '/enterprise/time-attendance',
     component: lazy(() => import('../pages/timeattendance/EnterpriseTimeAttendanceDashboardPage')),
+  },
+  {
+    path: '/enterprise/learning-development',
+    component: lazy(() => import('../pages/learning/EnterpriseLearningDevelopmentPage')),
+  },
+  {
+    path: '/enterprise/onboarding-lifecycle',
+    component: lazy(() => import('../pages/onboarding/EnterpriseOnboardingLifecyclePage')),
   },
 
   {

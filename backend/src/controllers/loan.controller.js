@@ -1,6 +1,136 @@
+/**
+ * @fileoverview Loan Controller
+ * @description Manages loan requests, approval workflows, amortization schedule generation, 
+ *              and loan lifecycle operations (issuance, repayment, foreclosure, etc.)
+ * Issue: #1290
+ */
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const loanService = require('../services/loan.service');
+const { LoanPolicy, LoanRequest, AmortizationSchedule } = require('../models/loan.model');
+const Employee = require('../models/employee.model');
+const { calculateEMI, generateSchedule } = require('../utils/amortizationEngine.utils');
+
+/**
+ * GET /api/loans/policy — retrieve or initialize the tenant's loan policy.
+ */
+exports.getPolicy = async (req, res, next) => {
+  try {
+    let policy = await LoanPolicy.findOne({ tenantId: req.tenantId });
+    if (!policy) policy = await LoanPolicy.create({ tenantId: req.tenantId });
+    res.status(200).json({ policy });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/loans/request — submit a new loan request for approval.
+ */
+exports.requestLoan = async (req, res, next) => {
+  try {
+    const { type, principalAmount, tenureMonths, purpose } = req.body;
+    const employee = await Employee.findOne({ userId: req.userId, tenantId: req.tenantId });
+    if (!employee) return res.status(404).json({ message: 'Employee profile not found' });
+
+    const policy = await LoanPolicy.findOne({ tenantId: req.tenantId });
+    const maxAmount = type === 'Salary Advance' ? policy.maxAdvanceAmount : policy.maxLoanAmount;
+
+    if (principalAmount > maxAmount) {
+      return res.status(400).json({ message: `Amount exceeds maximum limit of ${maxAmount} for ${type}.` });
+    }
+    if (tenureMonths > policy.maxTenureMonths) {
+      return res.status(400).json({ message: `Tenure exceeds maximum limit of ${policy.maxTenureMonths} months.` });
+    }
+
+    const loan = await LoanRequest.create({
+      tenantId: req.tenantId,
+      employeeId: employee._id,
+      type,
+      principalAmount,
+      tenureMonths,
+      interestRate: policy.interestRate,
+      purpose
+    });
+
+    res.status(201).json({ message: 'Loan request submitted', loan });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/loans/request/:id/approve — approve a pending loan request and generate schedule.
+ */
+exports.approveLoan = async (req, res, next) => {
+  try {
+    const loan = await LoanRequest.findById(req.params.id);
+    if (!loan || loan.status !== 'Pending') {
+      return res.status(400).json({ message: 'Loan not found or already processed.' });
+    }
+
+    loan.status = 'Approved';
+    loan.approvedBy = req.userId;
+    loan.approvedAt = new Date();
+    await loan.save();
+
+    // Generate Amortization Schedule starting next month
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() + 1);
+    startDate.setDate(1);
+
+    const schedule = generateSchedule(loan, startDate);
+    if (schedule.length > 0) {
+      await AmortizationSchedule.insertMany(schedule);
+    }
+
+    eventBus.emit('AUDIT_LOG', {
+      userId: req.userId,
+      action: 'LOAN_APPROVED',
+      resourceType: 'LoanRequest',
+      resourceIds: [loan._id],
+      details: {
+        employeeId: String(loan.employeeId),
+        type: loan.type,
+        principalAmount: loan.principalAmount,
+        tenureMonths: loan.tenureMonths,
+      },
+      req,
+    });
+
+    logger.info('Loan approved', {
+      userId: req.userId,
+      loanRequestId: loan._id,
+      employeeId: String(loan.employeeId),
+      principalAmount: loan.principalAmount,
+    });
+
+    res.status(200).json({ message: 'Loan approved and amortization schedule generated.', loan });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/loans/my-loans — list loans for the authenticated employee.
+ */
+exports.getMyLoans = async (req, res, next) => {
+  try {
+    const employee = await Employee.findOne({ userId: req.userId, tenantId: req.tenantId });
+    if (!employee) return res.status(404).json({ message: 'Employee profile not found' });
+
+    const loans = await LoanRequest.find({ employeeId: employee._id, tenantId: req.tenantId }).sort({ createdAt: -1 });
+
+    // Fetch schedule for active loans
+    const activeLoanIds = loans.filter(l => l.status === 'Approved').map(l => l._id);
+    const schedules = await AmortizationSchedule.find({ loanId: { $in: activeLoanIds } }).sort({ year: 1, month: 1 });
+
+    res.status(200).json({ loans, schedules });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * POST /api/loans — issue an advance or loan.
  */
@@ -50,6 +180,7 @@ exports.createLoan = async (req, res, next) => {
     next(error);
   }
 };
+
 /**
  * GET /api/loans — list, filtered and paginated.
  */
@@ -71,6 +202,7 @@ exports.getLoans = async (req, res, next) => {
     next(error);
   }
 };
+
 /**
  * GET /api/loans/summary — outstanding totals for the dashboard.
  */
@@ -87,6 +219,7 @@ exports.getLoanSummary = async (req, res, next) => {
     next(error);
   }
 };
+
 /**
  * GET /api/loans/:id — detail, with the schedule and the ledger.
  */
@@ -108,6 +241,7 @@ exports.getLoanById = async (req, res, next) => {
     next(error);
   }
 };
+
 /**
  * GET /api/loans/:id/schedule — the projected amortisation table.
  */
@@ -134,6 +268,7 @@ exports.getLoanSchedule = async (req, res, next) => {
     next(error);
   }
 };
+
 /**
  * POST /api/loans/preview — model the terms without writing anything.
  */
@@ -157,6 +292,7 @@ exports.previewLoanSchedule = async (req, res, next) => {
     next(error);
   }
 };
+
 /**
  * PATCH /api/loans/:id/status — hold, resume or cancel.
  */
@@ -204,6 +340,7 @@ exports.updateLoanStatus = async (req, res, next) => {
     next(error);
   }
 };
+
 /**
  * POST /api/loans/:id/repay — record an off-cycle lump-sum repayment.
  */
@@ -249,6 +386,7 @@ exports.recordManualRepayment = async (req, res, next) => {
     next(error);
   }
 };
+
 /**
  * GET /api/loans/:id/foreclosure-quote — what it costs to close the loan early.
  *
@@ -281,6 +419,7 @@ exports.getForeclosureQuote = async (req, res, next) => {
     next(error);
   }
 };
+
 /**
  * POST /api/loans/:id/foreclose — settle the balance and close the loan.
  */
@@ -332,6 +471,7 @@ exports.forecloseLoan = async (req, res, next) => {
     next(error);
   }
 };
+
 /**
  * POST /api/loans/:id/prepay — part-prepayment, with the schedule rebuilt.
  */
@@ -383,6 +523,7 @@ exports.recordPrepayment = async (req, res, next) => {
     next(error);
   }
 };
+
 /**
  * GET /api/loans/clearance/:employeeId — a leaver's total closure position.
  */

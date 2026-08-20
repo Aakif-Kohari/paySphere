@@ -105,6 +105,7 @@ exports.addEmployee = async (req, res, next) => {
       email,
       phone,
       bankDetails,
+      language,
     } = req.body;
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(role)) {
@@ -187,6 +188,7 @@ exports.addEmployee = async (req, res, next) => {
       tenantId: req.tenantId || user.tenantId,
       ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
       ...(normalizedPhone.value ? { phone: normalizedPhone.value } : {}),
+      ...(language ? { language } : {}),
     });
 
     // Optionally store bank details if provided
@@ -645,6 +647,7 @@ exports.updateEmployee = async (req, res, next) => {
       email,
       phone,
       bankDetails,
+      language,
     } = req.body;
 
     // `employee` used to be referenced (for the `department` update) before
