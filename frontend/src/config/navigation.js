@@ -357,6 +357,10 @@ export const APP_ROUTES = [
     path: '/enterprise/time-attendance',
     component: lazy(() => import('../pages/timeattendance/EnterpriseTimeAttendanceDashboardPage')),
   },
+  {
+    path: '/enterprise/learning-development',
+    component: lazy(() => import('../pages/learning/EnterpriseLearningDevelopmentPage')),
+  },
 
   {
     path: '/settings',
