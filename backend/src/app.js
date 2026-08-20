@@ -123,6 +123,7 @@ const disbursementRoutes = require('./routes/disbursement.routes');
 // been reachable over HTTP — `calculateCarryForward()` is called from nowhere
 // and `maxCarryForward` has never had an effect on anything.
 const leaveClosureRoutes = require('./routes/leaveClosure.routes');
+const treasuryRoutes = require('./routes/treasury.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -316,6 +317,7 @@ app.use('/api/audit-logs', auditRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/settlements', settlementRoutes);
 app.use('/api/loans', loanRoutes);
+app.use('/api/treasury', treasuryRoutes);
 
 // The archive browser for soft-deleted employees (#759). Mounted by one of the
 // two duplicated route tables and not the other.
