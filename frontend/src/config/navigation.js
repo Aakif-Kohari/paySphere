@@ -261,6 +261,17 @@ export const APP_ROUTES = [
     employee: true,
   },
   {
+    // In Workplace rather than Payroll: the desk is about where people are
+    // working and under what arrangement, and the money follows from that
+    // rather than the other way round (#1348).
+    path: '/mobility',
+    component: lazy(() => import('../pages/GlobalMobilityDesk')),
+    appShell: true,
+    label: 'Global mobility',
+    group: 'workplace',
+    icon: 'truck',
+  },
+  {
     path: '/monthly-updates',
     component: lazy(() => import('../pages/MonthlyUpdates')),
     label: 'Monthly updates',

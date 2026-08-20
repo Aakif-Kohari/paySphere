@@ -152,6 +152,23 @@ const PERMISSIONS = {
   // authority as MANAGE_EXPENSE_CATEGORY.
   MANAGE_TRAVEL_POLICY: 'MANAGE_TRAVEL_POLICY',
 
+  // --- International assignments (#1348) -----------------------------------
+  //
+  // Next to the travel permissions and deliberately not the same ones. An
+  // assignment is not a long trip: it changes where the employee is tax
+  // resident, commits the employer to bearing somebody's foreign tax bill for
+  // years, and can create a filing obligation in a second country. Approving a
+  // per-diem and approving that are not the same act and are not the same
+  // people.
+  READ_ASSIGNMENT: 'READ_ASSIGNMENT',
+  MANAGE_ASSIGNMENT: 'MANAGE_ASSIGNMENT',
+  // Kept apart from MANAGE_ASSIGNMENT for the same maker-checker reason as
+  // APPROVE_PAYROLL: a year-end equalization settlement moves money between the
+  // employee and the company in one direction or the other, and whoever built
+  // the package should not be the only person standing between it and that
+  // transfer.
+  SETTLE_ASSIGNMENT_TAX: 'SETTLE_ASSIGNMENT_TAX',
+
   // --- Equity (#1073) ------------------------------------------------------
   //
   // Three names rather than the usual read/write pair, because the acts differ
@@ -383,6 +400,21 @@ const PERMISSION_DEFINITIONS = [
     description:
       'Set the per-diem rates, lodging caps and travel-class entitlements every grade is paid under',
   },
+  {
+    name: PERMISSIONS.READ_ASSIGNMENT,
+    description:
+      'View international assignments, their cost projections and their treaty day counts',
+  },
+  {
+    name: PERMISSIONS.MANAGE_ASSIGNMENT,
+    description:
+      'Open and amend an international assignment, log host-country presence and approve its cost',
+  },
+  {
+    name: PERMISSIONS.SETTLE_ASSIGNMENT_TAX,
+    description:
+      'Record a year-end tax equalization settlement, which moves money between the employee and the company',
+  },
 
   // #1073.
   {
@@ -512,6 +544,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.APPROVE_TRAVEL,
       PERMISSIONS.MANAGE_TRAVEL_POLICY,
 
+      // #1348. All three. SETTLE_ASSIGNMENT_TAX stops here for the same reason
+      // APPROVE_PAYROLL does.
+      PERMISSIONS.READ_ASSIGNMENT,
+      PERMISSIONS.MANAGE_ASSIGNMENT,
+      PERMISSIONS.SETTLE_ASSIGNMENT_TAX,
+
       // #1073. MANAGE_ESOP stops here — it is the only permission in the
       // product that changes who owns the company.
       PERMISSIONS.READ_ESOP,
@@ -590,6 +628,15 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_TRAVEL,
       PERMISSIONS.SUBMIT_TRAVEL_REQUEST,
       PERMISSIONS.APPROVE_TRAVEL,
+
+      // #1348. HR runs the assignment — opening it, logging where the employee
+      // has been, costing the package — because that is mobility administration
+      // and it is HR's job. It does not settle the year: that moves money
+      // between the employee and the company, and it is the same maker-checker
+      // split that keeps APPROVE_PAYROLL away from the person who submits the
+      // run.
+      PERMISSIONS.READ_ASSIGNMENT,
+      PERMISSIONS.MANAGE_ASSIGNMENT,
 
       // #1074. HR runs the pipeline and sits on panels. It does not open
       // requisitions or move the CTC band — that is headcount budget, and

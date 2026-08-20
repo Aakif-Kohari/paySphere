@@ -101,6 +101,13 @@ const pyqRoutes = require('./routes/pyq.routes');
 // nothing in the product tracked.
 const travelRoutes = require('./routes/travel.routes');
 
+// International assignments (#1348). Next to travel and emphatically not part
+// of it: `travel.routes` settles a trip in per-diems over a few weeks, while an
+// assignment runs for years, changes where the employee is tax resident and is
+// the reason the employer files in a second country. The two share a plane and
+// nothing else.
+const assignmentRoutes = require('./routes/assignment.routes');
+
 // Stock option schemes, grants, vesting and exercises (#1073). Equity was the
 // one component of total compensation with no model, no route and no
 // calculator — and exercising an option is a taxable perquisite the employer
@@ -447,6 +454,10 @@ app.use('/api/pyqs', pyqRoutes);
 // Business travel (#1077). The router owns `/policies`, `/requests`,
 // `/advances` and `/my-trips`.
 app.use('/api/travel', travelRoutes);
+
+// #1348. The router owns `/`, `/:id`, `/:id/presence`, `/:id/cost-projection`,
+// `/:id/gross-up` and `/:id/settlements`.
+app.use('/api/assignments', assignmentRoutes);
 
 // Equity (#1073). The router owns `/schemes`, `/grants` and `/my-grants`, so
 // the prefix carries no noun of its own.
