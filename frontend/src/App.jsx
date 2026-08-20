@@ -12,6 +12,7 @@ import { useAppStore } from './store/useAppStore';
 import { NotFound, ROUTABLE } from './config/navigation';
 import RouteFallback from './components/common/RouteFallback';
 import AppPageShell from './components/Layout/AppPageShell';
+import ImpersonationBanner from './components/common/ImpersonationBanner';
 
 function App() {
   const user = useAppStore((state) => state.user);
@@ -77,6 +78,7 @@ function App() {
 
       <ToastProvider>
         <BrowserRouter>
+          <ImpersonationBanner />
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               {/* Built from `config/navigation.js` rather than written out

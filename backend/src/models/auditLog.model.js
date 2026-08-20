@@ -79,6 +79,8 @@ const AUDIT_ACTIONS = [
   // payroll run), so they are audited like SALARY_HISTORY_* above.
   'MONTHLY_UPDATE_UPSERT',
   'MONTHLY_UPDATE_DELETE',
+  'IMPERSONATE_USER_START',
+  'IMPERSONATE_USER_STOP',
 ];
 
 /** Every resource type a controller emits. Same story as the actions above. */

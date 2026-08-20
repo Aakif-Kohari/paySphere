@@ -72,6 +72,7 @@ const PERMISSIONS = {
   // what gets filed with the tax department under the employer's name. Kept
   // with the owner for the same reason MANAGE_EXPENSE_CATEGORY is.
   MANAGE_COMPLIANCE: 'MANAGE_COMPLIANCE',
+  IMPERSONATE_USER: 'IMPERSONATE_USER',
 
   // --- Feature areas that had no vocabulary of their own (#1011) -----------
   //
@@ -271,6 +272,11 @@ const PERMISSION_DEFINITIONS = [
     name: PERMISSIONS.MANAGE_ROLES,
     description:
       'Create, update and delete custom roles and their permission sets',
+  },
+  {
+    name: PERMISSIONS.IMPERSONATE_USER,
+    description:
+      'Impersonate any user account to troubleshoot issues with a strict audit log',
   },
 
   // #1011.
@@ -476,6 +482,7 @@ const ROLE_DEFINITIONS = [
       // Held by the owner alone: a role edit changes what every other account
       // in the company can do.
       PERMISSIONS.MANAGE_ROLES,
+      PERMISSIONS.IMPERSONATE_USER,
 
       // #1011. The owner holds everything, including the three that stop at
       // the owner on purpose — RUN_DEPRECIATION, MANAGE_VENDOR and
