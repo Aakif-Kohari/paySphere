@@ -20,6 +20,15 @@ const AUDIT_ACTIONS = [
   // one action left untracked (#458).
   'PAYROLL_APPROVE',
   'PAYROLL_REJECT',
+  // Statutory bonus under the Payment of Bonus Act (#1346). Committing a year
+  // declares what the establishment owes under a statute and writes a
+  // set-on/set-off balance that binds the next four years; the Form C export is
+  // every eligible employee's wage and bonus in one file; and the payment date
+  // is what the section 19 eight-month window is measured against. All three
+  // are inspection questions.
+  'STATUTORY_BONUS_COMMITTED',
+  'STATUTORY_BONUS_FORM_C_EXPORTED',
+  'STATUTORY_BONUS_PAID',
   'EMPLOYEE_CREATE',
   'EMPLOYEE_UPDATE',
   'EMPLOYEE_DELETE',
@@ -86,6 +95,7 @@ const AUDIT_ACTIONS = [
 /** Every resource type a controller emits. Same story as the actions above. */
 const AUDIT_RESOURCE_TYPES = [
   'Payroll',
+  'StatutoryBonus',
   'Employee',
   'User',
   'Report',
