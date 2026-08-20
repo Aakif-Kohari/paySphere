@@ -74,6 +74,7 @@ const searchRoutes = require('./routes/search.routes');
 const emailRoutes = require('./routes/email.routes');
 const complianceRoutes = require('./routes/compliance.routes');
 const forexRoutes = require('./routes/forex.routes');
+const announcementRoutes = require('./routes/announcement.routes');
 
 // The eleven routers #1009 found unmounted. Each one had a router, a
 // controller, its models and — for most of them — a finished frontend page, and
@@ -331,6 +332,7 @@ app.use('/api', salaryHistoryRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/forex', forexRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 // Webhook endpoints (#474) — an admin lets an external system subscribe to
 // payroll and employee events. The controller and models were written in #645

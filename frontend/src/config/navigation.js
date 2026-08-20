@@ -276,6 +276,14 @@ export const APP_ROUTES = [
     group: 'workplace',
     icon: 'flow',
   },
+  {
+    path: '/announcements',
+    component: lazy(() => import('../pages/CompanyAnnouncements')),
+    label: 'Announcements',
+    group: 'workplace',
+    icon: 'megaphone',
+    employee: true,
+  },
 
   // ── Learning ─────────────────────────────────────────────────────────────
   {
