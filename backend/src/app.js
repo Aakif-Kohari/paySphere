@@ -54,6 +54,12 @@ const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
 const settlementRoutes = require('./routes/settlement.routes');
+
+// Gratuity actuarial valuation (#1344). Next to settlements on purpose: the
+// two are the same statute seen from opposite ends. `settlement.routes` pays
+// gratuity to somebody who is leaving; this one measures what is still owed to
+// everybody who has not.
+const gratuityRoutes = require('./routes/gratuity.routes');
 const loanRoutes = require('./routes/loan.routes');
 const schedulerRoutes = require('./routes/scheduler.routes');
 const employeePortalRoutes = require('./routes/employeePortal.routes');
@@ -316,6 +322,10 @@ app.use('/api/schedules', schedulerRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/settlements', settlementRoutes);
+
+// #1344. The router owns `/assumptions`, `/preview`, `/valuations` and
+// `/employees/:employeeId`, so the prefix carries no noun of its own.
+app.use('/api/gratuity', gratuityRoutes);
 app.use('/api/loans', loanRoutes);
 app.use('/api/treasury', treasuryRoutes);
 
