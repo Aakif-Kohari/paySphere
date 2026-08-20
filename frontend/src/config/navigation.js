@@ -373,6 +373,10 @@ export const APP_ROUTES = [
     path: '/enterprise/learning-development',
     component: lazy(() => import('../pages/learning/EnterpriseLearningDevelopmentPage')),
   },
+  {
+    path: '/enterprise/workforce-intelligence',
+    component: lazy(() => import('../pages/workforce/EnterpriseWorkforceIntelligencePage')),
+  },
 
   {
     path: '/settings',
