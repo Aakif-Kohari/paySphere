@@ -74,6 +74,22 @@ const AUDIT_ACTIONS = [
   'WEBHOOK_UPDATE',
   'WEBHOOK_DELETE',
   'WEBHOOK_SECRET_REGENERATED',
+  // International assignments (#1348). Opening one commits the employer to
+  // bearing somebody's foreign tax bill for years; a settlement moves money
+  // between the employee and the company; and the two threshold events record
+  // the moment a treaty day count stopped being comfortable, which is the fact
+  // an adviser asks for when a host-country filing obligation turns up.
+  //
+  // The two threshold actions are emitted through a ternary, so
+  // `auditActions.coverage.test.js` cannot see them — its scan only matches a
+  // string literal. Registered here anyway: the schema would reject them at
+  // runtime and the entry would be dropped exactly as silently.
+  'ASSIGNMENT_CREATED',
+  'ASSIGNMENT_UPDATED',
+  'ASSIGNMENT_COST_APPROVED',
+  'ASSIGNMENT_SETTLEMENT_RECORDED',
+  'ASSIGNMENT_TREATY_THRESHOLD_APPROACHING',
+  'ASSIGNMENT_TREATY_THRESHOLD_EXCEEDED',
   // The monthly-updates endpoints emit their own two. Monthly revisions are
   // financial mutations (they move allowances and deductions into the next
   // payroll run), so they are audited like SALARY_HISTORY_* above.
@@ -100,6 +116,8 @@ const AUDIT_RESOURCE_TYPES = [
   // credentials an admin installs, so configuring, syncing and removing one are
   // audited like the webhook mutations it sits next to.
   'IntegrationConfig',
+  'Assignment',
+  'EqualizationSettlement',
   'MonthlyUpdate',
   // Where staff are allowed to clock in from (#930, reachable since #953).
   // Editing a fence changes whose attendance is recorded as field duty, so it
