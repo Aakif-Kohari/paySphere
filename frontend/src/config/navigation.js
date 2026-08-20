@@ -396,6 +396,10 @@ export const APP_ROUTES = [
     path: '/enterprise/cybersecurity-soc',
     component: lazy(() => import('../pages/security/EnterpriseCybersecuritySOCPage')),
   },
+  {
+    path: '/enterprise/engagement-sentiment',
+    component: lazy(() => import('../pages/engagement/EnterpriseEngagementSentimentPage')),
+  },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
