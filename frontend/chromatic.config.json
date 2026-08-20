@@ -1,0 +1,5 @@
+{
+  "buildScriptName": "build-storybook",
+  "exitZeroOnChanges": true,
+  "onlyChanged": true
+}
