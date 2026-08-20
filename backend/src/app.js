@@ -73,6 +73,11 @@ const employeePortalRoutes = require('./routes/employeePortal.routes');
 const workflowRoutes = require('./routes/workflow.routes');
 const salaryHistoryRoutes = require('./routes/salaryHistory.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+
+// Pay equity analytics (#1347). Next to the dashboard and stats routers because
+// it is analysis over the same directory, and behind its own permissions
+// because it is the only part of the product that reads declared gender.
+const payEquityRoutes = require('./routes/payEquity.routes');
 const statsRoutes = require('./routes/stats.routes');
 const departmentsRoutes = require('./routes/departments.routes');
 const flashcardRoutes = require('./routes/flashcard.routes');
@@ -400,6 +405,9 @@ app.use('/api/roles', roleRoutes);
 // the dashboard was not a special case, it was just the one that got noticed.
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/stats', statsRoutes);
+
+// #1347. The router owns `/preview`, `/reports`, `/compa-ratio` and `/bands`.
+app.use('/api/pay-equity', payEquityRoutes);
 app.use('/api/departments', departmentsRoutes);
 
 // The in-app notification centre (#440). The other half of the duplicate.

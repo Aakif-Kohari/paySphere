@@ -102,6 +102,13 @@ const AUDIT_ACTIONS = [
   // payroll run), so they are audited like SALARY_HISTORY_* above.
   'MONTHLY_UPDATE_UPSERT',
   'MONTHLY_UPDATE_DELETE',
+  // Pay equity (#1347). A committed report is a published figure in a growing
+  // number of jurisdictions, and a salary band decides what everybody at that
+  // grade is checked against — widening one is equivalent to approving any
+  // offer inside it. Both belong in the trail for the same reason the salary
+  // history entries above do.
+  'PAY_EQUITY_REPORT_COMMITTED',
+  'PAY_BAND_UPDATED',
   'IMPERSONATE_USER_START',
   'IMPERSONATE_USER_STOP',
 ];
@@ -132,6 +139,8 @@ const AUDIT_RESOURCE_TYPES = [
   // Editing a fence changes whose attendance is recorded as field duty, so it
   // is audited like the settings change it is.
   'OfficeLocation',
+  'PayEquityReport',
+  'PayBand',
 ];
 
 const auditLogSchema = new mongoose.Schema(

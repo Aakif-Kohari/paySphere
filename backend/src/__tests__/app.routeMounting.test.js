@@ -86,6 +86,7 @@ const MOUNTED_ROUTES = [
   ['/api/flashcards', 'get', '/api/flashcards/my-decks'],
   ['/api/webhooks', 'get', '/api/webhooks'],
   ['/api/dashboard', 'get', '/api/dashboard/layout'],
+  ['/api/pay-equity', 'get', '/api/pay-equity/reports'],
   ['/api/notifications', 'get', '/api/notifications'],
   [
     '/api/monthly-updates',
@@ -211,6 +212,7 @@ const ROUTER_MOUNTS = {
   lta: '/api/lta',
   monthlyUpdates: '/api/monthly-updates',
   notification: '/api/notifications',
+  payEquity: '/api/pay-equity',
   payroll: '/api/payroll',
   pyq: '/api/pyqs',
   recruitment: '/api/recruitment',
