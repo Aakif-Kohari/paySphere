@@ -1,8 +1,31 @@
-// CompensationBandCard — Visual card for salary band benchmarking and market data
-import React, { useState } from 'react';
+// CompensationBandCard — Strictly typed salary band benchmarking card
+import React, { useState, useCallback } from 'react';
 
+/** Equity grant range with typed discriminator */
+interface EquityRange {
+  min: number;
+  max: number;
+  type: 'stock_option' | 'rsu' | 'espp' | 'none';
+}
+
+/** Color scheme for a compensation grade tier */
+interface GradeColorScheme {
+  gradient: string;
+  accent: string;
+}
+
+/** Strict union for all supported compensation grades */
+type CompensationGrade =
+  | 'executive'
+  | 'director'
+  | 'senior_manager'
+  | 'manager'
+  | 'senior_individual'
+  | 'individual';
+
+/** Props for CompensationBandCard — all properties strictly typed */
 interface CompensationBandCardProps {
-  grade: string;
+  grade: CompensationGrade;
   title: string;
   minSalary: number;
   midpoint: number;
@@ -12,32 +35,37 @@ interface CompensationBandCardProps {
   marketP75: number;
   bonusTarget: number;
   benefitsValue: number;
-  equityRange: { min: number; max: number; type: string };
+  equityRange: EquityRange;
   headcount: number;
   location: string;
   lastUpdated: string;
+  onExpand?: (grade: CompensationGrade, expanded: boolean) => void;
+  onCompare?: (grade: CompensationGrade) => void;
 }
 
-const gradeColors: Record<string, { gradient: string; accent: string }> = {
-  executive: { gradient: 'linear-gradient(135deg, rgba(167,139,250,0.15), rgba(147,130,220,0.08))', accent: '#a78bfa' },
-  director: { gradient: 'linear-gradient(135deg, rgba(96,165,250,0.15), rgba(59,130,246,0.08))', accent: '#60a5fa' },
-  senior_manager: { gradient: 'linear-gradient(135deg, rgba(52,211,153,0.15), rgba(34,197,94,0.08))', accent: '#34d399' },
-  manager: { gradient: 'linear-gradient(135deg, rgba(251,191,36,0.15), rgba(234,179,8,0.08))', accent: '#fbbf24' },
-  senior_individual: { gradient: 'linear-gradient(135deg, rgba(244,114,182,0.15), rgba(236,72,153,0.08))', accent: '#f472b6' },
-  individual: { gradient: 'linear-gradient(135deg, rgba(148,163,184,0.15), rgba(100,116,139,0.08))', accent: '#94a3b8' },
-};
-
-const formatCurrency = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
-
 const CompensationBandCard: React.FC<CompensationBandCardProps> = ({
-  grade, title, minSalary, midpoint, maxSalary, marketP25, marketP50, marketP75,
-  bonusTarget, benefitsValue, equityRange, headcount, location, lastUpdated,
+  grade,
+  title,
+  minSalary,
+  midpoint,
+  maxSalary,
+  marketP25,
+  marketP50,
+  marketP75,
+  bonusTarget,
+  benefitsValue,
+  equityRange,
+  headcount,
+  location,
+  lastUpdated,
+  onExpand,
+  onCompare,
 }) => {
-  const [expanded, setExpanded] = useState(false);
-  const gc = gradeColors[grade] || gradeColors.individual;
-  const range = maxSalary - minSalary;
+  const [expanded, setExpanded] = useState<boolean>(false);
+  const gc: GradeColorScheme = gradeColors[grade] ?? gradeColors.individual;
+  const range: number = maxSalary - minSalary;
 
-  const renderBandBar = (value: number, label: string, color: string) => {
+  const renderBandBar = (value: number, label: string, color: string): React.ReactElement => {
     const pct = Math.min(Math.max(((value - minSalary) / range) * 100, 0), 100);
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
@@ -52,10 +80,29 @@ const CompensationBandCard: React.FC<CompensationBandCardProps> = ({
       </div>
     );
   };
+  const handleToggleExpand = useCallback((): void => {
+    const next = !expanded;
+    setExpanded(next);
+    onExpand?.(grade, next);
+  }, [expanded, grade, onExpand]);
+
+  const handleCompare = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>): void => {
+      e.stopPropagation();
+      onCompare?.(grade);
+    },
+    [grade, onCompare],
+  );
+
 
   return (
     <div
-      onClick={() => setExpanded(!expanded)}
+      onClick={handleToggleExpand}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e: React.KeyboardEvent<HTMLDivElement>): void => {
+        if (e.key === 'Enter' || e.key === ' ') handleToggleExpand();
+      }}
       style={{
         background: gc.gradient,
         border: `1px solid ${gc.accent}33`,
@@ -141,3 +188,5 @@ const CompensationBandCard: React.FC<CompensationBandCardProps> = ({
 };
 
 export default CompensationBandCard;
+
+export type { CompensationBandCardProps, CompensationGrade, EquityRange, GradeColorScheme };
