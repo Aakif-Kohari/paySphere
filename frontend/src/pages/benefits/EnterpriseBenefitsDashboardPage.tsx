@@ -1,357 +1,239 @@
-// EnterpriseBenefitsDashboardPage — Executive dashboard for benefits management & compensation intelligence
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
+import { Heart, ShieldCheck, Download, Search, Sparkles, CheckCircle2, Clock, Globe, ArrowUpRight, DollarSign, Users, Activity, PlusCircle } from 'lucide-react';
+import BenefitPlanCard, { BenefitPlan } from '../../components/benefits/BenefitPlanCard';
+import BenefitsEnrollmentTimeline from '../../components/benefits/BenefitsEnrollmentTimeline';
 
-// ── Mock Data ───────────────────────────────────────────────────────────────
-const MOCK_ENROLLMENTS = [
-  { id: 'ENR-001', employee: 'Sarah Chen', dept: 'Engineering', plan: 'Pinnacle Health Premium', type: 'health_insurance', tier: 'family', status: 'active', premium: 1350, employerContrib: 1080, employeeContrib: 270, ytdEmployerSpend: 12960, dependents: ['David Chen (spouse)', 'Mia Chen (child)'] },
-  { id: 'ENR-002', employee: 'Marcus Weber', dept: 'Product', plan: 'Pinnacle Health Premium', type: 'health_insurance', tier: 'individual', status: 'active', premium: 450, employerContrib: 360, employeeContrib: 90, ytdEmployerSpend: 4320, dependents: [] },
-  { id: 'ENR-003', employee: 'Priya Patel', dept: 'Finance', plan: 'SecureLife Term 500K', type: 'life_insurance', tier: 'family', status: 'active', premium: 24, employerContrib: 24, employeeContrib: 0, ytdEmployerSpend: 288, dependents: ['Raj Patel (spouse)'] },
-  { id: 'ENR-004', employee: 'James Hartley', dept: 'Marketing', plan: 'SecureFuture 401(k)', type: 'retirement_401k', tier: 'individual', status: 'active', premium: 0, employerContrib: 0, employeeContrib: 0, ytdEmployerSpend: 0, dependents: [] },
-  { id: 'ENR-005', employee: 'Yuki Tanaka', dept: 'Engineering', plan: 'Pinnacle Health Premium', type: 'health_insurance', tier: 'couple', status: 'active', premium: 900, employerContrib: 720, employeeContrib: 180, ytdEmployerSpend: 8640, dependents: ['Aiko Tanaka (spouse)'] },
-  { id: 'ENR-006', employee: "Liam O'Brien", dept: 'Operations', plan: 'WellnessPlus Program', type: 'wellness', tier: 'individual', status: 'active', premium: 0, employerContrib: 0, employeeContrib: 0, ytdEmployerSpend: 0, dependents: [] },
+const BENEFIT_PLANS: BenefitPlan[] = [
+  {
+    id: 'plan-301',
+    planName: 'Platinum PPO Healthcare & Vision',
+    providerName: 'BlueCross BlueShield Enterprise',
+    planCategory: 'Medical & Health',
+    monthlyEmployerContributionUSD: 650,
+    monthlyEmployeeDeductionUSD: 120,
+    coveredEmployees: 420,
+    tierType: 'Comprehensive PPO',
+    deductibleUSD: 250,
+    copayUSD: 15,
+    status: 'ACTIVE',
+  },
+  {
+    id: 'plan-302',
+    planName: 'Global Dental Premier & Orthodontia',
+    providerName: 'Delta Dental PPO',
+    planCategory: 'Dental Care',
+    monthlyEmployerContributionUSD: 85,
+    monthlyEmployeeDeductionUSD: 20,
+    coveredEmployees: 395,
+    tierType: 'In-Network Premier',
+    deductibleUSD: 50,
+    copayUSD: 10,
+    status: 'ACTIVE',
+  },
+  {
+    id: 'plan-303',
+    planName: '401(k) Retirement & 6% Employer Match',
+    providerName: 'Fidelity Investments Enterprise',
+    planCategory: 'Retirement Savings',
+    monthlyEmployerContributionUSD: 450,
+    monthlyEmployeeDeductionUSD: 450,
+    coveredEmployees: 480,
+    tierType: 'Auto-Enrollment 401(k)',
+    deductibleUSD: 0,
+    copayUSD: 0,
+    status: 'ACTIVE',
+  },
 ];
 
-const MOCK_COMP_BANDS = [
-  { grade: 'executive', title: 'VP / C-Suite', min: 250000, mid: 350000, max: 500000, p25: 280000, p50: 350000, p75: 420000, bonus: 50, benefits: 45000, equityMin: 100000, equityMax: 300000, equityType: 'RSU', headcount: 8, location: 'San Francisco' },
-  { grade: 'director', title: 'Director', min: 180000, mid: 220000, max: 280000, p25: 190000, p50: 220000, p75: 260000, bonus: 35, benefits: 38000, equityMin: 50000, equityMax: 150000, equityType: 'RSU', headcount: 22, location: 'San Francisco' },
-  { grade: 'senior_manager', title: 'Senior Manager', min: 145000, mid: 175000, max: 210000, p25: 150000, p50: 175000, p75: 200000, bonus: 25, benefits: 32000, equityMin: 25000, equityMax: 75000, equityType: 'RSU', headcount: 45, location: 'New York' },
-  { grade: 'manager', title: 'Manager', min: 120000, mid: 145000, max: 175000, p25: 125000, p50: 145000, p75: 165000, bonus: 20, benefits: 28000, equityMin: 15000, equityMax: 50000, equityType: 'RSU', headcount: 78, location: 'New York' },
-  { grade: 'senior_ic', title: 'Senior IC', min: 100000, mid: 130000, max: 160000, p25: 108000, p50: 130000, p75: 152000, bonus: 15, benefits: 25000, equityMin: 10000, equityMax: 35000, equityType: 'RSU', headcount: 156, location: 'Austin' },
-  { grade: 'individual', title: 'Individual Contributor', min: 75000, mid: 95000, max: 120000, p25: 80000, p50: 95000, p75: 112000, bonus: 10, benefits: 22000, equityMin: 5000, equityMax: 20000, equityType: 'RSU', headcount: 312, location: 'Austin' },
-];
-
-const PLAN_TYPE_LABELS: Record<string, string> = {
-  health_insurance: '🏥 Health', dental: '🦷 Dental', vision: '👁️ Vision',
-  life_insurance: '🛡️ Life', disability: '♿ Disability', retirement_401k: '💰 401(k)',
-  hsa: '🏦 HSA', commuter: '🚌 Commuter', wellness: '🧘 Wellness', tuition_reimbursement: '🎓 Tuition',
-};
-
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  active: { bg: 'rgba(34,197,94,0.15)', text: '#22c55e' },
-  pending: { bg: 'rgba(234,179,8,0.15)', text: '#eab308' },
-  terminated: { bg: 'rgba(239,68,68,0.15)', text: '#ef4444' },
-};
-
-const formatCurrency = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
-
-type Tab = 'enrollments' | 'compensation' | 'analytics';
-
-const EnterpriseBenefitsDashboardPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<Tab>('enrollments');
+export default function EnterpriseBenefitsDashboardPage() {
+  const [plans, setPlans] = useState<BenefitPlan[]>(BENEFIT_PLANS);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [showModal, setShowModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'plans' | 'enrollment-stream'>('plans');
+  const [selectedPlanModal, setSelectedPlanModal] = useState<BenefitPlan | null>(null);
 
-  // ── KPI Stats ─────────────────────────────────────────────────────────────
-  const totalEmployerSpend = MOCK_ENROLLMENTS.reduce((s, e) => s + e.ytdEmployerSpend, 0);
-  const activeEnrollments = MOCK_ENROLLMENTS.filter((e) => e.status === 'active').length;
-  const totalCompBudget = MOCK_COMP_BANDS.reduce((s, b) => s + b.max * b.headcount, 0);
-  const avgComp = Math.round(totalCompBudget / 621);
-  const healthPlanCount = MOCK_ENROLLMENTS.filter((e) => e.type === 'health_insurance').length;
+  const totalEmployerMonthlySubsidyUSD = plans.reduce((acc, p) => acc + (p.monthlyEmployerContributionUSD * p.coveredEmployees), 0);
 
-  // ── Filtered Data ─────────────────────────────────────────────────────────
-  const filteredEnrollments = useMemo(() => {
-    let data = [...MOCK_ENROLLMENTS];
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      data = data.filter((e) => e.employee.toLowerCase().includes(q) || e.plan.toLowerCase().includes(q) || e.dept.toLowerCase().includes(q));
-    }
-    if (statusFilter !== 'all') data = data.filter((e) => e.status === statusFilter);
-    return data;
-  }, [searchQuery, statusFilter]);
-
-  const filteredBands = useMemo(() => {
-    let data = [...MOCK_COMP_BANDS];
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      data = data.filter((b) => b.title.toLowerCase().includes(q) || b.location.toLowerCase().includes(q));
-    }
-    return data;
-  }, [searchQuery]);
-
-  // ── KPI Renderer ──────────────────────────────────────────────────────────
-  const renderKPI = (label: string, value: string, icon: string, color: string) => (
-    <div style={{
-      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: '14px', padding: '18px 20px', flex: 1, minWidth: '180px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-        <span style={{ fontSize: '18px' }}>{icon}</span>
-        <span style={{ color: '#64748b', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</span>
-      </div>
-      <p style={{ color, margin: 0, fontSize: '22px', fontWeight: 700 }}>{value}</p>
-    </div>
+  const filteredPlans = plans.filter(p =>
+    p.planName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.providerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.planCategory.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const renderStatusBadge = (status: string) => {
-    const sc = STATUS_COLORS[status] || STATUS_COLORS.active;
-    return (
-      <span style={{
-        background: sc.bg, color: sc.text, padding: '4px 10px',
-        borderRadius: '8px', fontSize: '12px', fontWeight: 600, textTransform: 'capitalize',
-      }}>
-        {status}
-      </span>
-    );
-  };
-
-  const tabs: { key: Tab; label: string; icon: string }[] = [
-    { key: 'enrollments', label: 'Enrollments', icon: '📋' },
-    { key: 'compensation', label: 'Comp Bands', icon: '💰' },
-    { key: 'analytics', label: 'Analytics', icon: '📊' },
-  ];
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0e1a', padding: '32px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
-      {/* Header */}
-      <div style={{ marginBottom: '28px' }}>
-        <h1 style={{ color: '#e2e8f0', margin: '0 0 4px', fontSize: '26px', fontWeight: 700 }}>
-          💰 Enterprise Benefits & Compensation
-        </h1>
-        <p style={{ color: '#64748b', margin: 0, fontSize: '14px' }}>
-          Benefits enrollment, compensation benchmarking, and total rewards intelligence across all global offices.
-        </p>
-      </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-10 font-sans">
+      {/* Header Banner */}
+      <header className="max-w-7xl mx-auto mb-8 bg-gradient-to-r from-cyan-950 via-slate-900 to-blue-950 border border-cyan-500/20 rounded-3xl p-8 backdrop-blur-xl relative overflow-hidden shadow-2xl">
+        <div className="absolute -right-10 -top-10 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <span className="bg-cyan-500/20 text-cyan-300 text-xs px-3 py-1 rounded-full font-semibold border border-cyan-500/30 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" /> PaySphere Total Rewards
+              </span>
+              <span className="text-slate-400 text-xs flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> ERISA & HIPAA Compliant Administration
+              </span>
+            </div>
+            <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-cyan-200 bg-clip-text text-transparent">
+              Global Employee Benefits & Insurance Suite
+            </h1>
+            <p className="text-slate-400 mt-2 max-w-2xl text-sm leading-relaxed">
+              Unified administration of medical PPO/HMO, 401(k) matching, dental, vision, life insurance, and open enrollment automation.
+            </p>
+          </div>
 
-      {/* KPI Row */}
-      <div style={{ display: 'flex', gap: '14px', marginBottom: '28px', flexWrap: 'wrap' }}>
-        {renderKPI('YTD Employer Spend', formatCurrency(totalEmployerSpend), '💵', '#22c55e')}
-        {renderKPI('Active Enrollments', `${activeEnrollments}`, '📋', '#60a5fa')}
-        {renderKPI('Health Plan Members', `${healthPlanCount}`, '🏥', '#a78bfa')}
-        {renderKPI('Total Comp Budget', formatCurrency(totalCompBudget), '💰', '#fbbf24')}
-        {renderKPI('Avg Comp / Employee', formatCurrency(avgComp), '👤', '#e2e8f0')}
-      </div>
-
-      {/* Tabs + Search */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.04)', borderRadius: '12px', padding: '4px' }}>
-          {tabs.map((t) => (
-            <button key={t.key} onClick={() => { setActiveTab(t.key); setSearchQuery(''); setStatusFilter('all'); }}
-              style={{
-                background: activeTab === t.key ? 'rgba(96,165,250,0.2)' : 'transparent',
-                color: activeTab === t.key ? '#60a5fa' : '#64748b',
-                border: activeTab === t.key ? '1px solid rgba(96,165,250,0.3)' : '1px solid transparent',
-                borderRadius: '10px', padding: '8px 16px', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
-                display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s',
-              }}>
-              <span>{t.icon}</span> {t.label}
+          <div className="flex items-center gap-3">
+            <button className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-5 py-3 rounded-xl font-medium shadow-lg shadow-cyan-600/30 transition flex items-center gap-2 border border-cyan-400/20 text-sm">
+              <Download className="w-4 h-4" /> Export Benefits Summary
             </button>
-          ))}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <input
-            type="text" placeholder="🔍 Search employees, plans..."
-            value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '10px', padding: '8px 16px', color: '#e2e8f0', fontSize: '13px', outline: 'none', width: '240px',
-            }}
-          />
-          {activeTab === 'enrollments' && (
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-              style={{
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '10px', padding: '8px 12px', color: '#e2e8f0', fontSize: '13px', outline: 'none', cursor: 'pointer',
-              }}>
-              <option value="all">All Status</option>
-              <option value="active">Active</option>
-              <option value="pending">Pending</option>
-              <option value="terminated">Terminated</option>
-            </select>
-          )}
-        </div>
-      </div>
+      </header>
 
-      {/* Enrollments Tab */}
-      {activeTab === 'enrollments' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
-          {filteredEnrollments.map((e) => (
-            <div key={e.id} onClick={() => { setSelectedItem(e); setShowModal(true); }}
-              style={{
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '14px', padding: '18px', cursor: 'pointer', transition: 'all 0.2s',
-              }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                <div>
-                  <h3 style={{ color: '#e2e8f0', margin: 0, fontSize: '14px', fontWeight: 600 }}>{e.employee}</h3>
-                  <p style={{ color: '#64748b', margin: '3px 0 0', fontSize: '12px' }}>{e.dept} • {PLAN_TYPE_LABELS[e.type] || e.type}</p>
-                </div>
-                {renderStatusBadge(e.status)}
-              </div>
-              <p style={{ color: '#94a3b8', margin: '0 0 10px', fontSize: '12px' }}>{e.plan} ({e.tier})</p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-                <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '8px' }}>
-                  <p style={{ color: '#64748b', margin: 0, fontSize: '10px' }}>Premium</p>
-                  <p style={{ color: '#e2e8f0', margin: '2px 0 0', fontSize: '13px', fontWeight: 700 }}>{formatCurrency(e.premium)}</p>
-                </div>
-                <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '8px' }}>
-                  <p style={{ color: '#64748b', margin: 0, fontSize: '10px' }}>Employer</p>
-                  <p style={{ color: '#22c55e', margin: '2px 0 0', fontSize: '13px', fontWeight: 700 }}>{formatCurrency(e.employerContrib)}</p>
-                </div>
-                <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '8px' }}>
-                  <p style={{ color: '#64748b', margin: 0, fontSize: '10px' }}>Employee</p>
-                  <p style={{ color: '#60a5fa', margin: '2px 0 0', fontSize: '13px', fontWeight: 700 }}>{formatCurrency(e.employeeContrib)}</p>
-                </div>
-              </div>
-              {e.dependents.length > 0 && (
-                <p style={{ color: '#94a3b8', margin: '10px 0 0', fontSize: '11px' }}>👥 {e.dependents.join(', ')}</p>
-              )}
+      {/* Main Container */}
+      <main className="max-w-7xl mx-auto space-y-6">
+        {/* Top KPIs */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-5 backdrop-blur-md">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+              <span>Total Monthly Employer Subsidy</span>
+              <DollarSign className="w-4 h-4 text-cyan-400" />
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Compensation Tab */}
-      {activeTab === 'compensation' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: '16px' }}>
-          {filteredBands.map((b) => {
-            const range = b.max - b.min;
-            return (
-              <div key={b.grade}
-                style={{
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                  borderRadius: '14px', padding: '20px', cursor: 'pointer', transition: 'all 0.2s',
-                }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                  <div>
-                    <h3 style={{ color: '#e2e8f0', margin: 0, fontSize: '15px', fontWeight: 600 }}>{b.title}</h3>
-                    <p style={{ color: '#64748b', margin: '3px 0 0', fontSize: '12px' }}>{b.location} • {b.headcount} headcount</p>
-                  </div>
-                  <span style={{
-                    background: 'rgba(251,191,36,0.15)', color: '#fbbf24',
-                    padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase',
-                  }}>{b.grade.replace(/_/g, ' ')}</span>
-                </div>
-                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: '8px', height: '10px', marginBottom: '8px', position: 'relative' }}>
-                  <div style={{
-                    background: 'linear-gradient(90deg, #60a5fa, #3b82f6)',
-                    borderRadius: '8px', height: '100%', width: '100%',
-                  }} />
-                  <div style={{ position: 'absolute', left: '50%', top: '-3px', width: '2px', height: '16px', background: '#fff', borderRadius: '1px' }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <span style={{ color: '#64748b', fontSize: '11px' }}>{formatCurrency(b.min)}</span>
-                  <span style={{ color: '#e2e8f0', fontSize: '11px', fontWeight: 600 }}>Mid: {formatCurrency(b.mid)}</span>
-                  <span style={{ color: '#64748b', fontSize: '11px' }}>{formatCurrency(b.max)}</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-                  <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '8px' }}>
-                    <p style={{ color: '#64748b', margin: 0, fontSize: '10px' }}>Bonus</p>
-                    <p style={{ color: '#fbbf24', margin: '2px 0 0', fontSize: '14px', fontWeight: 700 }}>{b.bonus}%</p>
-                  </div>
-                  <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '8px' }}>
-                    <p style={{ color: '#64748b', margin: 0, fontSize: '10px' }}>Benefits</p>
-                    <p style={{ color: '#e2e8f0', margin: '2px 0 0', fontSize: '13px', fontWeight: 700 }}>{formatCurrency(b.benefits)}</p>
-                  </div>
-                  <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '8px' }}>
-                    <p style={{ color: '#64748b', margin: 0, fontSize: '10px' }}>Equity</p>
-                    <p style={{ color: '#a78bfa', margin: '2px 0 0', fontSize: '12px', fontWeight: 700 }}>{b.equityType}</p>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Analytics Tab */}
-      {activeTab === 'analytics' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-          {/* Enrollment by Type */}
-          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '24px' }}>
-            <h3 style={{ color: '#e2e8f0', margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>📊 Enrollment by Plan Type</h3>
-            {Object.entries(PLAN_TYPE_LABELS).map(([type, label]) => {
-              const count = MOCK_ENROLLMENTS.filter((e) => e.type === type).length;
-              const totalPremium = MOCK_ENROLLMENTS.filter((e) => e.type === type).reduce((s, e) => s + e.premium, 0);
-              if (count === 0) return null;
-              return (
-                <div key={type} style={{ marginBottom: '12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '13px' }}>{label}</span>
-                    <span style={{ color: '#e2e8f0', fontSize: '13px', fontWeight: 600 }}>{count} enrollments • {formatCurrency(totalPremium)}/mo</span>
-                  </div>
-                  <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '6px', height: '8px' }}>
-                    <div style={{
-                      background: 'linear-gradient(90deg, #60a5fa, #a78bfa)',
-                      borderRadius: '6px', height: '100%',
-                      width: `${(count / MOCK_ENROLLMENTS.length) * 100}%`, transition: 'width 0.8s ease',
-                    }} />
-                  </div>
-                </div>
-              );
-            })}
+            <div className="text-3xl font-black text-white font-mono">${(totalEmployerMonthlySubsidyUSD / 1000).toFixed(1)}k USD</div>
+            <div className="text-emerald-400 text-xs mt-2 flex items-center gap-1 font-medium">
+              <CheckCircle2 className="w-3.5 h-3.5" /> 85% Employer Cost Coverage Rate
+            </div>
           </div>
 
-          {/* Employer Spend Breakdown */}
-          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '24px' }}>
-            <h3 style={{ color: '#e2e8f0', margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>💵 Employer Spend by Employee</h3>
-            {MOCK_ENROLLMENTS.sort((a, b) => b.ytdEmployerSpend - a.ytdEmployerSpend).map((e) => (
-              <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                <div>
-                  <p style={{ color: '#e2e8f0', margin: 0, fontSize: '13px' }}>{e.employee}</p>
-                  <p style={{ color: '#64748b', margin: '2px 0 0', fontSize: '11px' }}>{e.plan}</p>
-                </div>
-                <span style={{ color: '#22c55e', fontSize: '13px', fontWeight: 700 }}>{formatCurrency(e.ytdEmployerSpend)}</span>
-              </div>
+          <div className="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-5 backdrop-blur-md">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+              <span>Enrolled Workforce</span>
+              <Users className="w-4 h-4 text-blue-400" />
+            </div>
+            <div className="text-3xl font-black text-white font-mono">480 Staff</div>
+            <div className="text-cyan-400 text-xs mt-2 font-medium">
+              98.5% Total Benefits Participation
+            </div>
+          </div>
+
+          <div className="bg-slate-900/80 border border-slate-800/90 rounded-2xl p-5 backdrop-blur-md">
+            <div className="flex items-center justify-between text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">
+              <span>Active Provider Network</span>
+              <Heart className="w-4 h-4 text-rose-400" />
+            </div>
+            <div className="text-3xl font-black text-white font-mono">3 Global Carriers</div>
+            <div className="text-rose-400 text-xs mt-2 font-medium">
+              BlueCross, Delta Dental & Fidelity
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div className="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800 w-full md:w-auto">
+            <button
+              onClick={() => setActiveTab('plans')}
+              className={`flex-1 md:flex-none px-5 py-2.5 rounded-xl font-medium text-sm transition flex items-center justify-center gap-2 ${
+                activeTab === 'plans'
+                  ? 'bg-cyan-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              <Heart className="w-4 h-4" /> Active Benefit Plans
+            </button>
+            <button
+              onClick={() => setActiveTab('enrollment-stream')}
+              className={`flex-1 md:flex-none px-5 py-2.5 rounded-xl font-medium text-sm transition flex items-center justify-center gap-2 ${
+                activeTab === 'enrollment-stream'
+                  ? 'bg-cyan-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              }`}
+            >
+              <Activity className="w-4 h-4" /> Open Enrollment Stream
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-72">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search plan or carrier..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-900/90 border border-slate-800 rounded-xl text-slate-100 placeholder:text-slate-500 text-sm focus:outline-none focus:border-cyan-500 transition"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Body */}
+        {activeTab === 'enrollment-stream' ? (
+          <BenefitsEnrollmentTimeline />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {filteredPlans.map((plan) => (
+              <BenefitPlanCard
+                key={plan.id}
+                plan={plan}
+                onInspect={() => setSelectedPlanModal(plan)}
+              />
             ))}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-              <span style={{ color: '#e2e8f0', fontSize: '14px', fontWeight: 700 }}>Total YTD Spend</span>
-              <span style={{ color: '#22c55e', fontSize: '16px', fontWeight: 700 }}>{formatCurrency(totalEmployerSpend)}</span>
-            </div>
           </div>
+        )}
+      </main>
 
-          {/* Compensation Distribution */}
-          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '24px', gridColumn: '1 / -1' }}>
-            <h3 style={{ color: '#e2e8f0', margin: '0 0 16px', fontSize: '16px', fontWeight: 700 }}>🎯 Compensation Band Comparison</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-              {MOCK_COMP_BANDS.map((b) => (
-                <div key={b.grade} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '12px', padding: '16px' }}>
-                  <p style={{ color: '#e2e8f0', margin: '0 0 8px', fontSize: '14px', fontWeight: 600 }}>{b.title}</p>
-                  <p style={{ color: '#64748b', margin: '0 0 4px', fontSize: '12px' }}>Total Comp Range</p>
-                  <p style={{ color: '#fbbf24', margin: 0, fontSize: '16px', fontWeight: 700 }}>{formatCurrency(b.min)} — {formatCurrency(b.max)}</p>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-                    <span style={{ color: '#94a3b8', fontSize: '11px' }}>P50: {formatCurrency(b.p50)}</span>
-                    <span style={{ color: '#94a3b8', fontSize: '11px' }}>HC: {b.headcount}</span>
-                  </div>
-                </div>
-              ))}
+      {/* Modal View */}
+      {selectedPlanModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl relative">
+            <button
+              onClick={() => setSelectedPlanModal(null)}
+              className="absolute right-5 top-5 text-slate-400 hover:text-white text-xl font-bold"
+            >
+              ×
+            </button>
+
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-xl font-bold text-white">{selectedPlanModal.planName}</h3>
+                <div className="text-xs text-slate-400 font-mono">{selectedPlanModal.providerName}</div>
+              </div>
+              <span className="bg-cyan-500/20 text-cyan-400 px-2.5 py-1 rounded font-mono text-xs font-bold border border-cyan-500/30">
+                {selectedPlanModal.planCategory}
+              </span>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Detail Modal */}
-      {showModal && selectedItem && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}
-          onClick={() => setShowModal(false)}>
-          <div onClick={(e) => e.stopPropagation()} style={{
-            background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px',
-            padding: '28px', maxWidth: '520px', width: '90%', maxHeight: '80vh', overflow: 'auto',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ color: '#e2e8f0', margin: 0, fontSize: '18px', fontWeight: 700 }}>
-                {selectedItem.employee || selectedItem.title || 'Details'}
-              </h2>
-              <button onClick={() => setShowModal(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#94a3b8', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '13px' }}>
-                ✕ Close
+            <div className="grid grid-cols-2 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800 mb-6 text-xs font-mono">
+              <div>
+                <span className="text-slate-500 block">Employer Monthly Subsidy</span>
+                <span className="text-emerald-400 font-bold text-sm">${selectedPlanModal.monthlyEmployerContributionUSD} / mo</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Employee Payroll Deduction</span>
+                <span className="text-cyan-400 font-bold text-sm">${selectedPlanModal.monthlyEmployeeDeductionUSD} / mo</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Annual Individual Deductible</span>
+                <span className="text-amber-400 font-bold text-sm">${selectedPlanModal.deductibleUSD} USD</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block">Active Enrolled Staff</span>
+                <span className="text-white font-bold text-sm">{selectedPlanModal.coveredEmployees} Staff Members</span>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setSelectedPlanModal(null)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-xs transition"
+              >
+                Close Audit View
               </button>
-            </div>
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
-              {Object.entries(selectedItem).filter(([k]) => !['dependents', 'id'].includes(k)).map(([key, val]) => (
-                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ color: '#64748b', fontSize: '12px', textTransform: 'capitalize' }}>{key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ')}</span>
-                  <span style={{ color: '#e2e8f0', fontSize: '12px', fontWeight: 600, textAlign: 'right' }}>
-                    {typeof val === 'number' ? val.toLocaleString() : String(val)}
-                  </span>
-                </div>
-              ))}
             </div>
           </div>
         </div>
       )}
     </div>
   );
-};
-
-export default EnterpriseBenefitsDashboardPage;
+}

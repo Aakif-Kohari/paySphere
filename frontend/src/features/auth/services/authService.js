@@ -12,4 +12,16 @@ export const register = async (userData) => {
 
 export const logout = () => {
   localStorage.removeItem('token');
+  localStorage.removeItem('impersonator');
+  localStorage.removeItem('isImpersonating');
+};
+
+export const impersonateUser = async (targetUserId) => {
+  const response = await api.post('/api/auth/impersonate', { targetUserId });
+  return response.data;
+};
+
+export const stopImpersonation = async () => {
+  const response = await api.post('/api/auth/stop-impersonation');
+  return response.data;
 };

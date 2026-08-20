@@ -1,53 +1,173 @@
-// CompliancePolicyCard — Glassmorphism card for compliance policy display
 import React from 'react';
+import { Shield, FileCheck, Users, AlertCircle, Clock, ArrowUpRight, CheckCircle2 } from 'lucide-react';
 
-interface CompliancePolicyCardProps {
-  name: string; category: string; owner: string; status: string;
-  lastReviewed: string; nextReview: string; risk: string; regions: string[]; reqCount: number;
+export interface CompliancePolicy {
+  id: string;
+  policyName: string;
+  category: 'STATUTORY' | 'LABOR_LAW' | 'DATA_PRIVACY' | 'HEALTH_SAFETY' | 'INTERNAL_GOVERNANCE';
+  jurisdiction: string;
+  status: 'ACTIVE' | 'DRAFT' | 'UNDER_REVIEW' | 'ARCHIVED';
+  version: string;
+  effectiveDate: string;
+  lastReviewedAt?: string;
+  mandatoryAcknowledgment: boolean;
+  acknowledgedCount: number;
+  totalEligibleEmployees: number;
+  description?: string;
 }
 
-const SEV_COLORS: Record<string, string> = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e' };
-const CAT_ICONS: Record<string, string> = { data_privacy: '🔒', financial: '💰', security: '🛡️', labor: '👥', environmental: '🌿', internal_policy: '📜' };
+export interface CompliancePolicyCardProps {
+  policy: CompliancePolicy;
+  onView?: (policy: CompliancePolicy) => void;
+  onEdit?: (policy: CompliancePolicy) => void;
+  onAcknowledge?: (policy: CompliancePolicy) => void;
+}
 
-const CompliancePolicyCard: React.FC<CompliancePolicyCardProps> = ({ name, category, owner, status, lastReviewed, nextReview, risk, regions, reqCount }) => {
-  const riskColor = SEV_COLORS[risk] || '#94a3b8';
+export const CompliancePolicyCard: React.FC<CompliancePolicyCardProps> = ({
+  policy,
+  onView,
+  onEdit,
+  onAcknowledge,
+}) => {
+  const complianceRate = policy.totalEligibleEmployees > 0
+    ? Math.round((policy.acknowledgedCount / policy.totalEligibleEmployees) * 100)
+    : 0;
+
+  const getStatusBadge = (status: CompliancePolicy['status']) => {
+    switch (status) {
+      case 'ACTIVE':
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+      case 'UNDER_REVIEW':
+        return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+      case 'DRAFT':
+        return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+      default:
+        return 'bg-slate-500/10 text-slate-400 border-slate-500/30';
+    }
+  };
+
+  const getCategoryBadge = (category: CompliancePolicy['category']) => {
+    switch (category) {
+      case 'STATUTORY':
+        return 'bg-purple-500/10 text-purple-400 border-purple-500/30';
+      case 'LABOR_LAW':
+        return 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+      case 'DATA_PRIVACY':
+        return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
+      default:
+        return 'bg-slate-500/10 text-slate-300 border-slate-700';
+    }
+  };
+
   return (
-    <div style={{ background: `${riskColor}11`, border: `1px solid ${riskColor}33`, borderRadius: '16px', padding: '18px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span style={{ fontSize: '24px' }}>{CAT_ICONS[category] || '📜'}</span>
-          <div>
-            <h3 style={{ color: '#e2e8f0', margin: 0, fontSize: '14px', fontWeight: 700 }}>{name}</h3>
-            <p style={{ color: '#64748b', margin: '3px 0 0', fontSize: '12px' }}>Owner: {owner}</p>
+    <div
+      data-testid="compliance-policy-card"
+      className="bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-6 shadow-xl transition-all duration-300 hover:shadow-indigo-500/10 flex flex-col justify-between group"
+    >
+      <div>
+        {/* Header Badges */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-[11px] px-2.5 py-0.5 rounded-lg font-mono font-semibold border ${getCategoryBadge(policy.category)}`}>
+              {policy.category.replace('_', ' ')}
+            </span>
+            <span className="text-[11px] text-slate-400 font-mono">v{policy.version}</span>
+          </div>
+
+          <span className={`text-xs px-2.5 py-0.5 rounded-full font-mono font-semibold border uppercase ${getStatusBadge(policy.status)}`}>
+            {policy.status}
+          </span>
+        </div>
+
+        {/* Title & Jurisdiction */}
+        <h3 className="text-base font-bold text-slate-100 group-hover:text-indigo-300 transition mb-1 leading-snug">
+          {policy.policyName}
+        </h3>
+        <p className="text-xs text-slate-400 font-medium mb-4">
+          Jurisdiction: <span className="text-slate-200 font-semibold">{policy.jurisdiction}</span>
+        </p>
+
+        {/* Description */}
+        {policy.description && (
+          <p className="text-xs text-slate-400 mb-4 line-clamp-2 leading-relaxed">
+            {policy.description}
+          </p>
+        )}
+
+        {/* Acknowledgment Progress */}
+        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 mb-4 font-mono">
+          <div className="flex justify-between items-center text-[11px] text-slate-400 mb-1.5">
+            <span className="flex items-center gap-1.5">
+              <Users className="w-3.5 h-3.5 text-indigo-400" />
+              Staff Acknowledgment
+            </span>
+            <span className="text-slate-200 font-bold">{complianceRate}%</span>
+          </div>
+
+          <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-2">
+            <div
+              className={`h-full transition-all duration-500 rounded-full ${
+                complianceRate >= 90
+                  ? 'bg-emerald-500'
+                  : complianceRate >= 60
+                  ? 'bg-amber-500'
+                  : 'bg-rose-500'
+              }`}
+              style={{ width: `${Math.min(100, complianceRate)}%` }}
+            />
+          </div>
+
+          <div className="flex justify-between text-[11px] text-slate-500">
+            <span>{policy.acknowledgedCount} signed</span>
+            <span>{policy.totalEligibleEmployees} required</span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          <span style={{ color: riskColor, fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', background: `${riskColor}22`, padding: '3px 8px', borderRadius: '6px' }}>{risk}</span>
-          <span style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', padding: '3px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 600, textTransform: 'capitalize' }}>{status}</span>
+
+        {/* Meta Info */}
+        <div className="space-y-1.5 text-xs font-mono text-slate-400 mb-4">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3 text-slate-500" />
+              Effective Date:
+            </span>
+            <span className="text-slate-300 font-medium">{policy.effectiveDate}</span>
+          </div>
+          {policy.lastReviewedAt && (
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1">
+                <FileCheck className="w-3 h-3 text-slate-500" />
+                Last Reviewed:
+              </span>
+              <span className="text-slate-300 font-medium">{policy.lastReviewedAt}</span>
+            </div>
+          )}
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginTop: '10px' }}>
-        <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '8px' }}>
-          <p style={{ color: '#64748b', margin: 0, fontSize: '9px' }}>REQUIREMENTS</p>
-          <p style={{ color: '#a78bfa', margin: '2px 0 0', fontSize: '14px', fontWeight: 700 }}>{reqCount}</p>
-        </div>
-        <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '8px' }}>
-          <p style={{ color: '#64748b', margin: 0, fontSize: '9px' }}>REGIONS</p>
-          <p style={{ color: '#e2e8f0', margin: '2px 0 0', fontSize: '12px', fontWeight: 600 }}>{regions.join(', ')}</p>
-        </div>
-        <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '8px' }}>
-          <p style={{ color: '#64748b', margin: 0, fontSize: '9px' }}>NEXT REVIEW</p>
-          <p style={{ color: '#e2e8f0', margin: '2px 0 0', fontSize: '12px' }}>{nextReview}</p>
-        </div>
+
+      {/* Footer Actions */}
+      <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between gap-2">
+        {policy.mandatoryAcknowledgment && (
+          <button
+            type="button"
+            onClick={() => onAcknowledge?.(policy)}
+            className="flex-1 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white px-3 py-1.5 rounded-xl text-xs font-semibold border border-emerald-500/30 transition flex items-center justify-center gap-1.5"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Sign Policy</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => onView?.(policy)}
+          className="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold border border-indigo-500/30 transition flex items-center gap-1"
+        >
+          <span>Inspect</span>
+          <ArrowUpRight className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );
-};
-
-// Category display labels for policy type rendering
-export const CATEGORY_LABELS: Record<string, string> = {
-  data_privacy: 'Data Privacy', financial: 'Financial', security: 'Security',
-  labor: 'Labor & Employment', environmental: 'Environmental', industry: 'Industry', internal_policy: 'Internal Policy',
 };
 
 export default CompliancePolicyCard;

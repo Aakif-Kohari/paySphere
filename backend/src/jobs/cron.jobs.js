@@ -386,6 +386,14 @@ const startCronJobs = () => {
     );
   });
   logger.info('Daily TOIL expiration cron job registered.');
+
+  // 05:00 daily — Treasury Vault Liquidity Rebalancing.
+  cron.schedule('0 5 * * *', () => {
+    runTreasuryRebalancingCron().catch((error) =>
+      logger.error('Treasury rebalancing job threw', { error: error.message }),
+    );
+  });
+  logger.info('Daily treasury rebalancing cron job registered.');
 };
 
 /**
@@ -450,6 +458,28 @@ async function runToilExpirationJob() {
   }
 }
 
+async function runTreasuryRebalancingCron() {
+  const now = new Date();
+  const lockId = `treasury_rebalancing_${now.getFullYear()}_${now.getMonth() + 1}_${now.getDate()}`;
+
+  const lock = await acquireLock(lockId);
+  if (!lock.acquired) {
+    logger.info('Treasury rebalancing job skipped: lock is held elsewhere', { lockId });
+    return { ran: false, reason: lock.reason };
+  }
+
+  try {
+    const { runTreasuryRebalancingJob } = require('./treasuryRebalance.job');
+    const result = await runTreasuryRebalancingJob();
+    await releaseLock(lockId);
+    return { ran: true, ...result };
+  } catch (error) {
+    logger.error('Treasury rebalancing job failed', { error: error.message });
+    await releaseLock(lockId);
+    return { ran: false, reason: 'error' };
+  }
+}
+
 module.exports = {
   startCronJobs,
   runMonthlyPayslipJob,
@@ -459,6 +489,7 @@ module.exports = {
   runDatabaseArchivalJob,
   runForexSyncJob,
   runToilExpirationJob,
+  runTreasuryRebalancingJob: runTreasuryRebalancingCron,
   previousPeriod,
   acquireLock,
   releaseLock,
