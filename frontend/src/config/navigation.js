@@ -243,6 +243,13 @@ export const APP_ROUTES = [
     icon: 'alert',
     employee: true,
   },
+  {
+    path: '/audit-logs',
+    component: lazy(() => import('../pages/AuditLogs')),
+    label: 'Audit logs',
+    group: 'compliance',
+    icon: 'shield',
+  },
 
   // ── Workplace ────────────────────────────────────────────────────────────
   {
