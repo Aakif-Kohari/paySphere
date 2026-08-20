@@ -55,6 +55,19 @@ const PERMISSIONS = {
   // paid as taxable earnings or as a tax-free reimbursement. That is a tax
   // decision rather than day-to-day expense admin, so it stays with the owner.
   MANAGE_EXPENSE_CATEGORY: 'MANAGE_EXPENSE_CATEGORY',
+
+  // --- Statutory bonus, Payment of Bonus Act 1965 (#1346) ------------------
+  //
+  // Deliberately not READ_PAYROLL and WRITE_PAYROLL, which every payroll
+  // administrator holds. A statutory bonus computation reads the company's
+  // gross profit and its section 6 prior charges — figures out of the audited
+  // accounts that payroll staff have no other reason to see — and committing
+  // one declares what the establishment owes under a statute, sets on or sets
+  // off a balance that binds the next four years, and produces the Form C an
+  // inspector asks for. That is MANAGE_COMPLIANCE's class of authority rather
+  // than payroll admin's.
+  READ_STATUTORY_BONUS: 'READ_STATUTORY_BONUS',
+  MANAGE_STATUTORY_BONUS: 'MANAGE_STATUTORY_BONUS',
   // Statutory compliance (#933, reachable since #951). Deliberately not
   // READ_REPORT: a Form 16 is one person's complete tax position and a Form 24Q
   // export is every employee's PAN, salary and tax in one file, while
@@ -283,6 +296,16 @@ const PERMISSION_DEFINITIONS = [
     name: PERMISSIONS.MANAGE_EXPENSE_CATEGORY,
     description:
       'Create and edit expense categories, including whether a category is taxable',
+  },
+  {
+    name: PERMISSIONS.READ_STATUTORY_BONUS,
+    description:
+      'View the statutory bonus computation, the set-on/set-off ledger and the Form C register',
+  },
+  {
+    name: PERMISSIONS.MANAGE_STATUTORY_BONUS,
+    description:
+      'Commit a statutory bonus computation for an accounting year and record its payment',
   },
   {
     name: PERMISSIONS.READ_COMPLIANCE,
@@ -528,6 +551,11 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.WRITE_EXPENSE,
       PERMISSIONS.APPROVE_EXPENSE,
       PERMISSIONS.MANAGE_EXPENSE_CATEGORY,
+
+      // #1346.
+      PERMISSIONS.READ_STATUTORY_BONUS,
+      PERMISSIONS.MANAGE_STATUTORY_BONUS,
+
       PERMISSIONS.READ_COMPLIANCE,
       PERMISSIONS.MANAGE_COMPLIANCE,
       // Held by the owner alone: a role edit changes what every other account
@@ -613,6 +641,13 @@ const ROLE_DEFINITIONS = [
       // Issuing Form 16 at year end is HR's job. Setting the TAN the return is
       // filed under is not — that stays with the owner.
       PERMISSIONS.READ_COMPLIANCE,
+
+      // #1346. HR reads the bonus register — "what is this employee getting and
+      // why" is HR's question and Form C answers it. It does not commit the
+      // computation: that reads the company's gross profit and binds the next
+      // four years through the set-on/set-off ledger, so it stays with the
+      // owner alongside MANAGE_COMPLIANCE, which HR also does not hold.
+      PERMISSIONS.READ_STATUTORY_BONUS,
 
       // #1011. The day-to-day half of each new area, and not the half that
       // moves money.
