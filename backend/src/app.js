@@ -50,6 +50,13 @@ const employeeRoutes = require('./routes/employee.routes');
 const employeeImportRoutes = require('./routes/employeeImport.routes');
 const payrollRoutes = require('./routes/payroll.routes');
 const payrollApprovalRoutes = require('./routes/payrollApproval.routes');
+
+// Statutory bonus under the Payment of Bonus Act, 1965 (#1346). Next to the
+// payroll routers because it is a payment to employees, and separate from them
+// because it is not payroll: the amount is fixed by statute rather than by the
+// company, it is computed on a wage capped by section 12 rather than on the one
+// that is paid, and it produces a Rule 5 register.
+const statutoryBonusRoutes = require('./routes/statutoryBonus.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
@@ -310,6 +317,13 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/employees', employeeImportRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/payroll', payrollApprovalRoutes);
+
+// #1346. Its own prefix rather than a sub-path of `/api/payroll`: the
+// discretionary bonus on a payroll row and the statutory bonus under the Act
+// are different money with different authorities, and sharing a namespace
+// invites them to be confused. The router owns `/computations`, `/preview` and
+// `/ledger`.
+app.use('/api/statutory-bonus', statutoryBonusRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/employee-portal', employeePortalRoutes);
 app.use('/api/schedules', schedulerRoutes);

@@ -179,6 +179,17 @@ export const APP_ROUTES = [
     group: 'payroll',
     icon: 'target',
   },
+  {
+    // In Payroll rather than Compliance because it is money paid to employees,
+    // and separate from the payroll run because the amount is fixed by the
+    // Payment of Bonus Act rather than by the company (#1346).
+    path: '/statutory-bonus',
+    component: lazy(() => import('../pages/StatutoryBonusRegister')),
+    appShell: true,
+    label: 'Statutory bonus',
+    group: 'payroll',
+    icon: 'book',
+  },
 
   // ── Finance ──────────────────────────────────────────────────────────────
   {
