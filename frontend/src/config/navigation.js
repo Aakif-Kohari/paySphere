@@ -203,6 +203,14 @@ export const APP_ROUTES = [
     icon: 'receipt',
   },
   {
+    path: '/expense-reports',
+    component: lazy(() => import('../pages/CustomExpenseReports')),
+    label: 'Expense reports',
+    group: 'finance',
+    icon: 'wallet',
+    employee: true,
+  },
+  {
     path: '/accounting',
     component: lazy(() => import('../pages/AccountingExport')),
     label: 'Accounting export',
