@@ -25,22 +25,30 @@ const { AUDIT_LOG_EVENT } = eventBus;
  *
  * Configured with exponential backoff for failed deliveries.
  */
-const webhookQueue = new Queue('webhook-deliveries', {
-  connection: redisConnection,
-  defaultJobOptions: {
-    removeOnComplete: { count: 1000 }, // Keep last 1000 successful jobs
-    removeOnFail: { count: 5000 }, // Keep last 5000 failed jobs
-    attempts: 5, // Max 5 attempts
-    backoff: {
-      type: 'exponential',
-      delay: 60000, // Base delay; the worker's custom strategy shapes it further
+let webhookQueue;
+if (process.env.REDIS_URL) {
+  webhookQueue = new Queue('webhook-deliveries', {
+    connection: redisConnection,
+    defaultJobOptions: {
+      removeOnComplete: { count: 1000 },
+      removeOnFail: { count: 5000 },
+      attempts: 5,
+      backoff: {
+        type: 'exponential',
+        delay: 60000,
+      },
     },
-  },
-});
+  });
 
-webhookQueue.on('error', () => {
-  // Suppress unhandled error crashes when Redis is offline. config/redis.js already logs this.
-});
+  webhookQueue.on('error', () => {
+    // Suppress unhandled error crashes when Redis is offline. config/redis.js already logs this.
+  });
+} else {
+  webhookQueue = {
+    add: async () => ({ id: 'mock-webhook-job-id' }),
+    on: () => {},
+  };
+}
 
 /**
  * Maps internal event bus actions to webhook event names.

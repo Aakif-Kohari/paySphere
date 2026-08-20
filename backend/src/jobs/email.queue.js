@@ -9,19 +9,27 @@
 const { Queue } = require('bullmq');
 const redisConnection = require('../config/redis');
 
-const emailQueue = new Queue('email-processing', {
-  connection: redisConnection,
-  defaultJobOptions: {
-    removeOnComplete: { count: 1000 },
-    removeOnFail: { count: 5000 },
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 30000 },
-  },
-});
+let emailQueue;
+if (process.env.REDIS_URL) {
+  emailQueue = new Queue('email-processing', {
+    connection: redisConnection,
+    defaultJobOptions: {
+      removeOnComplete: { count: 1000 },
+      removeOnFail: { count: 5000 },
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 30000 },
+    },
+  });
 
-emailQueue.on('error', () => {
-  // Suppress unhandled error crashes when Redis is offline. config/redis.js already logs this.
-});
+  emailQueue.on('error', () => {
+    // Suppress unhandled error crashes when Redis is offline. config/redis.js already logs this.
+  });
+} else {
+  emailQueue = {
+    add: async () => ({ id: 'mock-email-job-id' }),
+    on: () => {},
+  };
+}
 
 /**
  * Enqueues an email for background delivery.
