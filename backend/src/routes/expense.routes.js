@@ -32,6 +32,7 @@ const {
   getMyReports,
   exportExpenseReport,
   updateReportStatus,
+  getFraudClaims,
 } = require('../controllers/expense.controller');
 
 const router = express.Router();
@@ -75,6 +76,13 @@ router.get(
   '/claims/my',
   auth,
   getMyClaims,
+);
+
+router.get(
+  '/claims/fraud',
+  auth,
+  requirePermission(PERMISSIONS.READ_PAYROLL),
+  getFraudClaims,
 );
 
 // --- Custom Expense Reports (#1285) ----------------------------------------
