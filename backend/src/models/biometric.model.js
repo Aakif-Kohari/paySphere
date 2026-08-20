@@ -16,6 +16,9 @@ const biometricDeviceSchema = new mongoose.Schema({
     deviceSerial: { type: String, required: true, unique: true, trim: true },
     deviceIp: { type: String, required: true },
     location: { type: String, default: '' },
+    latitude: { type: Number, default: 0 },
+    longitude: { type: Number, default: 0 },
+    secretKey: { type: String, default: 'biometric-device-secret-key' },
     isActive: { type: Boolean, default: true },
     lastPingAt: { type: Date, default: null },
 }, { timestamps: true });
