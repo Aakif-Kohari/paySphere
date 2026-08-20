@@ -87,6 +87,12 @@ const assetRoutes = require('./routes/asset.routes');
 const vendorRoutes = require('./routes/vendor.routes');
 const grievanceRoutes = require('./routes/grievance.routes');
 const taxProofRoutes = require('./routes/taxProof.routes');
+
+// Leave Travel Allowance (#1345). Next to the tax proofs because it is the same
+// act from the employee's side — file a document, get an exemption — and a
+// completely different rule set behind it: the entitlement is a four-year
+// statutory block rather than a financial year.
+const ltaRoutes = require('./routes/lta.routes');
 const appraisalRoutes = require('./routes/appraisal.routes');
 const contractRoutes = require('./routes/contract.routes');
 const forecastRoutes = require('./routes/forecast.routes');
@@ -422,6 +428,10 @@ app.use('/api/vendors', vendorRoutes);
 app.use('/api/grievances', grievanceRoutes);
 
 app.use('/api/tax-proofs', taxProofRoutes);
+
+// #1345. The router owns `/claims`, `/preview`, `/entitlement`, `/my-claims`,
+// `/queue` and `/summary/:employeeId`.
+app.use('/api/lta', ltaRoutes);
 app.use('/api/appraisals', appraisalRoutes);
 app.use('/api/contracts', contractRoutes);
 

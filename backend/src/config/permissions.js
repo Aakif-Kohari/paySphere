@@ -131,6 +131,17 @@ const PERMISSIONS = {
   // deducted from somebody's salary.
   VERIFY_TAX_PROOF: 'VERIFY_TAX_PROOF',
 
+  // --- Leave Travel Allowance (#1345) --------------------------------------
+  //
+  // The same pair as the tax proof permissions above, and deliberately not the
+  // same permissions. LTA is not an annual proof: the entitlement is a
+  // four-year statutory block, approving a journey consumes one of two, and the
+  // decision is about the section 10(5) rules rather than about a receipt.
+  // Somebody trusted to verify a rent receipt is not automatically the person
+  // who should be adjudicating a carry-forward.
+  SUBMIT_LTA_CLAIM: 'SUBMIT_LTA_CLAIM',
+  VERIFY_LTA_CLAIM: 'VERIFY_LTA_CLAIM',
+
   READ_PYQ: 'READ_PYQ',
   // `pyq.routes.js` applied `auth` and nothing else, so any authenticated
   // account in any tenant could bulk-upload questions and trigger forecast
@@ -354,6 +365,16 @@ const PERMISSION_DEFINITIONS = [
       'Approve or reject submitted investment proofs, which changes the TDS deducted from that salary',
   },
   {
+    name: PERMISSIONS.SUBMIT_LTA_CLAIM,
+    description:
+      'File a Leave Travel Allowance journey and see the exemption it earns under section 10(5)',
+  },
+  {
+    name: PERMISSIONS.VERIFY_LTA_CLAIM,
+    description:
+      'Approve or reject an LTA journey, which decides how much of the allowance escapes tax',
+  },
+  {
     name: PERMISSIONS.READ_PYQ,
     description: 'View the previous-year question bank and trend forecasts',
   },
@@ -503,6 +524,11 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_INVOICE,
       PERMISSIONS.SUBMIT_TAX_PROOF,
       PERMISSIONS.VERIFY_TAX_PROOF,
+
+      // #1345.
+      PERMISSIONS.SUBMIT_LTA_CLAIM,
+      PERMISSIONS.VERIFY_LTA_CLAIM,
+
       PERMISSIONS.READ_PYQ,
       PERMISSIONS.MANAGE_PYQ,
 
@@ -574,6 +600,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_INVOICE,
       PERMISSIONS.SUBMIT_TAX_PROOF,
       PERMISSIONS.VERIFY_TAX_PROOF,
+
+      // #1345. HR verifies LTA journeys for the same reason it verifies
+      // investment proofs: approving one changes the TDS deducted from that
+      // employee's salary for the rest of the year.
+      PERMISSIONS.SUBMIT_LTA_CLAIM,
+      PERMISSIONS.VERIFY_LTA_CLAIM,
+
       PERMISSIONS.READ_PYQ,
 
       // #1073. HR can see the cap table — it answers "what is this person's
@@ -631,6 +664,15 @@ const ROLE_DEFINITIONS = [
       // not let one employee read a colleague's review or file a proof in
       // their name.
       PERMISSIONS.SUBMIT_TAX_PROOF,
+
+      // #1345. Filing their own journeys and seeing their own entitlement.
+      // `submitClaim` files against the caller's own employee record when no
+      // id is sent, and `getEntitlement` and `getMyClaims` both resolve from
+      // `req.userId` — so this does not let one employee claim in another's
+      // name or read a colleague's block position. Deliberately not
+      // VERIFY_LTA_CLAIM, which reads any employee's four-year history.
+      PERMISSIONS.SUBMIT_LTA_CLAIM,
+
       PERMISSIONS.READ_OWN_APPRAISAL,
       // Employees see the roster they are on.
       PERMISSIONS.READ_ROSTER,
