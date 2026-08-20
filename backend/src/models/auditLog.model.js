@@ -39,6 +39,13 @@ const AUDIT_ACTIONS = [
   'EMPLOYEE_EXIT_INITIATED',
   'SETTLEMENT_CREATE',
   'SETTLEMENT_STATUS_CHANGE',
+  // Gratuity actuarial valuation (#1344). The assumptions decide the reported
+  // provision — moving the discount rate 50 basis points moves the balance
+  // sheet — and committing a valuation produces the figure carried in the
+  // accounts and every subsequent opening balance. Both are exactly what an
+  // auditor asks "who changed this, and when" about.
+  'GRATUITY_ASSUMPTIONS_UPDATED',
+  'GRATUITY_VALUATION_COMMITTED',
   // A salary advance commits future deductions from someone's pay, so
   // issuing, pausing and collecting against one are all financial events
   // and are audited as such (#460).
@@ -53,6 +60,13 @@ const AUDIT_ACTIONS = [
   'SALARY_HISTORY_CREATE',
   'SALARY_HISTORY_EXPORT',
   'SALARY_HISTORY_DELETE',
+  // LTA claims (#1345). Approving a journey decides how much of somebody's
+  // allowance escapes tax, and therefore the TDS deducted from their salary for
+  // the rest of the year — the same class of financial mutation as the salary
+  // history entries above.
+  'LTA_CLAIM_SUBMITTED',
+  'LTA_CLAIM_APPROVED',
+  'LTA_CLAIM_REJECTED',
   // The approval workflow engine (#590, mounted in #614) emits three (#664).
   // A change to the graph that decides who may approve a payroll run is
   // exactly the kind of thing an auditor asks about.
@@ -91,8 +105,11 @@ const AUDIT_RESOURCE_TYPES = [
   'Report',
   'Attendance',
   'Settlement',
+  'GratuityAssumption',
+  'GratuityValuation',
   'Loan',
   'SalaryHistory',
+  'LtaClaim',
   'Workflow',
   'WorkflowInstance',
   'Webhook',
