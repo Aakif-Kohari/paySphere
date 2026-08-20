@@ -2,6 +2,7 @@ const { sendEmail } = require('../utils/email');
 const { createCircuitBreaker } = require('../utils/circuitBreaker');
 const logger = require('../utils/logger');
 const User = require('../models/user.model');
+const { resolveEmployeeLanguage, translate } = require('../utils/i18n');
 
 // Wrap sendEmail in circuit breaker (Issue #685)
 const emailBreaker = createCircuitBreaker(sendEmail, 'smtp-email-service', {
@@ -20,10 +21,12 @@ exports.sendPayslipEmail = async (employee, payroll) => {
 
   // Fetch user to get company logo
   let companyLogo = null;
+  let employeeLanguage = resolveEmployeeLanguage(employee);
   try {
     const user = await User.findById(employee.createdBy);
     if (user && user.settings && user.settings.companyInfo) {
       companyLogo = user.settings.companyInfo.companyLogo;
+      employeeLanguage = resolveEmployeeLanguage(employee, user);
     }
   } catch (err) {
     logger.warn('Failed to fetch company logo for payslip email', { error: err.message });
@@ -40,7 +43,7 @@ exports.sendPayslipEmail = async (employee, payroll) => {
 
       pdfWorker.postMessage({
         type: 'GENERATE_PAYSLIP',
-        payload: { employee, payroll, companyLogo },
+        payload: { employee, payroll, companyLogo, language: employeeLanguage },
       });
 
       // Track whether the promise has already been settled to avoid
@@ -62,8 +65,15 @@ exports.sendPayslipEmail = async (employee, payroll) => {
               from:
                 process.env.EMAIL_FROM || '"PaySphere" <no-reply@paysphere.com>',
               to: employee.email,
-              subject: `Payslip for ${payroll.month}/${payroll.year}`,
-              text: `Hello ${employee.fullName},\n\nPlease find attached your payslip for ${payroll.month}/${payroll.year}.\n\nBest Regards,\nPaySphere Team`,
+              subject: translate(employeeLanguage, 'payslipSubject', payroll),
+              text: [
+                translate(employeeLanguage, 'payslipGreeting', { name: employee.fullName }),
+                '',
+                translate(employeeLanguage, 'payslipBody', payroll),
+                '',
+                translate(employeeLanguage, 'regards'),
+                translate(employeeLanguage, 'team'),
+              ].join('\n'),
               attachments: [
                 {
                   filename: `Payslip_${payroll.month}_${payroll.year}.pdf`,

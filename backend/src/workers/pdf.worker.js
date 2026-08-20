@@ -2,6 +2,7 @@ const { workerData, parentPort } = require("worker_threads");
 const PDFDocument = require("pdfkit");
 const { formatCurrency } = require("../utils/currency");
 const logger = require("../utils/logger");
+const { translate, normalizeLanguage } = require('../utils/i18n');
 
 /**
  * Generates Form 16 (Part A & Part B) PDF
@@ -252,7 +253,9 @@ async function handleCompanyReportGeneration(payload) {
  * Generates individual employee payslip PDF
  */
 async function handlePayslipGeneration(payload) {
-  const { employee, payroll, companyLogo, currency = "INR" } = payload;
+  const { employee, payroll, companyLogo, currency = "INR", language = employee?.language || 'en' } = payload;
+  const locale = normalizeLanguage(language);
+  const t = (key, variables) => translate(locale, key, variables);
 
   const doc = new PDFDocument({ margin: 50 });
   const buffers = [];
@@ -271,31 +274,31 @@ async function handlePayslipGeneration(payload) {
   }
   doc.fontSize(20).text("PaySphere", { align: "center" });
   doc.moveDown();
-  doc.fontSize(16).text(`Payslip for ${payroll.month}/${payroll.year}`, { align: "center" });
+  doc.fontSize(16).text(t('payslipTitle', payroll), { align: 'center' });
   doc.moveDown(2);
 
-  doc.fontSize(12).text(`Employee Name: ${employee.fullName}`);
-  doc.text(`Role: ${employee.role || "N/A"}`);
-  doc.text(`Company: ${employee.companyName}`);
+  doc.fontSize(12).text(`${t('employeeName')}: ${employee.fullName}`);
+  doc.text(`${t('role')}: ${employee.role || t('notAvailable')}`);
+  doc.text(`${t('company')}: ${employee.companyName}`);
   doc.moveDown();
 
-  doc.text(`Base Salary: ${formatCurrency(payroll.baseSalary, currency)}`);
-  doc.text(`Leave Days: ${payroll.leaveDays} (-${formatCurrency(payroll.leaveDeduction, currency)})`);
-  doc.text(`Overtime Hours: ${payroll.overtimeHours} (+${formatCurrency(payroll.overtimePay, currency)})`);
-  doc.text(`Bonus: +${formatCurrency(payroll.bonus || 0, currency)}`);
-  doc.text(`Deductions: -${formatCurrency(payroll.deductions || 0, currency)}`);
+  doc.text(`${t('baseSalary')}: ${formatCurrency(payroll.baseSalary, currency)}`);
+  doc.text(`${t('leaveDays')}: ${payroll.leaveDays} (-${formatCurrency(payroll.leaveDeduction, currency)})`);
+  doc.text(`${t('overtimeHours')}: ${payroll.overtimeHours} (+${formatCurrency(payroll.overtimePay, currency)})`);
+  doc.text(`${t('bonus')}: +${formatCurrency(payroll.bonus || 0, currency)}`);
+  doc.text(`${t('deductions')}: -${formatCurrency(payroll.deductions || 0, currency)}`);
 
   // Issue #719: Render tax-free reimbursements distinctly
   if (payroll.reimbursements && payroll.reimbursements > 0) {
     doc.moveDown(0.5);
-    doc.fontSize(11).font("Helvetica-Bold").fillColor("#2563EB").text("Reimbursements (Tax-Free)");
+    doc.fontSize(11).font("Helvetica-Bold").fillColor("#2563EB").text(t('reimbursements'));
     doc.fontSize(10).font("Helvetica").fillColor("#555555");
-    doc.text(`Expense Reimbursements: +${formatCurrency(payroll.reimbursements, currency)}`);
+    doc.text(`${t('expenseReimbursements')}: +${formatCurrency(payroll.reimbursements, currency)}`);
   }
 
   doc.moveDown(1);
 
-  doc.fontSize(14).text(`Net Salary: ${formatCurrency(payroll.netSalary, currency)}`, { underline: true });
+  doc.fontSize(14).text(`${t('netSalary')}: ${formatCurrency(payroll.netSalary, currency)}`, { underline: true });
   doc.end();
 }
 

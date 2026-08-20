@@ -139,6 +139,11 @@ const employeeSchema = new mongoose.Schema(
       type: String,
       default: 'INR',
     },
+    language: {
+      type: String,
+      enum: ['en', 'es', 'hi'],
+      default: 'en',
+    },
 
     /**
      * Who created this row. An audit fact, not a scoping key.
