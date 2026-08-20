@@ -13,7 +13,9 @@ router.post('/devices', auth, requirePermission('WRITE_EMPLOYEE'), writeRateLimi
 router.get('/logs', auth, requirePermission('READ_EMPLOYEE'), getLogs);
 router.post('/reconcile', auth, requirePermission('WRITE_EMPLOYEE'), writeRateLimiter, triggerReconciliation);
 
-// Device Webhook (Public/Rate Limited - in prod, use API key middleware)
-router.post('/webhook/punch', writeRateLimiter, ingestPunch);
+const { verifyBiometricPayload } = require('../middlewares/biometricSecurity');
+
+// Device Webhook (Public/Rate Limited - verified via HMAC signature)
+router.post('/webhook/punch', writeRateLimiter, verifyBiometricPayload, ingestPunch);
 
 module.exports = router;
