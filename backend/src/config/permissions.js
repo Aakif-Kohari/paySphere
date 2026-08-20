@@ -96,6 +96,21 @@ const PERMISSIONS = {
   // period action, closer to MANAGE_COMPLIANCE than to assigning a laptop.
   RUN_DEPRECIATION: 'RUN_DEPRECIATION',
 
+  // --- Gratuity actuarial valuation (#1344) --------------------------------
+  //
+  // Three names, because the three acts differ in kind.
+  //
+  // Reading a valuation is reading the company's balance sheet provision.
+  // Running one commits the figure that goes into the accounts and becomes
+  // next year's opening balance. Editing the assumptions is neither: the
+  // discount rate is a judgement made with the auditor, and moving it 50 basis
+  // points moves the reported liability by more than most payroll decisions
+  // ever will — so it is separated for the same reason MANAGE_COMPLIANCE is
+  // separated from READ_COMPLIANCE, and it stops at the owner.
+  READ_GRATUITY_VALUATION: 'READ_GRATUITY_VALUATION',
+  RUN_GRATUITY_VALUATION: 'RUN_GRATUITY_VALUATION',
+  MANAGE_GRATUITY_ASSUMPTIONS: 'MANAGE_GRATUITY_ASSUMPTIONS',
+
   READ_VENDOR: 'READ_VENDOR',
   // Recording a vendor invoice sets the 194C/194J TDS withheld, and therefore
   // what the company remits on that contractor's behalf. Same class of
@@ -296,6 +311,21 @@ const PERMISSION_DEFINITIONS = [
       'Run the monthly depreciation schedule, which rewrites the book value of every asset',
   },
   {
+    name: PERMISSIONS.READ_GRATUITY_VALUATION,
+    description:
+      'View the gratuity actuarial valuation, its roll-forward and the per-employee schedule behind it',
+  },
+  {
+    name: PERMISSIONS.RUN_GRATUITY_VALUATION,
+    description:
+      'Commit a gratuity valuation as at a reporting date, producing the provision carried in the accounts',
+  },
+  {
+    name: PERMISSIONS.MANAGE_GRATUITY_ASSUMPTIONS,
+    description:
+      'Set the discount rate, salary escalation and attrition assumptions the gratuity provision is measured on',
+  },
+  {
     name: PERMISSIONS.READ_VENDOR,
     description: 'View contractors, their invoices and their payment ledger',
   },
@@ -490,6 +520,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_ASSET,
       PERMISSIONS.MANAGE_ASSET,
       PERMISSIONS.RUN_DEPRECIATION,
+
+      // #1344. All three. MANAGE_GRATUITY_ASSUMPTIONS stops here for the same
+      // reason MANAGE_COMPLIANCE does — it decides what gets reported, not who
+      // gets paid.
+      PERMISSIONS.READ_GRATUITY_VALUATION,
+      PERMISSIONS.RUN_GRATUITY_VALUATION,
+      PERMISSIONS.MANAGE_GRATUITY_ASSUMPTIONS,
       PERMISSIONS.READ_VENDOR,
       PERMISSIONS.MANAGE_VENDOR,
       PERMISSIONS.READ_ROSTER,
@@ -564,6 +601,13 @@ const ROLE_DEFINITIONS = [
       // APPROVE_PAYROLL is not here either.
       PERMISSIONS.READ_ASSET,
       PERMISSIONS.MANAGE_ASSET,
+
+      // #1344. HR reads the valuation — "what is this leaver's gratuity going
+      // to cost us" is an HR question and the per-employee schedule answers it.
+      // It does not run one and it does not set the assumptions: both decide
+      // what the company reports, which is the owner's call and the auditor's.
+      PERMISSIONS.READ_GRATUITY_VALUATION,
+
       PERMISSIONS.READ_VENDOR,
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.MANAGE_ROSTER,

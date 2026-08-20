@@ -166,6 +166,17 @@ export const APP_ROUTES = [
     icon: 'exit',
   },
   {
+    // Next to Settlements, because the two are the same statute from opposite
+    // ends: Settlements pays gratuity to a leaver, this measures what is still
+    // owed to everybody who has not left (#1344).
+    path: '/gratuity',
+    component: lazy(() => import('../pages/GratuityProvisioning')),
+    appShell: true,
+    label: 'Gratuity provision',
+    group: 'payroll',
+    icon: 'shield',
+  },
+  {
     path: '/reports',
     component: lazy(() => import('../pages/Reports')),
     label: 'Reports',
