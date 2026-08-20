@@ -19,15 +19,12 @@ const {
   EsopTenderBid,
 } = require('../models/esop.model');
 const Employee = require('../models/employee.model');
+const esopCalculator = require('../services/esopCalculator');
 const {
-  buildVestingSchedule,
-  vestedAsOf,
-  computePerquisite,
   computeForfeitureOnExit,
   summarisePool,
   canGrant,
   normaliseTerms,
-  calculateTenderAllocations,
   GRANT_STATUS,
 } = require('../utils/vestingCalculator');
 const logger = require('../utils/logger');
@@ -302,7 +299,7 @@ exports.getVestingSchedule = async (req, res, next) => {
     }).lean();
     if (!grant) return res.status(404).json({ message: 'Grant not found' });
 
-    const schedule = buildVestingSchedule(grant);
+    const schedule = esopCalculator.calculateVestingSchedule(grant);
     if (!schedule.valid) {
       // Stored terms that no longer produce a schedule are a data problem, not
       // a client one — a 500 would be wrong, and so would pretending the grant
@@ -328,7 +325,7 @@ exports.getVestingSchedule = async (req, res, next) => {
         optionsGranted: grant.optionsGranted,
         exercisePrice: grant.exercisePrice,
       },
-      position: vestedAsOf(grant, asOf),
+      position: esopCalculator.assessVestingAsOf(grant, asOf),
       tranches: schedule.tranches,
     });
   } catch (error) {
@@ -400,7 +397,7 @@ exports.exerciseOptions = async (req, res, next) => {
       });
     }
 
-    const position = vestedAsOf(grant, when);
+    const position = esopCalculator.assessVestingAsOf(grant, when);
     if (options > position.exercisable) {
       return res.status(400).json({
         message: `Only ${position.exercisable} options are exercisable as of ${when.toISOString().slice(0, 10)}`,
@@ -409,7 +406,7 @@ exports.exerciseOptions = async (req, res, next) => {
       });
     }
 
-    const valuation = computePerquisite({
+    const valuation = esopCalculator.calculateOptionExerciseTax({
       optionsExercised: options,
       fmvPerShare,
       exercisePrice: grant.exercisePrice,
@@ -429,6 +426,8 @@ exports.exerciseOptions = async (req, res, next) => {
       tdsWithheld: valuation.tdsWithheld,
       exerciseCost: valuation.exerciseCost,
       capitalGainsCostBasis: valuation.capitalGainsCostBasis,
+      payrollMonth: when.getUTCMonth() + 1,
+      payrollYear: when.getUTCFullYear(),
       recordedBy: req.userId,
     });
 
