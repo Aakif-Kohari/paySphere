@@ -19,13 +19,63 @@ export const useAppStore = create((set, get) => ({
   isGlobalLoading: false,
   notification: { open: false, message: '', severity: 'info' },
 
-  setCredentials: ({ user, token }) => {
+  isImpersonating: Boolean(localStorage.getItem('isImpersonating')),
+  impersonator: JSON.parse(localStorage.getItem('impersonator') || 'null'),
+
+  setCredentials: ({ user, token, isImpersonating = false, impersonator = null }) => {
     if (token) localStorage.setItem('token', token);
-    set({ user, token, isAuthenticated: true, authError: null });
+    if (isImpersonating) {
+      localStorage.setItem('isImpersonating', 'true');
+      if (impersonator) localStorage.setItem('impersonator', JSON.stringify(impersonator));
+    } else {
+      localStorage.removeItem('isImpersonating');
+      localStorage.removeItem('impersonator');
+    }
+    set({
+      user,
+      token,
+      isAuthenticated: true,
+      authError: null,
+      isImpersonating: Boolean(isImpersonating),
+      impersonator: impersonator || null,
+    });
+  },
+  startImpersonation: ({ user, token, impersonator }) => {
+    if (token) localStorage.setItem('token', token);
+    localStorage.setItem('isImpersonating', 'true');
+    if (impersonator) localStorage.setItem('impersonator', JSON.stringify(impersonator));
+    set({
+      user,
+      token,
+      isAuthenticated: true,
+      isImpersonating: true,
+      impersonator,
+    });
+  },
+  stopImpersonationSession: ({ user, token }) => {
+    if (token) localStorage.setItem('token', token);
+    localStorage.removeItem('isImpersonating');
+    localStorage.removeItem('impersonator');
+    set({
+      user,
+      token,
+      isAuthenticated: true,
+      isImpersonating: false,
+      impersonator: null,
+    });
   },
   logout: () => {
     localStorage.removeItem('token');
-    set({ user: null, token: null, isAuthenticated: false, authError: null });
+    localStorage.removeItem('isImpersonating');
+    localStorage.removeItem('impersonator');
+    set({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      authError: null,
+      isImpersonating: false,
+      impersonator: null,
+    });
   },
   logoutUser: async () => {
     try {

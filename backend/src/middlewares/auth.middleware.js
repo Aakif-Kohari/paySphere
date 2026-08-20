@@ -170,6 +170,13 @@ const auth = async (req, res, next) => {
     req.accountType = resolveAccountType(user);
     req.tenantId = await resolveTenantId(user, decoded);
 
+    if (decoded.isImpersonating) {
+      req.isImpersonating = true;
+      req.impersonatorId = decoded.impersonatorId;
+      req.impersonatorName = decoded.impersonatorName;
+      req.impersonatorEmail = decoded.impersonatorEmail;
+    }
+
     next();
   } catch {
     // Deliberately opaque. Distinguishing "expired" from "malformed" from "bad
