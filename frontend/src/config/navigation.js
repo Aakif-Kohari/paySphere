@@ -246,6 +246,18 @@ export const APP_ROUTES = [
     icon: 'checkShield',
   },
   {
+    // Sits with the tax proofs because it is the same act from the employee's
+    // side — file a document, get an exemption — and a four-year statutory
+    // block rather than a financial year behind it (#1345).
+    path: '/lta',
+    component: lazy(() => import('../pages/LtaClaimPortal')),
+    appShell: true,
+    label: 'Travel allowance',
+    group: 'compliance',
+    icon: 'document',
+    employee: true,
+  },
+  {
     path: '/grievances',
     component: lazy(() => import('../pages/GrievancePortal')),
     appShell: true,
