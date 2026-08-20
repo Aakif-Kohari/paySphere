@@ -105,6 +105,26 @@ const PERMISSIONS = {
   READ_ROSTER: 'READ_ROSTER',
   MANAGE_ROSTER: 'MANAGE_ROSTER',
 
+  // --- Pay equity (#1347) --------------------------------------------------
+  //
+  // Its own pair rather than READ_EMPLOYEE, because the gap analysis reads
+  // declared gender — sensitive personal data, and the only place in the
+  // product that holds any. The population that should be running a pay gap
+  // analysis is much smaller than the population that can look up a colleague's
+  // phone number, and the access decision should say so rather than being
+  // inherited from the directory.
+  //
+  // Note what is deliberately *not* behind these: the compa-ratio analysis
+  // reads salary and salary bands and no protected characteristic at all, so it
+  // sits behind READ_PAYROLL. Hiding the most useful and least sensitive query
+  // in the module behind the demographic permission would stop the people who
+  // should run it weekly from running it.
+  READ_PAY_EQUITY: 'READ_PAY_EQUITY',
+  // Committing a report publishes a figure that is a statutory filing in a
+  // growing number of jurisdictions, and setting a salary band decides what
+  // everybody at that grade is checked against.
+  MANAGE_PAY_EQUITY: 'MANAGE_PAY_EQUITY',
+
   READ_CONTRACT: 'READ_CONTRACT',
   // Issuing an offer letter commits the company to a salary. Kept apart from
   // WRITE_EMPLOYEE for the same reason APPROVE_PAYROLL is kept apart from
@@ -314,6 +334,16 @@ const PERMISSION_DEFINITIONS = [
       'Create shift templates, assign shifts, and approve shift swaps',
   },
   {
+    name: PERMISSIONS.READ_PAY_EQUITY,
+    description:
+      'View the pay gap analysis, which is computed from employees’ declared gender',
+  },
+  {
+    name: PERMISSIONS.MANAGE_PAY_EQUITY,
+    description:
+      'Commit a pay equity report and set the salary bands every compa-ratio is measured against',
+  },
+  {
     name: PERMISSIONS.READ_CONTRACT,
     description: 'View issued offer letters and employment contracts',
   },
@@ -494,6 +524,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_VENDOR,
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.MANAGE_ROSTER,
+
+      // #1347. Both stop here. The gap analysis reads declared gender, which is
+      // the only sensitive personal data in the product, and a committed report
+      // is a published figure — neither is HR admin.
+      PERMISSIONS.READ_PAY_EQUITY,
+      PERMISSIONS.MANAGE_PAY_EQUITY,
       PERMISSIONS.READ_CONTRACT,
       PERMISSIONS.MANAGE_CONTRACT,
       PERMISSIONS.READ_APPRAISAL,

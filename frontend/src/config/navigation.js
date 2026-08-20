@@ -133,6 +133,21 @@ export const APP_ROUTES = [
     employee: true,
   },
   {
+    // In People rather than Payroll: the question is about how the workforce is
+    // paid relative to itself, which is a people decision that happens to be
+    // denominated in money (#1347).
+    //
+    // No `employee: true`. The gap analysis is computed from declared gender
+    // and the page is for the small population that holds READ_PAY_EQUITY;
+    // advertising it to everyone would be advertising a 403.
+    path: '/pay-equity',
+    component: lazy(() => import('../pages/PayEquityDashboard')),
+    appShell: true,
+    label: 'Pay equity',
+    group: 'people',
+    icon: 'chart',
+  },
+  {
     path: '/offer-letters',
     component: lazy(() => import('../pages/OfferLetterBuilder')),
     label: 'Offer letters',
