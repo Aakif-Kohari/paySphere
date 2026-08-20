@@ -28,6 +28,10 @@ const {
   updatePolicy,
   submitClaim,
   getMyClaims,
+  createCustomReport,
+  getMyReports,
+  exportExpenseReport,
+  updateReportStatus,
 } = require('../controllers/expense.controller');
 
 const router = express.Router();
@@ -71,6 +75,35 @@ router.get(
   '/claims/my',
   auth,
   getMyClaims,
+);
+
+// --- Custom Expense Reports (#1285) ----------------------------------------
+
+router.post(
+  '/reports/custom',
+  auth,
+  writeRateLimiter,
+  createCustomReport,
+);
+
+router.get(
+  '/reports/my',
+  auth,
+  getMyReports,
+);
+
+router.get(
+  '/reports/export',
+  auth,
+  exportExpenseReport,
+);
+
+router.patch(
+  '/reports/:id/status',
+  auth,
+  requirePermission(PERMISSIONS.APPROVE_EXPENSE),
+  writeRateLimiter,
+  updateReportStatus,
 );
 
 // --- Categories -----------------------------------------------------------

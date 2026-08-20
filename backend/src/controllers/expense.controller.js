@@ -10,6 +10,7 @@ const mongoose = require('mongoose');
 const ExpenseClaim = require('../models/expenseClaim.model');
 const ExpenseCategory = require('../models/expenseCategory.model');
 const { ExpensePolicy } = require('../models/expensePolicy.model');
+const ExpenseReport = require('../models/expenseReport.model');
 const Employee = require('../models/employee.model');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
@@ -659,6 +660,163 @@ exports.parseReceipt = async (req, res, next) => {
     return res.status(200).json(ocrResult);
   } catch (error) {
     logger.error('Failed to parse receipt via OCR', { error: error.message });
+    next(error);
+  }
+};
+
+// ============================================================================
+// CUSTOM EXPENSE REPORTS & REIMBURSEMENT TRACKING (#1285)
+// ============================================================================
+
+/**
+ * POST /api/expenses/reports/custom
+ * Create a new custom expense report bundling multiple expense claims.
+ */
+exports.createCustomReport = async (req, res, next) => {
+  try {
+    const { title, description, claimIds } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(400).json({ message: 'Title is required' });
+    }
+
+    let employeeId = pinnedEmployeeId(req);
+    if (!employeeId) {
+      if (req.body.employeeId) {
+        employeeId = req.body.employeeId;
+      } else {
+        const emp = await Employee.findOne({ userId: req.userId, tenantId: req.tenantId });
+        employeeId = emp?._id || req.userId;
+      }
+    }
+
+    let claims = [];
+    let totalAmount = 0;
+    if (Array.isArray(claimIds) && claimIds.length > 0) {
+      claims = await ExpenseClaim.find({
+        _id: { $in: claimIds },
+        tenantId: req.tenantId,
+      });
+      totalAmount = claims.reduce((sum, c) => sum + (c.amount || 0), 0);
+    }
+
+    const report = await ExpenseReport.create({
+      title: sanitizeText(title),
+      description: description ? sanitizeText(description) : '',
+      employeeId,
+      userId: req.userId,
+      tenantId: req.tenantId,
+      claimIds: claims.map((c) => c._id),
+      totalAmount,
+      status: 'submitted',
+    });
+
+    res.status(201).json({ message: 'Custom expense report created successfully', report });
+  } catch (error) {
+    logger.error('Failed to create custom expense report', { userId: req.userId, error: error.message });
+    next(error);
+  }
+};
+
+/**
+ * GET /api/expenses/reports/my
+ * Fetch custom expense reports for current employee with status tracking.
+ */
+exports.getMyReports = async (req, res, next) => {
+  try {
+    const reports = await ExpenseReport.find({
+      tenantId: req.tenantId,
+      userId: req.userId,
+    })
+      .populate('claimIds')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ reports });
+  } catch (error) {
+    logger.error('Failed to fetch expense reports', { userId: req.userId, error: error.message });
+    next(error);
+  }
+};
+
+/**
+ * GET /api/expenses/reports/export
+ * Filter expense claims/reports and return summary breakdown & export data.
+ */
+exports.exportExpenseReport = async (req, res, next) => {
+  try {
+    const { startDate, endDate, category, status } = req.query;
+    const filter = { tenantId: req.tenantId };
+
+    if (pinnedEmployeeId(req)) {
+      filter.employeeId = pinnedEmployeeId(req);
+    }
+
+    if (status) {
+      filter.status = status;
+    }
+
+    if (category) {
+      filter.category = category;
+    }
+
+    if (startDate || endDate) {
+      filter.expenseDate = {};
+      if (startDate) filter.expenseDate.$gte = new Date(startDate);
+      if (endDate) filter.expenseDate.$lte = new Date(endDate);
+    }
+
+    const claims = await ExpenseClaim.find(filter).sort({ expenseDate: -1 });
+
+    const totalAmount = claims.reduce((sum, c) => sum + (c.amount || 0), 0);
+    const categoryBreakdown = {};
+    claims.forEach((c) => {
+      categoryBreakdown[c.category] = (categoryBreakdown[c.category] || 0) + c.amount;
+    });
+
+    res.status(200).json({
+      summary: {
+        totalClaims: claims.length,
+        totalAmount,
+        categoryBreakdown,
+        filter: { startDate, endDate, category, status },
+      },
+      claims,
+    });
+  } catch (error) {
+    logger.error('Failed to export custom expense report', { error: error.message });
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/expenses/reports/:id/status
+ * Update reimbursement status for a custom expense report.
+ */
+exports.updateReportStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason } = req.body;
+
+    if (!['approved', 'reimbursed', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status transition' });
+    }
+
+    const report = await ExpenseReport.findOne({ _id: id, tenantId: req.tenantId });
+    if (!report) {
+      return res.status(404).json({ message: 'Expense report not found' });
+    }
+
+    report.status = status;
+    if (status === 'rejected') {
+      report.rejectionReason = rejectionReason || 'No reason provided';
+    } else if (status === 'reimbursed') {
+      report.reimbursedAt = new Date();
+    }
+
+    await report.save();
+
+    res.status(200).json({ message: `Expense report marked as ${status}`, report });
+  } catch (error) {
+    logger.error('Failed to update expense report status', { error: error.message });
     next(error);
   }
 };
