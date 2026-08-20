@@ -57,6 +57,7 @@ const employeeSchema = z
     email: z.string().trim().email('Invalid email address format').max(100).optional().nullable(),
     phone: z.string().trim().min(7).max(30).optional().nullable(),
     currency: z.enum(['INR', 'USD', 'EUR', 'GBP']).optional(),
+    language: z.enum(['en', 'es', 'hi', 'English', 'English (US)', 'Spanish', 'Hindi']).optional(),
     bankDetails: bankDetailsSchema.optional().nullable(),
   })
   .strict();
