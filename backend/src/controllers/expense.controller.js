@@ -128,14 +128,34 @@ exports.submitClaim = async (req, res, next) => {
       // If OCR is highly confident, override manual date/amount inputs to prevent fraud
       if (isConfidenceReliable(ocrConfidence)) {
         extractedDate = ocrResult.date;
-        // Optional: flag if manual amount differs significantly from OCR amount
       }
     }
+
+    const { calculateImageHash } = require('../utils/imageHasher');
+    const imageHash = req.body.imageHash || (receiptUrl ? calculateImageHash(Buffer.from(receiptUrl, 'utf8')) : '');
+
+    const ocrMetadata = req.body.ocrMetadata || {
+      extractedAmount: req.body.ocrAmount !== undefined ? Number(req.body.ocrAmount) : undefined,
+      extractedDate: req.body.ocrDate ? new Date(req.body.ocrDate) : undefined,
+      extractedCurrency: req.body.ocrCurrency || undefined,
+    };
+
+    // Find category ID
+    const ExpenseCategory = require('../models/expenseCategory.model');
+    const categoryDoc = await ExpenseCategory.findOne({
+      tenantId: req.tenantId,
+      $or: [
+        { name: category },
+        { _id: mongoose.Types.ObjectId.isValid(category) ? category : null }
+      ]
+    });
+    const categoryId = categoryDoc ? categoryDoc._id : null;
 
     const claimData = {
       tenantId: req.tenantId,
       employeeId: employee._id,
       category,
+      categoryId,
       amount: Number(amount),
       currency: policy.currency,
       expenseDate: extractedDate,
@@ -144,24 +164,33 @@ exports.submitClaim = async (req, res, next) => {
       receiptUrl,
       ocrConfidence,
       ocrRawText,
+      imageHash,
+      ocrMetadata,
+      submittedBy: req.userId,
     };
 
-    // Evaluate against policy
-    const evaluation = await evaluateClaim(claimData, policy);
-    claimData.policyViolations = evaluation.violations;
-    claimData.isCompliant = evaluation.isCompliant;
+    // Run Fraud Detection Verification
+    const { verifyExpenseClaim } = require('../services/expenseVerification');
+    const verifiedClaim = await verifyExpenseClaim(claimData);
 
-    // Determine initial status based on compliance and auto-approval threshold
-    if (!evaluation.isCompliant) {
-      claimData.status = 'Pending Manager'; // Violations require manual review
-    } else if (claimData.amount <= policy.autoApprovalThreshold) {
-      claimData.status = 'Auto-Approved';
-      claimData.approvedBy = null; // System approved
+    // Evaluate against policy
+    const evaluation = await evaluateClaim(verifiedClaim, policy);
+    verifiedClaim.policyViolations = evaluation.violations;
+    verifiedClaim.isCompliant = evaluation.isCompliant;
+
+    // Determine initial status based on compliance, fraud detection, and auto-approval threshold
+    if (verifiedClaim.isPossibleFraud) {
+      verifiedClaim.status = 'Pending Manager'; // Fraud claims must be audited manually
+    } else if (!evaluation.isCompliant) {
+      verifiedClaim.status = 'Pending Manager'; // Violations require manual review
+    } else if (verifiedClaim.amount <= policy.autoApprovalThreshold) {
+      verifiedClaim.status = 'Auto-Approved';
+      verifiedClaim.approvedBy = null; // System approved
     } else {
-      claimData.status = 'Submitted';
+      verifiedClaim.status = 'Submitted';
     }
 
-    const claim = await ExpenseClaim.create(claimData);
+    const claim = await ExpenseClaim.create(verifiedClaim);
 
     eventBus.emit('AUDIT_LOG', {
       userId: req.userId,
@@ -170,9 +199,10 @@ exports.submitClaim = async (req, res, next) => {
       resourceIds: [claim._id],
       details: {
         category,
-        amount: claimData.amount,
-        status: claimData.status,
+        amount: verifiedClaim.amount,
+        status: verifiedClaim.status,
         isCompliant: evaluation.isCompliant,
+        isPossibleFraud: verifiedClaim.isPossibleFraud,
         ocrConfidence,
       },
       req,
@@ -817,6 +847,18 @@ exports.updateReportStatus = async (req, res, next) => {
     res.status(200).json({ message: `Expense report marked as ${status}`, report });
   } catch (error) {
     logger.error('Failed to update expense report status', { error: error.message });
+    next(error);
+  }
+};
+
+exports.getFraudClaims = async (req, res, next) => {
+  try {
+    const claims = await ExpenseClaim.find({
+      tenantId: req.tenantId,
+      isPossibleFraud: true,
+    }).populate('employeeId', 'fullName email department');
+    res.status(200).json({ success: true, data: claims });
+  } catch (error) {
     next(error);
   }
 };
