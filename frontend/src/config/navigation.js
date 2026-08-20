@@ -133,6 +133,21 @@ export const APP_ROUTES = [
     employee: true,
   },
   {
+    // In People rather than Payroll: the question is about how the workforce is
+    // paid relative to itself, which is a people decision that happens to be
+    // denominated in money (#1347).
+    //
+    // No `employee: true`. The gap analysis is computed from declared gender
+    // and the page is for the small population that holds READ_PAY_EQUITY;
+    // advertising it to everyone would be advertising a 403.
+    path: '/pay-equity',
+    component: lazy(() => import('../pages/PayEquityDashboard')),
+    appShell: true,
+    label: 'Pay equity',
+    group: 'people',
+    icon: 'chart',
+  },
+  {
     path: '/offer-letters',
     component: lazy(() => import('../pages/OfferLetterBuilder')),
     label: 'Offer letters',
@@ -189,6 +204,17 @@ export const APP_ROUTES = [
     label: 'Budget planner',
     group: 'payroll',
     icon: 'target',
+  },
+  {
+    // In Payroll rather than Compliance because it is money paid to employees,
+    // and separate from the payroll run because the amount is fixed by the
+    // Payment of Bonus Act rather than by the company (#1346).
+    path: '/statutory-bonus',
+    component: lazy(() => import('../pages/StatutoryBonusRegister')),
+    appShell: true,
+    label: 'Statutory bonus',
+    group: 'payroll',
+    icon: 'book',
   },
 
   // ── Finance ──────────────────────────────────────────────────────────────
@@ -284,6 +310,17 @@ export const APP_ROUTES = [
     employee: true,
   },
   {
+    // In Workplace rather than Payroll: the desk is about where people are
+    // working and under what arrangement, and the money follows from that
+    // rather than the other way round (#1348).
+    path: '/mobility',
+    component: lazy(() => import('../pages/GlobalMobilityDesk')),
+    appShell: true,
+    label: 'Global mobility',
+    group: 'workplace',
+    icon: 'truck',
+  },
+  {
     path: '/monthly-updates',
     component: lazy(() => import('../pages/MonthlyUpdates')),
     label: 'Monthly updates',
@@ -358,6 +395,10 @@ export const APP_ROUTES = [
   {
     path: '/enterprise/cybersecurity-soc',
     component: lazy(() => import('../pages/security/EnterpriseCybersecuritySOCPage')),
+  },
+  {
+    path: '/enterprise/engagement-sentiment',
+    component: lazy(() => import('../pages/engagement/EnterpriseEngagementSentimentPage')),
   },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────

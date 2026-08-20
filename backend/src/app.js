@@ -50,6 +50,13 @@ const employeeRoutes = require('./routes/employee.routes');
 const employeeImportRoutes = require('./routes/employeeImport.routes');
 const payrollRoutes = require('./routes/payroll.routes');
 const payrollApprovalRoutes = require('./routes/payrollApproval.routes');
+
+// Statutory bonus under the Payment of Bonus Act, 1965 (#1346). Next to the
+// payroll routers because it is a payment to employees, and separate from them
+// because it is not payroll: the amount is fixed by statute rather than by the
+// company, it is computed on a wage capped by section 12 rather than on the one
+// that is paid, and it produces a Rule 5 register.
+const statutoryBonusRoutes = require('./routes/statutoryBonus.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
@@ -66,6 +73,11 @@ const employeePortalRoutes = require('./routes/employeePortal.routes');
 const workflowRoutes = require('./routes/workflow.routes');
 const salaryHistoryRoutes = require('./routes/salaryHistory.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+
+// Pay equity analytics (#1347). Next to the dashboard and stats routers because
+// it is analysis over the same directory, and behind its own permissions
+// because it is the only part of the product that reads declared gender.
+const payEquityRoutes = require('./routes/payEquity.routes');
 const statsRoutes = require('./routes/stats.routes');
 const departmentsRoutes = require('./routes/departments.routes');
 const flashcardRoutes = require('./routes/flashcard.routes');
@@ -112,6 +124,13 @@ const pyqRoutes = require('./routes/pyq.routes');
 // per-diem has no receipt at all — so an unspent advance was a receivable
 // nothing in the product tracked.
 const travelRoutes = require('./routes/travel.routes');
+
+// International assignments (#1348). Next to travel and emphatically not part
+// of it: `travel.routes` settles a trip in per-diems over a few weeks, while an
+// assignment runs for years, changes where the employee is tax resident and is
+// the reason the employer files in a second country. The two share a plane and
+// nothing else.
+const assignmentRoutes = require('./routes/assignment.routes');
 
 // Stock option schemes, grants, vesting and exercises (#1073). Equity was the
 // one component of total compensation with no model, no route and no
@@ -322,6 +341,13 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/employees', employeeImportRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/payroll', payrollApprovalRoutes);
+
+// #1346. Its own prefix rather than a sub-path of `/api/payroll`: the
+// discretionary bonus on a payroll row and the statutory bonus under the Act
+// are different money with different authorities, and sharing a namespace
+// invites them to be confused. The router owns `/computations`, `/preview` and
+// `/ledger`.
+app.use('/api/statutory-bonus', statutoryBonusRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/employee-portal', employeePortalRoutes);
 app.use('/api/schedules', schedulerRoutes);
@@ -386,6 +412,9 @@ app.use('/api/roles', roleRoutes);
 // the dashboard was not a special case, it was just the one that got noticed.
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/stats', statsRoutes);
+
+// #1347. The router owns `/preview`, `/reports`, `/compa-ratio` and `/bands`.
+app.use('/api/pay-equity', payEquityRoutes);
 app.use('/api/departments', departmentsRoutes);
 
 // The in-app notification centre (#440). The other half of the duplicate.
@@ -467,6 +496,10 @@ app.use('/api/pyqs', pyqRoutes);
 // Business travel (#1077). The router owns `/policies`, `/requests`,
 // `/advances` and `/my-trips`.
 app.use('/api/travel', travelRoutes);
+
+// #1348. The router owns `/`, `/:id`, `/:id/presence`, `/:id/cost-projection`,
+// `/:id/gross-up` and `/:id/settlements`.
+app.use('/api/assignments', assignmentRoutes);
 
 // Equity (#1073). The router owns `/schemes`, `/grants` and `/my-grants`, so
 // the prefix carries no noun of its own.

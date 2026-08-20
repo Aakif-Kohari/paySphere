@@ -55,6 +55,19 @@ const PERMISSIONS = {
   // paid as taxable earnings or as a tax-free reimbursement. That is a tax
   // decision rather than day-to-day expense admin, so it stays with the owner.
   MANAGE_EXPENSE_CATEGORY: 'MANAGE_EXPENSE_CATEGORY',
+
+  // --- Statutory bonus, Payment of Bonus Act 1965 (#1346) ------------------
+  //
+  // Deliberately not READ_PAYROLL and WRITE_PAYROLL, which every payroll
+  // administrator holds. A statutory bonus computation reads the company's
+  // gross profit and its section 6 prior charges — figures out of the audited
+  // accounts that payroll staff have no other reason to see — and committing
+  // one declares what the establishment owes under a statute, sets on or sets
+  // off a balance that binds the next four years, and produces the Form C an
+  // inspector asks for. That is MANAGE_COMPLIANCE's class of authority rather
+  // than payroll admin's.
+  READ_STATUTORY_BONUS: 'READ_STATUTORY_BONUS',
+  MANAGE_STATUTORY_BONUS: 'MANAGE_STATUTORY_BONUS',
   // Statutory compliance (#933, reachable since #951). Deliberately not
   // READ_REPORT: a Form 16 is one person's complete tax position and a Form 24Q
   // export is every employee's PAN, salary and tax in one file, while
@@ -120,6 +133,26 @@ const PERMISSIONS = {
   READ_ROSTER: 'READ_ROSTER',
   MANAGE_ROSTER: 'MANAGE_ROSTER',
 
+  // --- Pay equity (#1347) --------------------------------------------------
+  //
+  // Its own pair rather than READ_EMPLOYEE, because the gap analysis reads
+  // declared gender — sensitive personal data, and the only place in the
+  // product that holds any. The population that should be running a pay gap
+  // analysis is much smaller than the population that can look up a colleague's
+  // phone number, and the access decision should say so rather than being
+  // inherited from the directory.
+  //
+  // Note what is deliberately *not* behind these: the compa-ratio analysis
+  // reads salary and salary bands and no protected characteristic at all, so it
+  // sits behind READ_PAYROLL. Hiding the most useful and least sensitive query
+  // in the module behind the demographic permission would stop the people who
+  // should run it weekly from running it.
+  READ_PAY_EQUITY: 'READ_PAY_EQUITY',
+  // Committing a report publishes a figure that is a statutory filing in a
+  // growing number of jurisdictions, and setting a salary band decides what
+  // everybody at that grade is checked against.
+  MANAGE_PAY_EQUITY: 'MANAGE_PAY_EQUITY',
+
   READ_CONTRACT: 'READ_CONTRACT',
   // Issuing an offer letter commits the company to a salary. Kept apart from
   // WRITE_EMPLOYEE for the same reason APPROVE_PAYROLL is kept apart from
@@ -177,6 +210,23 @@ const PERMISSIONS = {
   // entitled to, so editing it is not a per-trip decision. Same class of
   // authority as MANAGE_EXPENSE_CATEGORY.
   MANAGE_TRAVEL_POLICY: 'MANAGE_TRAVEL_POLICY',
+
+  // --- International assignments (#1348) -----------------------------------
+  //
+  // Next to the travel permissions and deliberately not the same ones. An
+  // assignment is not a long trip: it changes where the employee is tax
+  // resident, commits the employer to bearing somebody's foreign tax bill for
+  // years, and can create a filing obligation in a second country. Approving a
+  // per-diem and approving that are not the same act and are not the same
+  // people.
+  READ_ASSIGNMENT: 'READ_ASSIGNMENT',
+  MANAGE_ASSIGNMENT: 'MANAGE_ASSIGNMENT',
+  // Kept apart from MANAGE_ASSIGNMENT for the same maker-checker reason as
+  // APPROVE_PAYROLL: a year-end equalization settlement moves money between the
+  // employee and the company in one direction or the other, and whoever built
+  // the package should not be the only person standing between it and that
+  // transfer.
+  SETTLE_ASSIGNMENT_TAX: 'SETTLE_ASSIGNMENT_TAX',
 
   // --- Equity (#1073) ------------------------------------------------------
   //
@@ -285,6 +335,16 @@ const PERMISSION_DEFINITIONS = [
       'Create and edit expense categories, including whether a category is taxable',
   },
   {
+    name: PERMISSIONS.READ_STATUTORY_BONUS,
+    description:
+      'View the statutory bonus computation, the set-on/set-off ledger and the Form C register',
+  },
+  {
+    name: PERMISSIONS.MANAGE_STATUTORY_BONUS,
+    description:
+      'Commit a statutory bonus computation for an accounting year and record its payment',
+  },
+  {
     name: PERMISSIONS.READ_COMPLIANCE,
     description:
       'View compliance settings and download Form 16 certificates and Form 24Q returns',
@@ -353,6 +413,16 @@ const PERMISSION_DEFINITIONS = [
     name: PERMISSIONS.MANAGE_ROSTER,
     description:
       'Create shift templates, assign shifts, and approve shift swaps',
+  },
+  {
+    name: PERMISSIONS.READ_PAY_EQUITY,
+    description:
+      'View the pay gap analysis, which is computed from employees’ declared gender',
+  },
+  {
+    name: PERMISSIONS.MANAGE_PAY_EQUITY,
+    description:
+      'Commit a pay equity report and set the salary bands every compa-ratio is measured against',
   },
   {
     name: PERMISSIONS.READ_CONTRACT,
@@ -433,6 +503,21 @@ const PERMISSION_DEFINITIONS = [
     name: PERMISSIONS.MANAGE_TRAVEL_POLICY,
     description:
       'Set the per-diem rates, lodging caps and travel-class entitlements every grade is paid under',
+  },
+  {
+    name: PERMISSIONS.READ_ASSIGNMENT,
+    description:
+      'View international assignments, their cost projections and their treaty day counts',
+  },
+  {
+    name: PERMISSIONS.MANAGE_ASSIGNMENT,
+    description:
+      'Open and amend an international assignment, log host-country presence and approve its cost',
+  },
+  {
+    name: PERMISSIONS.SETTLE_ASSIGNMENT_TAX,
+    description:
+      'Record a year-end tax equalization settlement, which moves money between the employee and the company',
   },
 
   // #1073.
@@ -528,6 +613,11 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.WRITE_EXPENSE,
       PERMISSIONS.APPROVE_EXPENSE,
       PERMISSIONS.MANAGE_EXPENSE_CATEGORY,
+
+      // #1346.
+      PERMISSIONS.READ_STATUTORY_BONUS,
+      PERMISSIONS.MANAGE_STATUTORY_BONUS,
+
       PERMISSIONS.READ_COMPLIANCE,
       PERMISSIONS.MANAGE_COMPLIANCE,
       // Held by the owner alone: a role edit changes what every other account
@@ -552,6 +642,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_VENDOR,
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.MANAGE_ROSTER,
+
+      // #1347. Both stop here. The gap analysis reads declared gender, which is
+      // the only sensitive personal data in the product, and a committed report
+      // is a published figure — neither is HR admin.
+      PERMISSIONS.READ_PAY_EQUITY,
+      PERMISSIONS.MANAGE_PAY_EQUITY,
       PERMISSIONS.READ_CONTRACT,
       PERMISSIONS.MANAGE_CONTRACT,
       PERMISSIONS.READ_APPRAISAL,
@@ -574,6 +670,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.SUBMIT_TRAVEL_REQUEST,
       PERMISSIONS.APPROVE_TRAVEL,
       PERMISSIONS.MANAGE_TRAVEL_POLICY,
+
+      // #1348. All three. SETTLE_ASSIGNMENT_TAX stops here for the same reason
+      // APPROVE_PAYROLL does.
+      PERMISSIONS.READ_ASSIGNMENT,
+      PERMISSIONS.MANAGE_ASSIGNMENT,
+      PERMISSIONS.SETTLE_ASSIGNMENT_TAX,
 
       // #1073. MANAGE_ESOP stops here — it is the only permission in the
       // product that changes who owns the company.
@@ -613,6 +715,13 @@ const ROLE_DEFINITIONS = [
       // Issuing Form 16 at year end is HR's job. Setting the TAN the return is
       // filed under is not — that stays with the owner.
       PERMISSIONS.READ_COMPLIANCE,
+
+      // #1346. HR reads the bonus register — "what is this employee getting and
+      // why" is HR's question and Form C answers it. It does not commit the
+      // computation: that reads the company's gross profit and binds the next
+      // four years through the set-on/set-off ledger, so it stays with the
+      // owner alongside MANAGE_COMPLIANCE, which HR also does not hold.
+      PERMISSIONS.READ_STATUTORY_BONUS,
 
       // #1011. The day-to-day half of each new area, and not the half that
       // moves money.
@@ -667,6 +776,15 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_TRAVEL,
       PERMISSIONS.SUBMIT_TRAVEL_REQUEST,
       PERMISSIONS.APPROVE_TRAVEL,
+
+      // #1348. HR runs the assignment — opening it, logging where the employee
+      // has been, costing the package — because that is mobility administration
+      // and it is HR's job. It does not settle the year: that moves money
+      // between the employee and the company, and it is the same maker-checker
+      // split that keeps APPROVE_PAYROLL away from the person who submits the
+      // run.
+      PERMISSIONS.READ_ASSIGNMENT,
+      PERMISSIONS.MANAGE_ASSIGNMENT,
 
       // #1074. HR runs the pipeline and sits on panels. It does not open
       // requisitions or move the CTC band — that is headcount budget, and

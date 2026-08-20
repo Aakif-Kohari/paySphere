@@ -20,6 +20,15 @@ const AUDIT_ACTIONS = [
   // one action left untracked (#458).
   'PAYROLL_APPROVE',
   'PAYROLL_REJECT',
+  // Statutory bonus under the Payment of Bonus Act (#1346). Committing a year
+  // declares what the establishment owes under a statute and writes a
+  // set-on/set-off balance that binds the next four years; the Form C export is
+  // every eligible employee's wage and bonus in one file; and the payment date
+  // is what the section 19 eight-month window is measured against. All three
+  // are inspection questions.
+  'STATUTORY_BONUS_COMMITTED',
+  'STATUTORY_BONUS_FORM_C_EXPORTED',
+  'STATUTORY_BONUS_PAID',
   'EMPLOYEE_CREATE',
   'EMPLOYEE_UPDATE',
   'EMPLOYEE_DELETE',
@@ -88,11 +97,34 @@ const AUDIT_ACTIONS = [
   'WEBHOOK_UPDATE',
   'WEBHOOK_DELETE',
   'WEBHOOK_SECRET_REGENERATED',
+  // International assignments (#1348). Opening one commits the employer to
+  // bearing somebody's foreign tax bill for years; a settlement moves money
+  // between the employee and the company; and the two threshold events record
+  // the moment a treaty day count stopped being comfortable, which is the fact
+  // an adviser asks for when a host-country filing obligation turns up.
+  //
+  // The two threshold actions are emitted through a ternary, so
+  // `auditActions.coverage.test.js` cannot see them — its scan only matches a
+  // string literal. Registered here anyway: the schema would reject them at
+  // runtime and the entry would be dropped exactly as silently.
+  'ASSIGNMENT_CREATED',
+  'ASSIGNMENT_UPDATED',
+  'ASSIGNMENT_COST_APPROVED',
+  'ASSIGNMENT_SETTLEMENT_RECORDED',
+  'ASSIGNMENT_TREATY_THRESHOLD_APPROACHING',
+  'ASSIGNMENT_TREATY_THRESHOLD_EXCEEDED',
   // The monthly-updates endpoints emit their own two. Monthly revisions are
   // financial mutations (they move allowances and deductions into the next
   // payroll run), so they are audited like SALARY_HISTORY_* above.
   'MONTHLY_UPDATE_UPSERT',
   'MONTHLY_UPDATE_DELETE',
+  // Pay equity (#1347). A committed report is a published figure in a growing
+  // number of jurisdictions, and a salary band decides what everybody at that
+  // grade is checked against — widening one is equivalent to approving any
+  // offer inside it. Both belong in the trail for the same reason the salary
+  // history entries above do.
+  'PAY_EQUITY_REPORT_COMMITTED',
+  'PAY_BAND_UPDATED',
   'IMPERSONATE_USER_START',
   'IMPERSONATE_USER_STOP',
 ];
@@ -100,6 +132,7 @@ const AUDIT_ACTIONS = [
 /** Every resource type a controller emits. Same story as the actions above. */
 const AUDIT_RESOURCE_TYPES = [
   'Payroll',
+  'StatutoryBonus',
   'Employee',
   'User',
   'Report',
@@ -117,11 +150,15 @@ const AUDIT_RESOURCE_TYPES = [
   // credentials an admin installs, so configuring, syncing and removing one are
   // audited like the webhook mutations it sits next to.
   'IntegrationConfig',
+  'Assignment',
+  'EqualizationSettlement',
   'MonthlyUpdate',
   // Where staff are allowed to clock in from (#930, reachable since #953).
   // Editing a fence changes whose attendance is recorded as field duty, so it
   // is audited like the settings change it is.
   'OfficeLocation',
+  'PayEquityReport',
+  'PayBand',
 ];
 
 const auditLogSchema = new mongoose.Schema(
