@@ -14,6 +14,13 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LogoutIcon from '@mui/icons-material/Logout';
+import ShieldIcon from '@mui/icons-material/Shield';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import CategoryIcon from '@mui/icons-material/Category';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import DescriptionIcon from '@mui/icons-material/Description';
+import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import api from '../../services/api';
 import { useAppStore } from '../../store/useAppStore';
 
@@ -24,7 +31,6 @@ const NAV_COMMANDS = [
     keywords: 'home overview payroll summary',
     icon: <GridViewIcon fontSize="small" />,
     path: '/dashboard',
-    tab: 'Dashboard',
   },
   {
     id: 'employees',
@@ -32,7 +38,6 @@ const NAV_COMMANDS = [
     keywords: 'people roster team members directory',
     icon: <PeopleIcon fontSize="small" />,
     path: '/dashboard?tab=employees',
-    tab: 'Employees',
   },
   {
     id: 'approvals',
@@ -40,15 +45,13 @@ const NAV_COMMANDS = [
     keywords: 'approve reject review pending',
     icon: <FactCheckIcon fontSize="small" />,
     path: '/dashboard?tab=approvals',
-    tab: 'Approvals',
   },
   {
     id: 'advances',
-    label: 'Advances',
+    label: 'Advances & Loans',
     keywords: 'loans salary advance credit',
     icon: <AccountBalanceWalletIcon fontSize="small" />,
     path: '/dashboard?tab=loans',
-    tab: 'Loans',
   },
   {
     id: 'monthly-updates',
@@ -56,7 +59,27 @@ const NAV_COMMANDS = [
     keywords: 'payroll run salary process',
     icon: <CalendarMonthIcon fontSize="small" />,
     path: '/monthly-updates',
-    tab: null,
+  },
+  {
+    id: 'expense-reports',
+    label: 'Custom Expense Reports',
+    keywords: 'expenses claims reimbursement receipts report',
+    icon: <ReceiptIcon fontSize="small" />,
+    path: '/expense-reports',
+  },
+  {
+    id: 'audit-logs',
+    label: 'Audit Logs & Trail',
+    keywords: 'audit system logs security actions history compliance',
+    icon: <ShieldIcon fontSize="small" />,
+    path: '/audit-logs',
+  },
+  {
+    id: 'announcements',
+    label: 'Company Announcements',
+    keywords: 'announcements news wysiwyg hr posts updates',
+    icon: <CampaignIcon fontSize="small" />,
+    path: '/announcements',
   },
   {
     id: 'add-employee',
@@ -64,15 +87,41 @@ const NAV_COMMANDS = [
     keywords: 'new hire onboarding create employee',
     icon: <PersonAddIcon fontSize="small" />,
     path: '/add-employee',
-    tab: null,
+  },
+  {
+    id: 'assets',
+    label: 'Asset Inventory',
+    keywords: 'assets equipment devices hardware tracking',
+    icon: <CategoryIcon fontSize="small" />,
+    path: '/assets',
+  },
+  {
+    id: 'vendors',
+    label: 'Vendor Management',
+    keywords: 'vendors suppliers contracts procurement',
+    icon: <LocalShippingIcon fontSize="small" />,
+    path: '/vendors',
+  },
+  {
+    id: 'client-invoices',
+    label: 'Client Invoices',
+    keywords: 'invoices billing clients payment receivable',
+    icon: <DescriptionIcon fontSize="small" />,
+    path: '/client-invoices',
+  },
+  {
+    id: 'grievances',
+    label: 'Grievance Portal',
+    keywords: 'grievances complaints issues HR support ticket',
+    icon: <ReportProblemIcon fontSize="small" />,
+    path: '/grievances',
   },
   {
     id: 'reports',
-    label: 'Reports',
+    label: 'Reports & Analytics',
     keywords: 'analytics export pdf xlsx csv',
     icon: <AssessmentIcon fontSize="small" />,
     path: '/reports',
-    tab: null,
   },
   {
     id: 'settings',
@@ -80,7 +129,6 @@ const NAV_COMMANDS = [
     keywords: 'preferences company profile account notifications',
     icon: <SettingsIcon fontSize="small" />,
     path: '/settings',
-    tab: null,
   },
 ];
 
@@ -172,6 +220,27 @@ const CommandPalette = () => {
         keywords: 'finalize submit monthly payroll',
         icon: <RocketLaunchIcon fontSize="small" />,
         path: '/monthly-updates',
+      },
+      {
+        id: 'create-expense-report',
+        label: 'Create Expense Report',
+        keywords: 'expense custom claim reimbursement',
+        icon: <ReceiptIcon fontSize="small" />,
+        path: '/expense-reports',
+      },
+      {
+        id: 'compose-announcement',
+        label: 'Compose Announcement',
+        keywords: 'announcement post publish hr update',
+        icon: <CampaignIcon fontSize="small" />,
+        path: '/announcements',
+      },
+      {
+        id: 'view-audit-logs',
+        label: 'View Audit Logs',
+        keywords: 'audit logs trail history actions',
+        icon: <ShieldIcon fontSize="small" />,
+        path: '/audit-logs',
       },
       {
         id: 'toggle-theme',
