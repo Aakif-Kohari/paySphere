@@ -5,7 +5,7 @@ Automated record of all feature hubs deployed to PaySphere.
 | # | Feature | Domain | Branch | Issue | PR | Route | Date |
 |---|---------|--------|--------|-------|----|-------|------|
 | 1 | Enterprise Cybersecurity & Zero-Trust SOC Hub | Security | `feature/frontend-cybersecurity-soc-hub` | [#1307](https://github.com/Dev1822/paySphere/issues/1307) | [#1308](https://github.com/Dev1822/paySphere/pull/1308) | `/enterprise/cybersecurity-soc` | 2026-08-20 |
-| 2 | Cardiopulmonary ECMO & Mechanical Ventilation Command Station | Critical Care / ECMO | `feature/frontend-ecmo-mechanical-ventilation-telemetry-hub` | Pending Submission | Pending Submission | `/enterprise/ecmo-critical-care` | 2026-08-21 |
+| 2 | Cardiopulmonary ECMO & Mechanical Ventilation Command Station | Critical Care / ECMO | `feature/frontend-ecmo-mechanical-ventilation-telemetry-hub` | Direct PR Submission | [#1439](https://github.com/Dev1822/paySphere/pull/1439) | `/enterprise/ecmo-critical-care` | 2026-08-21 |
 
 ---
 
