@@ -51,7 +51,19 @@ const employeeSchema = new mongoose.Schema(
     },
 
     /**
-     * Pay equity attributes (#1347).
+     * Who this employee reports to, for the drag-and-drop org chart (#1287).
+     *
+     * Self-referencing so the whole hierarchy can be rebuilt from a flat
+     * list. `null` means "top of the chart" (e.g. the CEO) rather than an
+     * unset value — the org chart builder treats both the same way anyway.
+     */
+    managerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Employee',
+      default: null,
+    },
+
+    /**     * Pay equity attributes (#1347).
      *
      * All three are optional and all three are absent by default, which is the
      * only version of this that is defensible. A tenant that does not collect
