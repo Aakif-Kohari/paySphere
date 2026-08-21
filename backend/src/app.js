@@ -45,6 +45,7 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 
 const roleRoutes = require('./routes/role.routes');
+const securitySettingsRoutes = require('./routes/securitySettings.routes');
 const userRoutes = require('./routes/user.routes');
 const employeeRoutes = require('./routes/employee.routes');
 const employeeImportRoutes = require('./routes/employeeImport.routes');
@@ -395,6 +396,9 @@ app.use('/api/integrations', integrationRoutes);
 // that decide what every other account can do. Mounted once, after the security
 // middleware, like the rest of the API.
 app.use('/api/roles', roleRoutes);
+app.use('/api/security', securitySettingsRoutes);
+app.use(require('./middlewares/sessionFingerprint.middleware'));
+app.use(require('./middlewares/ipAccessControl.middleware'));
 
 // Mounted here, once (#663).
 //
