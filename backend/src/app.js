@@ -94,7 +94,6 @@ const emailRoutes = require('./routes/email.routes');
 const complianceRoutes = require('./routes/compliance.routes');
 const forexRoutes = require('./routes/forex.routes');
 const announcementRoutes = require('./routes/announcement.routes');
-const treasuryHubRoutes = require('./routes/treasury.routes');
 
 // The eleven routers #1009 found unmounted. Each one had a router, a
 // controller, its models and — for most of them — a finished frontend page, and
@@ -119,6 +118,7 @@ const forecastRoutes = require('./routes/forecast.routes');
 const accountingRoutes = require('./routes/accounting.routes');
 const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
+const taxRoutes = require('./routes/tax.routes');
 const pyqRoutes = require('./routes/pyq.routes');
 
 // Business travel, per-diem and advance settlement (#1077). `expenseClaim` is
@@ -455,9 +455,6 @@ app.use('/api/search', searchRoutes);
 // neither of the two models it requires had been committed (#951).
 app.use('/api/compliance', complianceRoutes);
 
-// Global Payroll Treasury & Forex Hub (#1351)
-app.use('/api/treasury-hub', treasuryHubRoutes);
-
 // ─── Feature routers that were never mounted (#1009) ───────────────────────
 //
 // Eleven of them, each shipped complete — router, controller, models, utils,
@@ -505,6 +502,9 @@ app.use('/api/clients', clientInvoiceRoutes);
 // Same shape: the router defines `/roster`, `/templates` and `/swap/...`, and
 // `Roster.jsx` calls `/api/shifts/roster`.
 app.use('/api/shifts', shiftRosterRoutes);
+
+// Smart Tax Harmonization Engine
+app.use('/api/tax-engine', taxRoutes);
 
 app.use('/api/pyqs', pyqRoutes);
 
