@@ -118,7 +118,7 @@ const forecastRoutes = require('./routes/forecast.routes');
 const accountingRoutes = require('./routes/accounting.routes');
 const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
-const immigrationRoutes = require('./routes/immigration.routes');
+const successionRoutes = require('./routes/succession.routes');
 const pyqRoutes = require('./routes/pyq.routes');
 
 // Business travel, per-diem and advance settlement (#1077). `expenseClaim` is
@@ -503,8 +503,8 @@ app.use('/api/clients', clientInvoiceRoutes);
 // `Roster.jsx` calls `/api/shifts/roster`.
 app.use('/api/shifts', shiftRosterRoutes);
 
-// Legal Immigration & Visas Hub
-app.use('/api/immigration', immigrationRoutes);
+// Succession Planning Hub
+app.use('/api/succession', successionRoutes);
 
 app.use('/api/pyqs', pyqRoutes);
 
