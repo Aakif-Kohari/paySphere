@@ -15,8 +15,12 @@ const {
   updatePassword,
   disconnectGoogle,
   deleteAccount,
+  impersonateUser,
+  stopImpersonation,
 } = require('../controllers/user.controller');
 const auth = require('../middlewares/auth.middleware');
+const { requirePermission } = require('../middlewares/rbac.middleware');
+const { PERMISSIONS } = require('../config/permissions');
 const { validateRequest } = require('../middlewares/validate.middleware');
 const { signupSchema, loginSchema } = require('../validations/schemas');
 const {
@@ -24,11 +28,13 @@ const {
   writeRateLimiter,
 } = require('../middlewares/rateLimiter.middleware');
 const validateRecaptcha = require('../middlewares/recaptcha.middleware');
+const { generateCsrfToken } = require('../middlewares/csrf.middleware');
 const router = express.Router();
 
 router.post('/signup', validateRequest(signupSchema), signup);
 router.post('/login', validateRequest(loginSchema), login);
 router.post('/google', googleAuth);
+router.get('/csrf-token', generateCsrfToken);
 
 /**
  * @openapi
@@ -86,6 +92,15 @@ router.post(
 );
 router.post('/2fa/disable', auth, disable2FA);
 router.post('/2fa/validate-login', authRateLimiter, auth, validate2FALogin);
+
+router.post(
+  '/impersonate',
+  authRateLimiter,
+  auth,
+  requirePermission(PERMISSIONS.IMPERSONATE_USER),
+  impersonateUser,
+);
+router.post('/stop-impersonation', authRateLimiter, auth, stopImpersonation);
 
 const { setupMFA, verifyMFASetup } = require('../middlewares/mfa.middleware');
 router.post('/mfa/setup', auth, setupMFA);

@@ -50,16 +50,34 @@ const employeeRoutes = require('./routes/employee.routes');
 const employeeImportRoutes = require('./routes/employeeImport.routes');
 const payrollRoutes = require('./routes/payroll.routes');
 const payrollApprovalRoutes = require('./routes/payrollApproval.routes');
+
+// Statutory bonus under the Payment of Bonus Act, 1965 (#1346). Next to the
+// payroll routers because it is a payment to employees, and separate from them
+// because it is not payroll: the amount is fixed by statute rather than by the
+// company, it is computed on a wage capped by section 12 rather than on the one
+// that is paid, and it produces a Rule 5 register.
+const statutoryBonusRoutes = require('./routes/statutoryBonus.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
 const settlementRoutes = require('./routes/settlement.routes');
+
+// Gratuity actuarial valuation (#1344). Next to settlements on purpose: the
+// two are the same statute seen from opposite ends. `settlement.routes` pays
+// gratuity to somebody who is leaving; this one measures what is still owed to
+// everybody who has not.
+const gratuityRoutes = require('./routes/gratuity.routes');
 const loanRoutes = require('./routes/loan.routes');
 const schedulerRoutes = require('./routes/scheduler.routes');
 const employeePortalRoutes = require('./routes/employeePortal.routes');
 const workflowRoutes = require('./routes/workflow.routes');
 const salaryHistoryRoutes = require('./routes/salaryHistory.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
+
+// Pay equity analytics (#1347). Next to the dashboard and stats routers because
+// it is analysis over the same directory, and behind its own permissions
+// because it is the only part of the product that reads declared gender.
+const payEquityRoutes = require('./routes/payEquity.routes');
 const statsRoutes = require('./routes/stats.routes');
 const departmentsRoutes = require('./routes/departments.routes');
 const flashcardRoutes = require('./routes/flashcard.routes');
@@ -74,6 +92,7 @@ const searchRoutes = require('./routes/search.routes');
 const emailRoutes = require('./routes/email.routes');
 const complianceRoutes = require('./routes/compliance.routes');
 const forexRoutes = require('./routes/forex.routes');
+const announcementRoutes = require('./routes/announcement.routes');
 
 // The eleven routers #1009 found unmounted. Each one had a router, a
 // controller, its models and — for most of them — a finished frontend page, and
@@ -86,6 +105,12 @@ const assetRoutes = require('./routes/asset.routes');
 const vendorRoutes = require('./routes/vendor.routes');
 const grievanceRoutes = require('./routes/grievance.routes');
 const taxProofRoutes = require('./routes/taxProof.routes');
+
+// Leave Travel Allowance (#1345). Next to the tax proofs because it is the same
+// act from the employee's side — file a document, get an exemption — and a
+// completely different rule set behind it: the entitlement is a four-year
+// statutory block rather than a financial year.
+const ltaRoutes = require('./routes/lta.routes');
 const appraisalRoutes = require('./routes/appraisal.routes');
 const contractRoutes = require('./routes/contract.routes');
 const forecastRoutes = require('./routes/forecast.routes');
@@ -99,6 +124,13 @@ const pyqRoutes = require('./routes/pyq.routes');
 // per-diem has no receipt at all — so an unspent advance was a receivable
 // nothing in the product tracked.
 const travelRoutes = require('./routes/travel.routes');
+
+// International assignments (#1348). Next to travel and emphatically not part
+// of it: `travel.routes` settles a trip in per-diems over a few weeks, while an
+// assignment runs for years, changes where the employee is tax resident and is
+// the reason the employer files in a second country. The two share a plane and
+// nothing else.
+const assignmentRoutes = require('./routes/assignment.routes');
 
 // Stock option schemes, grants, vesting and exercises (#1073). Equity was the
 // one component of total compensation with no model, no route and no
@@ -122,6 +154,7 @@ const disbursementRoutes = require('./routes/disbursement.routes');
 // been reachable over HTTP — `calculateCarryForward()` is called from nowhere
 // and `maxCarryForward` has never had an effect on anything.
 const leaveClosureRoutes = require('./routes/leaveClosure.routes');
+const treasuryRoutes = require('./routes/treasury.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -310,13 +343,25 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/employees', employeeImportRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/payroll', payrollApprovalRoutes);
+
+// #1346. Its own prefix rather than a sub-path of `/api/payroll`: the
+// discretionary bonus on a payroll row and the statutory bonus under the Act
+// are different money with different authorities, and sharing a namespace
+// invites them to be confused. The router owns `/computations`, `/preview` and
+// `/ledger`.
+app.use('/api/statutory-bonus', statutoryBonusRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/employee-portal', employeePortalRoutes);
 app.use('/api/schedules', schedulerRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/settlements', settlementRoutes);
+
+// #1344. The router owns `/assumptions`, `/preview`, `/valuations` and
+// `/employees/:employeeId`, so the prefix carries no noun of its own.
+app.use('/api/gratuity', gratuityRoutes);
 app.use('/api/loans', loanRoutes);
+app.use('/api/treasury', treasuryRoutes);
 
 // The archive browser for soft-deleted employees (#759). Mounted by one of the
 // two duplicated route tables and not the other.
@@ -333,6 +378,7 @@ app.use('/api', salaryHistoryRoutes);
 app.use('/api/flashcards', flashcardRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/forex', forexRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 // Webhook endpoints (#474) — an admin lets an external system subscribe to
 // payroll and employee events. The controller and models were written in #645
@@ -368,6 +414,9 @@ app.use('/api/roles', roleRoutes);
 // the dashboard was not a special case, it was just the one that got noticed.
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/stats', statsRoutes);
+
+// #1347. The router owns `/preview`, `/reports`, `/compa-ratio` and `/bands`.
+app.use('/api/pay-equity', payEquityRoutes);
 app.use('/api/departments', departmentsRoutes);
 
 // The in-app notification centre (#440). The other half of the duplicate.
@@ -420,6 +469,10 @@ app.use('/api/vendors', vendorRoutes);
 app.use('/api/grievances', grievanceRoutes);
 
 app.use('/api/tax-proofs', taxProofRoutes);
+
+// #1345. The router owns `/claims`, `/preview`, `/entitlement`, `/my-claims`,
+// `/queue` and `/summary/:employeeId`.
+app.use('/api/lta', ltaRoutes);
 app.use('/api/appraisals', appraisalRoutes);
 app.use('/api/contracts', contractRoutes);
 
@@ -445,6 +498,10 @@ app.use('/api/pyqs', pyqRoutes);
 // Business travel (#1077). The router owns `/policies`, `/requests`,
 // `/advances` and `/my-trips`.
 app.use('/api/travel', travelRoutes);
+
+// #1348. The router owns `/`, `/:id`, `/:id/presence`, `/:id/cost-projection`,
+// `/:id/gross-up` and `/:id/settlements`.
+app.use('/api/assignments', assignmentRoutes);
 
 // Equity (#1073). The router owns `/schemes`, `/grants` and `/my-grants`, so
 // the prefix carries no noun of its own.

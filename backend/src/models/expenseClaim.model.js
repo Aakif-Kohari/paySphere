@@ -117,6 +117,17 @@ const expenseClaimSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    imageHash: { type: String, default: '' },
+    isPossibleFraud: { type: Boolean, default: false },
+    fraudDetails: { type: String, default: '' },
+    ocrMetadata: {
+      amountMatches: { type: Boolean, default: true },
+      dateMatches: { type: Boolean, default: true },
+      currencyMatches: { type: Boolean, default: true },
+      extractedAmount: { type: Number },
+      extractedDate: { type: Date },
+      extractedCurrency: { type: String }
+    },
   },
   { timestamps: true },
 );
