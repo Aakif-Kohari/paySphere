@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import CommandPalette from './components/common/CommandPalette';
+import OnboardingTour from './components/common/OnboardingTour';
 import ScrollToTop from './components/common/ScrollToTop';
 import OfflineSyncIndicator from './components/OfflineSyncIndicator';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -122,6 +123,7 @@ function App() {
 
           <ScrollToTop />
           <CommandPalette />
+          <OnboardingTour />
 
           {/* Global Offline Sync Indicator (Issue #815) */}
           <OfflineSyncIndicator />
