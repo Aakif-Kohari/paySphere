@@ -406,6 +406,10 @@ export const APP_ROUTES = [
     path: '/enterprise/engagement-sentiment',
     component: lazy(() => import('../pages/engagement/EnterpriseEngagementSentimentPage')),
   },
+  {
+    path: '/enterprise/clinical-telemetry',
+    component: lazy(() => import('../pages/clinical/ICUHemodynamicsTelemetryPage')),
+  },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
