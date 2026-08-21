@@ -92,20 +92,8 @@ async function loadPolicy(userId) {
  * @returns {Promise<object>}
  */
 async function computeFor({ employee, policy, body }) {
-  return buildSettlement({
-    monthlySalary: employee.monthlySalary,
-    joiningDate: employee.joiningDate,
-    lastWorkingDay: body.lastWorkingDay,
-    unusedLeaveDays: body.unusedLeaveDays,
-    noticePeriodDays: body.noticePeriodDays,
-    noticeServedDays: body.noticeServedDays,
-    bonus: body.bonus,
-    otherEarnings: body.otherEarnings,
-    advanceRecovery: body.advanceRecovery,
-    assetRecovery: body.assetRecovery,
-    otherDeductions: body.otherDeductions,
-    policy,
-  });
+  const { calculateSettlement } = require('../services/settlementEngine');
+  return calculateSettlement({ employee, policy, body });
 }
 
 /**
@@ -213,6 +201,24 @@ exports.initiateExit = async (req, res, next) => {
           },
         },
       },
+    );
+
+    const ExitClearance = require('../models/exitClearance.model');
+    await ExitClearance.findOneAndUpdate(
+      { employeeId: employee._id, tenantId: req.tenantId },
+      {
+        $setOnInsert: {
+          employeeId: employee._id,
+          tenantId: req.tenantId,
+          status: 'Pending',
+          itClearance: { status: 'Pending', notes: '' },
+          hrClearance: { status: 'Pending', notes: '' },
+          adminClearance: { status: 'Pending', notes: '' },
+          hasTrainingAgreement: Boolean(body.hasTrainingAgreement),
+          trainingClawbackAmount: Number(body.trainingClawbackAmount) || 0
+        }
+      },
+      { upsert: true, new: true }
     );
 
     eventBus.emit('AUDIT_LOG', {
@@ -616,6 +622,69 @@ exports.getSettlementById = async (req, res, next) => {
     res.status(200).json({
       settlement: owned.settlement,
       payrollHistoryCount,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getClearanceStatus = async (req, res, next) => {
+  try {
+    const ExitClearance = require('../models/exitClearance.model');
+    const clearance = await ExitClearance.findOne({
+      employeeId: req.params.employeeId,
+      tenantId: req.tenantId,
+    }).populate('employeeId', 'fullName email department');
+
+    if (!clearance) {
+      return res.status(404).json({ message: 'Exit clearance record not found' });
+    }
+
+    res.status(200).json({ success: true, clearance });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.submitClearanceSignoff = async (req, res, next) => {
+  try {
+    const { employeeId, department, status, notes } = req.body;
+    if (!['it', 'hr', 'admin'].includes(department)) {
+      return res.status(400).json({ message: 'Invalid department' });
+    }
+    if (!['Cleared', 'Rejected', 'Pending'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    const ExitClearance = require('../models/exitClearance.model');
+    const clearance = await ExitClearance.findOne({ employeeId, tenantId: req.tenantId });
+    if (!clearance) {
+      return res.status(404).json({ message: 'Exit clearance record not found' });
+    }
+
+    const stepKey = `${department}Clearance`;
+    clearance[stepKey] = {
+      status,
+      clearedBy: req.userId,
+      clearedAt: new Date(),
+      notes: notes || '',
+    };
+
+    const steps = [clearance.itClearance.status, clearance.hrClearance.status, clearance.adminClearance.status];
+    if (steps.every(s => s === 'Cleared')) {
+      clearance.status = 'Completed';
+    } else if (steps.some(s => s === 'Rejected')) {
+      clearance.status = 'Rejected';
+    } else {
+      clearance.status = 'Pending';
+    }
+
+    await clearance.save();
+
+    res.status(200).json({
+      success: true,
+      message: `${department.toUpperCase()} clearance updated successfully.`,
+      clearance,
     });
   } catch (error) {
     next(error);

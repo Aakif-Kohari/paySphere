@@ -254,6 +254,11 @@ exports.downloadPDFReport = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
+    // Dark mode for the PDF report (#1288). Anything other than the literal
+    // string "dark" falls back to the existing light theme, same as an
+    // unset param always has.
+    const theme = req.query.theme === "dark" ? "dark" : "light";
+
     const payrollQuery = {
       tenantId,
       month,
@@ -272,7 +277,6 @@ exports.downloadPDFReport = async (req, res, next) => {
 
     // Fetch payroll records for the selected month
     const payrolls = await PayrollUpdate.find(payrollQuery).sort({ employeeName: 1 });
-
     if (payrolls.length === 0) {
       return res
         .status(404)
@@ -340,10 +344,10 @@ exports.downloadPDFReport = async (req, res, next) => {
         totalBonus,
         totalDeductions,
         totalPayout,
-        currency
+        currency,
+        theme
       }
     });
-
     pdfWorker.on("message", async (result) => {
       if (isHandled) return;
       isHandled = true;
@@ -362,10 +366,9 @@ exports.downloadPDFReport = async (req, res, next) => {
           userId: req.userId,
           action: "REPORT_DOWNLOAD",
           resourceType: "Report",
-          details: { month, year, type: "payroll-pdf", employeeCount: payrolls.length, departments },
+          details: { month, year, type: "payroll-pdf", employeeCount: payrolls.length, departments, theme },
           req,
         });
-
         logger.info(`PDF report downloaded`, { userId: req.userId, month, year, employeeCount: payrolls.length, departments });
       } else {
         next(new Error("Failed to generate PDF: " + result.error));
@@ -459,6 +462,9 @@ exports.exportExcelReport = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid year parameter" });
     }
 
+    // Same dark-mode switch as the PDF export (#1288).
+    const theme = req.query.theme === "dark" ? "dark" : "light";
+
     const payrollQuery = {
       tenantId,
       month,
@@ -474,7 +480,6 @@ exports.exportExcelReport = async (req, res, next) => {
     if (employeeIds && employeeIds.length > 0) {
       payrollQuery.employeeId = { $in: employeeIds.map(id => require('mongoose').Types.ObjectId(id)) };
     }
-
     const payrolls = await PayrollUpdate.find(payrollQuery).sort({ employeeName: 1 });
 
     if (payrolls.length === 0) {
@@ -522,14 +527,26 @@ exports.exportExcelReport = async (req, res, next) => {
       { header: "Status", key: "status", width: 12 },
     ];
 
+    // Dark-mode colors for the spreadsheet export (#1288). Light mode keeps
+    // the existing hardcoded header style untouched.
+    const XLSX_DARK_THEME = {
+      headerBg: "0F172A",
+      headerText: "E2E8F0",
+      rowBg: "1E293B",
+      altRowBg: "111827",
+      rowText: "E2E8F0",
+    };
+
     const headerRow = worksheet.getRow(1);
-    headerRow.font = { bold: true, color: { argb: "FFFFFF" } };
+    headerRow.font = {
+      bold: true,
+      color: { argb: theme === "dark" ? XLSX_DARK_THEME.headerText : "FFFFFF" },
+    };
     headerRow.fill = {
       type: "pattern",
       pattern: "solid",
-      fgColor: { argb: "1E3A5F" },
+      fgColor: { argb: theme === "dark" ? XLSX_DARK_THEME.headerBg : "1E3A5F" },
     };
-
     let totalBase = 0;
     let totalLeaveDed = 0;
     let totalOvertimePay = 0;
@@ -548,7 +565,7 @@ exports.exportExcelReport = async (req, res, next) => {
       totalDeductions += totalDed;
       totalNet += p.netSalary || 0;
 
-      worksheet.addRow({
+      const dataRow = worksheet.addRow({
         employeeName: p.employeeName,
         role: emp?.role || "N/A",
         department: emp?.department || "N/A",
@@ -562,8 +579,13 @@ exports.exportExcelReport = async (req, res, next) => {
         netSalary: p.netSalary,
         status: p.status || "finalized",
       });
-    });
 
+      if (theme === "dark") {
+        const rowBg = payrolls.indexOf(p) % 2 === 0 ? XLSX_DARK_THEME.rowBg : XLSX_DARK_THEME.altRowBg;
+        dataRow.font = { color: { argb: XLSX_DARK_THEME.rowText } };
+        dataRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowBg } };
+      }
+    });
     const summaryRow = worksheet.addRow({
       employeeName: "TOTAL",
       role: "",
@@ -578,8 +600,13 @@ exports.exportExcelReport = async (req, res, next) => {
       netSalary: totalNet,
       status: "",
     });
-    summaryRow.font = { bold: true };
-
+    summaryRow.font =
+      theme === "dark"
+        ? { bold: true, color: { argb: XLSX_DARK_THEME.headerText } }
+        : { bold: true };
+    if (theme === "dark") {
+      summaryRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: XLSX_DARK_THEME.headerBg } };
+    }
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -596,10 +623,9 @@ exports.exportExcelReport = async (req, res, next) => {
       userId: req.userId,
       action: "REPORT_DOWNLOAD",
       resourceType: "Report",
-      details: { month, year, type: "payroll-xlsx", employeeCount: payrolls.length, departments },
+      details: { month, year, type: "payroll-xlsx", employeeCount: payrolls.length, departments, theme },
       req,
     });
-
     logger.info(`XLSX report downloaded`, { userId: req.userId, month, year, employeeCount: payrolls.length, departments });
   } catch (error) {
     next(error);

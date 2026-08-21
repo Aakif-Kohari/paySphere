@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import CommandPalette from './components/common/CommandPalette';
+import OnboardingTour from './components/common/OnboardingTour';
 import ScrollToTop from './components/common/ScrollToTop';
 import OfflineSyncIndicator from './components/OfflineSyncIndicator';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -12,6 +13,7 @@ import { useAppStore } from './store/useAppStore';
 import { NotFound, ROUTABLE } from './config/navigation';
 import RouteFallback from './components/common/RouteFallback';
 import AppPageShell from './components/Layout/AppPageShell';
+import ImpersonationBanner from './components/common/ImpersonationBanner';
 
 function App() {
   const user = useAppStore((state) => state.user);
@@ -77,6 +79,7 @@ function App() {
 
       <ToastProvider>
         <BrowserRouter>
+          <ImpersonationBanner />
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               {/* Built from `config/navigation.js` rather than written out
@@ -120,6 +123,7 @@ function App() {
 
           <ScrollToTop />
           <CommandPalette />
+          <OnboardingTour />
 
           {/* Global Offline Sync Indicator (Issue #815) */}
           <OfflineSyncIndicator />

@@ -45,6 +45,8 @@ export class CryptoPayrollService {
 const cryptoService = new CryptoPayrollService();
 const cryptoRouter = Router();
 
+const cryptoController = require('../controllers/crypto.controller');
+
 cryptoRouter.get('/crypto/wallets', (req: Request, res: Response) => {
   res.json({ success: true, data: cryptoService.getWallets() });
 });
@@ -53,6 +55,14 @@ cryptoRouter.post('/crypto/disburse', (req: Request, res: Response) => {
   const { recipientWallet, amountUSD, tokenSymbol } = req.body;
   const result = cryptoService.disburseOnChain(recipientWallet, amountUSD, tokenSymbol);
   res.json({ success: true, data: result });
+});
+
+cryptoRouter.post('/crypto/disburse-batch', (req: Request, res: Response, next) => {
+  cryptoController.disburseCryptoBatch(req, res, next);
+});
+
+cryptoRouter.get('/crypto/payout-logs', (req: Request, res: Response, next) => {
+  cryptoController.getPayoutLogs(req, res, next);
 });
 
 export default cryptoRouter;
