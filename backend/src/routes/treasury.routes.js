@@ -1,14 +1,20 @@
-const express = require('express');
-const { getVaults, executeSwap, getRebalanceLogs } = require('../controllers/treasury.controller');
-const auth = require('../middlewares/auth.middleware');
-const { requirePermission } = require('../middlewares/rbac.middleware');
-const { writeRateLimiter } = require('../middlewares/rateLimiter.middleware');
-const { PERMISSIONS } = require('../config/permissions');
+import express from 'express';
+import {
+    getTreasuryWallets,
+    getLiveExchangeRates,
+    getForwardLiquidityForecast,
+    getChartSequence,
+    getTradeLedger,
+    executeForexTrade
+} from '../controllers/treasury.controller.js';
 
 const router = express.Router();
 
-router.get('/vaults', auth, requirePermission(PERMISSIONS.READ_PAYROLL), getVaults);
-router.post('/swap', auth, requirePermission(PERMISSIONS.WRITE_PAYROLL), writeRateLimiter, executeSwap);
-router.get('/rebalance-logs', auth, requirePermission(PERMISSIONS.READ_PAYROLL), getRebalanceLogs);
+router.get('/wallets', getTreasuryWallets);
+router.get('/rates', getLiveExchangeRates);
+router.get('/forecast', getForwardLiquidityForecast);
+router.get('/forecast/chart', getChartSequence);
+router.get('/trades', getTradeLedger);
+router.post('/trades/execute', executeForexTrade);
 
-module.exports = router;
+export default router;

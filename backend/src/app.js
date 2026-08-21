@@ -94,6 +94,7 @@ const emailRoutes = require('./routes/email.routes');
 const complianceRoutes = require('./routes/compliance.routes');
 const forexRoutes = require('./routes/forex.routes');
 const announcementRoutes = require('./routes/announcement.routes');
+const treasuryHubRoutes = require('./routes/treasury.routes');
 
 // The eleven routers #1009 found unmounted. Each one had a router, a
 // controller, its models and — for most of them — a finished frontend page, and
@@ -453,6 +454,9 @@ app.use('/api/search', searchRoutes);
 // so there was no URL that reached it — and consequently nobody noticed that
 // neither of the two models it requires had been committed (#951).
 app.use('/api/compliance', complianceRoutes);
+
+// Global Payroll Treasury & Forex Hub (#1351)
+app.use('/api/treasury-hub', treasuryHubRoutes);
 
 // ─── Feature routers that were never mounted (#1009) ───────────────────────
 //
