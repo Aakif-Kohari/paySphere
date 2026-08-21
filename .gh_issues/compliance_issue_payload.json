@@ -1,0 +1,4 @@
+{
+    "title": "feat(compliance): Enterprise Payroll Compliance & Audit Intelligence Hub",
+    "body": "### Problem\nEnterprises need comprehensive auditing and compliance tracking for payroll deviations, tax gaps, and labor law breaches.\n\n### Solution\nImplementing an Enterprise Payroll Compliance Intelligence Hub. This feature introduces:\n- **Advanced Data Models**: `ComplianceAnomalies` with rich audit trailing.\n- **Predictive ML Analytics**: 12-month rolling forecasts on tax discrepancy penalties.\n- **Modern Stateful UI**: Extensive 1000+ line components utilizing `recharts`, `lucide-react`, and rich glassmorphism.\n- **Ledger Resolution**: Subpoena resolution states with robust HR/legal notations."
+}
