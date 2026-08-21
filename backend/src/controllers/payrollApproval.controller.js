@@ -8,7 +8,7 @@
 'use strict';
 
 const WorkflowInstance  = require('../models/workflowInstance.model');
-const { advanceStage }  = require('../services/payrollApproval.service');
+const approvalEngine    = require('../services/approvalEngine');
 const { tenantFilter }  = require('../utils/tenantScope');
 const logger            = require('../utils/logger');
 
@@ -26,13 +26,11 @@ async function approveStage(req, res) {
     const instance = await findInstance(req.params.payrollId, req.tenantId);
     if (!instance) return res.status(404).json({ message: 'No open approval workflow found for this payroll run.' });
 
-    const updated = await advanceStage({
+    const updated = await approvalEngine.processStageApproval({
       instanceId: instance._id,
       actorId: req.userId,
       action: 'approve',
       comment: req.body.comment || '',
-      nextNodeId: req.body.nextNodeId || 'finance_review',
-      terminalNodeId: req.body.terminalNodeId || 'approved',
       expectedVersion: instance.__v,
     });
 
@@ -49,13 +47,11 @@ async function rejectStage(req, res) {
     const instance = await findInstance(req.params.payrollId, req.tenantId);
     if (!instance) return res.status(404).json({ message: 'No open approval workflow found for this payroll run.' });
 
-    const updated = await advanceStage({
+    const updated = await approvalEngine.processStageApproval({
       instanceId: instance._id,
       actorId: req.userId,
       action: 'reject',
       comment: req.body.comment,
-      nextNodeId: 'rejected',
-      terminalNodeId: 'rejected',
       expectedVersion: instance.__v,
     });
 
@@ -89,4 +85,31 @@ async function getApprovalStatus(req, res) {
   }
 }
 
-module.exports = { approveStage, rejectStage, getApprovalStatus };
+async function saveApprovalWorkflow(req, res, next) {
+  try {
+    const { name, sequence } = req.body;
+    if (!name || !sequence || !Array.isArray(sequence) || sequence.length === 0) {
+      return res.status(400).json({ message: 'name and sequence are required' });
+    }
+
+    const ApprovalWorkflow = require('../models/approvalWorkflow.model');
+    await ApprovalWorkflow.updateMany(
+      { tenantId: req.tenantId, isActive: true },
+      { $set: { isActive: false, effectiveTo: new Date() } }
+    );
+
+    const workflow = await ApprovalWorkflow.create({
+      tenantId: req.tenantId,
+      name,
+      sequence,
+      isActive: true,
+      effectiveFrom: new Date()
+    });
+
+    res.status(201).json({ message: 'Approval workflow configuration saved', workflow });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { approveStage, rejectStage, getApprovalStatus, saveApprovalWorkflow };
