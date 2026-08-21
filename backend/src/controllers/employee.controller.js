@@ -337,8 +337,96 @@ exports.getRecentEmployees = async (req, res, next) => {
   }
 };
 
-exports.importEmployees = async (req, res, next) => {
+// GET LIGHTWEIGHT EMPLOYEE LIST FOR THE ORG CHART BUILDER (#1287)
+exports.getOrgChart = async (req, res, next) => {
   try {
+    const query = req.tenantId
+      ? { tenantId: req.tenantId }
+      : { createdBy: req.userId };
+    query.deletedAt = null;
+    query.isActive = true;
+
+    const employees = await Employee.find(query)
+      .select('_id fullName role department managerId')
+      .lean();
+
+    res.status(200).json({ employees });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// REASSIGN AN EMPLOYEE TO A DIFFERENT MANAGER (drag-and-drop org chart, #1287)
+exports.updateEmployeeManager = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { managerId } = req.body;
+
+    const query = req.tenantId
+      ? { _id: id, tenantId: req.tenantId }
+      : { _id: id, createdBy: req.userId };
+
+    const employee = await Employee.findOne(query);
+    if (!employee || employee.deletedAt) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+
+    // Clearing the manager (dragging to "no manager") makes this a root node.
+    if (!managerId) {
+      employee.managerId = null;
+      await employee.save();
+      return res.status(200).json({ employee });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(managerId)) {
+      return res.status(400).json({ message: 'Invalid manager id' });
+    }
+
+    if (String(managerId) === String(id)) {
+      return res
+        .status(400)
+        .json({ message: 'An employee cannot manage themselves' });
+    }
+
+    const managerQuery = req.tenantId
+      ? { _id: managerId, tenantId: req.tenantId }
+      : { _id: managerId, createdBy: req.userId };
+
+    let cursor = await Employee.findOne(managerQuery);
+    if (!cursor || cursor.deletedAt) {
+      return res.status(404).json({ message: 'Manager not found' });
+    }
+
+    // Walk up the proposed manager's own chain — if `employee` turns up as
+    // one of their managers, this reassignment would create a reporting loop.
+    const visited = new Set();
+    while (cursor && cursor.managerId) {
+      const nextId = String(cursor.managerId);
+      if (nextId === String(id)) {
+        return res
+          .status(400)
+          .json({ message: 'This change would create a reporting loop' });
+      }
+      if (visited.has(nextId)) break; // already-corrupt chain; don't loop forever
+      visited.add(nextId);
+      // eslint-disable-next-line no-await-in-loop
+      cursor = await Employee.findOne(
+        req.tenantId
+          ? { _id: nextId, tenantId: req.tenantId }
+          : { _id: nextId, createdBy: req.userId },
+      );
+    }
+
+    employee.managerId = managerId;
+    await employee.save();
+
+    res.status(200).json({ employee });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.importEmployees = async (req, res, next) => {  try {
     if (!req.file) {
       return res.status(400).json({
         message: 'No CSV file uploaded',
