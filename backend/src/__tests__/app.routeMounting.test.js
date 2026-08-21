@@ -143,6 +143,7 @@ const MOUNTED_ROUTES = [
   ['/api/regional-tax', 'get', '/api/regional-tax/jurisdictions'],
   ['/api/crypto/wallets', 'get', '/api/crypto/wallets'],
   ['/api/salary-adjustments', 'get', '/api/salary-adjustments'],
+  ['/api/pension', 'get', '/api/pension/policies'],
 ];
 
 /**
@@ -218,6 +219,7 @@ const ROUTER_MOUNTS = {
   monthlyUpdates: '/api/monthly-updates',
   notification: '/api/notifications',
   payEquity: '/api/pay-equity',
+  pension: '/api/pension',
   payroll: '/api/payroll',
   pyq: '/api/pyqs',
   recruitment: '/api/recruitment',

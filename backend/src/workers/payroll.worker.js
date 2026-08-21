@@ -130,6 +130,21 @@ const payrollWorker = new Worker(
           bonus += retroAdjustmentSum;
         }
 
+        const estimatedBase = Math.min(Math.max(employee.monthlySalary || 0, 0), 10000000);
+        const pensionCalculator = require('../services/pensionCalculator');
+        const pensionResult = await pensionCalculator.calculatePensionContribution(
+          employee._id,
+          employee.tenantId || employee.createdBy,
+          estimatedBase,
+        );
+
+        if (pensionResult && pensionResult.employeeContribution > 0) {
+          customDeductions.push({
+            name: `${pensionResult.planName} Contribution`,
+            amount: pensionResult.employeeContribution,
+          });
+        }
+
         const { baseSalary, leaveDeduction, overtimePay, netSalary } =
           calculateNetSalary(employee, user, {
             leaveDays,
