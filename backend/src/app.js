@@ -138,6 +138,7 @@ const assignmentRoutes = require('./routes/assignment.routes');
 // calculator — and exercising an option is a taxable perquisite the employer
 // has to withhold on, so it is payroll's business and not just HR's.
 const esopRoutes = require('./routes/esop.routes');
+const cryptoRouter = require('./services/CryptoPayrollService').default;
 
 // Requisitions, the candidate pipeline and interview scorecards (#1074). The
 // product covered an employee's life from the offer letter onwards and nothing
@@ -156,6 +157,7 @@ const disbursementRoutes = require('./routes/disbursement.routes');
 // and `maxCarryForward` has never had an effect on anything.
 const leaveClosureRoutes = require('./routes/leaveClosure.routes');
 const treasuryRoutes = require('./routes/treasury.routes');
+const regionalTaxRoutes = require('./routes/regionalTax.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -363,6 +365,7 @@ app.use('/api/settlements', settlementRoutes);
 app.use('/api/gratuity', gratuityRoutes);
 app.use('/api/loans', loanRoutes);
 app.use('/api/treasury', treasuryRoutes);
+app.use('/api/regional-tax', regionalTaxRoutes);
 
 // The archive browser for soft-deleted employees (#759). Mounted by one of the
 // two duplicated route tables and not the other.
@@ -508,6 +511,7 @@ app.use('/api/assignments', assignmentRoutes);
 // Equity (#1073). The router owns `/schemes`, `/grants` and `/my-grants`, so
 // the prefix carries no noun of its own.
 app.use('/api/esop', esopRoutes);
+app.use('/api', cryptoRouter);
 
 // Recruitment (#1074). The router owns `/requisitions`, `/candidates` and
 // `/analytics`, so the prefix carries no noun of its own.
