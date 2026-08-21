@@ -403,8 +403,8 @@ export const APP_ROUTES = [
     component: lazy(() => import('../pages/security/EnterpriseCybersecuritySOCPage')),
   },
   {
-    path: '/enterprise/nephrology-crrt',
-    component: lazy(() => import('../pages/nephrology/NephrologyCRRTPage')),
+    path: '/enterprise/pediatric-icu',
+    component: lazy(() => import('../pages/pediatric/PediatricICUTelemetryPage')),
   },
   {
     path: '/enterprise/engagement-sentiment',
