@@ -141,6 +141,7 @@ const MOUNTED_ROUTES = [
   // controller and no router, so nothing in it has ever answered a request.
   ['/api/leave-closure', 'get', '/api/leave-closure/policies'],
   ['/api/regional-tax', 'get', '/api/regional-tax/jurisdictions'],
+  ['/api/crypto/wallets', 'get', '/api/crypto/wallets'],
 ];
 
 /**
