@@ -176,6 +176,7 @@ const { MAX_FILE_SIZE } = require('./middlewares/upload.middleware');
 const { trackHttpMetrics, metricsHandler } = require('./utils/metrics');
 const auditContextMiddleware = require('./middlewares/auditContext.middleware');
 const requestLogger = require('./middlewares/requestLogger.middleware');
+const { csrfProtection } = require('./middlewares/csrf.middleware');
 
 const app = express();
 
@@ -260,6 +261,7 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 app.use(cookieParser());
+app.use('/api', csrfProtection);
 
 // CORS configuration — restrict strictly to frontend origin
 const allowedOrigin = process.env.FRONTEND_URL || 'http://localhost:5173';
