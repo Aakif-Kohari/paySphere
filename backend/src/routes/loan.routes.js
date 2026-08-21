@@ -12,6 +12,10 @@ const {
   forecloseLoan,
   recordPrepayment,
   getExitClearance,
+  getPolicy,
+  requestLoan,
+  approveLoan,
+  getMyLoans,
 } = require('../controllers/loan.controller');
 const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
@@ -19,6 +23,28 @@ const { writeRateLimiter } = require('../middlewares/rateLimiter.middleware');
 const { PERMISSIONS } = require('../config/permissions');
 
 const router = express.Router();
+
+// --- Loan Request & Approval Workflow (Issue #1290) ------------------------
+
+// Retrieve or initialize the tenant's loan policy
+router.get('/policy', auth, getPolicy);
+
+// Submit a new loan request for approval
+router.post('/request', auth, writeRateLimiter, requestLoan);
+
+// Get loans for the authenticated employee
+router.get('/my-loans', auth, getMyLoans);
+
+// Approve a pending loan request and generate amortization schedule
+router.patch(
+  '/:id/approve',
+  auth,
+  requirePermission(PERMISSIONS.WRITE_PAYROLL),
+  writeRateLimiter,
+  approveLoan,
+);
+
+// --- Existing Loan Management Routes ---------------------------------------
 
 // A loan changes what an employee is paid, so it is guarded with the payroll
 // permissions rather than the employee ones: reading a loan is reading payroll

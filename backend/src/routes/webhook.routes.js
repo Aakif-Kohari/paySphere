@@ -63,6 +63,14 @@ router.patch(
 );
 
 router.post(
+  "/:id/test",
+  auth,
+  requirePermission(PERMISSIONS.MANAGE_WEBHOOKS),
+  writeRateLimiter,
+  require("../controllers/webhook.controller").testWebhook
+);
+
+router.post(
   "/deliveries/:id/retry",
   auth,
   requirePermission(PERMISSIONS.MANAGE_WEBHOOKS),

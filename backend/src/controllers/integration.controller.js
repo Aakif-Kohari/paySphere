@@ -307,6 +307,38 @@ exports.deleteIntegration = async (req, res, next) => {
   }
 };
 
+exports.getFieldMapping = async (req, res, next) => {
+  try {
+    const provider = String(req.params.provider || '').toLowerCase();
+    const IntegrationFieldMap = require('../models/integrationFieldMap.model');
+    let map = await IntegrationFieldMap.findOne({ tenantId: req.tenantId, provider }).lean();
+    if (!map) {
+      map = { provider, mapping: { fullName: 'fullName', department: 'department', monthlySalary: 'monthlySalary' } };
+    }
+    res.status(200).json({ mapping: map.mapping });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.saveFieldMapping = async (req, res, next) => {
+  try {
+    const provider = String(req.params.provider || '').toLowerCase();
+    const { mapping } = req.body;
+    if (!mapping) return res.status(400).json({ message: 'Mapping object is required.' });
+
+    const IntegrationFieldMap = require('../models/integrationFieldMap.model');
+    const map = await IntegrationFieldMap.findOneAndUpdate(
+      { tenantId: req.tenantId, provider },
+      { $set: { mapping } },
+      { new: true, upsert: true }
+    );
+    res.status(200).json({ message: 'Field mapping saved successfully.', mapping: map.mapping });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports._internals = {
   present,
   protectCredentials,

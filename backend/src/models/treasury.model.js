@@ -5,7 +5,12 @@ const treasurySchema = new mongoose.Schema(
   {
     tenantId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant' },
     baseCurrency: { type: String, default: 'USD' },
-    balances: { type: Map, of: Number },
+    balances: { type: Map, of: Number, default: {} },
+    minReserves: {
+      type: Map,
+      of: Number,
+      default: { 'USD': 100000, 'EUR': 50000, 'GBP': 30000 }
+    },
   },
   { timestamps: true },
 );
