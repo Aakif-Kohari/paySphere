@@ -157,6 +157,8 @@ const disbursementRoutes = require('./routes/disbursement.routes');
 const leaveClosureRoutes = require('./routes/leaveClosure.routes');
 const treasuryRoutes = require('./routes/treasury.routes');
 const regionalTaxRoutes = require('./routes/regionalTax.routes');
+const salaryAdjustmentRoutes = require('./routes/salaryAdjustment.routes');
+const pensionRoutes = require('./routes/pension.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -365,6 +367,8 @@ app.use('/api/gratuity', gratuityRoutes);
 app.use('/api/loans', loanRoutes);
 app.use('/api/treasury', treasuryRoutes);
 app.use('/api/regional-tax', regionalTaxRoutes);
+app.use('/api/salary-adjustments', salaryAdjustmentRoutes);
+app.use('/api/pension', pensionRoutes);
 
 // The archive browser for soft-deleted employees (#759). Mounted by one of the
 // two duplicated route tables and not the other.

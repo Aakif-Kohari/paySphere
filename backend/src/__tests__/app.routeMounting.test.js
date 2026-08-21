@@ -141,6 +141,9 @@ const MOUNTED_ROUTES = [
   // controller and no router, so nothing in it has ever answered a request.
   ['/api/leave-closure', 'get', '/api/leave-closure/policies'],
   ['/api/regional-tax', 'get', '/api/regional-tax/jurisdictions'],
+  ['/api/crypto/wallets', 'get', '/api/crypto/wallets'],
+  ['/api/salary-adjustments', 'get', '/api/salary-adjustments'],
+  ['/api/pension', 'get', '/api/pension/policies'],
 ];
 
 /**
@@ -216,12 +219,14 @@ const ROUTER_MOUNTS = {
   monthlyUpdates: '/api/monthly-updates',
   notification: '/api/notifications',
   payEquity: '/api/pay-equity',
+  pension: '/api/pension',
   payroll: '/api/payroll',
   pyq: '/api/pyqs',
   recruitment: '/api/recruitment',
   regionalTax: '/api/regional-tax',
   reports: '/api/reports',
   role: '/api/roles',
+  salaryAdjustment: '/api/salary-adjustments',
   salaryHistory: '/api',
   scheduler: '/api/schedules',
   search: '/api/search',
