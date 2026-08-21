@@ -23,6 +23,7 @@ const eventBus = require('../services/event.service');
 const { getDefaultRole } = require('../seeds/rbac.seed');
 const { resolveAccountType } = require('../config/accountTypes');
 const { ensureTenantForUser } = require('../services/tenant.service');
+const { createAuditLog } = require('../services/audit.service');
 
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
@@ -195,9 +196,51 @@ exports.login = async (req, res, next) => {
     const user = await User.findOne({ email: cleanEmail });
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
+    // Check account lockout status (#1275)
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      const remainingMinutes = Math.ceil((user.lockUntil - Date.now()) / (60 * 1000));
+      return res.status(403).json({
+        message: `Account is locked due to 5 consecutive failed login attempts. Please try again after ${remainingMinutes} minute(s).`,
+        isLocked: true,
+        lockUntil: user.lockUntil,
+      });
+    }
+
+    // Auto-reset expired lockout
+    if (user.lockUntil && user.lockUntil <= Date.now()) {
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(400).json({ message: 'Invalid credentials' });
+    if (!isMatch) {
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+
+      if (user.failedLoginAttempts >= 5) {
+        user.lockUntil = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes lockout
+        await user.save();
+
+        return res.status(403).json({
+          message: 'Account locked due to 5 consecutive failed login attempts. Please try again after 30 minutes.',
+          isLocked: true,
+          lockUntil: user.lockUntil,
+        });
+      }
+
+      await user.save();
+      const remaining = 5 - user.failedLoginAttempts;
+      return res.status(400).json({
+        message: 'Invalid credentials',
+        remainingAttempts: remaining,
+      });
+    }
+
+    // Reset failed login attempts on successful match
+    if (user.failedLoginAttempts > 0 || user.lockUntil) {
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+      await user.save();
+    }
 
     if (user.isTwoFactorEnabled) {
       return res.status(200).json({
@@ -1256,6 +1299,150 @@ exports.validate2FALogin = async (req, res, next) => {
         email: user.email,
         fullName: user.fullName,
         companyName: user.companyName,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// IMPERSONATE USER
+exports.impersonateUser = async (req, res, next) => {
+  try {
+    const { targetUserId } = req.body;
+    if (!targetUserId) {
+      return res.status(400).json({ message: 'targetUserId is required' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({ message: 'Invalid targetUserId format' });
+    }
+
+    const impersonator = req.user;
+    if (!impersonator) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    if (String(impersonator._id) === String(targetUserId)) {
+      return res.status(400).json({ message: 'Cannot impersonate yourself' });
+    }
+
+    const targetUser = await User.findById(targetUserId).populate('role');
+    if (!targetUser || targetUser.isActive === false) {
+      return res.status(404).json({ message: 'Target user not found or inactive' });
+    }
+
+    const targetRoleName = targetUser.role?.name || targetUser.role;
+    if (targetRoleName === 'SuperAdmin') {
+      return res.status(403).json({ message: 'Cannot impersonate another SuperAdmin' });
+    }
+
+    if (
+      req.tenantId &&
+      targetUser.tenantId &&
+      String(req.tenantId) !== String(targetUser.tenantId)
+    ) {
+      return res.status(403).json({ message: 'Target user belongs to another organization' });
+    }
+
+    const tokenPayload = {
+      id: targetUser._id,
+      role: targetUser.role?._id || targetUser.role,
+      tenantId: targetUser.tenantId,
+      tokenVersion: targetUser.tokenVersion,
+      isImpersonating: true,
+      impersonatorId: impersonator._id,
+      impersonatorName: impersonator.fullName,
+      impersonatorEmail: impersonator.email,
+    };
+
+    const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+    await createAuditLog({
+      userId: impersonator._id,
+      tenantId: impersonator.tenantId || targetUser.tenantId,
+      action: 'IMPERSONATE_USER_START',
+      resourceType: 'User',
+      resourceIds: [targetUser._id],
+      details: {
+        impersonatorId: impersonator._id,
+        impersonatorEmail: impersonator.email,
+        impersonatedUserId: targetUser._id,
+        impersonatedUserEmail: targetUser.email,
+      },
+      req,
+    });
+
+    return res.status(200).json({
+      message: `Successfully impersonated ${targetUser.fullName}`,
+      token: accessToken,
+      isImpersonating: true,
+      impersonator: {
+        id: impersonator._id,
+        fullName: impersonator.fullName,
+        email: impersonator.email,
+      },
+      user: {
+        id: targetUser._id,
+        email: targetUser.email,
+        fullName: targetUser.fullName,
+        companyName: targetUser.companyName,
+        accountType: targetUser.accountType,
+        role: targetUser.role,
+        tenantId: targetUser.tenantId,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// STOP IMPERSONATION
+exports.stopImpersonation = async (req, res, next) => {
+  try {
+    if (!req.isImpersonating || !req.impersonatorId) {
+      return res.status(400).json({ message: 'No active impersonation session' });
+    }
+
+    const impersonator = await User.findById(req.impersonatorId).populate('role');
+    if (!impersonator || impersonator.isActive === false) {
+      return res.status(404).json({ message: 'Original admin account not found or inactive' });
+    }
+
+    const tokenPayload = {
+      id: impersonator._id,
+      role: impersonator.role?._id || impersonator.role,
+      tenantId: impersonator.tenantId,
+      tokenVersion: impersonator.tokenVersion,
+    };
+
+    const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '15m' });
+
+    await createAuditLog({
+      userId: impersonator._id,
+      tenantId: impersonator.tenantId,
+      action: 'IMPERSONATE_USER_STOP',
+      resourceType: 'User',
+      resourceIds: [req.userId],
+      details: {
+        impersonatorId: impersonator._id,
+        stoppedImpersonatingUserId: req.userId,
+      },
+      req,
+    });
+
+    return res.status(200).json({
+      message: 'Impersonation session ended',
+      token: accessToken,
+      isImpersonating: false,
+      user: {
+        id: impersonator._id,
+        email: impersonator.email,
+        fullName: impersonator.fullName,
+        companyName: impersonator.companyName,
+        accountType: impersonator.accountType,
+        role: impersonator.role,
+        tenantId: impersonator.tenantId,
       },
     });
   } catch (error) {

@@ -37,17 +37,15 @@ exports.registerDevice = async (req, res, next) => {
  */
 exports.ingestPunch = async (req, res, next) => {
     try {
-        const { deviceSerial, externalEmployeeId, timestamp, punchType, verificationType } = req.body;
-
-        const device = await BiometricDevice.findOne({ deviceSerial, isActive: true });
-        if (!device) return res.status(404).json({ message: 'Unregistered or inactive device' });
+        const { externalEmployeeId, timestamp, punchType, verificationType } = req.body;
+        const device = req.device;
 
         // Update last ping
         device.lastPingAt = new Date();
         await device.save();
 
         // Create raw log
-        await RawPunchLog.create({
+        const punchLog = await RawPunchLog.create({
             tenantId: device.tenantId,
             deviceId: device._id,
             externalEmployeeId: String(externalEmployeeId),
@@ -55,6 +53,11 @@ exports.ingestPunch = async (req, res, next) => {
             punchType: punchType || 'UNKNOWN',
             deviceIp: req.ip || device.deviceIp,
             verificationType: verificationType || 'Fingerprint'
+        });
+
+        const { detectAnomalyAndAlert } = require('../services/attendanceAnomaly');
+        detectAnomalyAndAlert(punchLog).catch(err => {
+            logger.error('Failed to run attendance anomaly detection', { error: err.message });
         });
 
         res.status(200).json({ message: 'Punch ingested' });

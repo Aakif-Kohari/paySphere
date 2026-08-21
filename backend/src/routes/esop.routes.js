@@ -69,6 +69,8 @@ router.get(
   getVestingSchedule,
 );
 
+// POST /api/esop/grants/:id/exercise
+// Exercises options and feeds perquisite TDS deductions into the monthly payroll run.
 router.post(
   '/grants/:id/exercise',
   auth,
