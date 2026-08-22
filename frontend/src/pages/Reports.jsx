@@ -1,5 +1,6 @@
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Helmet } from 'react-helmet-async';
 import { useAppStore } from '../store/useAppStore';
 import { useNavigate } from 'react-router-dom';
@@ -24,9 +25,9 @@ import { formatCurrency } from "../utils/currency";
 
 // --- Month-Year Selector ---
 const REPORT_TABS = [
-  { id: 'analytics', label: 'Payroll Analytics' },
-  { id: 'hr', label: 'HR Metrics' },
-  { id: 'custom', label: 'Custom Report' },
+  { id: 'analytics', labelKey: 'reports.payrollAnalytics' },
+  { id: 'hr', labelKey: 'reports.hrMetrics' },
+  { id: 'custom', labelKey: 'reports.customReport' },
 ];
 
 const MONTH_NAMES = [
@@ -93,6 +94,7 @@ const downloadFileWithProgress = async (url, filename, type, setExportingType, t
 
 export default function Reports() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const token = useAppStore((state) => state.token);
   const { toast } = useToast();
   const [activePage, setActivePage] = useState('Reports');
@@ -107,11 +109,10 @@ export default function Reports() {
   const [exportingType, setExportingType] = useState(null);
   const [reportData, setReportData] = useState(null);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  // Three branches below switch on this, but nothing ever declared it, so every
-  // render of this page threw `ReferenceError: activeTab is not defined` and the
-  // Reports route was blank. 'analytics' is the default because it is the view
-  // the export bar and the month selector belong to.
-  const [activeTab, setActiveTab] = useState('analytics');
+
+  // Multi-select department filter state
+  const [selectedDepartments, setSelectedDepartments] = useState([]);
+  const [availableDepartments, setAvailableDepartments] = useState([]);
   
   const companyName = localStorage.getItem('companyName') || 'PaySphere';
   const currency = localStorage.getItem('currency') || 'INR';
@@ -368,7 +369,7 @@ export default function Reports() {
   return (
     <>
       <Helmet>
-        <title>Reports & Analytics | PaySphere</title>
+        <title>{t('reports.pageTitle', 'Reports & Analytics | PaySphere')}</title>
       </Helmet>
 
       <div className="min-h-screen bg-gray-50 dark:bg-slate-950 transition-colors duration-200">
@@ -404,8 +405,8 @@ export default function Reports() {
                 <ArrowBackIcon />
               </button>
               <div>
-                <p className="text-xs text-gray-500 dark:text-slate-400">Payroll Analytics</p>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">Reports</h1>
+                <p className="text-xs text-gray-500 dark:text-slate-400">{t('reports.payrollAnalytics', 'Payroll Analytics')}</p>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">{t('nav.reports', 'Reports')}</h1>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -445,30 +446,35 @@ export default function Reports() {
                     : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
                 }`}
               >
-                {tab.label}
+                {t(`reports.${tab.labelKey?.split('.').pop()}`, tab.labelKey?.split('.').pop())}
               </button>
             ))}
           </div>
 
-          {/* Export Action Bar */}
+          {/* Department Filter */}
           {activeTab === 'analytics' && (
-          <div className="flex flex-wrap gap-3 mb-8 items-center">
-            <button
-              onClick={handleDownloadPDF}
-              disabled={Boolean(exportingType)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition-colors cursor-pointer disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-            >
-              {exportingType === 'pdf' ? (
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                {t('reports.filterByDepartment', 'Filter by Department(s)')}
+              </label>
+              <Select
+                isMulti
+                options={availableDepartments}
+                value={selectedDepartments}
+                onChange={handleDepartmentChange}
+                styles={selectStyles}
+                placeholder={t('reports.allDepartments', 'All Departments')}
+                noOptionsMessage={() => t('reports.noDepartmentsFound', 'No departments found')}
+                isClearable
+                className="max-w-md"
+              />
+              {selectedDepartments.length > 0 && (
+                <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
+                  Showing data for {selectedDepartments.length} department{selectedDepartments.length > 1 ? 's' : ''}
+                </p>
               )}
             </div>
+          )}
 
             {/* Export Action Bar */}
             {activeTab === 'analytics' && (
@@ -489,7 +495,7 @@ export default function Reports() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   )}
-                  {exportingType === 'pdf' ? 'Compiling PDF...' : 'Download PDF Report'}
+                  {exportingType === 'pdf' ? t('reports.compilingPdf', 'Compiling PDF...') : t('reports.downloadPdf', 'Download PDF Report')}
                 </button>
 
                 <button
@@ -508,7 +514,7 @@ export default function Reports() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                     </svg>
                   )}
-                  {exportingType === 'zip' ? 'Compiling Payslips ZIP...' : 'Download All Payslips (ZIP)'}
+                  {exportingType === 'zip' ? t('reports.compilingZip', 'Compiling Payslips ZIP...') : t('reports.downloadZip', 'Download All Payslips (ZIP)')}
                 </button>
 
                 <button
@@ -527,7 +533,7 @@ export default function Reports() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   )}
-                  {exportingType === 'xlsx' ? 'Compiling Excel...' : 'Export Payroll Summary (.xlsx)'}
+                  {exportingType === 'xlsx' ? t('reports.compilingExcel', 'Compiling Excel...') : t('reports.exportXlsx', 'Export Payroll Summary (.xlsx)')}
                 </button>
 
                 <button
@@ -546,7 +552,7 @@ export default function Reports() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                     </svg>
                   )}
-                  {exportingType === 'csv' ? 'Exporting CSV...' : 'Export Accounting CSV'}
+                  {exportingType === 'csv' ? t('reports.exportingCsv', 'Exporting CSV...') : t('reports.exportCsv', 'Export Accounting CSV')}
                 </button>
               </div>
             )}
@@ -574,15 +580,15 @@ export default function Reports() {
                 <svg className="mx-auto h-16 w-16 text-gray-400 dark:text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">No payroll data yet</h3>
+                <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">{t('reports.noPayrollData', 'No payroll data yet')}</h3>
                 <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
-                  Run payroll for at least one month to see analytics and generate reports.
+                  {t('reports.runPayrollHint', 'Run payroll for at least one month to see analytics and generate reports.')}
                 </p>
                 <button
                   onClick={() => navigate('/monthly-updates')}
                   className="mt-4 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition shadow-md shadow-blue-200 dark:shadow-none"
                 >
-                  Run Payroll
+                  {t('dashboard.runPayroll', 'Run Payroll')}
                 </button>
               </div>
             ) : (

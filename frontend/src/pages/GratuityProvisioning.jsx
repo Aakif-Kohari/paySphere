@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { formatCurrency, formatDate } from '../utils/formatLocale';
 
 /**
  * The gratuity provision, as finance is asked for it (#1344).
@@ -53,31 +54,10 @@ const SENSITIVITY_LABELS = {
   salaryEscalationRate: 'Salary escalation',
 };
 
-const formatCurrency = (value) => {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '—';
-
-  try {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    }).format(amount);
-  } catch {
-    return `₹${amount.toLocaleString('en-IN')}`;
-  }
-};
-
 const formatPercent = (value, digits = 2) => {
   const rate = Number(value);
   if (!Number.isFinite(rate)) return '—';
   return `${(rate * 100).toFixed(digits)}%`;
-};
-
-const formatDate = (value) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-IN');
 };
 
 const describeError = (error, fallback) => {

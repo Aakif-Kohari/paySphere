@@ -1,14 +1,19 @@
+import { formatCurrency as _formatCurrency } from './formatLocale';
+
 export const getCurrencySymbol = (currencyCode = 'INR') => {
   const symbols = {
     INR: '₹',
     USD: '$',
     EUR: '€',
-    GBP: '£'
+    GBP: '£',
   };
   return symbols[currencyCode] || currencyCode;
 };
 
-export const formatCurrency = (amount, currencyCode = 'INR') => {
-  const locale = currencyCode === 'INR' ? 'en-IN' : 'en-US';
-  return new Intl.NumberFormat(locale, { style: 'currency', currency: currencyCode }).format(amount);
-};
+/**
+ * Formats a currency amount using the user's active locale (via i18next).
+ * The locale is no longer derived from the currency code.
+ */
+export const formatCurrency = (amount, currencyCode = 'INR') =>
+  _formatCurrency(amount, currencyCode);
+

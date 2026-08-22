@@ -7,6 +7,7 @@
  * Issue: #1025
  */
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import PropTypes from 'prop-types';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PeopleIcon from '@mui/icons-material/People';
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
  * Bottom Navigation Bar Component
  */
 export default function BottomNavBar() {
+    const { t } = useTranslation();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -52,6 +54,7 @@ export default function BottomNavBar() {
                 {NAV_ITEMS.map((item) => {
                     const Icon = item.icon;
                     const active = isActive(item.path);
+                    const label = t(`nav.${item.id}`, item.label);
 
                     return (
                         <li key={item.id} className="flex-1 flex justify-center">
@@ -65,14 +68,14 @@ export default function BottomNavBar() {
                                         : 'text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-300'
                                     }
                 `}
-                                aria-label={item.label}
+                                aria-label={label}
                                 aria-current={active ? 'page' : undefined}
                             >
                                 <div className={`p-1.5 rounded-xl transition-colors ${active ? 'bg-brand-50 dark:bg-brand-900/30' : ''}`}>
                                     <Icon fontSize="small" />
                                 </div>
                                 <span className={`text-[10px] font-semibold mt-0.5 ${active ? 'text-brand-600 dark:text-brand-400' : ''}`}>
-                                    {item.label}
+                                    {label}
                                 </span>
                             </button>
                         </li>

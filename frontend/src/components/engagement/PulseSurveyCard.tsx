@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { PulseSurvey } from '../../services/engagement/engagementService';
 import { statusColor, formatRelativeTime } from '../../services/engagement/engagementService';
+import { formatDate } from '../../utils/formatLocale';
 
 /* ─────────────── Sub-components ────────────────── */
 
@@ -150,7 +151,7 @@ export default function PulseSurveyCard({ survey, onExport, onRemind, onViewDeta
           </span>
           <span className="flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            Closes {new Date(survey.closesAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            Closes {formatDate(survey.closesAt, { month: 'short', day: 'numeric' })}
           </span>
           <span className="flex items-center gap-1">
             <BarChart3 className="w-3 h-3" />

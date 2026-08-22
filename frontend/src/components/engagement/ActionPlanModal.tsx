@@ -25,6 +25,7 @@ import {
 import type { EngagementActionPlan, ActionPlanPriority, ActionPlanStatus, ActionMilestone } from '../../services/engagement/engagementService';
 import { priorityColor, statusColor, generateId } from '../../services/engagement/engagementService';
 import { SEED_DEPARTMENTS } from '../../services/engagement/engagementService';
+import { formatDate } from '../../utils/formatLocale';
 
 /* ─────────────── Types ────────────────── */
 
@@ -107,7 +108,7 @@ function ViewPlan({ plan, onClose }: { plan: EngagementActionPlan; onClose: () =
                 <Calendar className="w-3 h-3" /> Due Date
               </div>
               <div className={`text-xs font-semibold ${isOverdue ? 'text-red-400' : daysLeft <= 14 ? 'text-amber-400' : 'text-white'}`}>
-                {new Date(plan.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {formatDate(plan.dueDate, { month: 'short', day: 'numeric', year: 'numeric' })}
               </div>
               <div className={`text-[10px] mt-0.5 ${isOverdue ? 'text-red-400' : 'text-slate-500'}`}>
                 {plan.status === 'COMPLETED' ? 'Completed' : isOverdue ? `${Math.abs(daysLeft)} days overdue` : `${daysLeft} days left`}
@@ -173,7 +174,7 @@ function ViewPlan({ plan, onClose }: { plan: EngagementActionPlan; onClose: () =
                     {ms.completedAt && (
                       <span className="text-[10px] text-emerald-400/70 flex items-center gap-1 mt-0.5">
                         <Clock className="w-2.5 h-2.5" />
-                        Completed {new Date(ms.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        Completed {formatDate(ms.completedAt, { month: 'short', day: 'numeric' })}
                       </span>
                     )}
                   </div>
