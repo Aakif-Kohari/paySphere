@@ -6,7 +6,7 @@ Automated record of all feature hubs deployed to PaySphere.
 |---|---------|--------|--------|-------|----|-------|------|
 | 1 | Enterprise Cybersecurity & Zero-Trust SOC Hub | Security | `feature/frontend-cybersecurity-soc-hub` | [#1307](https://github.com/Dev1822/paySphere/issues/1307) | [#1308](https://github.com/Dev1822/paySphere/pull/1308) | `/enterprise/cybersecurity-soc` | 2026-08-20 |
 | 2 | Cardiopulmonary ECMO & Mechanical Ventilation Command Station | Critical Care / ECMO | `feature/frontend-ecmo-mechanical-ventilation-telemetry-hub` | [#1440](https://github.com/Dev1822/paySphere/issues/1440) | [#1439](https://github.com/Dev1822/paySphere/pull/1439) | `/enterprise/ecmo-critical-care` | 2026-08-21 |
-| 3 | Multimodal Neurocritical Care & ICP Telemetry Command Station | Neurocritical Care / TBI | `feature/frontend-neurocritical-icp-neuromonitoring-hub` | TBD | TBD | `/enterprise/neurocritical-neuromonitoring` | 2026-08-22 |
+| 3 | Multimodal Neurocritical Care & ICP Telemetry Command Station | Neurocritical Care / TBI | `feature/frontend-neurocritical-icp-neuromonitoring-hub` | [#1482](https://github.com/Dev1822/paySphere/issues/1482) | [#1483](https://github.com/Dev1822/paySphere/pull/1483) | `/enterprise/neurocritical-neuromonitoring` | 2026-08-22 |
 
 ---
 
