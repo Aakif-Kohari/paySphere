@@ -6,6 +6,7 @@ Automated record of all feature hubs deployed to PaySphere.
 |---|---------|--------|--------|-------|----|-------|------|
 | 1 | Enterprise Cybersecurity & Zero-Trust SOC Hub | Security | `feature/frontend-cybersecurity-soc-hub` | [#1307](https://github.com/Dev1822/paySphere/issues/1307) | [#1308](https://github.com/Dev1822/paySphere/pull/1308) | `/enterprise/cybersecurity-soc` | 2026-08-20 |
 | 2 | Cardiopulmonary ECMO & Mechanical Ventilation Command Station | Critical Care / ECMO | `feature/frontend-ecmo-mechanical-ventilation-telemetry-hub` | [#1440](https://github.com/Dev1822/paySphere/issues/1440) | [#1439](https://github.com/Dev1822/paySphere/pull/1439) | `/enterprise/ecmo-critical-care` | 2026-08-21 |
+| 4 | Trauma Resuscitation & Massive Transfusion Protocol (MTP) Command Station | Trauma / Critical Care | `feature/frontend-trauma-damage-control-resuscitation-hub` | TBD | TBD | `/enterprise/trauma-resuscitation` | 2026-08-22 |
 
 ---
 
@@ -15,6 +16,7 @@ Automated record of all feature hubs deployed to PaySphere.
 |--------|-----------|-------|--------|
 | Security | `frontend/src/pages/security/EnterpriseCybersecuritySOCPage.tsx` | 1,053 | ✅ Merged / In Review |
 | Critical Care | `frontend/src/pages/ecmo/ECMOVentilationTelemetryPage.tsx` | 1,012 | 🚀 Deployed & Active |
+| Trauma Resuscitation | `frontend/src/pages/trauma/TraumaResuscitationMTPPage.tsx` | 1,664 | 🚀 Deployed & Active |
 
 ### Backend Service Registry
 
@@ -22,6 +24,8 @@ Automated record of all feature hubs deployed to PaySphere.
 |--------|----------------------|-------------|
 | Critical Care | `backend/src/models/ecmoVentilation.model.js` | ELSO circuit thresholds, ARDSNet targets, anticoagulation targets & patient fixtures |
 | Critical Care | `backend/src/services/ecmoVentilationService.js` | Transmembrane Delta P, mechanical power, Murray score, driving pressure & FHIR bundle exporter |
+| Trauma Resuscitation | `backend/src/models/traumaResuscitation.model.js` | ACS-TQIP standards, TEG 6s / ROTEM thresholds, MTP cooler ratios, lethal triad criteria |
+| Trauma Resuscitation | `backend/src/services/traumaResuscitationService.js` | Shock Index, ABC Score, TEG coagulopathy analyzer, 1:1:1 MTP tracking & FHIR bundle exporter |
 
 ### Tech Stack Notes
 
