@@ -1,3 +1,15 @@
+/**
+ * Workflow Instance Model - Extended for Issue #1247
+ *
+ * One request travelling through a workflow, enhanced with:
+ *   - Optimistic locking via __v (already present)
+ *   - Stage locking: lockedBy / lockedAt / lockExpiresAt
+ *   - Escalation: escalationDeadlineAt, escalatedAt
+ *   - Detailed stageLog: timestamps + actor + comment + action per stage
+ *
+ * History is append-only by convention. A completed instance cannot be
+ * rejected afterwards.
+ */
 const mongoose = require('mongoose');
 const softDeletePlugin = require('../utils/softDelete.plugin');
 const {
@@ -7,15 +19,6 @@ const {
   INSTANCE_STATUS,
 } = require('../config/workflow');
 
-/**
- * One request travelling through a workflow (#590).
- *
- * `history` is the approval trail, so it is append-only by convention: the
- * controller pushes an entry on every transition and refuses to touch an
- * instance that has already reached a terminal state. #590 guarded neither,
- * which meant a completed instance could be rejected afterwards and both
- * entries would sit in the trail (#614).
- */
 const workflowInstanceSchema = new mongoose.Schema(
   {
     workflowId: {
@@ -42,10 +45,24 @@ const workflowInstanceSchema = new mongoose.Schema(
         _id: false,
         nodeId: String,
         actionBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        // Enumerated rather than a free String: #590 recorded whatever the
-        // request body contained, so the trail could hold actions the engine
-        // does not have.
         action: { type: String, enum: ALL_WORKFLOW_ACTIONS },
+        comment: { type: String, default: '' },
+        timestamp: { type: Date, default: Date.now },
+      },
+    ],
+
+    /**
+     * Detailed stage log: each entry records who acted, what they did,
+     * when, and any comment. This is the audit trail for compliance.
+     */
+    stageLog: [
+      {
+        _id: false,
+        stageIndex: { type: Number, required: true },
+        stageName: { type: String, required: true },
+        actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        action: { type: String, enum: ['pending', 'locked', 'approved', 'rejected', 'escalated'] },
+        comment: { type: String, default: '' },
         timestamp: { type: Date, default: Date.now },
       },
     ],
@@ -56,7 +73,7 @@ const workflowInstanceSchema = new mongoose.Schema(
       default: INSTANCE_STATUS.PENDING,
     },
 
-    /** Who raised the request. The audit fact; `tenantId` is the scope. */
+    /** Who raised the request. */
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -67,18 +84,79 @@ const workflowInstanceSchema = new mongoose.Schema(
       ref: 'Tenant',
       required: true,
     },
+
+    // ─── Stage Locking ────────────────────────────────────────────────────
+    // Prevents two approvers from acting on the same stage simultaneously.
+    // The lock auto-expires after lockTTLMs (default 10 minutes).
+    lockedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    lockedAt: {
+      type: Date,
+      default: null,
+    },
+    lockExpiresAt: {
+      type: Date,
+      default: null,
+    },
+
+    // ─── Escalation ───────────────────────────────────────────────────────
+    // When the current stage's approver hasn't acted by this deadline,
+    // the escalation job auto-escalates to the next approver in the chain.
+    escalationDeadlineAt: {
+      type: Date,
+      default: null,
+    },
+    escalatedAt: {
+      type: Date,
+      default: null,
+    },
+    escalationNotifiedTo: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    }],
+
+    // ─── Stage Chain Snapshot ─────────────────────────────────────────────
+    // Captures the workflow sequence at creation time so the frontend
+    // can render the full chain even after the instance advances.
+    stageChain: [{
+      _id: false,
+      stageIndex: Number,
+      roleName: String,
+      status: {
+        type: String,
+        enum: ['pending', 'active', 'approved', 'rejected', 'escalated'],
+        default: 'pending',
+      },
+      actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      actedAt: { type: Date, default: null },
+      comment: { type: String, default: '' },
+    }],
+
+    /** Lock TTL in milliseconds. Default 10 minutes. */
+    lockTTLMs: {
+      type: Number,
+      default: 10 * 60 * 1000,
+    },
   },
   { timestamps: true },
 );
 
-// "This company's requests, optionally filtered by status, newest first."
+// Indexes
 workflowInstanceSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
-
-// "Is there already a request open against this payroll run?"
 workflowInstanceSchema.index({
   tenantId: 1,
   targetEntityType: 1,
   targetEntityId: 1,
+});
+// For the escalation job: find instances past their deadline that haven't
+// been escalated yet.
+workflowInstanceSchema.index({
+  status: 'in_progress',
+  escalationDeadlineAt: 1,
+  escalatedAt: 1,
 });
 
 workflowInstanceSchema.plugin(softDeletePlugin);
