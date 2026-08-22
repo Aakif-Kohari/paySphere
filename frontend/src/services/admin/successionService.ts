@@ -1,71 +1,89 @@
 import axios from 'axios';
 
-const API_URL = '/api/succession';
+// Assuming base URL configuration is handled in a central axios instance. 
+// For this standalone service we define the base route.
+const BASE_URL = '/api/v1/admin/succession';
 
-export interface KeyRole {
-    _id: string;
-    roleId: string;
-    title: string;
-    department: string;
-    criticalityLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
-    businessImpactScore: number;
-    currentIncumbent: {
-        employeeId: string;
-        name: string;
-        flightRisk: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
-        retirementWindow: string;
-    };
-    status: 'STABLE' | 'AT_RISK' | 'VACANT';
-    skillsRequired: string[];
-}
-
-export interface SuccessionCandidate {
-    _id: string;
-    candidateId: string;
-    targetRoleId: KeyRole;
-    employeeName: string;
-    currentRole: string;
-    readinessTimeline: 'READY_NOW' | 'READY_IN_1_YEAR' | 'READY_IN_3_YEARS';
-    nineBoxGrid: {
-        potential: string;
-        performance: string;
-        gridPlacement: string;
-    };
-    skillsGap: string[];
-    retentionRisk: string;
-}
-
-export interface SuccessionTopologyData {
-    department: string;
-    criticalRoles: number;
-    atRisk: number;
-    vacant: number;
-    benchStrength: number;
-    impact: number;
-}
-
-export const successionService = {
-    getRoles: async (status?: string) => {
-        const params = new URLSearchParams();
-        if (status) params.append('status', status);
-        const response = await axios.get(`${API_URL}/roles?${params.toString()}`);
-        return response.data.data;
+export const successionAPI = {
+    /**
+     * Evaluates the 9-box grid position based on performance and potential
+     */
+    getTalentMatrix: async (department?: string) => {
+        try {
+            const response = await axios.get(`${BASE_URL}/matrix`, {
+                params: { department }
+            });
+            return response;
+        } catch (error) {
+            console.error('Failed to fetch talent matrix:', error);
+            throw error;
+        }
     },
 
-    getCandidates: async (page = 1, limit = 50, filters = {}) => {
-        const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
-        if (filters.gridPlacement) params.append('gridPlacement', filters.gridPlacement);
-        const response = await axios.get(`${API_URL}/candidates?${params.toString()}`);
-        return response.data;
+    /**
+     * Retrieves high flight risk critical talent (Top Flight Risk Topology)
+     */
+    getFlightRiskTopology: async (threshold: number = 70) => {
+        try {
+            const response = await axios.get(`${BASE_URL}/topology/flight-risk`, {
+                params: { threshold }
+            });
+            return response;
+        } catch (error) {
+            console.error('Failed to fetch flight risk topology:', error);
+            throw error;
+        }
     },
 
-    getTopology: async () => {
-        const response = await axios.get(`${API_URL}/topology`);
-        return response.data.data;
+    /**
+     * Dashboard Summary API Logic
+     */
+    getDashboardSummary: async () => {
+        try {
+            const response = await axios.get(`${BASE_URL}/dashboard/summary`);
+            return response;
+        } catch (error) {
+            console.error('Failed to fetch dashboard summary:', error);
+            throw error;
+        }
     },
 
-    seedData: async () => {
-        const response = await axios.post(`${API_URL}/seed`);
-        return response.data;
+    /**
+     * Proposes candidates for a succession plan using readiness and performance logic
+     */
+    suggestCandidates: async (targetRoleId: string) => {
+        try {
+            const response = await axios.get(`${BASE_URL}/plans/${targetRoleId}/suggest-candidates`);
+            return response;
+        } catch (error) {
+            console.error('Failed to suggest candidates:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Create or update a succession plan
+     */
+    upsertSuccessionPlan: async (planPayload: any) => {
+        try {
+            const response = await axios.post(`${BASE_URL}/plans`, planPayload);
+            return response;
+        } catch (error) {
+            console.error('Failed to upsert succession plan:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Batch simulate data for a demo environment
+     */
+    seedDemoData: async () => {
+        try {
+            const response = await axios.post(`${BASE_URL}/seed-demo`);
+            return response;
+        } catch (error) {
+            console.error('Failed to seed demo data:', error);
+            throw error;
+        }
     }
 };

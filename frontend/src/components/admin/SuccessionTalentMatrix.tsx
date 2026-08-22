@@ -1,125 +1,206 @@
-import React, { useState } from 'react';
-import { SuccessionCandidate } from '../../services/admin/successionService';
-import { Crown, Compass, UserCheck, AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import { Target, Users, Search, Play, Plus, MapPin, Award } from 'lucide-react';
 
-interface MatrixProps {
-    candidates: SuccessionCandidate[];
+export interface TalentProfile {
+    employeeId: string;
+    performanceScore: number;
+    potentialScore: number;
+    criticality: string;
+    readinessDelay: number;
+    currentRole: string;
 }
 
-export const SuccessionTalentMatrix: React.FC<MatrixProps> = ({ candidates }) => {
-    const [searchTerm, setSearchTerm] = useState('');
+export interface MatrixCategory {
+    [key: string]: TalentProfile[];
+}
 
-    const filtered = candidates.filter(c =>
-        c.candidateId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.nineBoxGrid.gridPlacement.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+interface Props {
+    matrix: MatrixCategory;
+    loading: boolean;
+}
 
-    const getGridUI = (placement: string) => {
-        if (['Future Leader', 'Growth Employee', 'High Professional'].includes(placement)) {
-            return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-        }
-        if (['Trusted Professional', 'Core Employee', 'Effective Employee'].includes(placement)) {
-            return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-        }
-        if (['Enigma', 'Dilemma'].includes(placement)) {
-            return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-        }
-        return 'text-rose-400 bg-rose-500/10 border-rose-500/20';
-    };
+export default function SuccessionTalentMatrix({ matrix, loading }: Props) {
+    const [selectedCell, setSelectedCell] = useState<string | null>(null);
 
-    const getReadinessUI = (readiness: string) => {
-        switch (readiness) {
-            case 'READY_NOW': return <UserCheck className="w-4 h-4 text-emerald-400" />;
-            case 'READY_IN_1_YEAR': return <Compass className="w-4 h-4 text-amber-400" />;
-            default: return <Clock className="w-4 h-4 text-slate-400" />;
-        }
-    };
-    // Note: the Clock icon mapping fallbacks are conceptual since lucide clock is missing, using generic
+    const GRID_CATEGORIES = [
+        { key: 'Consistent Star', title: 'Consistent Stars', bg: 'bg-emerald-900/40', border: 'border-emerald-500/50', text: 'text-emerald-400', pot: 'High', perf: 'High' },
+        { key: 'High Professional', title: 'High Professionals', bg: 'bg-teal-900/30', border: 'border-teal-500/40', text: 'text-teal-400', pot: 'Medium', perf: 'High' },
+        { key: 'Solid Performer', title: 'Solid Performers', bg: 'bg-cyan-900/20', border: 'border-cyan-500/30', text: 'text-cyan-400', pot: 'Low', perf: 'High' },
+        { key: 'Future Star', title: 'Future Stars', bg: 'bg-indigo-900/30', border: 'border-indigo-500/40', text: 'text-indigo-400', pot: 'High', perf: 'Medium' },
+        { key: 'Key Player', title: 'Key Players', bg: 'bg-blue-900/20', border: 'border-blue-500/30', text: 'text-blue-400', pot: 'Medium', perf: 'Medium' },
+        { key: 'Effective Performer', title: 'Effective Performers', bg: 'bg-gray-800/50', border: 'border-gray-600/50', text: 'text-gray-300', pot: 'Low', perf: 'Medium' },
+        { key: 'Rough Diamond', title: 'Rough Diamonds', bg: 'bg-purple-900/20', border: 'border-purple-500/30', text: 'text-purple-400', pot: 'High', perf: 'Low' },
+        { key: 'Inconsistent Player', title: 'Inconsistent Players', bg: 'bg-orange-900/20', border: 'border-orange-500/30', text: 'text-orange-400', pot: 'Medium', perf: 'Low' },
+        { key: 'Underperformer', title: 'Underperformers', bg: 'bg-red-900/20', border: 'border-red-500/30', text: 'text-red-400', pot: 'Low', perf: 'Low' },
+    ];
+
+    if (loading) {
+        return (
+            <div className="grid grid-cols-3 gap-2 w-full max-w-4xl mx-auto h-[600px] animate-pulse">
+                {Array.from({ length: 9 }).map((_, i) => (
+                    <div key={i} className="bg-gray-800/50 rounded-xl border border-gray-700/50" />
+                ))}
+            </div>
+        );
+    }
 
     return (
-        <div className="bg-slate-900/50 backdrop-blur-xl rounded-2xl border border-slate-700/50 overflow-hidden flex flex-col h-full shadow-2xl">
-            <div className="p-6 border-b border-slate-700/50 bg-slate-900/20">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h3 className="text-xl font-semibold text-white">Talent Succession Pipeline</h3>
-                        <p className="text-slate-400 text-sm mt-1">9-Box structured organizational bench depth</p>
-                    </div>
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder="Search Candidate, Grid..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="bg-slate-800 border border-slate-600 text-white placeholder-slate-400 text-sm rounded-lg focus:ring-amber-500 focus:border-amber-500 block w-64 p-2.5 outline-none transition-all"
-                        />
-                    </div>
+        <div className="flex flex-col xl:flex-row gap-6 w-full max-w-7xl mx-auto">
+
+            {/* 9-Box Grid Layout */}
+            <div className="flex-1 w-full bg-gray-900/60 backdrop-blur-sm border border-gray-800 rounded-2xl p-6 shadow-2xl relative">
+                <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                    <Target className="text-emerald-400 h-5 w-5" />
+                    Enterprise 9-Box Talent Matrix
+                </h3>
+
+                {/* Labels */}
+                <div className="absolute left-[-20px] top-1/2 -rotate-90 transform -translate-y-1/2 text-gray-500 font-bold tracking-widest text-xs uppercase hidden xl:block">
+                    Potential Score
+                </div>
+                <div className="absolute bottom-[0px] left-1/2 transform -translate-x-1/2 text-gray-500 font-bold tracking-widest text-xs uppercase hidden xl:block">
+                    Performance Score
+                </div>
+
+                <div className="grid grid-cols-3 grid-rows-3 gap-3 w-full h-[650px] relative z-10 p-4 xl:p-8">
+                    {GRID_CATEGORIES.map((cat, idx) => {
+                        const employees = matrix[cat.key] || [];
+                        const isSelected = selectedCell === cat.key;
+
+                        return (
+                            <div
+                                key={cat.key}
+                                onClick={() => setSelectedCell(cat.key)}
+                                className={`relative flex flex-col overflow-hidden rounded-xl border transition-all cursor-pointer hover:shadow-lg ${cat.bg} ${cat.border} ${isSelected ? 'ring-2 ring-white scale-[1.02] z-20 shadow-black/50' : 'hover:scale-[1.01]'}`}
+                            >
+                                {/* Header */}
+                                <div className="p-3 border-b border-white/5 flex justify-between items-center bg-black/20">
+                                    <span className={`text-xs sm:text-sm font-semibold truncate ${cat.text}`}>{cat.title}</span>
+                                    <div className="flex items-center justify-center bg-black/40 rounded-full h-6 w-6 text-xs text-white">
+                                        {employees.length}
+                                    </div>
+                                </div>
+
+                                {/* Body (Avatars/Initials) */}
+                                <div className="flex-1 p-3 flex flex-wrap gap-2 content-start overflow-hidden relative">
+                                    {employees.slice(0, 8).map(emp => (
+                                        <div
+                                            key={emp.employeeId}
+                                            title={`${emp.employeeId} - ${emp.currentRole}`}
+                                            className="h-8 w-8 rounded-full bg-gray-950 border border-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-300 shadow hover:border-white transition-colors"
+                                        >
+                                            {emp.employeeId.slice(-3)}
+                                        </div>
+                                    ))}
+                                    {employees.length > 8 && (
+                                        <div className="h-8 w-8 rounded-full bg-gray-800/80 border border-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-400">
+                                            +{employees.length - 8}
+                                        </div>
+                                    )}
+
+                                    {/* Empty state hint */}
+                                    {employees.length === 0 && (
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-10">
+                                            <Users className="h-10 w-10 text-white" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Grid Position Labels */}
+                                <span className="absolute bottom-1 right-2 text-[8px] uppercase tracking-wider text-white/30 hidden sm:block">
+                                    {cat.pot.slice(0, 1)}/P &middot; {cat.perf.slice(0, 1)}/P
+                                </span>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
-            <div className="flex-1 overflow-auto">
-                <table className="w-full text-sm text-left text-slate-300">
-                    <thead className="text-xs text-slate-400 uppercase bg-slate-800/50 sticky top-0 z-10 backdrop-blur-md">
-                        <tr>
-                            <th scope="col" className="px-6 py-4 font-semibold tracking-wider">Candidate / Target</th>
-                            <th scope="col" className="px-6 py-4 font-semibold tracking-wider">9-Box Assessment</th>
-                            <th scope="col" className="px-6 py-4 font-semibold tracking-wider">Readiness</th>
-                            <th scope="col" className="px-6 py-4 font-semibold tracking-wider text-center">Threat Vector</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-700/50">
-                        {filtered.slice(0, 30).map((cand) => (
-                            <tr key={cand._id} className="hover:bg-slate-800/40 transition-colors group">
-                                <td className="px-6 py-4">
-                                    <div className="font-semibold text-white text-base">{cand.employeeName}</div>
-                                    <div className="text-xs text-amber-500 mt-0.5 mb-1 max-w-[200px] truncate">Current: {cand.currentRole}</div>
-                                    <div className="flex flex-col mt-2">
-                                        <span className="text-[10px] uppercase font-bold text-slate-500 mb-0.5">Successor To:</span>
-                                        <div className="flex items-center gap-2">
-                                            <Crown className={`w-3 h-3 ${cand.targetRoleId?.criticalityLevel === 'CRITICAL' ? 'text-rose-400' : 'text-blue-400'}`} />
-                                            <span className="text-white text-xs font-medium truncate max-w-[200px]">
-                                                {cand.targetRoleId?.title || 'Unknown Role'}
+            {/* Details Side Panel */}
+            <div className="w-full xl:w-[400px] bg-gray-950/80 backdrop-blur-md rounded-2xl border border-gray-800 p-5 shadow-2xl flex flex-col h-full min-h-[600px]">
+                {selectedCell ? (
+                    <>
+                        <div className="flex justify-between items-center border-b border-gray-800 pb-4 mb-4">
+                            <div>
+                                <h4 className="text-lg font-bold text-white">{selectedCell}</h4>
+                                <p className="text-sm text-gray-500">{matrix[selectedCell]?.length || 0} Employees in this pool</p>
+                            </div>
+                            <button
+                                onClick={() => setSelectedCell(null)}
+                                className="text-gray-500 hover:text-white transition-colors p-1"
+                            >
+                                &times;
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-4">
+                            {(matrix[selectedCell] || []).length === 0 ? (
+                                <div className="text-center py-10 text-gray-500">
+                                    No talent matches this quadrant.
+                                </div>
+                            ) : (
+                                (matrix[selectedCell] || []).map((emp) => (
+                                    <div key={emp.employeeId} className="bg-gray-900 border border-gray-800 p-4 rounded-xl hover:border-gray-700 transition-colors group">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-lg shadow-indigo-500/20">
+                                                    {emp.employeeId.slice(0, 2)}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-gray-100">{emp.employeeId}</p>
+                                                    <p className="text-xs text-indigo-400 line-clamp-1">{emp.currentRole}</p>
+                                                </div>
+                                            </div>
+                                            {emp.criticality === 'CRITICAL' && (
+                                                <span className="bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                                                    CRITICAL
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-gray-800/50">
+                                            <div>
+                                                <p className="text-[10px] text-gray-500 uppercase tracking-widest">Perf</p>
+                                                <p className="text-sm text-white font-semibold">{emp.performanceScore}/5</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-gray-500 uppercase tracking-widest">Pot</p>
+                                                <p className="text-sm text-white font-semibold">{emp.potentialScore}/5</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-4 pt-3 flex items-center justify-between">
+                                            <span className="text-xs text-gray-400 flex items-center gap-1">
+                                                <Award className="h-3 w-3" /> Readiness: {emp.readinessDelay}mo
                                             </span>
+                                            <button className="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                Action <Plus className="h-3 w-3" />
+                                            </button>
                                         </div>
                                     </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className={`px-3 py-1.5 rounded text-xs font-bold w-max mb-2 ${getGridUI(cand.nineBoxGrid.gridPlacement)}`}>
-                                        {cand.nineBoxGrid.gridPlacement}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <div className="bg-slate-800/80 px-2 py-1 rounded text-[10px] text-slate-400">
-                                            Pot: <span className="font-semibold text-white">{cand.nineBoxGrid.potential}</span>
-                                        </div>
-                                        <div className="bg-slate-800/80 px-2 py-1 rounded text-[10px] text-slate-400">
-                                            Prf: <span className="font-semibold text-white">{cand.nineBoxGrid.performance}</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-slate-300">
-                                    <div className="flex items-center gap-2">
-                                        {cand.readinessTimeline === 'READY_NOW' ? <UserCheck className="w-4 h-4 text-emerald-400" /> : <Compass className="w-4 h-4 text-amber-400" />}
-                                        <span className="font-medium font-mono text-xs">{cand.readinessTimeline.replace(/_/g, ' ')}</span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex justify-center">
-                                        <span className={`px-3 py-1 rounded border text-xs font-bold ${cand.retentionRisk === 'HIGH' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' : 'text-emerald-400 bg-emerald-500/10 border-emerald-400/20'}`}>
-                                            {cand.retentionRisk} RISK
-                                        </span>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                {filtered.length === 0 && (
-                    <div className="py-12 flex flex-col items-center justify-center text-slate-500">
-                        <AlertTriangle className="w-12 h-12 mb-3 opacity-20" />
-                        <p>No succession profiles found matching criteria.</p>
+                                ))
+                            )}
+                        </div>
+
+                        <div className="pt-4 border-t border-gray-800 mt-auto">
+                            <button className="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-lg text-sm border border-gray-700 transition-colors flex justify-center items-center gap-2">
+                                <Search className="h-4 w-4" /> Export Selection
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <div className="h-full flex flex-col justify-center items-center text-center p-8">
+                        <div className="h-16 w-16 bg-gray-900 rounded-2xl flex items-center justify-center border border-gray-800 mb-6 shadow-xl text-emerald-500/40 rotate-12">
+                            <Search className="h-8 w-8" />
+                        </div>
+                        <h4 className="text-lg font-bold text-gray-300 mb-2">Select a Matrix Cell</h4>
+                        <p className="text-sm text-gray-500">
+                            Click on any quadrant within the 9-box grid to deeply analyze the talent pool, view individual performance data, and plan executive succession transitions.
+                        </p>
                     </div>
                 )}
             </div>
+
         </div>
     );
-};
+}
