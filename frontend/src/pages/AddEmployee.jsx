@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "../components/ThemeToggle";
 import EmployeeForm from "../components/EmployeeForm";
+import NotificationCenter from "../components/common/NotificationCenter";
 import { useAppStore } from "../store/useAppStore";
 import useCtrlEnterSubmit from "../hooks/useCtrlEnterSubmit";
 import api from "../services/api";
@@ -377,7 +378,7 @@ export default function AddEmployee() {
 
           <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
             <ThemeToggle />
-            <button aria-label="Notifications" className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><BellIcon /></button>
+            <NotificationCenter />
             <button aria-label="Help & Support" className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><HelpCircleIcon /></button>
             <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
               {getInitials(companyName)}
@@ -530,19 +531,45 @@ export default function AddEmployee() {
                 ) : (
                   <div className="divide-y divide-gray-100 dark:divide-slate-800">
                     {recentEmployees.map((emp) => (
-                      <div key={emp._id} className="py-3 flex items-center gap-3">
-                        <Avatar name={emp.fullName} size={36} />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                            {emp.fullName}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-slate-500 truncate">
-                            {emp.role} {emp.department ? `• ${emp.department}` : ""}
-                          </p>
+                      <div key={emp._id} className="py-3 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Avatar name={emp.fullName} size={36} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                              {emp.fullName}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-slate-500 truncate">
+                              {emp.role} {emp.department ? `• ${emp.department}` : ""}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-xs font-bold text-gray-900 dark:text-slate-200">
-                          {fmt(emp.monthlySalary, emp.currency)}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-gray-900 dark:text-slate-200">
+                            {fmt(emp.monthlySalary, emp.currency)}
+                          </p>
+                          {emp.userId && (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const { impersonateUser } = await import('../features/auth/services/authService');
+                                  const res = await impersonateUser(emp.userId);
+                                  useAppStore.getState().startImpersonation({
+                                    user: res.user,
+                                    token: res.token,
+                                    impersonator: res.impersonator,
+                                  });
+                                  window.location.href = '/';
+                                } catch (err) {
+                                  alert(err.response?.data?.message || 'Failed to impersonate user');
+                                }
+                              }}
+                              className="px-2 py-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 rounded hover:bg-indigo-100 transition"
+                              title={`Impersonate ${emp.fullName}`}
+                            >
+                              Impersonate
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

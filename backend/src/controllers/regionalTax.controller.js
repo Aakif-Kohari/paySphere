@@ -103,3 +103,22 @@ exports.getRemoteWorkerReport = async (req, res, next) => {
         res.status(200).json({ report, nexusAlerts });
     } catch (error) { next(error); }
 };
+
+exports.syncTaxSlabs = async (req, res, next) => {
+    try {
+        const taxSyncService = require('../services/taxSync.service');
+        const result = await taxSyncService.syncRegionalTaxSlabs(req.tenantId, 'OnDemand');
+        if (!result.success) {
+            return res.status(500).json({ message: 'Tax sync failed. Check system logs.' });
+        }
+        res.status(200).json({ message: 'Tax slab sync complete', updatedCount: result.updatedCount });
+    } catch (error) { next(error); }
+};
+
+exports.getSyncLogs = async (req, res, next) => {
+    try {
+        const { TaxSyncLog } = require('../models/regionalTax.model');
+        const logs = await TaxSyncLog.find({ tenantId: req.tenantId }).sort({ createdAt: -1 });
+        res.status(200).json({ logs });
+    } catch (error) { next(error); }
+};

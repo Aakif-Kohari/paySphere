@@ -11,6 +11,8 @@ const {
   cancelSettlement,
   getSettlements,
   getSettlementById,
+  getClearanceStatus,
+  submitClearanceSignoff,
 } = require('../controllers/settlement.controller');
 const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
@@ -106,6 +108,21 @@ router.post(
   requirePermission(PERMISSIONS.WRITE_PAYROLL),
   writeRateLimiter,
   cancelSettlement,
+);
+
+router.get(
+  '/clearance/:employeeId',
+  auth,
+  requirePermission(PERMISSIONS.READ_PAYROLL),
+  getClearanceStatus,
+);
+
+router.post(
+  '/clearance/signoff',
+  auth,
+  requirePermission(PERMISSIONS.WRITE_PAYROLL),
+  writeRateLimiter,
+  submitClearanceSignoff,
 );
 
 module.exports = router;
