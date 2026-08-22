@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { formatDateTime } from '../utils/formatLocale';
 
 const EVENT_LABELS = {
   EMPLOYEE_CREATE: 'Employee Created',
@@ -17,8 +18,7 @@ const EVENT_KEYS = Object.keys(EVENT_LABELS);
 const getErrorMessage = (err) =>
   err.response?.data?.message || 'Something went wrong. Please try again.';
 
-const formatDate = (value) =>
-  value ? new Date(value).toLocaleString() : '—';
+const formatDate = (value) => formatDateTime(value);
 
 export default function WebhooksSection() {
   const { toast } = useToast();

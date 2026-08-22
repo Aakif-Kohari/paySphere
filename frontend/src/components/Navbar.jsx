@@ -14,10 +14,14 @@ import styles from './Navbar.module.css';
 // that cannot be built is not worth much, and this is four lines.
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import ThemeToggle from './ThemeToggle';
+import LanguageSwitcher from './LanguageSwitcher';
 import api from '../services/api';
+import { formatDate } from '../utils/formatLocale';
 
 export default function Navbar() {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -137,31 +141,32 @@ export default function Navbar() {
               href="#features"
               className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
-              Features
+              {t('landing.features', 'Features')}
             </a>
             <a
               href="#process"
               className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
-              Process
+              {t('landing.process', 'Process')}
             </a>
             <a
               href="#pricing"
               className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
-              Pricing
+              {t('landing.pricing', 'Pricing')}
             </a>
             <a
               href="#faq"
               className="hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
-              FAQ
+              {t('landing.faq', 'FAQ')}
             </a>
           </ul>
         </div>
 
         {/* Desktop Buttons */}
         <div className="hidden md:flex items-center gap-3 lg:gap-4">
+          <LanguageSwitcher />
           <ThemeToggle />
 
           {/* Notification Bell (Only if authenticated) */}
@@ -170,7 +175,7 @@ export default function Navbar() {
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
                 className="relative p-2 text-gray-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors focus:outline-none"
-                aria-label="Notifications"
+                aria-label={t('common.notifications', 'Notifications')}
                 aria-expanded={showNotifications}
                 aria-haspopup="true"
               >
@@ -199,14 +204,14 @@ export default function Navbar() {
                 <div role="region" aria-label="Notifications panel" className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-xl shadow-xl py-3 z-50">
                   <div className="flex items-center justify-between px-4 pb-2 border-b border-gray-100 dark:border-slate-800">
                     <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
-                      Notifications
+                      {t('common.notifications', 'Notifications')}
                     </h3>
                     {unreadCount > 0 && (
                       <button
                         onClick={handleMarkAllAsRead}
                         className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
                       >
-                        Mark all as read
+                        {t('common.markAllRead', 'Mark all as read')}
                       </button>
                     )}
                   </div>
@@ -214,7 +219,7 @@ export default function Navbar() {
                   <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-slate-800">
                     {notifications.length === 0 ? (
                       <div className="py-6 text-center text-gray-500 dark:text-slate-400 text-sm">
-                        No notifications yet
+                        {t('common.noNotifications', 'No notifications yet')}
                       </div>
                     ) : (
                       notifications.map((notif) => (
@@ -238,12 +243,8 @@ export default function Navbar() {
                                 [],
                                 { hour: '2-digit', minute: '2-digit' },
                               )}{' '}
-                              - {new Date(notif.createdAt).toLocaleDateString()}
+                              - {formatDate(notif.createdAt)}
                             </span>
-                            {/* `link` is a client-side path the service sets
-                                alongside the message, so a notification about a
-                                payroll run lands on payroll rather than leaving
-                                the reader to go and find it. */}
                             {notif.link && (
                               <Link
                                 to={notif.link}
@@ -254,7 +255,7 @@ export default function Navbar() {
                                 }}
                                 className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline font-medium mt-1 inline-block"
                               >
-                                View
+                                {t('common.view', 'View')}
                               </Link>
                             )}
                           </div>
@@ -263,13 +264,13 @@ export default function Navbar() {
                               <button
                                 onClick={() => handleMarkAsRead(notif._id)}
                                 className="w-2 h-2 rounded-full bg-blue-600 mt-1"
-                                title="Mark as read"
+                                title={t('common.markAsRead', 'Mark as read')}
                               />
                             )}
                             <button
                               onClick={() => handleDelete(notif._id)}
                               className="text-gray-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 text-xs leading-none px-1"
-                              title="Dismiss"
+                              title={t('common.dismiss', 'Dismiss')}
                               aria-label={`Dismiss notification: ${notif.title}`}
                             >
                               ×
@@ -288,23 +289,24 @@ export default function Navbar() {
             to="/auth?mode=login"
             className="text-[15px] font-semibold px-4 py-2 hover:bg-gray-50 dark:hover:bg-slate-800 dark:text-slate-200 rounded-lg transition-colors"
           >
-            Login
+            {t('nav.login', 'Login')}
           </Link>
           <Link
             to="/auth?mode=signup"
             className="bg-blue-600 hover:bg-blue-700 text-white text-[15px] font-bold px-6 py-2.5 rounded-lg shadow-lg shadow-blue-200 dark:shadow-none transition-all active:scale-95"
           >
-            Get Started
+            {t('nav.getStarted', 'Get Started')}
           </Link>
         </div>
 
         {/* Mobile Menu Button */}
         <div className="flex items-center gap-2 md:hidden">
+          <LanguageSwitcher />
           <ThemeToggle />
           <button
             className="flex flex-col gap-1 p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             onClick={() => setIsOpen(!isOpen)}
-            aria-label={isOpen ? "Close menu" : "Open menu"}
+            aria-label={isOpen ? t('common.closeMenu', 'Close menu') : t('common.openMenu', 'Open menu')}
             aria-expanded={isOpen}
           >
             <span className="w-6 h-0.5 bg-black dark:bg-white transition-colors"></span>
@@ -323,28 +325,28 @@ export default function Navbar() {
               className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => setIsOpen(false)}
             >
-              Features
+              {t('landing.features', 'Features')}
             </a>
             <a
               href="#process"
               className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => setIsOpen(false)}
             >
-              Process
+              {t('landing.process', 'Process')}
             </a>
             <a
               href="#pricing"
               className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => setIsOpen(false)}
             >
-              Pricing
+              {t('landing.pricing', 'Pricing')}
             </a>
             <a
               href="#faq"
               className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               onClick={() => setIsOpen(false)}
             >
-              FAQ
+              {t('landing.faq', 'FAQ')}
             </a>
           </ul>
 
@@ -354,14 +356,14 @@ export default function Navbar() {
               className="flex-1 text-center text-[15px] font-semibold px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-slate-800 dark:text-slate-200 rounded-lg border border-gray-200 dark:border-slate-700 transition-colors"
               onClick={() => setIsOpen(false)}
             >
-              Login
+              {t('nav.login', 'Login')}
             </Link>
             <Link
               to="/auth?mode=signup"
               className="flex-1 text-center bg-blue-600 hover:bg-blue-700 text-white text-[15px] font-bold px-6 py-2.5 rounded-lg shadow-lg shadow-blue-200 dark:shadow-none transition-all active:scale-95"
               onClick={() => setIsOpen(false)}
             >
-              Get Started
+              {t('nav.getStarted', 'Get Started')}
             </Link>
           </div>
         </div>

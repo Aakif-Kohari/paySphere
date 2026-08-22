@@ -2,9 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { logout } from '../features/auth/authSlice';
-import { setThemeMode } from '../features/ui/uiSlice';
 import ThemeToggle from '../components/ThemeToggle';
 
 // ── Icons for Sidebar (Copied from AddEmployee for consistency) ──
