@@ -402,6 +402,27 @@ const startCronJobs = () => {
     );
   });
   logger.info('Daily regional tax sync cron job registered.');
+
+  // 02:00 daily - Usage Counter Rollup (#1113).
+  // Persists Redis usage counters to TenantSubscription.usage and checks overage alerts.
+  cron.schedule('0 2 * * *', () => {
+    const { runUsageRollup } = require('./usageRollup.job');
+    runUsageRollup().catch((error) =>
+      logger.error('Usage rollup job threw', { error: error.message }),
+    );
+  });
+  logger.info('Daily usage rollup cron job registered.');
+
+  // Every 15 minutes — Payroll Approval Escalation (#1247).
+  // Finds approval instances past their escalationDeadlineAt and marks them
+  // escalated so salary disbursement is not blocked by an absent approver.
+  cron.schedule('*/15 * * * *', () => {
+    const { processEscalation } = require('./approvalEscalation.job');
+    processEscalation().catch((error) =>
+      logger.error('Payroll approval escalation job threw', { error: error.message }),
+    );
+  });
+  logger.info('Payroll approval escalation cron job registered (every 15 min).');
 };
 
 /**

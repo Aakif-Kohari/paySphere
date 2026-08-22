@@ -6,6 +6,7 @@ import api from '../services/api';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import { formatDate } from '../utils/formatLocale';
 
 export default function ComplianceDashboard() {
     const [stats, setStats] = useState({ complianceRate: 100, expiringSoon: 0, nonCompliant: 0 });
@@ -86,7 +87,7 @@ export default function ComplianceDashboard() {
                                                 <tr key={rec._id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                                                     <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{rec.employeeId?.fullName}</td>
                                                     <td className="px-6 py-4 text-sm text-gray-700 dark:text-slate-300">{rec.courseId?.title}</td>
-                                                    <td className="px-6 py-4 text-sm text-gray-700 dark:text-slate-300">{new Date(rec.expiresAt).toLocaleDateString()}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-700 dark:text-slate-300">{formatDate(rec.expiresAt)}</td>
                                                     <td className="px-6 py-4 text-center">
                                                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${daysLeft <= 7 ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'}`}>
                                                             {daysLeft} Days

@@ -4,6 +4,7 @@ import Sidebar from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import api from '../services/api';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import { formatDate } from '../utils/formatLocale';
 
 export default function ManagerClearance() {
     const [plans, setPlans] = useState([]);
@@ -64,7 +65,7 @@ export default function ManagerClearance() {
                                 ) : plans.map(plan => (
                                     <tr key={plan._id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                                         <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{plan.employeeId?.fullName}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-700 dark:text-slate-300">{new Date(plan.exitDate).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4 text-sm text-gray-700 dark:text-slate-300">{formatDate(plan.exitDate)}</td>
                                         <td className="px-6 py-4 text-center text-sm font-bold text-brand-600">{plan.clearanceScore}%</td>
                                         <td className="px-6 py-4 text-center">
                                             {plan.isFnFBlocked ? (

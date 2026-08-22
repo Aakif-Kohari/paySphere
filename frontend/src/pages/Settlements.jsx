@@ -3,6 +3,7 @@ import Alert from '@mui/material/Alert';
 import Pagination from '../components/common/Pagination';
 import SettlementsSkeleton from '../components/common/skeleton/SettlementsSkeleton';
 import api from '../services/api';
+import { formatCurrency, formatDate } from '../utils/formatLocale';
 import { useToast } from '../context/ToastContext';
 
 const STATUS_LABELS = {
@@ -29,30 +30,6 @@ const EXIT_TYPES = [
   { value: 'end_of_contract', label: 'End of contract' },
 ];
 
-const formatCurrency = (value, currency = 'INR') => {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '—';
-
-  try {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toLocaleString('en-IN')}`;
-  }
-};
-
-const formatDate = (value) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-};
 
 const describeError = (error, fallback) => {
   const response = error?.response;

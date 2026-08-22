@@ -118,6 +118,7 @@ const forecastRoutes = require('./routes/forecast.routes');
 const accountingRoutes = require('./routes/accounting.routes');
 const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
+const successionRoutes = require('./routes/succession.routes');
 const pyqRoutes = require('./routes/pyq.routes');
 
 // Business travel, per-diem and advance settlement (#1077). `expenseClaim` is
@@ -151,6 +152,7 @@ const recruitmentRoutes = require('./routes/recruitment.routes');
 // product produced the bank file that actually moves the money.
 const disbursementRoutes = require('./routes/disbursement.routes');
 
+
 // Leave year-end closure (#1159). The leave module has had models and two pure
 // engines since #646 and never a controller or a router, so none of it has
 // been reachable over HTTP — `calculateCarryForward()` is called from nowhere
@@ -160,6 +162,7 @@ const treasuryRoutes = require('./routes/treasury.routes');
 const regionalTaxRoutes = require('./routes/regionalTax.routes');
 const salaryAdjustmentRoutes = require('./routes/salaryAdjustment.routes');
 const pensionRoutes = require('./routes/pension.routes');
+const { tenantRouter: subscriptionTenantRoutes, adminRouter: subscriptionAdminRoutes } = require('./routes/subscription.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -502,6 +505,9 @@ app.use('/api/clients', clientInvoiceRoutes);
 // `Roster.jsx` calls `/api/shifts/roster`.
 app.use('/api/shifts', shiftRosterRoutes);
 
+// Succession Planning Hub
+app.use('/api/succession', successionRoutes);
+
 app.use('/api/pyqs', pyqRoutes);
 
 // Business travel (#1077). The router owns `/policies`, `/requests`,
@@ -523,6 +529,12 @@ app.use('/api/recruitment', recruitmentRoutes);
 
 // Salary disbursement (#1075). The router owns `/batches` and `/profiles`.
 app.use('/api/disbursements', disbursementRoutes);
+
+// Subscription & Feature Gating (#1113)
+// Tenant routes: plan info, upgrade, cancel, usage
+app.use('/api/tenant', subscriptionTenantRoutes);
+// Admin routes: list all subscriptions, aggregate stats
+app.use('/api/admin', subscriptionAdminRoutes);
 
 // Leave year-end closure (#1159). The router owns `/policies`, `/preview`,
 // `/run` and `/history`. Not mounted at `/api/leave`: this router closes a

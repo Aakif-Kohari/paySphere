@@ -1,0 +1,6 @@
+{
+  "title": "feat(onboarding): Add Enterprise Onboarding Lifecycle Intelligence Hub",
+  "body": "## Summary\n\nAdds a full-featured Employee Onboarding Lifecycle Intelligence dashboard to PaySphere.\n\n### 5 Production Files (984 lines)\n\n1. `onboardingService.ts` (221 lines) — Types, seed data, CSV export, color helpers\n2. `OnboardingPipeline.tsx` (90 lines) — Kanban pipeline showing hires across onboarding stages\n3. `OnboardingFunnel.tsx` (69 lines) — Conversion funnel with drop-off indicators\n4. `HireDetailModal.tsx` (146 lines) — Full hire profile with milestones, risk factors, NPS\n5. `EnterpriseOnboardingLifecyclePage.tsx` (458 lines) — Main dashboard with 5 tabs, 6 KPIs\n\n### Features\n- **Pipeline** — Kanban view of all new hires by onboarding stage with risk indicators\n- **Funnel** — Pre-board to completion conversion rates with drop-off analysis\n- **Milestones** — 8 key milestones with target vs actual completion tracking\n- **Departments** — Time-to-productivity, completion rate, NPS by department\n- **Buddy Program** — Buddy effectiveness metrics with satisfaction scores\n\n### Route\n`/enterprise/onboarding-lifecycle`",
+  "head": "karan-chaos:feature/enterprise-onboarding-lifecycle",
+  "base": "main"
+}
