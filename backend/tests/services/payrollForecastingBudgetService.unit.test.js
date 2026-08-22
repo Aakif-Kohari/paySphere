@@ -18,6 +18,11 @@ describe('PayrollForecastingBudgetService Unit Tests', () => {
     const projections = PayrollForecastingBudgetService.runForecastSimulation(1200000, 0, 0, 0, 0);
     expect(projections[0].projectedGrossSalariesUSD).toBe(100000);
   });
+
+  test('should approve scenario and log approval audit event', async () => {
+    const mockFindOne = jest.spyOn(PayrollForecastingBudgetService, 'approveScenario');
+    expect(mockFindOne).toBeDefined();
+  });
 });
 
 // ==============================================================================

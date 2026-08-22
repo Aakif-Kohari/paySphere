@@ -7,6 +7,7 @@ export default function PayrollForecastingBudgetHub() {
   const [baseRunRate, setBaseRunRate] = useState(5000000);
   const [headcountGrowth, setHeadcountGrowth] = useState(15);
   const [meritIncrease, setMeritIncrease] = useState(4.5);
+  const [departmentFilter, setDepartmentFilter] = useState('Engineering');
 
   const projectedTotalOutflow = baseRunRate * (1 + headcountGrowth / 100) * (1 + meritIncrease / 100) * 1.28;
 
@@ -32,9 +33,22 @@ export default function PayrollForecastingBudgetHub() {
       <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <section className="lg:col-span-2 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md">
           <h2 className="text-xl font-bold text-slate-100 mb-4">📈 Predictive Outflow Simulator</h2>
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-4 gap-4 mb-6">
             <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
-              <label className="text-xs text-slate-400 block mb-1">Base Annual Run Rate ($)</label>
+              <label className="text-xs text-slate-400 block mb-1">Target Department</label>
+              <select
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                className="w-full bg-slate-900 text-slate-200 border border-slate-700 rounded-lg p-2 text-sm focus:outline-none"
+              >
+                <option value="Engineering">Engineering</option>
+                <option value="Sales">Sales & Marketing</option>
+                <option value="Operations">Global Operations</option>
+                <option value="Product">Product Management</option>
+              </select>
+            </div>
+            <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+              <label className="text-xs text-slate-400 block mb-1">Base Run Rate ($)</label>
               <input
                 type="number"
                 value={baseRunRate}
@@ -64,7 +78,7 @@ export default function PayrollForecastingBudgetHub() {
 
           <div className="bg-slate-950 border border-slate-800 p-6 rounded-xl space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-slate-300 font-semibold">12-Month Projected Total Outflow</span>
+              <span className="text-sm text-slate-300 font-semibold">12-Month Projected Total Outflow ({departmentFilter})</span>
               <span className="text-xl font-extrabold text-indigo-400">${projectedTotalOutflow.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
             </div>
             <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">

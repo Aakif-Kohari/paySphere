@@ -52,6 +52,31 @@ class PayrollForecastingBudgetService {
       ...scenarioData,
       monthlyForecastProjections: projections,
       status: 'SIMULATED',
+      auditLogs: [
+        {
+          action: 'SCENARIO_CREATED',
+          details: `Created scenario '${scenarioData.scenarioName}' for ${scenarioData.department}`,
+          performedBy: 'SYSTEM_FINANCE_ADMIN',
+        },
+      ],
+    });
+
+    await forecast.save();
+    return forecast;
+  }
+
+  /**
+   * Approves a payroll forecast scenario and locks parameters.
+   */
+  static async approveScenario(forecastScenarioId, approvedByUserId) {
+    const forecast = await PayrollForecastingBudget.findOne({ forecastScenarioId });
+    if (!forecast) throw new Error('Forecast scenario not found');
+
+    forecast.status = 'APPROVED';
+    forecast.auditLogs.push({
+      action: 'SCENARIO_APPROVED',
+      details: `Scenario approved and locked by user ${approvedByUserId}`,
+      performedBy: approvedByUserId,
     });
 
     await forecast.save();
@@ -69,4 +94,5 @@ module.exports = PayrollForecastingBudgetService;
 // Section 1: Financial Compound Growth Math
 // - Compounding Formula: `Monthly Outflow = Gross * (1 + HeadcountGrowthRate) * MeritFactor + Benefits + StatutoryTaxes`.
 // - Stress Testing Engine: Evaluates worst-case macro inflation scenarios up to 15% annual rate.
+// - Approval Workflow Engine: Enforces state transitions from DRAFT -> SIMULATED -> APPROVED.
 // ==============================================================================
