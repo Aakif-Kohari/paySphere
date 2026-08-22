@@ -6,7 +6,7 @@ Automated record of all feature hubs deployed to PaySphere.
 |---|---------|--------|--------|-------|----|-------|------|
 | 1 | Enterprise Cybersecurity & Zero-Trust SOC Hub | Security | `feature/frontend-cybersecurity-soc-hub` | [#1307](https://github.com/Dev1822/paySphere/issues/1307) | [#1308](https://github.com/Dev1822/paySphere/pull/1308) | `/enterprise/cybersecurity-soc` | 2026-08-20 |
 | 2 | Cardiopulmonary ECMO & Mechanical Ventilation Command Station | Critical Care / ECMO | `feature/frontend-ecmo-mechanical-ventilation-telemetry-hub` | [#1440](https://github.com/Dev1822/paySphere/issues/1440) | [#1439](https://github.com/Dev1822/paySphere/pull/1439) | `/enterprise/ecmo-critical-care` | 2026-08-21 |
-| 3 | Emergency & Mass-Casualty Triage Command Station | Emergency Medicine | `feature/frontend-emergency-triage-command-station-hub` | Submission pending | Submission pending | `/enterprise/emergency-triage` | 2026-08-22 |
+| 3 | Emergency & Mass-Casualty Triage Command Station | Emergency Medicine | `feature/frontend-emergency-triage-command-station-hub` | [#1488](https://github.com/Dev1822/paySphere/issues/1488) | [#1489](https://github.com/Dev1822/paySphere/pull/1489) | `/enterprise/emergency-triage` | 2026-08-22 |
 
 ---
 
@@ -16,7 +16,7 @@ Automated record of all feature hubs deployed to PaySphere.
 |--------|-----------|-------|--------|
 | Security | `frontend/src/pages/security/EnterpriseCybersecuritySOCPage.tsx` | 1,053 | ✅ Merged / In Review |
 | Critical Care | `frontend/src/pages/ecmo/ECMOVentilationTelemetryPage.tsx` | 1,012 | 🚀 Deployed & Active |
-| Emergency Medicine | `frontend/src/pages/emergency/EmergencyTriageCommandStationPage.tsx` | 488 | 🚧 Feature branch ready for review |
+| Emergency Medicine | `frontend/src/pages/emergency/EmergencyTriageCommandStationPage.tsx` | 488 | 🚀 Pull request open |
 
 ### Backend Service Registry
 
