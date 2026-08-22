@@ -6,7 +6,7 @@ Automated record of all feature hubs deployed to PaySphere.
 |---|---------|--------|--------|-------|----|-------|------|
 | 1 | Enterprise Cybersecurity & Zero-Trust SOC Hub | Security | `feature/frontend-cybersecurity-soc-hub` | [#1307](https://github.com/Dev1822/paySphere/issues/1307) | [#1308](https://github.com/Dev1822/paySphere/pull/1308) | `/enterprise/cybersecurity-soc` | 2026-08-20 |
 | 2 | Cardiopulmonary ECMO & Mechanical Ventilation Command Station | Critical Care / ECMO | `feature/frontend-ecmo-mechanical-ventilation-telemetry-hub` | [#1440](https://github.com/Dev1822/paySphere/issues/1440) | [#1439](https://github.com/Dev1822/paySphere/pull/1439) | `/enterprise/ecmo-critical-care` | 2026-08-21 |
-| 5 | Maternal-Fetal Telemetry & Labor Delivery Command Station | Obstetrics / Maternal-Fetal Medicine | `feature/frontend-obstetrics-maternal-fetal-telemetry-hub` | TBD | TBD | `/enterprise/maternal-fetal-telemetry` | 2026-08-22 |
+| 5 | Maternal-Fetal Telemetry & Labor Delivery Command Station | Obstetrics / Maternal-Fetal Medicine | `feature/frontend-obstetrics-maternal-fetal-telemetry-hub` | [#1486](https://github.com/Dev1822/paySphere/issues/1486) | [#1487](https://github.com/Dev1822/paySphere/pull/1487) | `/enterprise/maternal-fetal-telemetry` | 2026-08-22 |
 
 ---
 
