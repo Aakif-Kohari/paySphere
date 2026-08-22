@@ -415,8 +415,8 @@ export const APP_ROUTES = [
     component: lazy(() => import('../pages/clinical/ICUHemodynamicsTelemetryPage')),
   },
   {
-    path: '/enterprise/neurocritical-neuromonitoring',
-    component: lazy(() => import('../pages/neurocritical/NeurocriticalCareTelemetryPage')),
+    path: '/enterprise/trauma-resuscitation',
+    component: lazy(() => import('../pages/trauma/TraumaResuscitationMTPPage')),
   },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
