@@ -1,5 +1,6 @@
 // ProcurementActivityTimeline — Vertical timeline showing procurement lifecycle events
 import React from 'react';
+import { formatCurrency, formatDate } from '../../utils/formatLocale';
 
 interface TimelineEvent {
   id: string;
@@ -71,7 +72,7 @@ const MOCK_TIMELINE: TimelineEvent[] = [
 
 function formatAmount(amount?: number, currency?: string): string {
   if (!amount) return '';
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(amount);
+  return formatCurrency(amount, currency || 'USD', { maximumFractionDigits: 0 });
 }
 
 function formatTimestamp(ts: string): string {
@@ -83,7 +84,7 @@ function formatTimestamp(ts: string): string {
   if (diffH < 24) return `${diffH}h ago`;
   const diffD = Math.floor(diffH / 24);
   if (diffD < 7) return `${diffD}d ago`;
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return formatDate(d, { month: 'short', day: 'numeric' });
 }
 
 interface ProcurementActivityTimelineProps {

@@ -372,24 +372,24 @@ const Sidebar = ({
                 {companyName}
               </p>
               <p className="text-xs text-gray-500 dark:text-slate-500">
-                Payroll workspace
+                {t('dashboard.payrollWorkspace', 'Payroll workspace')}
               </p>
             </div>
           </div>
           <button
             className="md:hidden p-2 text-gray-500 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             onClick={onClose}
-            aria-label="Close sidebar"
+            aria-label={t('common.close', 'Close sidebar')}
           >
             ✕
           </button>
         </div>
 
-        <nav aria-label="Main menu" className="flex-1 p-3 space-y-1">
+        <nav aria-label="Main menu" className="flex-1 p-3 space-y-1 overflow-y-auto">
           {sections.map(({ group, items }) => (
             <div key={group.id} className="space-y-1 pb-3 last:pb-0">
               <p className="px-4 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                {group.label}
+                {t(`nav.groups.${group.id}`, group.label)}
               </p>
               {items.map((item) => {
                 const Icon = ICONS[item.icon] || ICONS.grid;
@@ -407,7 +407,7 @@ const Sidebar = ({
                     }`}
                   >
                     <Icon />
-                    {item.label}
+                    {t(`nav.${item.id}`, item.label)}
                   </Link>
                 );
               })}
@@ -424,7 +424,7 @@ const Sidebar = ({
             className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
           >
             <ICONS.settings />
-            {t('nav.settings')}
+            {t('nav.settings', 'Settings')}
           </Link>
 
           <Link
@@ -433,7 +433,7 @@ const Sidebar = ({
             className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
           >
             <ICONS.user />
-            Profile settings
+            {t('settings.profile', 'Profile settings')}
           </Link>
 
           <button
@@ -444,7 +444,7 @@ const Sidebar = ({
             className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800 transition"
           >
             <ICONS.help />
-            Help &amp; Support
+            {t('common.helpAndSupport', 'Help & Support')}
           </button>
 
           <button
@@ -454,7 +454,7 @@ const Sidebar = ({
             }}
             className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition"
           >
-            {t('nav.logout')}
+            {t('nav.logout', 'Logout')}
           </button>
         </div>
       </aside>

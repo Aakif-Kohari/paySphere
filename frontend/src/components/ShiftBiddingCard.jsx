@@ -2,9 +2,11 @@ import PropTypes from 'prop-types';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import { formatDate } from '../utils/formatLocale';
 
 export default function ShiftBiddingCard({ shift, onBid, isManager }) {
-    const dateStr = new Date(shift.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const dateStr = formatDate(shift.date, { weekday: 'short', month: 'short', day: 'numeric' });
+
 
     return (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col gap-4">
