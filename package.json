@@ -1,6 +1,10 @@
 {
   "name": "paysphere-monorepo",
   "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "packageManager": "pnpm@9.12.0",
   "overrides": {
     "react": "^19.2.0",
