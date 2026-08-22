@@ -28,7 +28,7 @@ const PayrollAuditTrailForensicSchema = new mongoose.Schema(
     },
     actionType: {
       type: String,
-      enum: ['GROSS_ADJUSTMENT', 'TAX_OVERRIDE', 'DIRECT_DEPOSIT_MUTATION', 'GARNISHMENT_MODIFICATION', 'APPROVAL_SIGN_OFF'],
+      enum: ['GROSS_ADJUSTMENT', 'TAX_OVERRIDE', 'DIRECT_DEPOSIT_MUTATION', 'GARNISHMENT_MODIFICATION', 'APPROVAL_SIGN_OFF', 'FORENSIC_EXPORT'],
       required: true,
     },
     previousStateHash: {
@@ -71,6 +71,13 @@ const PayrollAuditTrailForensicSchema = new mongoose.Schema(
       comments: String,
       timestamp: Date,
     },
+    forensicExportLogs: [
+      {
+        exportedBy: String,
+        exportFormat: { type: String, default: 'PDF_AUDIT_BUNDLE' },
+        exportedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
     timestamps: true,

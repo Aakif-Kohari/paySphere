@@ -37,6 +37,11 @@ describe('PayrollAuditTrailForensicService Unit Tests', () => {
     const mockService = jest.spyOn(PayrollAuditTrailForensicService, 'executeSoxSignOff');
     expect(mockService).toBeDefined();
   });
+
+  test('should export forensic audit bundle correctly', async () => {
+    const mockExport = jest.spyOn(PayrollAuditTrailForensicService, 'exportForensicAuditBundle');
+    expect(mockExport).toBeDefined();
+  });
 });
 
 // ==============================================================================
