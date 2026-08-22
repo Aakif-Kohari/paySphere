@@ -5,9 +5,11 @@ import React, { useState } from 'react';
  */
 export default function PayrollAuditTrailForensicHub() {
   const [actionFilter, setActionFilter] = useState('ALL');
+  const [signedOff, setSignedOff] = useState(false);
   const [auditLogStream, setAuditLogStream] = useState([
     { id: 1, action: 'GROSS_ADJUSTMENT', actor: 'Admin_01', hash: '7f8a9b2c...e1f2', status: 'VERIFIED' },
     { id: 2, action: 'TAX_OVERRIDE', actor: 'TaxLead_04', hash: '9a3b4c1d...f8e9', status: 'VERIFIED' },
+    { id: 3, action: 'GARNISHMENT_MODIFICATION', actor: 'Legal_02', hash: '3e4f5a6b...c7d8', status: 'VERIFIED' },
   ]);
 
   return (
@@ -48,9 +50,15 @@ export default function PayrollAuditTrailForensicHub() {
         {/* Sidebar Security Controls */}
         <aside className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-6 backdrop-blur-md">
           <h2 className="text-xl font-bold text-slate-100 mb-4">🛡️ SOX 404 Sign-off</h2>
-          <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+          <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-4">
             <span className="text-xs text-slate-400">Audit Status</span>
-            <p className="text-sm font-bold text-slate-200 mt-1">Ready for Quarterly Compliance Review</p>
+            <p className="text-sm font-bold text-slate-200">Ready for Quarterly Compliance Review</p>
+            <button
+              onClick={() => setSignedOff(!signedOff)}
+              className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-4 rounded-lg text-sm transition-all"
+            >
+              {signedOff ? '✅ SOX Sign-Off Completed' : 'Execute SOX 404 Sign-Off'}
+            </button>
           </div>
         </aside>
       </main>

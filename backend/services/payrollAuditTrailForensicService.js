@@ -52,6 +52,24 @@ class PayrollAuditTrailForensicService {
 
     return auditEvent.previousStateHash === computedPrev && auditEvent.newStateHash === computedNew;
   }
+
+  /**
+   * Performs formal SOX 404 quarterly compliance sign-off.
+   */
+  static async executeSoxSignOff(auditEventId, signedOffBy, signOffRole, comments) {
+    const auditEvent = await PayrollAuditTrailForensic.findOne({ auditEventId });
+    if (!auditEvent) throw new Error('Audit event not found');
+
+    auditEvent.soxSignOffMetadata = {
+      signedOffBy,
+      signOffRole,
+      comments,
+      timestamp: new Date(),
+    };
+
+    await auditEvent.save();
+    return auditEvent;
+  }
 }
 
 module.exports = PayrollAuditTrailForensicService;

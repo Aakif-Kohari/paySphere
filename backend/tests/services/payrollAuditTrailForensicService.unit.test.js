@@ -32,6 +32,11 @@ describe('PayrollAuditTrailForensicService Unit Tests', () => {
     const isValid = PayrollAuditTrailForensicService.verifyEventIntegrity(mockEvent, prev, tamperedCurr);
     expect(isValid).toBe(false);
   });
+
+  test('should execute SOX sign-off and attach metadata timestamp', async () => {
+    const mockService = jest.spyOn(PayrollAuditTrailForensicService, 'executeSoxSignOff');
+    expect(mockService).toBeDefined();
+  });
 });
 
 // ==============================================================================

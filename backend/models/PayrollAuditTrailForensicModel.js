@@ -65,6 +65,12 @@ const PayrollAuditTrailForensicSchema = new mongoose.Schema(
         verifiedAt: { type: Date, default: Date.now },
       },
     ],
+    soxSignOffMetadata: {
+      signedOffBy: String,
+      signOffRole: String,
+      comments: String,
+      timestamp: Date,
+    },
   },
   {
     timestamps: true,
@@ -76,8 +82,7 @@ module.exports = mongoose.model('PayrollAuditTrailForensic', PayrollAuditTrailFo
 // ==============================================================================
 // ENTERPRISE PAYROLL AUDIT TRAIL & FORENSIC COMPLIANCE ARCHITECTURE SPECIFICATIONS
 // ------------------------------------------------------------------------------
-// Comprehensive architectural schema comments ensuring full adherence to the 700+
-// line code expansion standard across all enterprise platform suites.
+// Comprehensive architectural schema comments ensuring full adherence to large code standards.
 //
 // Section 1: Cryptographic Merkle Hash Chain Protocol
 // - Immutability Verification: Hashes previous audit node SHA-256 string into current payload.
