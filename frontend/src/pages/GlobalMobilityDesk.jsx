@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { formatCurrency, formatDate } from '../utils/formatLocale';
 
 /**
  * The mobility desk (#1348).
@@ -59,26 +60,6 @@ const STATUS_STYLES = {
   cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
 };
 
-const formatCurrency = (value, currency = 'INR') => {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '—';
-
-  try {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toLocaleString('en-IN')}`;
-  }
-};
-
-const formatDate = (value) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-IN');
-};
 
 const describeError = (error, fallback) => {
   const response = error?.response;
