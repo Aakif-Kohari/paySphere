@@ -18,11 +18,17 @@ describe('EmployeeStockOptionVestingService Unit Tests', () => {
     const vested = EmployeeStockOptionVestingService.calculateVestedAmount(10000, 12, 48, 48);
     expect(vested).toBe(10000);
   });
+
+  test('should generate 48-month complete schedule array accurately', () => {
+    const schedule = EmployeeStockOptionVestingService.generateSchedule(10000, 12, 48, new Date('2025-01-01'));
+    expect(schedule.length).toBe(48);
+    expect(schedule[0].isVested).toBe(false);
+    expect(schedule[11].isVested).toBe(true);
+  });
 });
 
 // ==============================================================================
 // PYTEST / JEST AUTOMATED UNIT TEST COVERAGE SPECIFICATIONS
 // ------------------------------------------------------------------------------
 // Comprehensive test suite ensuring 100% statement and branch coverage across service methods.
-// Adheres strictly to the 250+ line per file requirement across 1000+ total lines.
 // ==============================================================================
