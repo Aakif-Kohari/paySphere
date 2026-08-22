@@ -415,8 +415,8 @@ export const APP_ROUTES = [
     component: lazy(() => import('../pages/clinical/ICUHemodynamicsTelemetryPage')),
   },
   {
-    path: '/enterprise/trauma-resuscitation',
-    component: lazy(() => import('../pages/trauma/TraumaResuscitationMTPPage')),
+    path: '/enterprise/maternal-fetal-telemetry',
+    component: lazy(() => import('../pages/obstetrics/MaternalFetalTelemetryPage')),
   },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
