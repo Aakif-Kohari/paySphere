@@ -464,9 +464,9 @@ export const APP_ROUTES = [
     ),
   },
   {
-    path: '/enterprise/sepsis-stewardship',
+    path: '/enterprise/cardiology-stemi',
     component: lazy(
-      () => import('../pages/sepsis/SepsisAntimicrobialStewardshipPage'),
+      () => import('../pages/cardiology/CardiologySTEMICathLabPage'),
     ),
   },
 
