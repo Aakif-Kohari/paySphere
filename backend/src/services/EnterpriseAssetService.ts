@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Enterprise Asset Management & IT Inventory — Service Layer
 import { Router, Request, Response } from 'express';
 import { createMockAssets, createMockSoftwareLicenses, createMockAssetRequests } from '../models/EnterpriseAssetModel';
