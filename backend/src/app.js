@@ -52,6 +52,7 @@ const employeeImportRoutes = require('./routes/employeeImport.routes');
 const payrollRoutes = require('./routes/payroll.routes');
 const payrollApprovalRoutes = require('./routes/payrollApproval.routes');
 const payrollComparisonRoutes = require('./routes/payrollComparison.routes');
+const employeeCompensationRoutes = require('./routes/employeeCompensation.routes');
 
 // Statutory bonus under the Payment of Bonus Act, 1965 (#1346). Next to the
 // payroll routers because it is a payment to employees, and separate from them
@@ -163,6 +164,7 @@ const regionalTaxRoutes = require('./routes/regionalTax.routes');
 const salaryAdjustmentRoutes = require('./routes/salaryAdjustment.routes');
 const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
+const teamRoutes = require('./routes/team.routes');
 const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
@@ -356,6 +358,7 @@ app.use('/api/employees', employeeImportRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/payroll', payrollApprovalRoutes);
 app.use('/api/payroll-comparison', payrollComparisonRoutes);
+app.use('/api/compensation', employeeCompensationRoutes);
 
 // #1346. Its own prefix rather than a sub-path of `/api/payroll`: the
 // discretionary bonus on a payroll row and the statutory bonus under the Act
@@ -547,6 +550,7 @@ app.use('/api/admin', subscriptionAdminRoutes);
 // prefix would claim a namespace it does not implement.
 app.use('/api/leave-closure', leaveClosureRoutes);
 app.use('/api/fbp', fbpRoutes);
+app.use('/api/team', teamRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.

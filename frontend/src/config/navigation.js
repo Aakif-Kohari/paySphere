@@ -96,6 +96,15 @@ export const APP_ROUTES = [
     icon: 'user',
     employee: true,
   },
+  {
+    path: '/compensation-timeline',
+    component: lazy(() => import('../pages/EmployeeCompensationTimeline')),
+    label: 'Compensation timeline',
+    group: 'overview',
+    icon: 'chart',
+    employee: true,
+    appShell: true,
+  },
 
   // ── People ───────────────────────────────────────────────────────────────
   {

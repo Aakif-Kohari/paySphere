@@ -678,27 +678,7 @@ exports.getMyTraining = async (req, res, next) => {
   }
 };
 
-/**
- * Everything the compliance reports need, loaded once.
- *
- * The three report endpoints below all need the same three collections, and
- * three copies of these queries is three chances for one of them to forget the
- * tenant filter.
- *
- * @param {string} tenantId
- * @returns {Promise<{courses: Array, employees: Array, enrollments: Array}>}
- */
-async function loadComplianceInputs(tenantId) {
-  const [courses, employees, enrollments] = await Promise.all([
-    TrainingCourse.find({ tenantId, isActive: true }).lean(),
-    Employee.find({ tenantId, isActive: true })
-      .select('_id fullName department role')
-      .lean(),
-    TrainingEnrollment.find({ tenantId }).lean(),
-  ]);
 
-  return { courses, employees, enrollments };
-}
 
 // ============================================================================
 // Dashboard Statistics (#1085)

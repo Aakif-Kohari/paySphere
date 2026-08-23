@@ -284,8 +284,4 @@ const OncologyProfileSchema = new mongoose.Schema(
 
 export const OncologyProfile = mongoose.model('OncologyProfile', OncologyProfileSchema);
 export const TumorBoardDecision = mongoose.model('TumorBoardDecision', TumorBoardDecisionSchema);
-
-export default {
-  OncologyProfile,
-  TumorBoardDecision,
-};\n
+
