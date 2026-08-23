@@ -454,6 +454,12 @@ export const APP_ROUTES = [
       () => import('../pages/emergency/EmergencyTriageCommandStationPage'),
     ),
   },
+  {
+    path: '/enterprise/cardiology-stemi',
+    component: lazy(
+      () => import('../pages/cardiology/CardiologySTEMICathLabPage'),
+    ),
+  },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
