@@ -1,4 +1,3 @@
-/* eslint-disable jsx-a11y/label-has-associated-control */
 import { useEffect, useState } from 'react';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
