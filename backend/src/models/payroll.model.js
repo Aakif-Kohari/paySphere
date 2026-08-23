@@ -95,16 +95,9 @@ customDeductions: [
       type: String,
       default: 'USD',
     },
-    baseCurrency: {
-      type: String,
-      default: 'USD',
-    },
     exchangeRate: {
       type: Number,
       default: 1,
-    },
-    convertedNetSalary: {
-      type: Number,
     },
     /**
      * Who created this row. An audit fact, not a scoping key.
