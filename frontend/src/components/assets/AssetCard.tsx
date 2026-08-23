@@ -22,7 +22,7 @@ const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', c
 const AssetCard: React.FC<AssetCardProps> = ({ name, tagNumber, category, serialNumber, currentValue, status, condition, assignedTo, department, location, purchaseDate, warrantyExpiry }) => {
   const sc = STATUS_COLORS[status] || STATUS_COLORS.active;
   return (
-    <div style={{ background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: '16px', padding: '20px', cursor: 'pointer', boxShadow: '0 0 20px rgba(96,165,250,0.08)' }}>
+    <div data-testid="asset-card" style={{ background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: '16px', padding: '20px', cursor: 'pointer', boxShadow: '0 0 20px rgba(96,165,250,0.08)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <span style={{ fontSize: '28px' }}>{CAT_ICONS[category] || '📦'}</span>
