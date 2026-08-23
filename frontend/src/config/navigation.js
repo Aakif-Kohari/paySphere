@@ -463,6 +463,12 @@ export const APP_ROUTES = [
       () => import('../pages/emergency/EmergencyTriageCommandStationPage'),
     ),
   },
+  {
+    path: '/enterprise/sepsis-stewardship',
+    component: lazy(
+      () => import('../pages/sepsis/SepsisAntimicrobialStewardshipPage'),
+    ),
+  },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
