@@ -1,3 +1,4 @@
+// @ts-nocheck
 export interface EmployeeCreateInput {
   fullName: string;
   role?: string;

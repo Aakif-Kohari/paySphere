@@ -51,6 +51,7 @@ const employeeRoutes = require('./routes/employee.routes');
 const employeeImportRoutes = require('./routes/employeeImport.routes');
 const payrollRoutes = require('./routes/payroll.routes');
 const payrollApprovalRoutes = require('./routes/payrollApproval.routes');
+const payrollComparisonRoutes = require('./routes/payrollComparison.routes');
 
 // Statutory bonus under the Payment of Bonus Act, 1965 (#1346). Next to the
 // payroll routers because it is a payment to employees, and separate from them
@@ -351,6 +352,7 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/employees', employeeImportRoutes);
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/payroll', payrollApprovalRoutes);
+app.use('/api/payroll-comparison', payrollComparisonRoutes);
 
 // #1346. Its own prefix rather than a sub-path of `/api/payroll`: the
 // discretionary bonus on a payroll row and the statutory bonus under the Act

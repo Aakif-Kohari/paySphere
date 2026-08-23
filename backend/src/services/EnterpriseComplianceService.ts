@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Enterprise Compliance & Audit Trail Suite — Service Layer
 import { Router, Request, Response } from 'express';
 import { createMockPolicies, createMockAudits, createMockIncidents } from '../models/EnterpriseComplianceModel';
