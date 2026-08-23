@@ -177,7 +177,6 @@ describe('the route table is well formed', () => {
   });
 });
 
-
 describe('route-level code splitting', () => {
   const lazyType = Symbol.for('react.lazy');
 
@@ -187,9 +186,9 @@ describe('route-level code splitting', () => {
     );
 
     expect(publicFirstPaint).toHaveLength(2);
-    expect(publicFirstPaint.every((route) => route.component?.$$typeof !== lazyType)).toBe(
-      true,
-    );
+    expect(
+      publicFirstPaint.every((route) => route.component?.$$typeof !== lazyType),
+    ).toBe(true);
 
     const resetPassword = APP_ROUTES.find(
       (route) => route.path === '/reset-password/:token',
@@ -214,7 +213,7 @@ describe('route-level code splitting', () => {
   it('does not accidentally eager-import page modules in the registry', () => {
     const eagerPageImports = registrySource
       .split('\n')
-      .filter((line) => /^import .* from ['"]\\.\\.\\/pages\\//.test(line.trim()));
+      .filter((line) => /^import .* from ['"]\.\.\/pages\//.test(line.trim()));
 
     expect(eagerPageImports).toEqual([
       "import Landing from '../pages/Landing';",

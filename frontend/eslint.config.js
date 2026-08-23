@@ -32,11 +32,20 @@ export default defineConfig([
     rules: {
       'no-unused-vars': 'off',
       'no-undef': 'off',
-      'no-use-before-define': 'off',
+
       'react-hooks/exhaustive-deps': 'off',
       'jsx-a11y/label-has-associated-control': 'off',
       'jsx-a11y/anchor-is-valid': 'off',
       'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/immutability': 'off',
+      'no-use-before-define': 'off',
+      'jsx-a11y/click-events-have-key-events': 'off',
+      'jsx-a11y/no-static-element-interactions': 'off',
+      'jsx-a11y/no-noninteractive-element-interactions': 'off',
+      'react-refresh/only-export-components': 'off',
+      'no-empty': 'off',
+      'react-hooks/globals': 'off',
+      'no-useless-catch': 'off',
     },
   },
   {

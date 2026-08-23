@@ -22,7 +22,7 @@ export class EnterpriseEquityService {
       grantType: 'ISO Stock Options',
       sharesGranted: 125000,
       strikePriceUSD: 1.25,
-      currentFairMarketValueUSD: 18.50,
+      currentFairMarketValueUSD: 18.5,
       vestingProgressPercent: 50.0,
       status: 'ACTIVE_VESTING',
     },
@@ -32,8 +32,8 @@ export class EnterpriseEquityService {
       roleTitle: 'Principal Architect',
       grantType: 'RSUs',
       sharesGranted: 85000,
-      strikePriceUSD: 0.00,
-      currentFairMarketValueUSD: 18.50,
+      strikePriceUSD: 0.0,
+      currentFairMarketValueUSD: 18.5,
       vestingProgressPercent: 50.0,
       status: 'ACTIVE_VESTING',
     },
@@ -43,11 +43,22 @@ export class EnterpriseEquityService {
     return this.grants;
   }
 
-  public exerciseOptionGrant(id: string, sharesToExercise: number): { success: boolean; totalCostUSD: number; remainingShares: number } | null {
-    const grant = this.grants.find(g => g.id === id);
+  public exerciseOptionGrant(
+    id: string,
+    sharesToExercise: number,
+  ): {
+    success: boolean;
+    totalCostUSD: number;
+    remainingShares: number;
+  } | null {
+    const grant = this.grants.find((g) => g.id === id);
     if (!grant) return null;
     const totalCostUSD = sharesToExercise * grant.strikePriceUSD;
-    return { success: true, totalCostUSD, remainingShares: grant.sharesGranted - sharesToExercise };
+    return {
+      success: true,
+      totalCostUSD,
+      remainingShares: grant.sharesGranted - sharesToExercise,
+    };
   }
 }
 
@@ -58,11 +69,20 @@ equityRouter.get('/equity/grants', (req: Request, res: Response) => {
   res.json({ success: true, data: equityService.getGrants() });
 });
 
-equityRouter.post('/equity/grants/:id/exercise', (req: Request, res: Response) => {
-  const { sharesToExercise } = req.body;
-  const result = equityService.exerciseOptionGrant(req.params.id, sharesToExercise);
-  if (!result) return res.status(404).json({ success: false, error: 'Grant profile not found' });
-  res.json({ success: true, data: result });
-});
+equityRouter.post(
+  '/equity/grants/:id/exercise',
+  (req: Request, res: Response) => {
+    const { sharesToExercise } = req.body;
+    const result = equityService.exerciseOptionGrant(
+      req.params.id,
+      sharesToExercise,
+    );
+    if (!result)
+      return res
+        .status(404)
+        .json({ success: false, error: 'Grant profile not found' });
+    res.json({ success: true, data: result });
+  },
+);
 
 export default equityRouter;

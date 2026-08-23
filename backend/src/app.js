@@ -153,7 +153,6 @@ const recruitmentRoutes = require('./routes/recruitment.routes');
 // product produced the bank file that actually moves the money.
 const disbursementRoutes = require('./routes/disbursement.routes');
 
-
 // Leave year-end closure (#1159). The leave module has had models and two pure
 // engines since #646 and never a controller or a router, so none of it has
 // been reachable over HTTP — `calculateCarryForward()` is called from nowhere
@@ -163,7 +162,11 @@ const treasuryRoutes = require('./routes/treasury.routes');
 const regionalTaxRoutes = require('./routes/regionalTax.routes');
 const salaryAdjustmentRoutes = require('./routes/salaryAdjustment.routes');
 const pensionRoutes = require('./routes/pension.routes');
-const { tenantRouter: subscriptionTenantRoutes, adminRouter: subscriptionAdminRoutes } = require('./routes/subscription.routes');
+const fbpRoutes = require('./routes/fbp.routes');
+const {
+  tenantRouter: subscriptionTenantRoutes,
+  adminRouter: subscriptionAdminRoutes,
+} = require('./routes/subscription.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -543,6 +546,7 @@ app.use('/api/admin', subscriptionAdminRoutes);
 // leave year and does not manage leave requests, so taking the whole `/leave`
 // prefix would claim a namespace it does not implement.
 app.use('/api/leave-closure', leaveClosureRoutes);
+app.use('/api/fbp', fbpRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.

@@ -41,7 +41,7 @@ export class EnterprisePayrollService {
   }
 
   public getDepartmentById(id: string): DepartmentPayrollDTO | undefined {
-    return this.departments.find(d => d.id === id);
+    return this.departments.find((d) => d.id === id);
   }
 
   public triggerDisbursement(id: string): DepartmentPayrollDTO | null {
@@ -60,10 +60,16 @@ payrollRouter.get('/payroll/departments', (req: Request, res: Response) => {
   res.json({ success: true, data: items });
 });
 
-payrollRouter.post('/payroll/departments/:id/disburse', (req: Request, res: Response) => {
-  const updated = payrollService.triggerDisbursement(req.params.id);
-  if (!updated) return res.status(404).json({ success: false, error: 'Department not found' });
-  res.json({ success: true, data: updated });
-});
+payrollRouter.post(
+  '/payroll/departments/:id/disburse',
+  (req: Request, res: Response) => {
+    const updated = payrollService.triggerDisbursement(req.params.id);
+    if (!updated)
+      return res
+        .status(404)
+        .json({ success: false, error: 'Department not found' });
+    res.json({ success: true, data: updated });
+  },
+);
 
 export default payrollRouter;

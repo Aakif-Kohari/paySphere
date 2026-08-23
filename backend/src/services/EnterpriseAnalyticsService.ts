@@ -40,10 +40,17 @@ export class EnterpriseAnalyticsService {
     return this.models;
   }
 
-  public runMonteCarloSimulation(id: string, iterations: number): { success: boolean; iterations: number; meanSpendUSD: number } | null {
-    const model = this.models.find(m => m.id === id);
+  public runMonteCarloSimulation(
+    id: string,
+    iterations: number,
+  ): { success: boolean; iterations: number; meanSpendUSD: number } | null {
+    const model = this.models.find((m) => m.id === id);
     if (!model) return null;
-    return { success: true, iterations, meanSpendUSD: model.projectedQuarterlySpendUSD };
+    return {
+      success: true,
+      iterations,
+      meanSpendUSD: model.projectedQuarterlySpendUSD,
+    };
   }
 }
 
@@ -54,11 +61,20 @@ analyticsRouter.get('/analytics/forecasts', (req: Request, res: Response) => {
   res.json({ success: true, data: analyticsService.getModels() });
 });
 
-analyticsRouter.post('/analytics/forecasts/:id/simulate', (req: Request, res: Response) => {
-  const { iterations = 100000 } = req.body;
-  const result = analyticsService.runMonteCarloSimulation(req.params.id, iterations);
-  if (!result) return res.status(404).json({ success: false, error: 'Forecast model not found' });
-  res.json({ success: true, data: result });
-});
+analyticsRouter.post(
+  '/analytics/forecasts/:id/simulate',
+  (req: Request, res: Response) => {
+    const { iterations = 100000 } = req.body;
+    const result = analyticsService.runMonteCarloSimulation(
+      req.params.id,
+      iterations,
+    );
+    if (!result)
+      return res
+        .status(404)
+        .json({ success: false, error: 'Forecast model not found' });
+    res.json({ success: true, data: result });
+  },
+);
 
 export default analyticsRouter;

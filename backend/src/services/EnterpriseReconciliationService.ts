@@ -21,7 +21,7 @@ export class EnterpriseReconciliationService {
       totalDisbursedUSD: 4850000,
       matchedTransactionsCount: 1420,
       unmatchedDiscrepanciesCount: 0,
-      varianceUSD: 0.00,
+      varianceUSD: 0.0,
       status: 'PERFECT_MATCH',
     },
     {
@@ -31,7 +31,7 @@ export class EnterpriseReconciliationService {
       totalDisbursedUSD: 3120000,
       matchedTransactionsCount: 850,
       unmatchedDiscrepanciesCount: 2,
-      varianceUSD: 14.50,
+      varianceUSD: 14.5,
       status: 'VARIANCE_DETECTED',
     },
   ];
@@ -40,11 +40,13 @@ export class EnterpriseReconciliationService {
     return this.batches;
   }
 
-  public resolveDiscrepancy(id: string): { success: boolean; updatedStatus: string } | null {
-    const batch = this.batches.find(b => b.id === id);
+  public resolveDiscrepancy(
+    id: string,
+  ): { success: boolean; updatedStatus: string } | null {
+    const batch = this.batches.find((b) => b.id === id);
     if (!batch) return null;
     batch.unmatchedDiscrepanciesCount = 0;
-    batch.varianceUSD = 0.00;
+    batch.varianceUSD = 0.0;
     batch.status = 'PERFECT_MATCH';
     return { success: true, updatedStatus: batch.status };
   }
@@ -53,14 +55,23 @@ export class EnterpriseReconciliationService {
 const reconcileService = new EnterpriseReconciliationService();
 const reconcileRouter = Router();
 
-reconcileRouter.get('/reconciliation/batches', (req: Request, res: Response) => {
-  res.json({ success: true, data: reconcileService.getBatches() });
-});
+reconcileRouter.get(
+  '/reconciliation/batches',
+  (req: Request, res: Response) => {
+    res.json({ success: true, data: reconcileService.getBatches() });
+  },
+);
 
-reconcileRouter.post('/reconciliation/batches/:id/resolve', (req: Request, res: Response) => {
-  const result = reconcileService.resolveDiscrepancy(req.params.id);
-  if (!result) return res.status(404).json({ success: false, error: 'Reconciliation batch not found' });
-  res.json({ success: true, data: result });
-});
+reconcileRouter.post(
+  '/reconciliation/batches/:id/resolve',
+  (req: Request, res: Response) => {
+    const result = reconcileService.resolveDiscrepancy(req.params.id);
+    if (!result)
+      return res
+        .status(404)
+        .json({ success: false, error: 'Reconciliation batch not found' });
+    res.json({ success: true, data: result });
+  },
+);
 
 export default reconcileRouter;
