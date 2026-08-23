@@ -32,6 +32,7 @@ export default defineConfig([
     rules: {
       'no-unused-vars': 'off',
       'no-undef': 'off',
+
       'react-hooks/exhaustive-deps': 'off',
       'jsx-a11y/label-has-associated-control': 'off',
       'jsx-a11y/anchor-is-valid': 'off',
