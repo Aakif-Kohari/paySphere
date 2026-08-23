@@ -1,5 +1,6 @@
 // EnterpriseAssetDashboardPage — Executive dashboard for asset management & IT inventory
 import React, { useState, useMemo } from 'react';
+import AssetCard from '../../components/assets/AssetCard';
 
 const MOCK_ASSETS = [
   { id: 'A-001', tag: 'IT-2024-001', name: 'MacBook Pro 16" M3', category: 'laptop', model: 'MacBook Pro M3 Max', serial: 'C02X1234H02D', purchaseDate: '2024-06-15', price: 3499, value: 2799, status: 'active', condition: 'excellent', assignedTo: 'Sarah Chen', dept: 'Engineering', location: 'SF Office', warranty: '2027-06-15' },
@@ -112,34 +113,23 @@ const EnterpriseAssetDashboardPage: React.FC = () => {
 
       {/* Assets Tab */}
       {activeTab === 'assets' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '18px' }} data-testid="assets-grid">
           {filteredAssets.map((a) => (
-            <div key={a.id} onClick={() => { setSelectedItem(a); setShowModal(true); }}
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '24px' }}>{CAT_ICONS[a.category] || '📦'}</span>
-                  <div>
-                    <h3 style={{ color: '#e2e8f0', margin: 0, fontSize: '14px', fontWeight: 700 }}>{a.name}</h3>
-                    <p style={{ color: '#64748b', margin: '2px 0 0', fontSize: '11px' }}>{a.tag} • {a.serial}</p>
-                  </div>
-                </div>
-                {renderBadge(a.status)}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginTop: '10px' }}>
-                <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '6px' }}>
-                  <p style={{ color: '#64748b', margin: 0, fontSize: '9px' }}>VALUE</p>
-                  <p style={{ color: '#e2e8f0', margin: '2px 0 0', fontSize: '13px', fontWeight: 700 }}>{fmt(a.value)}</p>
-                </div>
-                <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '6px' }}>
-                  <p style={{ color: '#64748b', margin: 0, fontSize: '9px' }}>ASSIGNED</p>
-                  <p style={{ color: a.assignedTo ? '#22c55e' : '#64748b', margin: '2px 0 0', fontSize: '12px', fontWeight: 600 }}>{a.assignedTo || 'Unassigned'}</p>
-                </div>
-                <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', padding: '6px' }}>
-                  <p style={{ color: '#64748b', margin: 0, fontSize: '9px' }}>LOCATION</p>
-                  <p style={{ color: '#94a3b8', margin: '2px 0 0', fontSize: '11px' }}>{a.location}</p>
-                </div>
-              </div>
+            <div key={a.id} onClick={() => { setSelectedItem(a); setShowModal(true); }}>
+              <AssetCard
+                name={a.name}
+                tagNumber={a.tag}
+                category={a.category}
+                serialNumber={a.serial}
+                currentValue={a.value}
+                status={a.status}
+                condition={a.condition}
+                assignedTo={a.assignedTo}
+                department={a.dept}
+                location={a.location}
+                purchaseDate={a.purchaseDate}
+                warrantyExpiry={a.warranty}
+              />
             </div>
           ))}
         </div>
