@@ -125,7 +125,8 @@ export const APP_ROUTES = [
     icon: 'people',
   },
   {
-    path: '/archive',    component: lazy(() => import('../pages/Archive')),
+    path: '/archive',
+    component: lazy(() => import('../pages/Archive')),
     label: 'Archive',
     group: 'people',
     icon: 'archive',
@@ -162,6 +163,23 @@ export const APP_ROUTES = [
   },
 
   // ── Payroll ──────────────────────────────────────────────────────────────
+  {
+    path: '/fbp-admin',
+    component: lazy(() => import('../features/fbp/FbpAdminDashboard')),
+    appShell: true,
+    label: 'FBP Administration',
+    group: 'payroll',
+    icon: 'wallet',
+  },
+  {
+    path: '/fbp-calculator',
+    component: lazy(() => import('../features/fbp/FbpRestructuringCalculator')),
+    appShell: true,
+    label: 'FBP Restructuring',
+    group: 'payroll',
+    icon: 'wallet',
+    employee: true,
+  },
   {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
@@ -380,27 +398,39 @@ export const APP_ROUTES = [
   // ── Enterprise Suites (routed, sidebar-hidden) ──────────────────────────────
   {
     path: '/enterprise/vendor-management',
-    component: lazy(() => import('../pages/vendor/EnterpriseVendorDashboardPage')),
+    component: lazy(
+      () => import('../pages/vendor/EnterpriseVendorDashboardPage'),
+    ),
   },
   {
     path: '/enterprise/benefits-compensation',
-    component: lazy(() => import('../pages/benefits/EnterpriseBenefitsDashboardPage')),
+    component: lazy(
+      () => import('../pages/benefits/EnterpriseBenefitsDashboardPage'),
+    ),
   },
   {
     path: '/enterprise/travel-expense',
-    component: lazy(() => import('../pages/travel/EnterpriseTravelDashboardPage')),
+    component: lazy(
+      () => import('../pages/travel/EnterpriseTravelDashboardPage'),
+    ),
   },
   {
     path: '/enterprise/asset-inventory',
-    component: lazy(() => import('../pages/assets/EnterpriseAssetDashboardPage')),
+    component: lazy(
+      () => import('../pages/assets/EnterpriseAssetDashboardPage'),
+    ),
   },
   {
     path: '/enterprise/compliance-audit',
-    component: lazy(() => import('../pages/compliance/EnterpriseComplianceDashboardPage')),
+    component: lazy(
+      () => import('../pages/compliance/EnterpriseComplianceDashboardPage'),
+    ),
   },
   {
     path: '/enterprise/cybersecurity-soc',
-    component: lazy(() => import('../pages/security/EnterpriseCybersecuritySOCPage')),
+    component: lazy(
+      () => import('../pages/security/EnterpriseCybersecuritySOCPage'),
+    ),
   },
   {
     path: '/enterprise/ecmo-critical-care',
@@ -408,15 +438,21 @@ export const APP_ROUTES = [
   },
   {
     path: '/enterprise/engagement-sentiment',
-    component: lazy(() => import('../pages/engagement/EnterpriseEngagementSentimentPage')),
+    component: lazy(
+      () => import('../pages/engagement/EnterpriseEngagementSentimentPage'),
+    ),
   },
   {
     path: '/enterprise/clinical-telemetry',
-    component: lazy(() => import('../pages/clinical/ICUHemodynamicsTelemetryPage')),
+    component: lazy(
+      () => import('../pages/clinical/ICUHemodynamicsTelemetryPage'),
+    ),
   },
   {
     path: '/enterprise/emergency-triage',
-    component: lazy(() => import('../pages/emergency/EmergencyTriageCommandStationPage')),
+    component: lazy(
+      () => import('../pages/emergency/EmergencyTriageCommandStationPage'),
+    ),
   },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
@@ -426,15 +462,22 @@ export const APP_ROUTES = [
   // ── Enterprise (routed but sidebar entry managed separately) ─────────────
   {
     path: '/enterprise/time-attendance',
-    component: lazy(() => import('../pages/timeattendance/EnterpriseTimeAttendanceDashboardPage')),
+    component: lazy(
+      () =>
+        import('../pages/timeattendance/EnterpriseTimeAttendanceDashboardPage'),
+    ),
   },
   {
     path: '/enterprise/learning-development',
-    component: lazy(() => import('../pages/learning/EnterpriseLearningDevelopmentPage')),
+    component: lazy(
+      () => import('../pages/learning/EnterpriseLearningDevelopmentPage'),
+    ),
   },
   {
     path: '/enterprise/onboarding-lifecycle',
-    component: lazy(() => import('../pages/onboarding/EnterpriseOnboardingLifecyclePage')),
+    component: lazy(
+      () => import('../pages/onboarding/EnterpriseOnboardingLifecyclePage'),
+    ),
   },
 
   {
