@@ -281,6 +281,14 @@ export const APP_ROUTES = [
     employee: true,
   },
   {
+    path: '/adjudication-workspace',
+    component: lazy(() => import('../pages/AdjudicationWorkspace')),
+    appShell: true,
+    label: 'Expense Adjudication',
+    group: 'finance',
+    icon: 'checkShield',
+  },
+  {
     path: '/accounting',
     component: lazy(() => import('../pages/AccountingExport')),
     label: 'Accounting export',
