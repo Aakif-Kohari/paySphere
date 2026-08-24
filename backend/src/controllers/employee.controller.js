@@ -409,7 +409,7 @@ exports.updateEmployeeManager = async (req, res, next) => {
       }
       if (visited.has(nextId)) break; // already-corrupt chain; don't loop forever
       visited.add(nextId);
-      // eslint-disable-next-line no-await-in-loop
+
       cursor = await Employee.findOne(
         req.tenantId
           ? { _id: nextId, tenantId: req.tenantId }
@@ -426,7 +426,8 @@ exports.updateEmployeeManager = async (req, res, next) => {
   }
 };
 
-exports.importEmployees = async (req, res, next) => {  try {
+exports.importEmployees = async (req, res, next) => {
+  try {
     if (!req.file) {
       return res.status(400).json({
         message: 'No CSV file uploaded',
@@ -1349,7 +1350,9 @@ exports.searchEmployees = async (req, res) => {
       data: hits,
     });
   } catch (error) {
-    logger.error('Elasticsearch query failed', { error: error.message || error });
+    logger.error('Elasticsearch query failed', {
+      error: error.message || error,
+    });
     res.status(500).json({ success: false, message: 'Search engine error' });
   }
 };
