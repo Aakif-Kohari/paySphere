@@ -51,7 +51,7 @@ export default function CompensationBenchmarking() {
   ];
 
   const topGapsByFamily = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map();
     data.gaps.filter(g => g.gapPct < 0).forEach(g => {
       map.set(g.jobFamily, (map.get(g.jobFamily) || 0) + g.gapPct);
     });
