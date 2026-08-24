@@ -493,9 +493,9 @@ export const APP_ROUTES = [
     ),
   },
   {
-    path: '/enterprise/precision-oncology-bioai',
+    path: '/enterprise/nephrology-crrt',
     component: lazy(
-      () => import('../pages/oncology/PrecisionOncologyBioAIPage'),
+      () => import('../pages/nephrology/NephrologyCRRTPage'),
     ),
   },
 
