@@ -492,6 +492,18 @@ export const APP_ROUTES = [
       () => import('../pages/cardiology/CardiologySTEMICathLabPage'),
     ),
   },
+  {
+    path: '/enterprise/neurocritical-care',
+    component: lazy(
+      () => import('../pages/neurocritical/NeurocriticalCareTelemetryPage'),
+    ),
+  },
+  {
+    path: '/enterprise/pulmonary-ards-ventilation',
+    component: lazy(
+      () => import('../pages/pulmonary/PulmonaryARDSVentilationPage'),
+    ),
+  },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
