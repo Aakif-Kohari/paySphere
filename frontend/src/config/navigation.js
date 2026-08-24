@@ -493,9 +493,9 @@ export const APP_ROUTES = [
     ),
   },
   {
-    path: '/enterprise/nicu-critical-care',
+    path: '/enterprise/precision-oncology-bioai',
     component: lazy(
-      () => import('../pages/nicu/NeonatalIcuTelemetryHubPage'),
+      () => import('../pages/oncology/PrecisionOncologyBioAIPage'),
     ),
   },
 

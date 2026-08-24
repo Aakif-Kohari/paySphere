@@ -8,7 +8,7 @@ Automated record of all feature hubs deployed to PaySphere.
 | 2 | Cardiopulmonary ECMO & Mechanical Ventilation Command Station | Critical Care / ECMO | `feature/frontend-ecmo-mechanical-ventilation-telemetry-hub` | [#1440](https://github.com/Dev1822/paySphere/issues/1440) | [#1439](https://github.com/Dev1822/paySphere/pull/1439) | `/enterprise/ecmo-critical-care` | 2026-08-21 |
 | 3 | Emergency & Mass-Casualty Triage Command Station | Emergency Medicine | `feature/frontend-emergency-triage-command-station-hub` | [#1488](https://github.com/Dev1822/paySphere/issues/1488) | [#1489](https://github.com/Dev1822/paySphere/pull/1489) | `/enterprise/emergency-triage` | 2026-08-22 |
 | 4 | Acute Coronary Syndrome & STEMI Interventional Cath Lab Command Station | Cardiology / Cath Lab | `feature/frontend-cardiology-stemi-interventional-hub` | [#1556](https://github.com/Dev1822/paySphere/issues/1556) | [#1557](https://github.com/Dev1822/paySphere/pull/1557) | `/enterprise/cardiology-stemi` | 2026-08-23 |
-| 5 | Neonatal ICU & Critical Hemodynamics Command Station | Neonatology / NICU | `feature/frontend-nicu-neonatal-critical-care-telemetry-hub` | [#1649](https://github.com/Dev1822/paySphere/issues/1649) | [#1650](https://github.com/Dev1822/paySphere/pull/1650) | `/enterprise/nicu-critical-care` | 2026-08-24 |
+| 5 | Precision Oncology & Bio-AI Molecular Diagnostics Hub | Oncology / Genomics | `feature/frontend-oncology-precision-bioai-genomics-hub` | [#1651](https://github.com/Dev1822/paySphere/issues/1651) | [#1653](https://github.com/Dev1822/paySphere/pull/1653) | `/enterprise/precision-oncology-bioai` | 2026-08-24 |
 
 ---
 
@@ -20,7 +20,7 @@ Automated record of all feature hubs deployed to PaySphere.
 | Critical Care | `frontend/src/pages/ecmo/ECMOVentilationTelemetryPage.tsx` | 1,012 | 🚀 Deployed & Active |
 | Emergency Medicine | `frontend/src/pages/emergency/EmergencyTriageCommandStationPage.tsx` | 488 | 🚀 Pull request open |
 | Cardiology / Cath Lab | `frontend/src/pages/cardiology/CardiologySTEMICathLabPage.tsx` | 1,158 | 🚀 Pull request open |
-| Neonatology / NICU | `frontend/src/pages/nicu/NeonatalIcuTelemetryHubPage.tsx` | 1,777 | 🚀 Pull request open |
+| Oncology / Genomics | `frontend/src/pages/oncology/PrecisionOncologyBioAIPage.tsx` | 1,759 | 🚀 Pull request open |
 
 ### Backend Service Registry
 
@@ -33,9 +33,9 @@ Automated record of all feature hubs deployed to PaySphere.
 | Cardiology / Cath Lab | `backend/src/models/cardiologyStemi.model.js` | D2B milestones, Killip classification matrix, TIMI STEMI risk criteria & culprit vessel models |
 | Cardiology / Cath Lab | `backend/src/services/cardiologyStemiService.js` | Cardiac Power Output (CPO), Shock Index, Coronary Perfusion Pressure, TIMI score & FHIR R4 exporter |
 | Cardiology / Cath Lab | `backend/src/main/java/com/medtrack/cardiology/service/CardiologyStemiService.java` | Spring Boot companion service for transactional CPO, shock index, and TIMI scoring |
-| Neonatology / NICU | `backend/src/models/neonatalICU.model.js` | GA physiological norms, hypothermia phases, HFOV targets & ELBW/HIE/PPHN patient fixtures |
-| Neonatology / NICU | `backend/src/services/neonatalICUService.js` | nSOFA, SNAPPE-II, Oxygenation Index (OI), VIS, Pre/Post-Ductal Shunt Delta & FHIR R4 exporter |
-| Neonatology / NICU | `backend/src/main/java/com/medtrack/nicu/service/NeonatalIcuService.java` | Spring Boot companion service for transactional nSOFA, VIS, OI, and hypothermia safety evaluation |
+| Oncology / Genomics | `backend/src/models/oncologyGenomics.model.js` | Somatic driver mutations, AMP/ASCO/CAP actionability tiers, and MTB patient fixtures |
+| Oncology / Genomics | `backend/src/services/oncologyGenomicsService.js` | TMB categorization, HRD synthetic lethality, ESCAT tiering & FHIR R4 exporter |
+| Oncology / Genomics | `backend/src/main/java/com/medtrack/oncology/service/PrecisionOncologyService.java` | Spring Boot companion service for transactional TMB, HRD, and targeted therapy prioritizing |
 
 ### Tech Stack Notes
 
