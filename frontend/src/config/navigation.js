@@ -492,6 +492,12 @@ export const APP_ROUTES = [
       () => import('../pages/cardiology/CardiologySTEMICathLabPage'),
     ),
   },
+  {
+    path: '/enterprise/nicu-critical-care',
+    component: lazy(
+      () => import('../pages/nicu/NeonatalIcuTelemetryHubPage'),
+    ),
+  },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
