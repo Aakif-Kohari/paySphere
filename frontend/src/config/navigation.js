@@ -493,9 +493,15 @@ export const APP_ROUTES = [
     ),
   },
   {
-    path: '/enterprise/nephrology-crrt',
+    path: '/enterprise/neurocritical-care',
     component: lazy(
-      () => import('../pages/nephrology/NephrologyCRRTPage'),
+      () => import('../pages/neurocritical/NeurocriticalCareTelemetryPage'),
+    ),
+  },
+  {
+    path: '/enterprise/pulmonary-ards-ventilation',
+    component: lazy(
+      () => import('../pages/pulmonary/PulmonaryARDSVentilationPage'),
     ),
   },
 

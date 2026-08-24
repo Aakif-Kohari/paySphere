@@ -8,7 +8,7 @@ Automated record of all feature hubs deployed to PaySphere.
 | 2 | Cardiopulmonary ECMO & Mechanical Ventilation Command Station | Critical Care / ECMO | `feature/frontend-ecmo-mechanical-ventilation-telemetry-hub` | [#1440](https://github.com/Dev1822/paySphere/issues/1440) | [#1439](https://github.com/Dev1822/paySphere/pull/1439) | `/enterprise/ecmo-critical-care` | 2026-08-21 |
 | 3 | Emergency & Mass-Casualty Triage Command Station | Emergency Medicine | `feature/frontend-emergency-triage-command-station-hub` | [#1488](https://github.com/Dev1822/paySphere/issues/1488) | [#1489](https://github.com/Dev1822/paySphere/pull/1489) | `/enterprise/emergency-triage` | 2026-08-22 |
 | 4 | Acute Coronary Syndrome & STEMI Interventional Cath Lab Command Station | Cardiology / Cath Lab | `feature/frontend-cardiology-stemi-interventional-hub` | [#1556](https://github.com/Dev1822/paySphere/issues/1556) | [#1557](https://github.com/Dev1822/paySphere/pull/1557) | `/enterprise/cardiology-stemi` | 2026-08-23 |
-| 5 | Nephrology CRRT & Renal Replacement Therapy Command Station | Nephrology / CRRT | `feature/frontend-nephrology-crrt-renal-replacement-hub` | [#1654](https://github.com/Dev1822/paySphere/issues/1654) | [#1655](https://github.com/Dev1822/paySphere/pull/1655) | `/enterprise/nephrology-crrt` | 2026-08-24 |
+| 5 | Pulmonary Critical Care, ARDS & Advanced Mechanical Ventilation Command Station | Pulmonary / Critical Care | `feature/frontend-pulmonary-ards-mechanical-ventilation-hub` | [#1658](https://github.com/Dev1822/paySphere/issues/1658) | [#1659](https://github.com/Dev1822/paySphere/pull/1659) | `/enterprise/pulmonary-ards-ventilation` | 2026-08-24 |
 
 ---
 
@@ -20,7 +20,7 @@ Automated record of all feature hubs deployed to PaySphere.
 | Critical Care | `frontend/src/pages/ecmo/ECMOVentilationTelemetryPage.tsx` | 1,012 | 🚀 Deployed & Active |
 | Emergency Medicine | `frontend/src/pages/emergency/EmergencyTriageCommandStationPage.tsx` | 488 | 🚀 Pull request open |
 | Cardiology / Cath Lab | `frontend/src/pages/cardiology/CardiologySTEMICathLabPage.tsx` | 1,158 | 🚀 Pull request open |
-| Nephrology / CRRT | `frontend/src/pages/nephrology/NephrologyCRRTPage.tsx` | 1,942 | 🚀 Pull request open |
+| Pulmonary / Critical Care | `frontend/src/pages/pulmonary/PulmonaryARDSVentilationPage.tsx` | 1,482 | 🚀 Pull request open |
 
 ### Backend Service Registry
 
@@ -33,9 +33,9 @@ Automated record of all feature hubs deployed to PaySphere.
 | Cardiology / Cath Lab | `backend/src/models/cardiologyStemi.model.js` | D2B milestones, Killip classification matrix, TIMI STEMI risk criteria & culprit vessel models |
 | Cardiology / Cath Lab | `backend/src/services/cardiologyStemiService.js` | Cardiac Power Output (CPO), Shock Index, Coronary Perfusion Pressure, TIMI score & FHIR R4 exporter |
 | Cardiology / Cath Lab | `backend/src/main/java/com/medtrack/cardiology/service/CardiologyStemiService.java` | Spring Boot companion service for transactional CPO, shock index, and TIMI scoring |
-| Nephrology / CRRT | `backend/src/models/nephrologyCRRT.model.js` | KDIGO definitions, CRRT modalities (CVVH/D/F), RCA protocols & patient fixtures |
-| Nephrology / CRRT | `backend/src/services/nephrologyCRRTService.js` | KDIGO calculations, TMP/Delta-P sentries, RCA citrate monitoring & FHIR R4 exporter |
-| Nephrology / CRRT | `backend/src/main/java/com/medtrack/nephrology/service/NephrologyCrrtService.java` | Spring Boot companion service for transactional KDIGO staging, effluent dose, and citrate toxicity sentry |
+| Pulmonary / Critical Care | `backend/src/models/pulmonaryVentilation.model.js` | Berlin ARDS criteria, ARDSNet LTVV constants, Devine PBW models, and PROSEVA prone milestones |
+| Pulmonary / Critical Care | `backend/src/services/pulmonaryVentilationService.js` | Driving Pressure, Gattinoni Mechanical Power, Static Compliance, Ventilatory Ratio, RSBI, and FHIR R4 exporter |
+| Pulmonary / Critical Care | `backend/src/main/java/com/medtrack/pulmonary/service/PulmonaryARDSVentilationService.java` | Spring Boot companion service for transactional ARDS staging, driving pressure, and mechanical power calculations |
 
 ### Tech Stack Notes
 
