@@ -12,9 +12,15 @@ const seedE2EUser = async () => {
   try {
     await connectDB();
     await seedRbac();
+ qa/compensation-band-card-e2e
+    const ownerRole = await Role.findOne({ name: "SuperAdmin" });
+    if (!ownerRole) {
+      throw new Error("SuperAdmin role not found after RBAC seeding");
+
     const ownerRole = await Role.findOne({ name: "Owner" });
     if (!ownerRole) {
       throw new Error("Owner role not found after RBAC seeding");
+ main
     }
 
     const testEmail = (process.env.TEST_USER_EMAIL || "test@example.com").toLowerCase();
