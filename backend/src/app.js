@@ -64,6 +64,7 @@ const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
 const settlementRoutes = require('./routes/settlement.routes');
+const severanceRoutes = require('./routes/severance.routes');
 
 // Gratuity actuarial valuation (#1344). Next to settlements on purpose: the
 // two are the same statute seen from opposite ends. `settlement.routes` pays
