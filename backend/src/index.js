@@ -153,6 +153,13 @@ const startServer = async () => {
     logger.info(`Server running on port ${PORT}`),
   );
   require('./sockets/payroll.socket').init(server);
+  require('./sockets/shiftMarketplace.socket').init(server);
+
+  // Start the surge pricing service for shift marketplace
+  const surgePricingService = require('./services/SurgePricingService').default;
+  if (surgePricingService) {
+    surgePricingService.start();
+  }
 };
 
 startServer().catch((error) => {

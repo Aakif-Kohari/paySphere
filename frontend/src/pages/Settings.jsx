@@ -204,6 +204,20 @@ const InfoIcon = () => (
   </svg>
 );
 
+const SlidersIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="4" y1="21" x2="4" y2="14" />
+    <line x1="4" y1="10" x2="4" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="12" />
+    <line x1="12" y1="8" x2="12" y2="3" />
+    <line x1="20" y1="21" x2="20" y2="16" />
+    <line x1="20" y1="12" x2="20" y2="3" />
+    <line x1="1" y1="14" x2="7" y2="14" />
+    <line x1="9" y1="8" x2="15" y2="8" />
+    <line x1="17" y1="16" x2="23" y2="16" />
+  </svg>
+);
+
 export default function Settings() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -482,6 +496,7 @@ export default function Settings() {
     { id: 'company', label: 'Company Info', icon: <BuildingIcon /> },
     { id: 'payroll', label: 'Payroll Config', icon: <WalletIcon /> },
     { id: 'notifications', label: 'Notifications', icon: <BellIcon /> },
+    { id: 'systemSettings', label: 'System Settings', icon: <SlidersIcon /> },
     { id: 'about', label: 'About PaySphere', icon: <InfoIcon /> },
     { id: 'auditLogs', label: 'Audit Logs', icon: <ShieldIcon /> },
   ];
@@ -496,6 +511,43 @@ export default function Settings() {
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'systemSettings':
+        return (
+          <SettingsPanel
+            initialSettings={{
+              companyName: userProfile.companyName,
+              defaultCurrency: settings.payrollConfig.currency,
+              timezone: 'Asia/Kolkata',
+              notificationEmail: userProfile.email,
+              mfaEnforced: true,
+              autoApproveExpensesUnder: 1000,
+              allowBiometricClockIn: true,
+              allowToilEncashment: true,
+              fiscalYearStart: 'April',
+            }}
+            onSave={async (newSettings) => {
+              try {
+                await api.patch('/api/auth/settings', {
+                  settings: {
+                    ...settings,
+                    preferences: { ...settings.preferences, timezone: newSettings.timezone },
+                    notifications: { ...settings.notifications, emailReminders: newSettings.mfaEnforced }
+                  },
+                  companyName: newSettings.companyName,
+                  email: newSettings.notificationEmail,
+                });
+                setUserProfile(prev => ({
+                  ...prev,
+                  companyName: newSettings.companyName,
+                  email: newSettings.notificationEmail
+                }));
+              } catch (err) {
+                console.error(err);
+                throw err;
+              }
+            }}
+          />
+        );
       case 'profile':
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
