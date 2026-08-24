@@ -90,6 +90,7 @@ const archiveRoutes = require('./routes/archive.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
+const fringeBenefitsRoutes = require('./routes/fringeBenefits.routes');
 const varianceReportRoutes = require('./routes/varianceReport.routes');
 const searchRoutes = require('./routes/search.routes');
 const emailRoutes = require('./routes/email.routes');
@@ -451,6 +452,7 @@ app.use('/api/monthly-updates', monthlyUpdatesRoutes);
 // answer 403 until the EXPENSE permissions exist (#794); mounting them is the
 // part that belongs to this file.
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/fringe-benefits', fringeBenefitsRoutes);
 
 // Payroll variance reports, budget tracking, annual forecasting (#915).
 app.use('/api/reports', varianceReportRoutes);
