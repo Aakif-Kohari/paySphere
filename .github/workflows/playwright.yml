@@ -60,21 +60,23 @@ jobs:
     
     - name: Seed E2E Test User
       working-directory: ./backend
-      run: node src/seeds/e2eSeeder.js
+      run: |
+        node src/seeds/e2eSeeder.js 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+        exit ${PIPESTATUS[0]}
       env:
-        MONGO_URI: ${{ secrets.TEST_MONGO_URI || 'mongodb://127.0.0.1:27017/paySphere_test' }}
-        TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL || 'test@example.com' }}
-        TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD || 'testpassword' }}
+        MONGO_URI: mongodb://127.0.0.1:27017/paySphere_test
+        TEST_USER_EMAIL: test@example.com
+        TEST_USER_PASSWORD: testpassword
 
     - name: Start backend server
       working-directory: ./backend
       run: |
         npm run dev &
       env:
-        MONGO_URI: ${{ secrets.TEST_MONGO_URI || 'mongodb://127.0.0.1:27017/paySphere_test' }}
-        JWT_SECRET: ${{ secrets.TEST_JWT_SECRET || 'test_jwt_secret_change_me' }}
-        JWT_REFRESH_SECRET: ${{ secrets.TEST_JWT_REFRESH_SECRET || 'test_jwt_refresh_secret_change_me' }}
-        REDIS_URI: ${{ secrets.TEST_REDIS_URI || 'redis://127.0.0.1:6379' }}
+        MONGO_URI: mongodb://127.0.0.1:27017/paySphere_test
+        JWT_SECRET: test_jwt_secret_change_me
+        JWT_REFRESH_SECRET: test_jwt_refresh_secret_change_me
+        REDIS_URI: redis://127.0.0.1:6379
         NODE_ENV: test
     
     - name: Wait for backend to be ready
