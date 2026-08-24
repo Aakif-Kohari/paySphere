@@ -492,6 +492,12 @@ export const APP_ROUTES = [
       () => import('../pages/cardiology/CardiologySTEMICathLabPage'),
     ),
   },
+  {
+    path: '/enterprise/precision-oncology-bioai',
+    component: lazy(
+      () => import('../pages/oncology/PrecisionOncologyBioAIPage'),
+    ),
+  },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
