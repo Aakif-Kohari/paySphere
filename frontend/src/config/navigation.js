@@ -492,6 +492,12 @@ export const APP_ROUTES = [
       () => import('../pages/cardiology/CardiologySTEMICathLabPage'),
     ),
   },
+  {
+    path: '/enterprise/commandcenter-predictive-monitoring',
+    component: lazy(
+      () => import('../pages/commandcenter/HospitalCommandCenterPredictivePage'),
+    ),
+  },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
