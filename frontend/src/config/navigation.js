@@ -358,6 +358,14 @@ export const APP_ROUTES = [
     employee: true,
   },
   {
+    path: '/shift-marketplace',
+    component: lazy(() => import('../pages/DynamicShiftBidding')),
+    label: 'Shift Marketplace',
+    group: 'workplace',
+    icon: 'briefcase',
+    employee: true,
+  },
+  {
     // In Workplace rather than Payroll: the desk is about where people are
     // working and under what arrangement, and the money follows from that
     // rather than the other way round (#1348).
