@@ -492,6 +492,12 @@ export const APP_ROUTES = [
       () => import('../pages/cardiology/CardiologySTEMICathLabPage'),
     ),
   },
+  {
+    path: '/enterprise/mechanical-circulatory-support',
+    component: lazy(
+      () => import('../pages/circulatory/MechanicalCirculatorySupportPage'),
+    ),
+  },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
