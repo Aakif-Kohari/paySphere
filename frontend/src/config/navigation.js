@@ -493,15 +493,9 @@ export const APP_ROUTES = [
     ),
   },
   {
-    path: '/enterprise/neurocritical-care',
+    path: '/enterprise/commandcenter-predictive-monitoring',
     component: lazy(
-      () => import('../pages/neurocritical/NeurocriticalCareTelemetryPage'),
-    ),
-  },
-  {
-    path: '/enterprise/pulmonary-ards-ventilation',
-    component: lazy(
-      () => import('../pages/pulmonary/PulmonaryARDSVentilationPage'),
+      () => import('../pages/commandcenter/HospitalCommandCenterPredictivePage'),
     ),
   },
 
