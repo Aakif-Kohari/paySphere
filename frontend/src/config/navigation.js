@@ -493,9 +493,9 @@ export const APP_ROUTES = [
     ),
   },
   {
-    path: '/enterprise/commandcenter-predictive-monitoring',
+    path: '/enterprise/mechanical-circulatory-support',
     component: lazy(
-      () => import('../pages/commandcenter/HospitalCommandCenterPredictivePage'),
+      () => import('../pages/circulatory/MechanicalCirculatorySupportPage'),
     ),
   },
 
