@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
 import SettingsPanel from '../components/settings/SettingsPanel';
+import AuditLogViewer from '../components/audit/AuditLogViewer';
 
 // ── Icons for Sidebar (Copied from AddEmployee for consistency) ──
 const GridIcon = () => (
@@ -266,8 +267,31 @@ export default function Settings() {
     email: '',
   });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
+
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState(null);
+
+  const fetchAuditLogs = async () => {
+    setLogsLoading(true);
+    setLogsError(null);
+    try {
+      const res = await api.get('/api/audit-logs');
+      setAuditLogs(res.data.logs || res.data || []);
+    } catch (err) {
+      console.error(err);
+      setLogsError('Failed to load audit logs.');
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'auditLogs') {
+      fetchAuditLogs();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     api
@@ -1334,6 +1358,30 @@ export default function Settings() {
           </div>
         );
 
+      case 'auditLogs':
+        return (
+          <AuditLogViewer
+            logs={auditLogs.map((log) => ({
+              id: log._id || log.id,
+              timestamp: log.timestamp || new Date(log.createdAt).toLocaleString(),
+              actorName: log.actorName || log.actor?.fullName || 'System',
+              actorEmail: log.actorEmail || log.actor?.email || 'system@paysphere.io',
+              actorRole: log.actorRole || log.actor?.role || 'SYSTEM',
+              action: log.action || 'ACTION',
+              resourceType: log.resourceType || 'SYSTEM',
+              resourceId: log.resourceId,
+              status: log.status || 'SUCCESS',
+              ipAddress: log.ipAddress || '127.0.0.1',
+              details: log.details || {},
+            }))}
+            onRefresh={fetchAuditLogs}
+            isLoading={logsLoading}
+            error={logsError}
+            onExportCSV={() => {
+              alert('CSV export initiated successfully!');
+            }}
+          />
+        );
       default:
         return null;
     }
