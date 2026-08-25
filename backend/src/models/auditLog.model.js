@@ -79,6 +79,15 @@ const AUDIT_ACTIONS = [
   'LOAN_ISSUE',
   'LOAN_STATUS_CHANGE',
   'LOAN_REPAYMENT',
+  // Labour Welfare Fund (#1701). A state rule decides what every employee in
+  // that state owes for years, so adding one changes contributions not yet
+  // made; a committed contribution is a liability to a welfare board; the
+  // challan is its discharge; and the register is every employee's wages and
+  // amount in one file.
+  'LWF_RULE_ADDED',
+  'LWF_CONTRIBUTION_COMMITTED',
+  'LWF_REMITTANCE_RECORDED',
+  'LWF_REGISTER_EXPORTED',
   // EMPLOYEE_UPDATE records only the *names* of the fields that changed,
   // so a salary change left no trace of what it changed from. This one
   // carries the before/after (#461).
@@ -173,6 +182,8 @@ const AUDIT_RESOURCE_TYPES = [
   'GratuityAssumption',
   'GratuityValuation',
   'Loan',
+  'LabourWelfareFundRule',
+  'LabourWelfareFundContribution',
   'SalaryHistory',
   'LtaClaim',
   'Workflow',

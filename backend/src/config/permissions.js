@@ -214,6 +214,18 @@ const PERMISSIONS = {
   // deducted from somebody's salary.
   VERIFY_TAX_PROOF: 'VERIFY_TAX_PROOF',
 
+  // --- Labour Welfare Fund (#1701) -----------------------------------------
+  //
+  // Next to the tax-proof names because both decide a deduction from somebody's
+  // pay. The deduction here is the smallest in Indian payroll; the authority is
+  // not. A state rule with the wrong periodicity silently under-remits for an
+  // entire workforce in that state, for years, and nothing in the payroll run
+  // objects. Split three ways so that whoever maintains the amounts is not also
+  // certifying the remittance measured against them.
+  READ_LWF: 'READ_LWF',
+  MANAGE_LWF_RULES: 'MANAGE_LWF_RULES',
+  MANAGE_LWF_CONTRIBUTION: 'MANAGE_LWF_CONTRIBUTION',
+
   // --- Leave Travel Allowance (#1345) --------------------------------------
   //
   // The same pair as the tax proof permissions above, and deliberately not the
@@ -535,6 +547,21 @@ const PERMISSION_DEFINITIONS = [
       'Approve or reject submitted investment proofs, which changes the TDS deducted from that salary',
   },
   {
+    name: PERMISSIONS.READ_LWF,
+    description:
+      'View labour welfare fund rules, the contribution register and the collection calendar',
+  },
+  {
+    name: PERMISSIONS.MANAGE_LWF_RULES,
+    description:
+      'Record a state’s labour welfare fund amounts, periodicity and exclusions, which every contribution in that state is computed from',
+  },
+  {
+    name: PERMISSIONS.MANAGE_LWF_CONTRIBUTION,
+    description:
+      'Commit a labour welfare fund contribution for a state and period, and record its remittance challan',
+  },
+  {
     name: PERMISSIONS.SUBMIT_LTA_CLAIM,
     description:
       'File a Leave Travel Allowance journey and see the exemption it earns under section 10(5)',
@@ -747,6 +774,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.SUBMIT_TAX_PROOF,
       PERMISSIONS.VERIFY_TAX_PROOF,
 
+      // #1701. All three. The owner is the one account allowed to be both
+      // halves of a check, because there is nobody above it to be the other.
+      PERMISSIONS.READ_LWF,
+      PERMISSIONS.MANAGE_LWF_RULES,
+      PERMISSIONS.MANAGE_LWF_CONTRIBUTION,
+
       // #1345.
       PERMISSIONS.SUBMIT_LTA_CLAIM,
       PERMISSIONS.VERIFY_LTA_CLAIM,
@@ -867,6 +900,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_INVOICE,
       PERMISSIONS.SUBMIT_TAX_PROOF,
       PERMISSIONS.VERIFY_TAX_PROOF,
+
+      // #1701. HR reads the register and maintains the state rules — knowing
+      // that Karnataka collects in December and Kerala every month is HR's
+      // business, and somebody has to transcribe the notification. It does not
+      // commit the contribution, which is a remittance to a welfare board.
+      PERMISSIONS.READ_LWF,
+      PERMISSIONS.MANAGE_LWF_RULES,
 
       // #1345. HR verifies LTA journeys for the same reason it verifies
       // investment proofs: approving one changes the TDS deducted from that

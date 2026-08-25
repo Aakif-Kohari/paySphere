@@ -112,6 +112,11 @@ const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
 const fringeBenefitsRoutes = require('./routes/fringeBenefits.routes');
+
+// Labour Welfare Fund (#1701). There is no central Act — fifteen or so state
+// enactments that agree on almost nothing — so the state rule is data and this
+// router is the calendar and the register built on top of it.
+const labourWelfareFundRoutes = require('./routes/labourWelfareFund.routes');
 const varianceReportRoutes = require('./routes/varianceReport.routes');
 const searchRoutes = require('./routes/search.routes');
 const emailRoutes = require('./routes/email.routes');
@@ -500,6 +505,10 @@ app.use('/api/monthly-updates', monthlyUpdatesRoutes);
 // part that belongs to this file.
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/fringe-benefits', fringeBenefitsRoutes);
+
+// #1701. The router owns `/rules`, `/preview`, `/calendar` and
+// `/contributions`.
+app.use('/api/labour-welfare-fund', labourWelfareFundRoutes);
 
 // Payroll variance reports, budget tracking, annual forecasting (#915).
 app.use('/api/reports', varianceReportRoutes);
