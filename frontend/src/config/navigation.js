@@ -592,9 +592,9 @@ export const APP_ROUTES = [
     ),
   },
   {
-    path: '/enterprise/ma-harmonization',
+    path: '/enterprise/succession-planning',
     component: lazy(
-      () => import('../pages/enterprise/MAHarmonizationHubPage'),
+      () => import('../pages/enterprise/SuccessionPlanningHubPage'),
     ),
     appShell: false,
   },
