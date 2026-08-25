@@ -239,4 +239,47 @@ if (import.meta.env.DEV) {
   });
 }
 
+/**
+ * Helper to extract data from an API response, handling both
+ * the new standard ResponseEnvelope ({ success: true, data: ... })
+ * and legacy shapes (res.data, res.data.employees, etc.).
+ */
+export const extractData = (response) => {
+  if (!response || !response.data) return null;
+  const body = response.data;
+
+  // New Envelope format
+  if (body.success === true && body.data !== undefined) {
+    return body.data;
+  }
+
+  // Legacy fallback
+  return body;
+};
+
+/**
+ * Helper to extract the error message from an API error, handling both
+ * the new standard ResponseEnvelope ({ success: false, error: { message } })
+ * and legacy shapes.
+ */
+export const extractErrorMessage = (error) => {
+  if (error?.response?.data) {
+    const body = error.response.data;
+
+    // New Envelope format
+    if (body.success === false && body.error && body.error.message) {
+      return body.error.message;
+    }
+
+    // Legacy fallback
+    if (body.message) {
+      return body.message;
+    }
+
+    return typeof body === 'string' ? body : 'An unexpected error occurred';
+  }
+
+  return error?.message || 'Network Error';
+};
+
 export default api;
