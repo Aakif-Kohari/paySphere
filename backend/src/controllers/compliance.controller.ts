@@ -8,10 +8,9 @@
  */
 
 import type { NextFunction, Request, Response } from 'express';
-const mongoose = require('mongoose') as typeof import('mongoose');
-const { Worker } =
-  require('node:worker_threads') as typeof import('node:worker_threads');
-const path = require('node:path') as typeof import('node:path');
+import mongoose from 'mongoose';
+import { Worker } from 'node:worker_threads';
+import * as path from 'node:path';
 
 const { aggregateFYData } = require('../utils/complianceAggregator') as {
   aggregateFYData: (
@@ -136,6 +135,12 @@ type EmployeeRecord = {
 type MongooseQuery<T> = {
   lean: () => Promise<T>;
   sort: (value: Record<string, 1 | -1>) => MongooseQuery<T>;
+  then: <TResult1 = T, TResult2 = never>(
+    onfulfilled?:
+      ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null,
+    onrejected?:
+      ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null,
+  ) => Promise<TResult1 | TResult2>;
 };
 
 type ComplianceConfigModel = {
@@ -285,20 +290,18 @@ export async function generateForm16(
   try {
     const { employeeId } = req.params;
 
-    if (!employeeId || !mongoose.Types.ObjectId.isValid(employeeId)) {
+    if (!employeeId || !mongoose.Types.ObjectId.isValid(employeeId as string)) {
       return sendValidationError(res, 'Invalid employee ID');
     }
 
     const fy = parseFinancialYear(
       queryValue(req.query.fy as FinancialYearQuery['fy']),
     );
-    if (!fy.ok) return sendValidationError(res, fy.message);
+    if (!fy.ok) return sendValidationError(res, (fy as any).message);
 
     const tenantId = requireTenant(req);
 
-    const config = await ComplianceConfig.findOne({ tenantId }).then((query) =>
-      query.lean(),
-    );
+    const config = await ComplianceConfig.findOne({ tenantId }).lean();
 
     if (!config) {
       return res.status(400).json({
@@ -343,7 +346,7 @@ export async function generateForm16(
         if (!result.success) {
           return next(
             new Error(
-              `Failed to generate Form 16: ${result.error || 'unknown error'}`,
+              `Failed to generate Form 16: ${(result as PdfWorkerFailure).error || 'unknown error'}`,
             ),
           );
         }
@@ -352,7 +355,7 @@ export async function generateForm16(
           userId: req.userId,
           action: 'COMPLIANCE_FORM16_GENERATE',
           resourceType: 'Employee',
-          resourceIds: [employeeId],
+          resourceIds: [employeeId as string],
           details: {
             employeeName: empData.employeeName,
             financialYear: fy.fyStartYear,
@@ -371,7 +374,9 @@ export async function generateForm16(
           `attachment; filename=Form16_${safeName}_${formatFY(fy.fyStartYear)}.pdf`,
         );
 
-        res.send(Buffer.from(result.pdfData));
+        res.send(
+          Buffer.from((result as PdfWorkerSuccess).pdfData as ArrayBuffer),
+        );
       });
     });
 
@@ -402,7 +407,7 @@ export async function generateForm24Q(
     const query = req.query as Form24QQuery;
     const fy = parseFinancialYear(queryValue(query.fy));
 
-    if (!fy.ok) return sendValidationError(res, fy.message);
+    if (!fy.ok) return sendValidationError(res, (fy as any).message);
 
     const quarterValue = queryValue(query.quarter) || 'Q4';
     const quarter = quarterValue.toUpperCase() as Quarter;
@@ -414,9 +419,7 @@ export async function generateForm24Q(
 
     const tenantId = requireTenant(req);
 
-    const config = await ComplianceConfig.findOne({ tenantId }).then(
-      (queryResult) => queryResult.lean(),
-    );
+    const config = await ComplianceConfig.findOne({ tenantId }).lean();
 
     if (!config) {
       return res.status(400).json({
@@ -520,9 +523,7 @@ export async function getComplianceConfig(
 ): Promise<Response | void> {
   try {
     const tenantId = requireTenant(req);
-    const config = await ComplianceConfig.findOne({ tenantId }).then((query) =>
-      query.lean(),
-    );
+    const config = await ComplianceConfig.findOne({ tenantId }).lean();
 
     return res.status(200).json({ config: config || null });
   } catch (error) {
@@ -610,7 +611,7 @@ export async function getTaxDeclarations(
     const query = req.query as EmployeeQuery;
     const fy = parseFinancialYear(queryValue(query.fy));
 
-    if (!fy.ok) return sendValidationError(res, fy.message);
+    if (!fy.ok) return sendValidationError(res, (fy as any).message);
 
     const tenantId = requireTenant(req);
     const filter: Record<string, unknown> = {
@@ -621,7 +622,7 @@ export async function getTaxDeclarations(
     const employeeId = queryValue(query.employeeId);
 
     if (employeeId) {
-      if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+      if (!mongoose.Types.ObjectId.isValid(employeeId as string)) {
         return sendValidationError(res, 'Invalid employee ID');
       }
 
@@ -650,7 +651,7 @@ export async function upsertTaxDeclaration(
   try {
     const { employeeId } = req.params;
 
-    if (!employeeId || !mongoose.Types.ObjectId.isValid(employeeId)) {
+    if (!employeeId || !mongoose.Types.ObjectId.isValid(employeeId as string)) {
       return sendValidationError(res, 'Invalid employee ID');
     }
 
@@ -658,14 +659,14 @@ export async function upsertTaxDeclaration(
     const query = req.query as FinancialYearQuery;
     const fy = parseFinancialYear(body.financialYear ?? queryValue(query.fy));
 
-    if (!fy.ok) return sendValidationError(res, fy.message);
+    if (!fy.ok) return sendValidationError(res, (fy as any).message);
 
     const tenantId = requireTenant(req);
 
     const employee = await Employee.findOne({
-      _id: employeeId,
+      _id: employeeId as string,
       tenantId,
-    }).then((queryResult) => queryResult.lean());
+    }).lean();
 
     if (!employee) {
       return res.status(404).json({ message: 'Employee not found' });
