@@ -323,6 +323,9 @@ app.use(redactionMiddleware);
 const responseMiddleware = require('./middlewares/response.middleware');
 app.use(responseMiddleware);
 
+const responseEnvelopeMiddleware = require('./middlewares/responseEnvelope.middleware');
+app.use(responseEnvelopeMiddleware);
+
 // Require request body for state-changing methods
 app.use('/api', requireBody);
 
