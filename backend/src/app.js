@@ -60,10 +60,18 @@ const employeeCompensationRoutes = require('./routes/employeeCompensation.routes
 // company, it is computed on a wage capped by section 12 rather than on the one
 // that is paid, and it produces a Rule 5 register.
 const statutoryBonusRoutes = require('./routes/statutoryBonus.routes');
+
+// Minimum Wages Act, 1948 (#1698). Next to the statutory bonus router because
+// the two are the same kind of thing — a floor the statute sets rather than a
+// figure the company chooses — and because section 12 of the Payment of Bonus
+// Act computes on the higher of ₹7,000 and the applicable minimum wage, so this
+// is where that number now comes from.
+const minimumWagesRoutes = require('./routes/minimumWages.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
 const settlementRoutes = require('./routes/settlement.routes');
+const severanceRoutes = require('./routes/severance.routes');
 
 // Gratuity actuarial valuation (#1344). Next to settlements on purpose: the
 // two are the same statute seen from opposite ends. `settlement.routes` pays
@@ -87,9 +95,11 @@ const flashcardRoutes = require('./routes/flashcard.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const integrationRoutes = require('./routes/integration.routes');
 const archiveRoutes = require('./routes/archive.routes');
+const documentVaultRoutes = require('./routes/documentVault.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
+const fringeBenefitsRoutes = require('./routes/fringeBenefits.routes');
 const varianceReportRoutes = require('./routes/varianceReport.routes');
 const searchRoutes = require('./routes/search.routes');
 const emailRoutes = require('./routes/email.routes');
@@ -120,6 +130,7 @@ const forecastRoutes = require('./routes/forecast.routes');
 const accountingRoutes = require('./routes/accounting.routes');
 const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
+const shiftPreferenceRoutes = require('./routes/shiftPreference.routes');
 const successionRoutes = require('./routes/succession.routes');
 const pyqRoutes = require('./routes/pyq.routes');
 
@@ -141,6 +152,7 @@ const assignmentRoutes = require('./routes/assignment.routes');
 // calculator — and exercising an option is a taxable perquisite the employer
 // has to withhold on, so it is payroll's business and not just HR's.
 const esopRoutes = require('./routes/esop.routes');
+const esppRoutes = require('./routes/espp.routes');
 const cryptoRouter = require('./services/CryptoPayrollService').default;
 
 // Requisitions, the candidate pipeline and interview scorecards (#1074). The
@@ -148,6 +160,7 @@ const cryptoRouter = require('./services/CryptoPayrollService').default;
 // before it — `OfferLetterBuilder.jsx` types in a name and a salary by hand
 // because there was no candidate record to draw them from.
 const recruitmentRoutes = require('./routes/recruitment.routes');
+const referralBonusRoutes = require('./routes/referralBonus.routes');
 
 // Salary disbursement (#1075). Payroll was computed to the rupee and then
 // stopped: `payroll.model.js` has a `disbursed` status and nothing in the
@@ -165,6 +178,7 @@ const salaryAdjustmentRoutes = require('./routes/salaryAdjustment.routes');
 const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
 const teamRoutes = require('./routes/team.routes');
+const healthChallengeRoutes = require('./routes/healthChallenge.routes');
 const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
@@ -366,6 +380,12 @@ app.use('/api/compensation', employeeCompensationRoutes);
 // invites them to be confused. The router owns `/computations`, `/preview` and
 // `/ledger`.
 app.use('/api/statutory-bonus', statutoryBonusRoutes);
+
+// #1698. Its own prefix rather than a sub-path of `/api/compliance`: the
+// compliance router is about what gets filed with the tax authorities, and this
+// is about what is paid to the employee before any of that. The router owns
+// `/notifications`, `/preview` and `/assessments`.
+app.use('/api/minimum-wages', minimumWagesRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/employee-portal', employeePortalRoutes);
 app.use('/api/schedules', schedulerRoutes);
@@ -385,6 +405,9 @@ app.use('/api/pension', pensionRoutes);
 // The archive browser for soft-deleted employees (#759). Mounted by one of the
 // two duplicated route tables and not the other.
 app.use('/api/archive', archiveRoutes);
+
+// Employee Document Vault
+app.use('/api/document-vault', documentVaultRoutes);
 
 // #590 shipped the controller, the models, the router and a WorkflowBuilder
 // page, and never registered the router — so the whole engine was a 404 and the
@@ -451,6 +474,7 @@ app.use('/api/monthly-updates', monthlyUpdatesRoutes);
 // answer 403 until the EXPENSE permissions exist (#794); mounting them is the
 // part that belongs to this file.
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/fringe-benefits', fringeBenefitsRoutes);
 
 // Payroll variance reports, budget tracking, annual forecasting (#915).
 app.use('/api/reports', varianceReportRoutes);
@@ -512,6 +536,7 @@ app.use('/api/clients', clientInvoiceRoutes);
 // Same shape: the router defines `/roster`, `/templates` and `/swap/...`, and
 // `Roster.jsx` calls `/api/shifts/roster`.
 app.use('/api/shifts', shiftRosterRoutes);
+app.use('/api/shift-preferences', shiftPreferenceRoutes);
 
 // Succession Planning Hub
 app.use('/api/succession', successionRoutes);
@@ -529,11 +554,15 @@ app.use('/api/assignments', assignmentRoutes);
 // Equity (#1073). The router owns `/schemes`, `/grants` and `/my-grants`, so
 // the prefix carries no noun of its own.
 app.use('/api/esop', esopRoutes);
+app.use('/api/espp', esppRoutes);
 app.use('/api', cryptoRouter);
 
 // Recruitment (#1074). The router owns `/requisitions`, `/candidates` and
 // `/analytics`, so the prefix carries no noun of its own.
 app.use('/api/recruitment', recruitmentRoutes);
+
+// Referral Bonus Tracking
+app.use('/api/referral-bonuses', referralBonusRoutes);
 
 // Salary disbursement (#1075). The router owns `/batches` and `/profiles`.
 app.use('/api/disbursements', disbursementRoutes);
@@ -551,6 +580,11 @@ app.use('/api/admin', subscriptionAdminRoutes);
 app.use('/api/leave-closure', leaveClosureRoutes);
 app.use('/api/fbp', fbpRoutes);
 app.use('/api/team', teamRoutes);
+
+// Peer Nomination & Awards (#peer-nominations). Employee-driven recognition
+// with category configuration, cycle management, voting, review, and analytics.
+const peerNominationRoutes = require('./routes/peerNomination.routes');
+app.use('/api/peer-nominations', peerNominationRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.

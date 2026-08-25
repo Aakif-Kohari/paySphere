@@ -68,6 +68,18 @@ const PERMISSIONS = {
   // than payroll admin's.
   READ_STATUTORY_BONUS: 'READ_STATUTORY_BONUS',
   MANAGE_STATUTORY_BONUS: 'MANAGE_STATUTORY_BONUS',
+
+  // --- Minimum Wages Act, 1948 (#1698) -------------------------------------
+  //
+  // Three rather than two, because transcribing a gazetted rate and committing
+  // the finding that measures the employer against it are different acts. The
+  // rate is a fact about the world; the assessment is a statement about what
+  // this employer owes, and it is the document an inspector is handed. Holding
+  // both halves of that check in one pair of hands is how a shortfall gets
+  // assessed away by editing the rate it was measured against.
+  READ_MINIMUM_WAGE: 'READ_MINIMUM_WAGE',
+  MANAGE_MINIMUM_WAGE_SCHEDULE: 'MANAGE_MINIMUM_WAGE_SCHEDULE',
+  RUN_MINIMUM_WAGE_ASSESSMENT: 'RUN_MINIMUM_WAGE_ASSESSMENT',
   // Statutory compliance (#933, reachable since #951). Deliberately not
   // READ_REPORT: a Form 16 is one person's complete tax position and a Form 24Q
   // export is every employee's PAN, salary and tax in one file, while
@@ -345,6 +357,21 @@ const PERMISSION_DEFINITIONS = [
       'Commit a statutory bonus computation for an accounting year and record its payment',
   },
   {
+    name: PERMISSIONS.READ_MINIMUM_WAGE,
+    description:
+      'View notified minimum wage rates, the shortfall register and what a retrospective revision would cost',
+  },
+  {
+    name: PERMISSIONS.MANAGE_MINIMUM_WAGE_SCHEDULE,
+    description:
+      'Record a gazetted minimum wage notification, which is the rate every assessment is measured against',
+  },
+  {
+    name: PERMISSIONS.RUN_MINIMUM_WAGE_ASSESSMENT,
+    description:
+      'Commit a minimum wage assessment for a wage period, which states what the establishment owes',
+  },
+  {
     name: PERMISSIONS.READ_COMPLIANCE,
     description:
       'View compliance settings and download Form 16 certificates and Form 24Q returns',
@@ -618,6 +645,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_STATUTORY_BONUS,
       PERMISSIONS.MANAGE_STATUTORY_BONUS,
 
+      // #1698. All three, including the two that are kept apart from each other
+      // below — the owner is the one account that is allowed to be both halves
+      // of a check, because there is nobody above it to be the other half.
+      PERMISSIONS.READ_MINIMUM_WAGE,
+      PERMISSIONS.MANAGE_MINIMUM_WAGE_SCHEDULE,
+      PERMISSIONS.RUN_MINIMUM_WAGE_ASSESSMENT,
+
       PERMISSIONS.READ_COMPLIANCE,
       PERMISSIONS.MANAGE_COMPLIANCE,
       // Held by the owner alone: a role edit changes what every other account
@@ -722,6 +756,15 @@ const ROLE_DEFINITIONS = [
       // four years through the set-on/set-off ledger, so it stays with the
       // owner alongside MANAGE_COMPLIANCE, which HR also does not hold.
       PERMISSIONS.READ_STATUTORY_BONUS,
+
+      // #1698. HR reads the shortfall register and transcribes the gazetted
+      // rate — "is this offer above the notified minimum for that state" is an
+      // HR question and both halves of it are HR work. It does not commit the
+      // assessment, for the reason the three names were split in the first
+      // place: whoever maintains the rate should not also be the one certifying
+      // the establishment against it.
+      PERMISSIONS.READ_MINIMUM_WAGE,
+      PERMISSIONS.MANAGE_MINIMUM_WAGE_SCHEDULE,
 
       // #1011. The day-to-day half of each new area, and not the half that
       // moves money.

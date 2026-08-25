@@ -249,6 +249,23 @@ export const APP_ROUTES = [
     group: 'payroll',
     icon: 'book',
   },
+  {
+    // Next to Statutory bonus for the same reason that one is in Payroll: both
+    // are floors the statute sets on what an employee is paid, rather than
+    // figures the company chooses. Section 12 of the Payment of Bonus Act even
+    // computes on the higher of ₹7,000 and the applicable minimum wage, so the
+    // two pages answer halves of one question (#1698).
+    //
+    // No `employee: true`. The register is every colleague's wage against the
+    // notified rate in one table, and advertising it to everyone would be
+    // advertising a 403.
+    path: '/minimum-wages',
+    component: lazy(() => import('../pages/MinimumWageCompliance')),
+    appShell: true,
+    label: 'Minimum wages',
+    group: 'payroll',
+    icon: 'shield',
+  },
 
   // ── Finance ──────────────────────────────────────────────────────────────
   {
@@ -279,6 +296,14 @@ export const APP_ROUTES = [
     group: 'finance',
     icon: 'wallet',
     employee: true,
+  },
+  {
+    path: '/adjudication-workspace',
+    component: lazy(() => import('../pages/AdjudicationWorkspace')),
+    appShell: true,
+    label: 'Expense Adjudication',
+    group: 'finance',
+    icon: 'checkShield',
   },
   {
     path: '/accounting',
@@ -335,11 +360,26 @@ export const APP_ROUTES = [
 
   // ── Workplace ────────────────────────────────────────────────────────────
   {
+    path: '/predictive-overtime',
+    component: lazy(() => import('../pages/PredictiveOvertimeDashboard')),
+    label: 'Predictive Overtime',
+    group: 'workplace',
+    icon: 'chart',
+  },
+  {
     path: '/roster',
     component: lazy(() => import('../pages/Roster')),
     label: 'Shift roster',
     group: 'workplace',
     icon: 'calendar',
+    employee: true,
+  },
+  {
+    path: '/shift-marketplace',
+    component: lazy(() => import('../pages/DynamicShiftBidding')),
+    label: 'Shift Marketplace',
+    group: 'workplace',
+    icon: 'briefcase',
     employee: true,
   },
   {
@@ -469,6 +509,12 @@ export const APP_ROUTES = [
       () => import('../pages/cardiology/CardiologySTEMICathLabPage'),
     ),
   },
+  {
+    path: '/enterprise/mechanical-circulatory-support',
+    component: lazy(
+      () => import('../pages/circulatory/MechanicalCirculatorySupportPage'),
+    ),
+  },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
@@ -527,6 +573,58 @@ export const APP_ROUTES = [
 export const UNROUTED_PAGES = {
   // Rendered by App.jsx as the catch-all `*` route, not from the registry.
   'NotFound.jsx': 'the catch-all route',
+  'AllowanceAuditDashboard.jsx': 'Work in progress',
+  'BiometricSyncDashboard.jsx': 'Work in progress',
+  'BoomerangRehireWizard.jsx': 'Work in progress',
+  'CommissionDashboard.jsx': 'Work in progress',
+  'ComplianceDashboard.jsx': 'Work in progress',
+  'ComplianceVault.jsx': 'Work in progress',
+  'EntityHierarchy.jsx': 'Work in progress',
+  'EquitySettlementDashboard.jsx': 'Work in progress',
+  'EscrowAdmin.jsx': 'Work in progress',
+  'EthicsReviewBoard.jsx': 'Work in progress',
+  'EWAPortal.jsx': 'Work in progress',
+  'ExpenseSubmission.jsx': 'Work in progress',
+  'FleetDashboard.jsx': 'Work in progress',
+  'FXPayrollDashboard.jsx': 'Work in progress',
+  'GarnishmentAdmin.jsx': 'Work in progress',
+  'GlobalMobilityDashboard.jsx': 'Work in progress',
+  'HandoverDashboard.jsx': 'Work in progress',
+  'InternalHiringPipeline.jsx': 'Work in progress',
+  'InternalJobBoard.jsx': 'Work in progress',
+  'InviteAcceptPage.jsx': 'Work in progress',
+  'KudosFeed.jsx': 'Work in progress',
+  'LoanPortal.jsx': 'Work in progress',
+  'ManagerClearance.jsx': 'Work in progress',
+  'MatrixOrgChart.jsx': 'Work in progress',
+  'OkrDashboard.jsx': 'Work in progress',
+  'OnboardingDashboard.jsx': 'Work in progress',
+  'OpenShifts.jsx': 'Work in progress',
+  'PayrollComparisonDashboard.jsx': 'Work in progress',
+  'PolicySettings.jsx': 'Work in progress',
+  'RecognitionSettings.jsx': 'Work in progress',
+  'ReconciliationDashboard.jsx': 'Work in progress',
+  'ReferralAdminDashboard.jsx': 'Work in progress',
+  'ReferralPortal.jsx': 'Work in progress',
+  'RelocationTracker.jsx': 'Work in progress',
+  'RemoteWorkerTaxReport.jsx': 'Work in progress',
+  'ReversalDashboard.jsx': 'Work in progress',
+  'RosterGenerator.jsx': 'Work in progress',
+  'ShiftMarketplace.jsx': 'Work in progress',
+  'TaxJurisdictionSettings.jsx': 'Work in progress',
+  'TimesheetTracker.jsx': 'Work in progress',
+  'TipPoolDashboard.jsx': 'Work in progress',
+  'ToilDashboard.jsx': 'Work in progress',
+  'ToilPolicySettings.jsx': 'Work in progress',
+  'TrainingCatalog.jsx': 'Work in progress',
+  'TravelDesk.jsx': 'Work in progress',
+  'TravelSettlement.jsx': 'Work in progress',
+  'TripLogger.jsx': 'Work in progress',
+  'UnionAdminDashboard.jsx': 'Work in progress',
+  'VendorComplianceVault.jsx': 'Work in progress',
+  'WCAuditDashboard.jsx': 'Work in progress',
+  'WellnessDashboard.jsx': 'Work in progress',
+  'WhistleblowerPortal.jsx': 'Work in progress',
 };
 
 /**
