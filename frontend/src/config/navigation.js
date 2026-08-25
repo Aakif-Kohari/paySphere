@@ -501,6 +501,13 @@ export const APP_ROUTES = [
     ),
     appShell: false,
   },
+  {
+    path: '/enterprise/salary-benchmarking',
+    component: lazy(
+      () => import('../pages/compensation/SalaryBenchmarkingHubPage'),
+    ),
+    appShell: false,
+  },
 
   {
     path: '/settings',
