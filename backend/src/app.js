@@ -122,6 +122,7 @@ const forecastRoutes = require('./routes/forecast.routes');
 const accountingRoutes = require('./routes/accounting.routes');
 const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
+const shiftPreferenceRoutes = require('./routes/shiftPreference.routes');
 const successionRoutes = require('./routes/succession.routes');
 const pyqRoutes = require('./routes/pyq.routes');
 
@@ -517,6 +518,7 @@ app.use('/api/clients', clientInvoiceRoutes);
 // Same shape: the router defines `/roster`, `/templates` and `/swap/...`, and
 // `Roster.jsx` calls `/api/shifts/roster`.
 app.use('/api/shifts', shiftRosterRoutes);
+app.use('/api/shift-preferences', shiftPreferenceRoutes);
 
 // Succession Planning Hub
 app.use('/api/succession', successionRoutes);
