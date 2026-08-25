@@ -494,6 +494,13 @@ export const APP_ROUTES = [
       () => import('../pages/onboarding/EnterpriseOnboardingLifecyclePage'),
     ),
   },
+  {
+    path: '/enterprise/esop-management',
+    component: lazy(
+      () => import('../pages/enterprise/EsopManagementHubPage'),
+    ),
+    appShell: false,
+  },
 
   {
     path: '/settings',
