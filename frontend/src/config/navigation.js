@@ -592,9 +592,9 @@ export const APP_ROUTES = [
     ),
   },
   {
-    path: '/enterprise/succession-planning',
+    path: '/enterprise/esop-management',
     component: lazy(
-      () => import('../pages/enterprise/SuccessionPlanningHubPage'),
+      () => import('../pages/enterprise/EsopManagementHubPage'),
     ),
     appShell: false,
   },
