@@ -400,6 +400,17 @@ export const APP_ROUTES = [
 
   // ── Workplace ────────────────────────────────────────────────────────────
   {
+    // In Workplace rather than Compliance: the fix for a spread-over breach is
+    // a different rota, and rostering lives here. That it also produces a
+    // statutory finding is true of most of what this group does (#1702).
+    path: '/working-hours',
+    component: lazy(() => import('../pages/WorkingHoursCompliance')),
+    appShell: true,
+    label: 'Working hours',
+    group: 'workplace',
+    icon: 'calendar',
+  },
+  {
     path: '/predictive-overtime',
     component: lazy(() => import('../pages/PredictiveOvertimeDashboard')),
     label: 'Predictive Overtime',

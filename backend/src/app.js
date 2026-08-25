@@ -70,6 +70,12 @@ const minimumWagesRoutes = require('./routes/minimumWages.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
+
+// Working hours compliance (#1702). Next to attendance because it reads that
+// ledger, and separate from it because the questions differ: attendance answers
+// "was this person here", and this answers "is this shift pattern lawful" —
+// which is a question about the employer rather than about the employee.
+const workingHoursRoutes = require('./routes/workingHours.routes');
 const settlementRoutes = require('./routes/settlement.routes');
 
 // Employees' Compensation Act, 1923 (#1699). Next to settlements because both
@@ -415,6 +421,12 @@ app.use('/api/employee-portal', employeePortalRoutes);
 app.use('/api/schedules', schedulerRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/attendance', attendanceRoutes);
+
+// #1702. Its own prefix rather than a sub-path of `/api/attendance`: an
+// attendance row is about one person's day and a finding here is about a shift
+// pattern across a quarter. The router owns `/limits`, `/assessment` and
+// `/assessments`.
+app.use('/api/working-hours', workingHoursRoutes);
 app.use('/api/settlements', settlementRoutes);
 
 // #1699. Its own prefix rather than a sub-path of `/api/settlements`: a
