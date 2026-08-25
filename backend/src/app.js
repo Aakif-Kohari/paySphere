@@ -168,6 +168,7 @@ const salaryAdjustmentRoutes = require('./routes/salaryAdjustment.routes');
 const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
 const teamRoutes = require('./routes/team.routes');
+const healthChallengeRoutes = require('./routes/healthChallenge.routes');
 const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
@@ -556,6 +557,9 @@ app.use('/api/admin', subscriptionAdminRoutes);
 app.use('/api/leave-closure', leaveClosureRoutes);
 app.use('/api/fbp', fbpRoutes);
 app.use('/api/team', teamRoutes);
+
+// Employee Health Challenges & Wellness Tracking
+app.use('/api/health-challenges', healthChallengeRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
