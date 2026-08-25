@@ -494,6 +494,13 @@ export const APP_ROUTES = [
       () => import('../pages/onboarding/EnterpriseOnboardingLifecyclePage'),
     ),
   },
+  {
+    path: '/enterprise/employee-relations',
+    component: lazy(
+      () => import('../pages/enterprise/EmployeeRelationsHubPage'),
+    ),
+    appShell: false,
+  },
 
   {
     path: '/settings',
