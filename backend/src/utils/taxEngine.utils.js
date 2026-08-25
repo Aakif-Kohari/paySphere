@@ -68,7 +68,7 @@ async function getActiveStateRules(tenantId, stateCode) {
         tenantId,
         jurisdictionId: jurisdiction._id,
         effectiveFrom: { $lte: now },
-        $or: [{ effectiveTo: null }, { effectiveTo: { $gte: now }],
+        $or: [{ effectiveTo: null }, { effectiveTo: { $gte: now } }],
     }
   ).sort({ effectiveFrom: -1 });
 

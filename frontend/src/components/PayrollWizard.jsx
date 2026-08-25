@@ -62,6 +62,7 @@ export default function PayrollWizard() {
 
   // Core Wizard States
   const [step, setStep] = useState(1);
+  const [totalSteps, setTotalSteps] = useState(6);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [employees, setEmployees] = useState([]);
@@ -69,6 +70,11 @@ export default function PayrollWizard() {
   const [includedEmployees, setIncludedEmployees] = useState({});
   const [adjustments, setAdjustments] = useState({}); // empId -> { leaveDays, overtimeHours, bonus, deductions }
   const [warnings, setWarnings] = useState({}); // empId -> { field -> message }
+
+  const [comparisonData, setComparisonData] = useState(null);
+  const [loadingComparison, setLoadingComparison] = useState(false);
+  const [selectedAnomaly, setSelectedAnomaly] = useState(null);
+  const [approvedAnomalies, setApprovedAnomalies] = useState({}); // empId -> boolean
 
   // Submit / Finalize states
   const [confirmed, setConfirmed] = useState(false);
@@ -145,8 +151,17 @@ export default function PayrollWizard() {
     if (step === 1) return true;
     if (step === 2) return getIncludedEmployeesList().length > 0;
     if (step === 3) return true;
-    if (step === 4) return true;
-    if (step === 5) return confirmed;
+    if (step === 4) {
+       // Anomaly review step.
+       if (loadingComparison) return false;
+       const criticalAnomalies = comparisonData?.categories?.anomalies?.filter(
+          a => a.anomalies.some(an => an.type === 'CRITICAL')
+       ) || [];
+       const unapproved = criticalAnomalies.filter(a => !approvedAnomalies[a.employeeId]);
+       return unapproved.length === 0;
+    }
+    if (step === 5) return true;
+    if (step === 6) return confirmed;
     return false;
   };
 
@@ -872,8 +887,76 @@ export default function PayrollWizard() {
           </div>
         )}
 
-        {/* STEP 4: Summary & Totals */}
+        {/* STEP 4: Anomaly Review */}
         {step === 4 && (
+          <div>
+            <h2
+              ref={headingRef}
+              tabIndex={-1}
+              style={{ fontSize: 22, fontWeight: 700, marginBottom: 8, outline: "none" }}
+            >
+              Anomaly Review
+            </h2>
+            <p style={{ fontSize: 14, color: isDark ? "#9CA3AF" : "#6B7280", marginBottom: 20 }}>
+              Review significant deviations from previous payroll periods. Critical anomalies must be approved to proceed.
+            </p>
+            
+            {loadingComparison ? (
+               <div style={{ padding: 20, textAlign: "center" }}>Checking anomalies...</div>
+            ) : comparisonData?.categories?.anomalies?.length > 0 ? (
+               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {comparisonData.categories.anomalies.map(record => {
+                     const isCritical = record.anomalies.some(a => a.type === 'CRITICAL');
+                     const isApproved = approvedAnomalies[record.employeeId];
+                     
+                     return (
+                        <div key={record.employeeId} style={{
+                           padding: 16,
+                           borderRadius: 8,
+                           border: isCritical && !isApproved ? "1.5px solid #FCA5A5" : "1.5px solid #E5E7EB",
+                           background: isCritical && !isApproved ? "#FEF2F2" : (isDark ? "#111827" : "white"),
+                           display: "flex",
+                           justifyContent: "space-between",
+                           alignItems: "center"
+                        }}>
+                           <div>
+                              <div style={{ fontWeight: 600, color: isCritical && !isApproved ? "#B91C1C" : "inherit" }}>{record.employeeName}</div>
+                              <div style={{ fontSize: 13, marginTop: 4 }}>
+                                 {record.anomalies.map((a, i) => <div key={i}>{a.type}: {a.reason}</div>)}
+                              </div>
+                           </div>
+                           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                              {isCritical && (
+                                 <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                                    <input 
+                                       type="checkbox" 
+                                       checked={!!isApproved} 
+                                       onChange={(e) => setApprovedAnomalies(prev => ({...prev, [record.employeeId]: e.target.checked}))}
+                                    />
+                                    Approve
+                                 </label>
+                              )}
+                              <button 
+                                 onClick={() => setSelectedAnomaly(record)}
+                                 style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #D1D5DB", background: "white", cursor: "pointer", fontSize: 12 }}
+                              >
+                                 Review
+                              </button>
+                           </div>
+                        </div>
+                     );
+                  })}
+               </div>
+            ) : (
+               <div style={{ padding: 20, textAlign: "center", border: "1px dashed #D1D5DB", borderRadius: 8 }}>
+                 No anomalies detected. You can proceed.
+               </div>
+            )}
+          </div>
+        )}
+
+        {/* STEP 5: Summary & Totals */}
+        {step === 5 && (
           <div>
             <h2
               ref={headingRef}
@@ -939,8 +1022,8 @@ export default function PayrollWizard() {
           </div>
         )}
 
-        {/* STEP 5: Confirm & Submit */}
-        {step === 5 && (
+        {/* STEP 6: Confirm & Submit */}
+        {step === 6 && (
           <div>
             <h2
               ref={headingRef}
@@ -1057,8 +1140,24 @@ export default function PayrollWizard() {
         </button>
 
         <button
-          onClick={() => {
-            if (step < 5) {
+          onClick={async () => {
+            if (step === 3) {
+               // Load comparison data before moving to step 4
+               setLoadingComparison(true);
+               setStep(4);
+               try {
+                 const monthA = selectedMonth === 1 ? 12 : selectedMonth - 1;
+                 const yearA = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
+                 const res = await api.get('/api/payroll-comparison/compare', {
+                    params: { monthA, yearA, monthB: selectedMonth, yearB: selectedYear }
+                 });
+                 setComparisonData(res.data.data);
+               } catch (err) {
+                 console.error(err);
+               } finally {
+                 setLoadingComparison(false);
+               }
+            } else if (step < 6) {
               setStep((s) => s + 1);
             } else {
               handleFinalize();
@@ -1078,9 +1177,39 @@ export default function PayrollWizard() {
             minHeight: 44,
           }}
         >
-          {submitting ? "Processing..." : step === 5 ? "Submit Payroll" : "Next"}
+          {submitting ? "Processing..." : step === 6 ? "Submit Payroll" : "Next"}
         </button>
       </div>
+      
+      {/* Dynamic import for drilldown to avoid circular dep issues in this component. In real app, import at top. */}
+      {selectedAnomaly && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000, background: "rgba(0,0,0,0.5)" }}>
+           <div style={{ position: "absolute", top: 20, right: 20, bottom: 20, width: 600, background: "white", borderRadius: 8, padding: 20, overflowY: "auto" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
+                 <h3>{selectedAnomaly.employeeName} Comparison</h3>
+                 <button onClick={() => setSelectedAnomaly(null)} style={{ border: "none", background: "none", fontSize: 24, cursor: "pointer" }}>&times;</button>
+              </div>
+              
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                 <div>
+                    <h4>Previous Period</h4>
+                    <div>Net Pay: ₹{selectedAnomaly.periodA?.netSalary}</div>
+                    <div>Base Salary: ₹{selectedAnomaly.periodA?.baseSalary}</div>
+                 </div>
+                 <div>
+                    <h4>Current Period</h4>
+                    <div>Net Pay: ₹{selectedAnomaly.periodB?.netSalary}</div>
+                    <div>Base Salary: ₹{selectedAnomaly.periodB?.baseSalary}</div>
+                 </div>
+              </div>
+              
+              <div style={{ marginTop: 24 }}>
+                 <h4>Differences</h4>
+                 <div>Net Pay Diff: {selectedAnomaly.diff.netSalaryPct.toFixed(2)}%</div>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

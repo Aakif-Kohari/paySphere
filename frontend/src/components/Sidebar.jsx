@@ -439,15 +439,15 @@ const Sidebar = ({
             {t('settings.profile', 'Profile settings')}
           </Link>
 
-          <button
-            onClick={() => {
-              resetTour(navigate);
-              onClose();
-            }}
-            className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 transition font-medium"
+         <button
+         onClick={() => {
+         resetTour(navigate);
+          onClose();
+          }}
+          className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 transition font-medium"
           >
-            <ICONS.help />
-            Onboarding Tour
+          <ICONS.help />
+           Onboarding Tour
           </button>
 
           <button
