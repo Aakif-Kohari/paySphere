@@ -195,6 +195,54 @@ describe('section 66 night hours', () => {
     expect(entry.severity).toBe(SEVERITY.BREACH);
   });
 
+  it('catches a shift that ends half an hour inside the window', () => {
+    // The hour component of 19:30 is 19, so a whole-hour comparison against a
+    // window starting at 19:00 misses the half hour that is actually in it.
+    const result = evaluateDay({
+      date: '2026-06-01',
+      sessions: [session('2026-06-01', '11:00', '19:30')],
+      nightHoursRestricted: true,
+    });
+
+    expect(result.findings.map((f) => f.code)).toContain(FINDING.NIGHT_HOURS);
+  });
+
+  it('leaves a shift that ends exactly on the boundary alone', () => {
+    const result = evaluateDay({
+      date: '2026-06-01',
+      sessions: [
+        session('2026-06-01', '10:30', '14:00'),
+        session('2026-06-01', '14:45', '19:00'),
+      ],
+      nightHoursRestricted: true,
+    });
+
+    expect(result.findings).toEqual([]);
+  });
+
+  it('catches a shift that runs right up to six in the morning', () => {
+    // The other boundary, and not symmetrical with the evening one: a shift
+    // ending at exactly 06:00 worked right up to the window's close, while one
+    // ending at exactly 19:00 never entered it.
+    const result = evaluateDay({
+      date: '2026-06-01',
+      sessions: [session('2026-06-01', '02:00', '06:00')],
+      nightHoursRestricted: true,
+    });
+
+    expect(result.findings.map((f) => f.code)).toContain(FINDING.NIGHT_HOURS);
+  });
+
+  it('catches an early-morning start inside the window', () => {
+    const result = evaluateDay({
+      date: '2026-06-01',
+      sessions: [session('2026-06-01', '05:30', '13:00')],
+      nightHoursRestricted: true,
+    });
+
+    expect(result.findings.map((f) => f.code)).toContain(FINDING.NIGHT_HOURS);
+  });
+
   it('is informational, not silent, under a state exemption', () => {
     // The exemptions carry conditions on transport, group size and consent, and
     // those are what get inspected — so the shift is still worth surfacing.
@@ -222,6 +270,9 @@ describe('the week', () => {
         session(date, '13:30', hours[1]),
       ],
     }));
+
+  /** A day off, as the attendance ledger records one: a row with no sessions. */
+  const restDay = (date) => ({ date, sessions: [] });
 
   const employee = { employeeId: 'e1', name: 'A Kumar' };
 
@@ -296,7 +347,7 @@ describe('the week', () => {
     );
   });
 
-  it('reports a week with no holiday at all', () => {
+  it('reports a week with no holiday and none substituted either side', () => {
     const result = assessEmployee({
       employee,
       days: week([
@@ -311,6 +362,89 @@ describe('the week', () => {
     });
 
     expect(result.findings.map((f) => f.code)).toContain(
+      FINDING.WEEKLY_HOLIDAY,
+    );
+  });
+
+  it('accepts a holiday substituted inside the three days after', () => {
+    // Section 52(1) permits the weekly holiday to be substituted by one of the
+    // three days immediately before or after. A seven-day week with a rest day
+    // on the Tuesday following is compliant, and reporting it would be
+    // asserting a breach the Act expressly allows.
+    //
+    // 8 and 9 June are worked and 10 June is recorded with no sessions — three
+    // days past the week that ended on the 7th, so inside the window.
+    const result = assessEmployee({
+      employee,
+      days: [
+        ...week([
+          '2026-06-01',
+          '2026-06-02',
+          '2026-06-03',
+          '2026-06-04',
+          '2026-06-05',
+          '2026-06-06',
+          '2026-06-07',
+        ]),
+        ...week(['2026-06-08', '2026-06-09']),
+        restDay('2026-06-10'),
+      ],
+    });
+
+    const firstWeek = result.weeks[0];
+
+    expect(firstWeek.workedDays).toBe(7);
+    expect(firstWeek.holidaySubstituted).toBe(true);
+    expect(firstWeek.findings.map((f) => f.code)).not.toContain(
+      FINDING.WEEKLY_HOLIDAY,
+    );
+  });
+
+  it('reports the week where nothing follows it in the record', () => {
+    // A substitution needs positive evidence of a rest day. Seven recorded days
+    // all worked is evidence that the week had no holiday; days that were never
+    // recorded are not evidence that one was substituted.
+    const result = assessEmployee({
+      employee,
+      days: week([
+        '2026-06-01',
+        '2026-06-02',
+        '2026-06-03',
+        '2026-06-04',
+        '2026-06-05',
+        '2026-06-06',
+        '2026-06-07',
+      ]),
+    });
+
+    expect(result.weeks[0].holidaySubstituted).toBe(false);
+    expect(result.weeks[0].findings.map((f) => f.code)).toContain(
+      FINDING.WEEKLY_HOLIDAY,
+    );
+  });
+
+  it('does not accept a rest day beyond the substitution window', () => {
+    // 8 to 11 June worked, so the recorded rest day is the 12th — five days
+    // past the week that ended on the 7th, and outside the three-day window.
+    const result = assessEmployee({
+      employee,
+      days: [
+        ...week([
+          '2026-06-01',
+          '2026-06-02',
+          '2026-06-03',
+          '2026-06-04',
+          '2026-06-05',
+          '2026-06-06',
+          '2026-06-07',
+        ]),
+        ...week(['2026-06-08', '2026-06-09', '2026-06-10', '2026-06-11']),
+        restDay('2026-06-12'),
+      ],
+    });
+
+    expect(result.weeks[0].holidaySubstituted).toBe(false);
+    expect(result.weeks[0].findings.map((f) => f.code)).toContain(
       FINDING.WEEKLY_HOLIDAY,
     );
   });

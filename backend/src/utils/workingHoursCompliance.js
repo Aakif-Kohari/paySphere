@@ -301,15 +301,26 @@ function evaluateDay({
   // (transport, a minimum group size, consent) and those are what get
   // inspected, so the fact that such a shift happened is worth surfacing.
   if (nightHoursRestricted) {
+    // Fractional hours rather than `getUTCHours()`. A shift ending at 19:30 has
+    // an hour component of 19, so a whole-hour comparison against a window
+    // starting at 19:00 misses the half hour that is actually inside it.
+    const hourOf = (date) =>
+      date.getUTCHours() + date.getUTCMinutes() / MINUTES_PER_HOUR;
+
+    // The window is [19:00, 06:00), so a session overlaps it when it *starts*
+    // inside it or *ends* past its opening. Both ends are tested because a shift
+    // can enter the window from either side, and the two boundaries are not
+    // symmetrical: a shift ending at exactly 19:00 never worked inside the
+    // window, while one ending at exactly 06:00 worked right up to it.
     const inNightWindow = usable.some((session) => {
-      const startHour = session.from.getUTCHours();
-      const endHour = session.to.getUTCHours();
+      const from = hourOf(session.from);
+      const to = hourOf(session.to);
 
       return (
-        startHour >= rules.nightHoursStart ||
-        startHour < rules.nightHoursEnd ||
-        endHour > rules.nightHoursStart ||
-        endHour <= rules.nightHoursEnd
+        from >= rules.nightHoursStart ||
+        from < rules.nightHoursEnd ||
+        to > rules.nightHoursStart ||
+        to <= rules.nightHoursEnd
       );
     });
 
@@ -398,9 +409,11 @@ function groupIntoWeeks(days, rules) {
  *
  * @param {object} week
  * @param {object} rules
+ * @param {Array<object>} [surroundingDays] every evaluated day, for the section
+ *   52 substitution window, which reaches outside the week by definition
  * @returns {object}
  */
-function evaluateWeek(week, rules) {
+function evaluateWeek(week, rules, surroundingDays) {
   const ordinaryHours = round2(
     week.days.reduce((sum, day) => sum + day.hoursWorked, 0),
   );
@@ -433,17 +446,49 @@ function evaluateWeek(week, rules) {
   }
 
   // Section 52 is measured on the week rather than on a rolling seven days: the
-  // Act gives a weekly holiday in each week, and a substituted holiday inside
-  // the permitted window satisfies it.
+  // Act gives a weekly holiday in each week.
+  //
+  // A week with every day worked is not automatically a breach, which is the
+  // part that needs the surrounding days. Section 52(1) allows the holiday to be
+  // substituted by one of the three days immediately before or after, so a
+  // seven-day week is compliant when a rest day falls inside that window on
+  // either side. Reporting one without looking would be asserting a breach the
+  // Act expressly permits.
+  //
+  // A substitution needs a *recorded* rest day. Seven recorded days all worked
+  // is evidence that the week had no holiday; days that were never recorded are
+  // not evidence that one was substituted, so the finding stands. That is the
+  // opposite direction from the consecutive-days rule below, and deliberately:
+  // in both cases the engine asserts only from what the ledger actually says.
   const workedDays = week.days.filter((day) => day.worked).length;
+
+  let substituted = false;
+
   if (workedDays >= 7) {
-    findings.push(
-      finding(
-        FINDING.WEEKLY_HOLIDAY,
-        `every day worked in the week beginning ${weekLabel}, with no weekly holiday and no substituted one inside the ${rules.substitutionWindowDays}-day window`,
-        { weekStart: week.weekStart },
-      ),
-    );
+    const windowMs = rules.substitutionWindowDays * 86400000;
+    const weekEnd = new Date(week.weekStart.getTime() + 6 * 86400000);
+
+    substituted = (surroundingDays || []).some((day) => {
+      if (day.worked || Number.isNaN(day.date.getTime())) return false;
+
+      const beforeGap = week.weekStart.getTime() - day.date.getTime();
+      const afterGap = day.date.getTime() - weekEnd.getTime();
+
+      return (
+        (beforeGap > 0 && beforeGap <= windowMs) ||
+        (afterGap > 0 && afterGap <= windowMs)
+      );
+    });
+
+    if (!substituted) {
+      findings.push(
+        finding(
+          FINDING.WEEKLY_HOLIDAY,
+          `every day worked in the week beginning ${weekLabel}, with no weekly holiday and no substituted one inside the ${rules.substitutionWindowDays} days either side`,
+          { weekStart: week.weekStart },
+        ),
+      );
+    }
   }
 
   return {
@@ -452,6 +497,7 @@ function evaluateWeek(week, rules) {
     overtimeHours,
     totalHours,
     workedDays,
+    holidaySubstituted: substituted,
     findings,
   };
 }
@@ -670,7 +716,7 @@ function assessEmployee({ employee, days, limits }) {
   );
 
   const weeks = groupIntoWeeks(evaluated, rules).map((week) =>
-    evaluateWeek(week, rules),
+    evaluateWeek(week, rules, evaluated),
   );
 
   const consecutiveFindings = evaluateConsecutiveDays(evaluated, rules);
