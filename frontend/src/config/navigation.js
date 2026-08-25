@@ -592,9 +592,9 @@ export const APP_ROUTES = [
     ),
   },
   {
-    path: '/enterprise/esop-management',
+    path: '/enterprise/employee-relations',
     component: lazy(
-      () => import('../pages/enterprise/EsopManagementHubPage'),
+      () => import('../pages/enterprise/EmployeeRelationsHubPage'),
     ),
     appShell: false,
   },
