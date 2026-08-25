@@ -298,6 +298,18 @@ export const APP_ROUTES = [
 
   // ── Compliance ───────────────────────────────────────────────────────────
   {
+    // In Compliance rather than Finance, even though a contractor is a vendor.
+    // The vendor ledger's question is "what do we owe this counterparty"; this
+    // one's is "what are we liable for on account of people we do not employ",
+    // and the answer is a contingent liability rather than an invoice (#1700).
+    path: '/contract-labour',
+    component: lazy(() => import('../pages/ContractLabourRegister')),
+    appShell: true,
+    label: 'Contract labour',
+    group: 'compliance',
+    icon: 'shield',
+  },
+  {
     path: '/tax-proofs',
     component: lazy(() => import('../pages/TaxProofPortal')),
     label: 'My tax proofs',

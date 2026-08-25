@@ -108,6 +108,13 @@ const announcementRoutes = require('./routes/announcement.routes');
 // are not the obvious choice and the reason belongs where someone would look.
 const assetRoutes = require('./routes/asset.routes');
 const vendorRoutes = require('./routes/vendor.routes');
+
+// Contract Labour (Regulation and Abolition) Act, 1970 (#1700). Next to the
+// vendor router because a contractor is one, and separate from it because this
+// is not about the counterparty to an invoice: it is the principal employer's
+// liability for that contractor's workmen, of whom there may be four hundred
+// behind one vendor row.
+const contractLabourRoutes = require('./routes/contractLabour.routes');
 const grievanceRoutes = require('./routes/grievance.routes');
 const taxProofRoutes = require('./routes/taxProof.routes');
 
@@ -486,6 +493,10 @@ app.use('/api/compliance', complianceRoutes);
 
 app.use('/api/assets', assetRoutes);
 app.use('/api/vendors', vendorRoutes);
+
+// #1700. The router owns `/contractors`, `/deployments`, `/assessment`,
+// `/returns` and `/registers`.
+app.use('/api/contract-labour', contractLabourRoutes);
 
 // POSH grievances (#958). Gated by `requireICC` rather than `requirePermission`
 // — the committee is deliberately not the same population as "HR", and admins

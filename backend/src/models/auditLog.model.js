@@ -97,6 +97,15 @@ const AUDIT_ACTIONS = [
   'WEBHOOK_UPDATE',
   'WEBHOOK_DELETE',
   'WEBHOOK_SECRET_REGENERATED',
+  // Contract Labour (Regulation and Abolition) Act, 1970 (#1700). A licence
+  // decides whether a deployment is lawful, so editing one changes findings
+  // already made; the Form XXV return is a statement to the labour department;
+  // and Forms XII, XIII and XVII are every contract workman's designation and
+  // wage in one file. All four are inspection questions.
+  'CONTRACT_LABOUR_CONTRACTOR_REGISTERED',
+  'CONTRACT_LABOUR_LICENCE_UPDATED',
+  'CONTRACT_LABOUR_RETURN_FILED',
+  'CONTRACT_LABOUR_REGISTER_EXPORTED',
   // International assignments (#1348). Opening one commits the employer to
   // bearing somebody's foreign tax bill for years; a settlement moves money
   // between the employee and the company; and the two threshold events record
@@ -150,6 +159,8 @@ const AUDIT_RESOURCE_TYPES = [
   'Workflow',
   'WorkflowInstance',
   'Webhook',
+  'ContractLabourContractor',
+  'ContractLabourReturn',
   // An HRMS connection (#954) can read and write the employee directory under
   // credentials an admin installs, so configuring, syncing and removing one are
   // audited like the webhook mutations it sits next to.
