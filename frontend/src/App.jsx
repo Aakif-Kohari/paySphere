@@ -13,6 +13,12 @@ import { NotFound, ROUTABLE } from './config/navigation';
 import RouteFallback from './components/common/RouteFallback';
 import AppPageShell from './components/Layout/AppPageShell';
 import ImpersonationBanner from './components/common/ImpersonationBanner';
+import OnboardingTooltip from './components/onboarding/OnboardingTooltip';
+
+// DEV-ONLY: exposes window.devLogin() / window.devLogout() in browser console
+if (import.meta.env.DEV) {
+  import('./utils/devBypass');
+}
 
 function App() {
   const user = useAppStore((state) => state.user);
@@ -125,6 +131,7 @@ function App() {
 
           {/* Global Offline Sync Indicator (Issue #815) */}
           <OfflineSyncIndicator />
+          <OnboardingTooltip />
         </BrowserRouter>
       </ToastProvider>
     </ThemeProvider>

@@ -192,5 +192,11 @@ api.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+// DEV-ONLY: return mock data when backend is unreachable
+if (import.meta.env.DEV) {
+  import('../utils/mockApi').then(({ installMockInterceptor }) => {
+    installMockInterceptor(api);
+  });
+}
 
 export default api;

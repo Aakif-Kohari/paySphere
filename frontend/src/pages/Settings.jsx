@@ -3,6 +3,7 @@ import api from '../services/api';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
+import { useAppStore } from '../store/useAppStore';
 
 // ── Icons for Sidebar (Copied from AddEmployee for consistency) ──
 const GridIcon = () => (
@@ -204,7 +205,8 @@ const InfoIcon = () => (
 
 export default function Settings() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const storeSetThemeMode = useAppStore((state) => state.setThemeMode);
+  const storeLogout = useAppStore((state) => state.logout);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const localCompanyName = localStorage.getItem('companyName') || 'Acme Corp';
@@ -290,7 +292,7 @@ export default function Settings() {
                   ? 'dark'
                   : 'light'
                 : t;
-            dispatch(setThemeMode(newMode));
+            storeSetThemeMode(newMode);
           }
         } else {
           setSettings((prev) => ({
@@ -305,7 +307,7 @@ export default function Settings() {
       })
       .catch((err) => console.error('Failed to fetch settings', err))
       .finally(() => setLoading(false));
-  }, [localCompanyName, dispatch]);
+  }, [localCompanyName, storeSetThemeMode]);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -758,7 +760,7 @@ export default function Settings() {
                                 ? 'dark'
                                 : 'light'
                               : t;
-                          dispatch(setThemeMode(newMode));
+                          storeSetThemeMode(newMode);
                         }}
                         className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                       />
@@ -1404,7 +1406,7 @@ export default function Settings() {
             </div>
             <button
               onClick={() => {
-                dispatch(logout());
+                storeLogout();
                 localStorage.removeItem('companyName');
                 navigate('/auth');
               }}

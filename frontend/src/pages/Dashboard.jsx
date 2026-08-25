@@ -16,6 +16,7 @@ import EmployeeManagementSkeleton from '../components/common/skeleton/EmployeeMa
 import PayrollTableSkeleton from '../components/common/skeleton/PayrollTableSkeleton';
 import DashboardGrid from '../components/dashboard/DashboardGrid';
 import { useAppStore } from '../store/useAppStore';
+import { useOnboardingStore } from '../store/useOnboardingStore';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 import api from '../services/api';
 import { formatCurrency, getCurrencySymbol } from '../utils/currency';
@@ -141,7 +142,7 @@ const DashboardOverview = ({
   return (
     <>
       {/* Overview Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-gray-200 dark:border-slate-800">
+      <div data-tour="dashboard-overview" className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-gray-200 dark:border-slate-800">
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1">
             {t('dashboard.monthlyOverview', 'Monthly Overview')}
@@ -172,6 +173,7 @@ const DashboardOverview = ({
           </button>
 
           <button
+            data-tour="run-payroll-btn"
             onClick={onAddUpdate}
             className="flex-1 cursor-pointer sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           >
@@ -234,14 +236,23 @@ const DashboardOverview = ({
             {t('dashboard.gettingStarted.desc', 'New to PaySphere? Watch this quick tutorial to learn how to navigate the application and get started.')}
           </p>
 
-          <a
-            href="https://youtu.be/N3SizOsiNGw"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-5 inline-flex items-center rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-          >
-            {t('dashboard.gettingStarted.watch', '▶ Watch Tutorial')}
-          </a>
+          <div className="mt-5 flex flex-wrap gap-3 items-center">
+            <a
+              href="https://youtu.be/N3SizOsiNGw"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+            >
+              {t('dashboard.gettingStarted.watch', '▶ Watch Tutorial')}
+            </a>
+            <button
+              type="button"
+              onClick={() => useOnboardingStore.getState().resetTour(navigate)}
+              className="inline-flex items-center rounded-lg border border-blue-600 px-5 py-2.5 font-medium text-blue-600 dark:text-blue-400 transition-colors duration-200 hover:bg-blue-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 cursor-pointer"
+            >
+              ✨ Take Guided Tour
+            </button>
+          </div>
         </div>
       )}
 
@@ -343,6 +354,7 @@ const DashboardOverview = ({
 
         {(filtered.length > 0 || search || roleFilter) && (
           <div
+            data-tour="add-employee-btn"
             role="button"
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
@@ -988,6 +1000,17 @@ export default function PaySphereDashboard() {
       navigate('/auth');
     }
   }, [token, navigate]);
+
+  // Auto-start onboarding tour for new users on initial load
+  useEffect(() => {
+    const { hasCompleted, hasDismissed, isActive, startTour } = useOnboardingStore.getState();
+    if (token && !hasCompleted && !hasDismissed && !isActive) {
+      const timer = setTimeout(() => {
+        startTour();
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [token]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
