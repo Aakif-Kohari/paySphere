@@ -88,6 +88,7 @@ const flashcardRoutes = require('./routes/flashcard.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const integrationRoutes = require('./routes/integration.routes');
 const archiveRoutes = require('./routes/archive.routes');
+const documentVaultRoutes = require('./routes/documentVault.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
@@ -122,6 +123,7 @@ const forecastRoutes = require('./routes/forecast.routes');
 const accountingRoutes = require('./routes/accounting.routes');
 const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
+const shiftPreferenceRoutes = require('./routes/shiftPreference.routes');
 const successionRoutes = require('./routes/succession.routes');
 const pyqRoutes = require('./routes/pyq.routes');
 
@@ -151,6 +153,7 @@ const cryptoRouter = require('./services/CryptoPayrollService').default;
 // before it — `OfferLetterBuilder.jsx` types in a name and a salary by hand
 // because there was no candidate record to draw them from.
 const recruitmentRoutes = require('./routes/recruitment.routes');
+const referralBonusRoutes = require('./routes/referralBonus.routes');
 
 // Salary disbursement (#1075). Payroll was computed to the rupee and then
 // stopped: `payroll.model.js` has a `disbursed` status and nothing in the
@@ -168,6 +171,7 @@ const salaryAdjustmentRoutes = require('./routes/salaryAdjustment.routes');
 const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
 const teamRoutes = require('./routes/team.routes');
+const healthChallengeRoutes = require('./routes/healthChallenge.routes');
 const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
@@ -389,6 +393,9 @@ app.use('/api/pension', pensionRoutes);
 // two duplicated route tables and not the other.
 app.use('/api/archive', archiveRoutes);
 
+// Employee Document Vault
+app.use('/api/document-vault', documentVaultRoutes);
+
 // #590 shipped the controller, the models, the router and a WorkflowBuilder
 // page, and never registered the router — so the whole engine was a 404 and the
 // builder had nothing to talk to. It could not simply be added either: the
@@ -516,6 +523,7 @@ app.use('/api/clients', clientInvoiceRoutes);
 // Same shape: the router defines `/roster`, `/templates` and `/swap/...`, and
 // `Roster.jsx` calls `/api/shifts/roster`.
 app.use('/api/shifts', shiftRosterRoutes);
+app.use('/api/shift-preferences', shiftPreferenceRoutes);
 
 // Succession Planning Hub
 app.use('/api/succession', successionRoutes);
@@ -539,6 +547,9 @@ app.use('/api', cryptoRouter);
 // Recruitment (#1074). The router owns `/requisitions`, `/candidates` and
 // `/analytics`, so the prefix carries no noun of its own.
 app.use('/api/recruitment', recruitmentRoutes);
+
+// Referral Bonus Tracking
+app.use('/api/referral-bonuses', referralBonusRoutes);
 
 // Salary disbursement (#1075). The router owns `/batches` and `/profiles`.
 app.use('/api/disbursements', disbursementRoutes);
