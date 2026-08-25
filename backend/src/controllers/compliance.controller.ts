@@ -10,7 +10,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { Worker } from 'node:worker_threads';
-import * as path from 'node:path';
+import path from 'node:path';
 
 const { aggregateFYData } = require('../utils/complianceAggregator') as {
   aggregateFYData: (
@@ -297,7 +297,7 @@ export async function generateForm16(
     const fy = parseFinancialYear(
       queryValue(req.query.fy as FinancialYearQuery['fy']),
     );
-    if (!fy.ok) return sendValidationError(res, (fy as any).message);
+    if (fy.ok === false) return sendValidationError(res, fy.message);
 
     const tenantId = requireTenant(req);
 
@@ -374,9 +374,7 @@ export async function generateForm16(
           `attachment; filename=Form16_${safeName}_${formatFY(fy.fyStartYear)}.pdf`,
         );
 
-        res.send(
-          Buffer.from((result as PdfWorkerSuccess).pdfData as ArrayBuffer),
-        );
+        res.send(Buffer.from(result.pdfData as Uint8Array | string));
       });
     });
 
@@ -407,7 +405,7 @@ export async function generateForm24Q(
     const query = req.query as Form24QQuery;
     const fy = parseFinancialYear(queryValue(query.fy));
 
-    if (!fy.ok) return sendValidationError(res, (fy as any).message);
+    if (fy.ok === false) return sendValidationError(res, fy.message);
 
     const quarterValue = queryValue(query.quarter) || 'Q4';
     const quarter = quarterValue.toUpperCase() as Quarter;
@@ -611,7 +609,7 @@ export async function getTaxDeclarations(
     const query = req.query as EmployeeQuery;
     const fy = parseFinancialYear(queryValue(query.fy));
 
-    if (!fy.ok) return sendValidationError(res, (fy as any).message);
+    if (fy.ok === false) return sendValidationError(res, fy.message);
 
     const tenantId = requireTenant(req);
     const filter: Record<string, unknown> = {
@@ -659,7 +657,7 @@ export async function upsertTaxDeclaration(
     const query = req.query as FinancialYearQuery;
     const fy = parseFinancialYear(body.financialYear ?? queryValue(query.fy));
 
-    if (!fy.ok) return sendValidationError(res, (fy as any).message);
+    if (fy.ok === false) return sendValidationError(res, fy.message);
 
     const tenantId = requireTenant(req);
 

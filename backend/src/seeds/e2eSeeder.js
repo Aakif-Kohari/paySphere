@@ -12,9 +12,9 @@ const seedE2EUser = async () => {
   try {
     await connectDB();
     await seedRbac();
-    const ownerRole = await Role.findOne({ name: 'Owner' });
+    const ownerRole = await Role.findOne({ name: 'SuperAdmin' });
     if (!ownerRole) {
-      throw new Error('Owner role not found after RBAC seeding');
+      throw new Error('SuperAdmin role not found after RBAC seeding');
     }
 
     const testEmail = (
