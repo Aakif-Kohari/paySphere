@@ -1,50 +1,46 @@
-require("dotenv").config();
-const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
-const connectDB = require("../config/db");
-const logger = require("../utils/logger");
-const User = require("../models/user.model");
-const Tenant = require("../models/tenant.model");
-const Role = require("../models/role.model");
-const { seedRbac } = require("./rbac.seed");
+require('dotenv').config();
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const connectDB = require('../config/db');
+const logger = require('../utils/logger');
+const User = require('../models/user.model');
+const Tenant = require('../models/tenant.model');
+const Role = require('../models/role.model');
+const { seedRbac } = require('./rbac.seed');
 
 const seedE2EUser = async () => {
   try {
     await connectDB();
     await seedRbac();
- qa/compensation-band-card-e2e
-    const ownerRole = await Role.findOne({ name: "SuperAdmin" });
+    const ownerRole = await Role.findOne({ name: 'Owner' });
     if (!ownerRole) {
-      throw new Error("SuperAdmin role not found after RBAC seeding");
-
-    const ownerRole = await Role.findOne({ name: "Owner" });
-    if (!ownerRole) {
-      throw new Error("Owner role not found after RBAC seeding");
- main
+      throw new Error('Owner role not found after RBAC seeding');
     }
 
-    const testEmail = (process.env.TEST_USER_EMAIL || "test@example.com").toLowerCase();
-    const testPassword = process.env.TEST_USER_PASSWORD || "testpassword";
+    const testEmail = (
+      process.env.TEST_USER_EMAIL || 'test@example.com'
+    ).toLowerCase();
+    const testPassword = process.env.TEST_USER_PASSWORD || 'testpassword';
 
     let user = await User.findOne({ email: testEmail });
     if (!user) {
       const hashedPassword = await bcrypt.hash(testPassword, 12);
-      
+
       // Setup Tenant first
       let tenant = new Tenant({
-        name: "PaySphere Test Tenant",
-        domain: "paysphere-test.com",
+        name: 'PaySphere Test Tenant',
+        domain: 'paysphere-test.com',
       });
       await tenant.save();
-      logger.info("Test Tenant created");
+      logger.info('Test Tenant created');
 
       user = new User({
-        fullName: "Test E2E User",
+        fullName: 'Test E2E User',
         email: testEmail,
-        companyName: "PaySphere Test Tenant",
+        companyName: 'PaySphere Test Tenant',
         password: hashedPassword,
         passwordHistory: [hashedPassword],
-        accountType: "ADMIN",
+        accountType: 'ADMIN',
         role: ownerRole._id,
         tenantId: tenant._id,
         isEmailVerified: true,
@@ -61,7 +57,7 @@ const seedE2EUser = async () => {
     await mongoose.disconnect();
     process.exit(0);
   } catch (error) {
-    logger.error("E2E database seeding failed", { error: error.message });
+    logger.error('E2E database seeding failed', { error: error.message });
     try {
       await mongoose.disconnect();
     } catch (_) {}
