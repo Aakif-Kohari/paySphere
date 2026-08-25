@@ -170,6 +170,22 @@ export const APP_ROUTES = [
     group: 'people',
     icon: 'document',
   },
+  {
+    // In People rather than Compliance: the subject is a colleague who was
+    // hurt at work, and the register is opened by whoever is looking after
+    // them. That it produces a statutory figure is true of half of People
+    // already (#1699).
+    //
+    // No `employee: true`. A claim carries a named individual's date of birth
+    // and the circumstances of their injury, which is the most sensitive data
+    // in the product after declared gender.
+    path: '/injury-compensation',
+    component: lazy(() => import('../pages/InjuryCompensationClaims')),
+    appShell: true,
+    label: 'Injury compensation',
+    group: 'people',
+    icon: 'shield',
+  },
 
   // ── Payroll ──────────────────────────────────────────────────────────────
   {

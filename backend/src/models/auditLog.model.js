@@ -48,6 +48,15 @@ const AUDIT_ACTIONS = [
   'EMPLOYEE_EXIT_INITIATED',
   'SETTLEMENT_CREATE',
   'SETTLEMENT_STATUS_CHANGE',
+  // Employees' Compensation Act, 1923 (#1699). Next to the settlement actions
+  // because both record what is owed when an employment event happens.
+  // Computing a claim fixes the figure a dependant is offered; depositing it
+  // with the Commissioner is the section 8 discharge, without which a death
+  // claim is not settled however much was paid; and every other transition
+  // decides whether interest is still running.
+  'INJURY_CLAIM_COMPUTED',
+  'INJURY_CLAIM_DEPOSITED',
+  'INJURY_CLAIM_STATUS_CHANGED',
   // Gratuity actuarial valuation (#1344). The assumptions decide the reported
   // provision — moving the discount rate 50 basis points moves the balance
   // sheet — and committing a valuation produces the figure carried in the
@@ -142,6 +151,7 @@ const AUDIT_RESOURCE_TYPES = [
   'Report',
   'Attendance',
   'Settlement',
+  'InjuryCompensationClaim',
   'GratuityAssumption',
   'GratuityValuation',
   'Loan',

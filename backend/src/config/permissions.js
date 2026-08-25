@@ -124,6 +124,18 @@ const PERMISSIONS = {
   RUN_GRATUITY_VALUATION: 'RUN_GRATUITY_VALUATION',
   MANAGE_GRATUITY_ASSUMPTIONS: 'MANAGE_GRATUITY_ASSUMPTIONS',
 
+  // --- Employees' Compensation Act, 1923 (#1699) ---------------------------
+  //
+  // Next to the gratuity names because both measure what is owed when something
+  // happens to the employment, and deliberately not a payroll permission: a
+  // claim carries an employee's date of birth and the circumstances of an
+  // injury — medical information about a named individual, which nothing else
+  // in the product holds — and admitting one commits the company to a
+  // non-discretionary payment accruing interest at twelve percent from the date
+  // of the accident.
+  READ_EC_CLAIM: 'READ_EC_CLAIM',
+  MANAGE_EC_CLAIM: 'MANAGE_EC_CLAIM',
+
   READ_VENDOR: 'READ_VENDOR',
   // Recording a vendor invoice sets the 194C/194J TDS withheld, and therefore
   // what the company remits on that contractor's behalf. Same class of
@@ -397,6 +409,16 @@ const PERMISSION_DEFINITIONS = [
       'Set the discount rate, salary escalation and attrition assumptions the gratuity provision is measured on',
   },
   {
+    name: PERMISSIONS.READ_EC_CLAIM,
+    description:
+      'View workplace injury compensation claims, including the injured employee’s age and the circumstances of the accident',
+  },
+  {
+    name: PERMISSIONS.MANAGE_EC_CLAIM,
+    description:
+      'Compute a workplace injury compensation claim and record its deposit with the Commissioner or its payment',
+  },
+  {
     name: PERMISSIONS.READ_VENDOR,
     description: 'View contractors, their invoices and their payment ledger',
   },
@@ -638,6 +660,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_GRATUITY_VALUATION,
       PERMISSIONS.RUN_GRATUITY_VALUATION,
       PERMISSIONS.MANAGE_GRATUITY_ASSUMPTIONS,
+
+      // #1699. Both. Admitting a claim commits the company and depositing one
+      // with the Commissioner discharges a statutory liability, which is the
+      // same class of authority as APPROVE_PAYROLL.
+      PERMISSIONS.READ_EC_CLAIM,
+      PERMISSIONS.MANAGE_EC_CLAIM,
       PERMISSIONS.READ_VENDOR,
       PERMISSIONS.MANAGE_VENDOR,
       PERMISSIONS.READ_ROSTER,
@@ -742,6 +770,13 @@ const ROLE_DEFINITIONS = [
       // It does not run one and it does not set the assumptions: both decide
       // what the company reports, which is the owner's call and the auditor's.
       PERMISSIONS.READ_GRATUITY_VALUATION,
+
+      // #1699. HR reads the injury register — it reports the accident, it
+      // handles the employee, and "what is this going to cost" is a question it
+      // is asked. It does not admit the claim: that commits the company to a
+      // payment and starts a section 4A clock, which is the owner's call for
+      // the same reason APPROVE_PAYROLL is.
+      PERMISSIONS.READ_EC_CLAIM,
 
       PERMISSIONS.READ_VENDOR,
       PERMISSIONS.READ_ROSTER,

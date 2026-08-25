@@ -64,6 +64,18 @@ const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
 const settlementRoutes = require('./routes/settlement.routes');
+
+// Employees' Compensation Act, 1923 (#1699). Next to settlements because both
+// answer "what is owed to this person now that something has happened to the
+// employment", and apart from them because a settlement is what the company
+// agreed to pay and this is what a statute says it must — computed from the
+// employee's age through a Schedule IV commutation factor, on a wage capped at
+// ₹15,000.
+//
+// Named for the injury, not the Act: `employeeCompensation.routes` is already
+// taken by the longitudinal compensation timeline, which is a different subject
+// wearing three quarters of the same name.
+const injuryCompensationRoutes = require('./routes/injuryCompensation.routes');
 const severanceRoutes = require('./routes/severance.routes');
 
 // Gratuity actuarial valuation (#1344). Next to settlements on purpose: the
@@ -375,6 +387,12 @@ app.use('/api/schedules', schedulerRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/settlements', settlementRoutes);
+
+// #1699. Its own prefix rather than a sub-path of `/api/settlements`: a
+// settlement is paid to somebody who is leaving, and a compensation claim for
+// temporary disablement is paid to somebody who is still on the rolls and
+// coming back. The router owns `/schedules`, `/preview` and `/claims`.
+app.use('/api/injury-compensation', injuryCompensationRoutes);
 
 // #1344. The router owns `/assumptions`, `/preview`, `/valuations` and
 // `/employees/:employeeId`, so the prefix carries no noun of its own.
