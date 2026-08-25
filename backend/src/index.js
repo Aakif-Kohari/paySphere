@@ -160,6 +160,9 @@ const startServer = async () => {
   if (surgePricingService) {
     surgePricingService.start();
   }
+
+  const { initShutdownHandler } = require('./shutdown');
+  initShutdownHandler(server);
 };
 
 startServer().catch((error) => {

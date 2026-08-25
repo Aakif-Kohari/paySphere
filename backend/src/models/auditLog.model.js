@@ -29,6 +29,15 @@ const AUDIT_ACTIONS = [
   'STATUTORY_BONUS_COMMITTED',
   'STATUTORY_BONUS_FORM_C_EXPORTED',
   'STATUTORY_BONUS_PAID',
+  // Minimum Wages Act, 1948 (#1698). A notification is the rate every
+  // assessment in that state is measured against, so adding one silently
+  // changes findings that have already been made; a committed assessment is
+  // the establishment's own statement of what it owes; and the register is
+  // every employee's wage against the notified rate in one file. All three are
+  // questions an inspection asks by name.
+  'MINIMUM_WAGE_NOTIFICATION_ADDED',
+  'MINIMUM_WAGE_ASSESSMENT_COMMITTED',
+  'MINIMUM_WAGE_REGISTER_EXPORTED',
   'EMPLOYEE_CREATE',
   'EMPLOYEE_UPDATE',
   'EMPLOYEE_DELETE',
@@ -161,6 +170,8 @@ const AUDIT_RESOURCE_TYPES = [
   // Editing a fence changes whose attendance is recorded as field duty, so it
   // is audited like the settings change it is.
   'OfficeLocation',
+  'MinimumWageNotification',
+  'MinimumWageAssessment',
   'PayEquityReport',
   'PayBand',
   'TeamInvite',

@@ -249,6 +249,23 @@ export const APP_ROUTES = [
     group: 'payroll',
     icon: 'book',
   },
+  {
+    // Next to Statutory bonus for the same reason that one is in Payroll: both
+    // are floors the statute sets on what an employee is paid, rather than
+    // figures the company chooses. Section 12 of the Payment of Bonus Act even
+    // computes on the higher of ₹7,000 and the applicable minimum wage, so the
+    // two pages answer halves of one question (#1698).
+    //
+    // No `employee: true`. The register is every colleague's wage against the
+    // notified rate in one table, and advertising it to everyone would be
+    // advertising a 403.
+    path: '/minimum-wages',
+    component: lazy(() => import('../pages/MinimumWageCompliance')),
+    appShell: true,
+    label: 'Minimum wages',
+    group: 'payroll',
+    icon: 'shield',
+  },
 
   // ── Finance ──────────────────────────────────────────────────────────────
   {

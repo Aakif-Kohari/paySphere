@@ -135,6 +135,12 @@ type EmployeeRecord = {
 type MongooseQuery<T> = {
   lean: () => Promise<T>;
   sort: (value: Record<string, 1 | -1>) => MongooseQuery<T>;
+  then: <TResult1 = T, TResult2 = never>(
+    onfulfilled?:
+      ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null,
+    onrejected?:
+      ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null,
+  ) => Promise<TResult1 | TResult2>;
 };
 
 type ComplianceConfigModel = {
@@ -614,7 +620,7 @@ export async function getTaxDeclarations(
     const employeeId = queryValue(query.employeeId);
 
     if (employeeId) {
-      if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+      if (!mongoose.Types.ObjectId.isValid(employeeId as string)) {
         return sendValidationError(res, 'Invalid employee ID');
       }
 
@@ -656,7 +662,7 @@ export async function upsertTaxDeclaration(
     const tenantId = requireTenant(req);
 
     const employee = await Employee.findOne({
-      _id: employeeId,
+      _id: employeeId as string,
       tenantId,
     }).lean();
 
