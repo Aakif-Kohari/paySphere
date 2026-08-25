@@ -540,6 +540,13 @@ export const APP_ROUTES = [
       () => import('../pages/onboarding/EnterpriseOnboardingLifecyclePage'),
     ),
   },
+  {
+    path: '/enterprise/mental-health-hub',
+    component: lazy(
+      () => import('../pages/wellness/MentalHealthHubPage'),
+    ),
+    appShell: false,
+  },
 
   {
     path: '/settings',

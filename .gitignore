@@ -5,4 +5,4 @@ build/
 backend/dist/
 frontend/dist/
 uploads/
-backend/dist/
+.freebuff/
