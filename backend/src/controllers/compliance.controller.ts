@@ -288,16 +288,20 @@ export async function generateForm16(
   let pdfWorker: Worker | null = null;
 
   try {
-    const { employeeId } = req.params;
+    const employeeId = req.params.employeeId as string;
 
-    if (!employeeId || !mongoose.Types.ObjectId.isValid(employeeId as string)) {
+    if (
+      !employeeId ||
+      typeof employeeId !== 'string' ||
+      !mongoose.Types.ObjectId.isValid(employeeId)
+    ) {
       return sendValidationError(res, 'Invalid employee ID');
     }
 
     const fy = parseFinancialYear(
       queryValue(req.query.fy as FinancialYearQuery['fy']),
     );
-    if (fy.ok === false) return sendValidationError(res, fy.message);
+    if (!fy.ok) return sendValidationError(res, (fy as any).message);
 
     const tenantId = requireTenant(req);
 
@@ -374,7 +378,7 @@ export async function generateForm16(
           `attachment; filename=Form16_${safeName}_${formatFY(fy.fyStartYear)}.pdf`,
         );
 
-        res.send(Buffer.from(result.pdfData as Uint8Array | string));
+        res.send(Buffer.from(result.pdfData as any));
       });
     });
 
@@ -405,7 +409,7 @@ export async function generateForm24Q(
     const query = req.query as Form24QQuery;
     const fy = parseFinancialYear(queryValue(query.fy));
 
-    if (fy.ok === false) return sendValidationError(res, fy.message);
+    if (!fy.ok) return sendValidationError(res, (fy as any).message);
 
     const quarterValue = queryValue(query.quarter) || 'Q4';
     const quarter = quarterValue.toUpperCase() as Quarter;
@@ -609,7 +613,7 @@ export async function getTaxDeclarations(
     const query = req.query as EmployeeQuery;
     const fy = parseFinancialYear(queryValue(query.fy));
 
-    if (fy.ok === false) return sendValidationError(res, fy.message);
+    if (!fy.ok) return sendValidationError(res, (fy as any).message);
 
     const tenantId = requireTenant(req);
     const filter: Record<string, unknown> = {
@@ -647,9 +651,13 @@ export async function upsertTaxDeclaration(
   next: NextFunction,
 ): Promise<Response | void> {
   try {
-    const { employeeId } = req.params;
+    const employeeId = req.params.employeeId as string;
 
-    if (!employeeId || !mongoose.Types.ObjectId.isValid(employeeId as string)) {
+    if (
+      !employeeId ||
+      typeof employeeId !== 'string' ||
+      !mongoose.Types.ObjectId.isValid(employeeId)
+    ) {
       return sendValidationError(res, 'Invalid employee ID');
     }
 
@@ -657,7 +665,7 @@ export async function upsertTaxDeclaration(
     const query = req.query as FinancialYearQuery;
     const fy = parseFinancialYear(body.financialYear ?? queryValue(query.fy));
 
-    if (fy.ok === false) return sendValidationError(res, fy.message);
+    if (!fy.ok) return sendValidationError(res, (fy as any).message);
 
     const tenantId = requireTenant(req);
 
