@@ -88,6 +88,7 @@ const flashcardRoutes = require('./routes/flashcard.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const integrationRoutes = require('./routes/integration.routes');
 const archiveRoutes = require('./routes/archive.routes');
+const documentVaultRoutes = require('./routes/documentVault.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
@@ -391,6 +392,9 @@ app.use('/api/pension', pensionRoutes);
 // The archive browser for soft-deleted employees (#759). Mounted by one of the
 // two duplicated route tables and not the other.
 app.use('/api/archive', archiveRoutes);
+
+// Employee Document Vault
+app.use('/api/document-vault', documentVaultRoutes);
 
 // #590 shipped the controller, the models, the router and a WorkflowBuilder
 // page, and never registered the router — so the whole engine was a 404 and the
