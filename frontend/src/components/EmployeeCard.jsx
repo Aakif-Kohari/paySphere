@@ -37,17 +37,21 @@ const AVATAR_COLORS = [
   '#14B8A6',
 ];
 
+const safeName = (name) => (typeof name === 'string' && name.trim() ? name.trim() : 'Employee');
+
 const getAvatarColor = (name) => {
-  const idx = name
+  const str = safeName(name);
+  const idx = str
     .split('')
     .reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % AVATAR_COLORS.length;
   return AVATAR_COLORS[idx];
 };
 
 const getInitials = (name) =>
-  name
+  safeName(name)
     .split(' ')
     .map((w) => w[0])
+    .filter(Boolean)
     .join('')
     .slice(0, 2)
     .toUpperCase();
@@ -71,21 +75,23 @@ const StatusBadge = ({ finalized }) => {
 
 const CardHeader = ({ emp, finalized, onEdit }) => {
   const { t } = useTranslation();
+  const name = emp?.fullName || (emp?.firstName ? `${emp.firstName} ${emp.lastName || ''}`.trim() : '') || emp?.name || emp?.employeeName || 'Employee';
+
   return (
     <div className="flex justify-between items-center w-full">
       <div className="flex items-center gap-3">
         <div
           className="w-11 h-11 rounded-full text-white flex items-center justify-center font-bold"
-          style={{ backgroundColor: getAvatarColor(emp.fullName) }}
+          style={{ backgroundColor: getAvatarColor(name) }}
         >
-          {getInitials(emp.fullName)}
+          {getInitials(name)}
         </div>
         <div>
           <p className="font-bold text-sm text-slate-900 dark:text-white">
-            {emp.fullName}
+            {name}
           </p>
           <p className="text-xs text-gray-500 dark:text-slate-500">
-            {emp.role || t('dashboard.table.employee', 'Employee')}
+            {emp?.role || t('dashboard.table.employee', 'Employee')}
           </p>
         </div>
       </div>
@@ -96,7 +102,7 @@ const CardHeader = ({ emp, finalized, onEdit }) => {
             onClick={onEdit}
             className="pt-2 px-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 bg-gray-50 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             title={t('common.edit', 'Edit Employee')}
-            aria-label={`Edit ${emp.fullName}`}
+            aria-label={`Edit ${name}`}
           >
             <EditOutlinedIcon fontSize="small" className='mb-2'/>
           </button>

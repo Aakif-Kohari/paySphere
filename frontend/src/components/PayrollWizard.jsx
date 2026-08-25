@@ -498,6 +498,7 @@ export default function PayrollWizard() {
 
   return (
     <div
+      data-tour="generate-payroll-section"
       style={{
         width: "100%",
         maxWidth: 480,
