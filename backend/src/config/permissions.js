@@ -154,6 +154,17 @@ const PERMISSIONS = {
   // authority as MANAGE_COMPLIANCE.
   MANAGE_VENDOR: 'MANAGE_VENDOR',
 
+  // --- Contract Labour (Regulation and Abolition) Act, 1970 (#1700) --------
+  //
+  // Next to the vendor names, and deliberately not the same as them. The vendor
+  // permission is about who the company pays; these are about the company's
+  // liability for people it does not employ — the section 21 exposure is a
+  // contingent liability an auditor asks about. The read is also wider than the
+  // vendor ledger: it includes the establishment's own median wage per
+  // designation, which is the rule 25(2)(v)(a) comparator.
+  READ_CONTRACT_LABOUR: 'READ_CONTRACT_LABOUR',
+  MANAGE_CONTRACT_LABOUR: 'MANAGE_CONTRACT_LABOUR',
+
   READ_ROSTER: 'READ_ROSTER',
   MANAGE_ROSTER: 'MANAGE_ROSTER',
 
@@ -455,6 +466,16 @@ const PERMISSION_DEFINITIONS = [
       'Register contractors and record invoices, which sets the 194C/194J TDS withheld on their behalf',
   },
   {
+    name: PERMISSIONS.READ_CONTRACT_LABOUR,
+    description:
+      'View the contract labour registers, the principal employer’s section 21 exposure and the wage parity comparison against directly employed staff',
+  },
+  {
+    name: PERMISSIONS.MANAGE_CONTRACT_LABOUR,
+    description:
+      'Register contractors, record their licences and monthly deployments, and file the Form XXV annual return',
+  },
+  {
     name: PERMISSIONS.READ_ROSTER,
     description: 'View published shift rosters',
   },
@@ -702,6 +723,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_EC_CLAIM,
       PERMISSIONS.READ_VENDOR,
       PERMISSIONS.MANAGE_VENDOR,
+
+      // #1700. Both. Filing the Form XXV return is a statement to the labour
+      // department about the establishment, and the section 21 exposure is a
+      // contingent liability an auditor asks about.
+      PERMISSIONS.READ_CONTRACT_LABOUR,
+      PERMISSIONS.MANAGE_CONTRACT_LABOUR,
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.MANAGE_ROSTER,
 
@@ -822,6 +849,15 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_EC_CLAIM,
 
       PERMISSIONS.READ_VENDOR,
+
+      // #1700. Both. Registering a contractor and recording who is on site each
+      // month is HR administration in the ordinary sense — somebody has to walk
+      // the site and count — and the return it feeds is a headcount statement
+      // rather than a payment. Unlike the other new areas, the write half here
+      // moves no money.
+      PERMISSIONS.READ_CONTRACT_LABOUR,
+      PERMISSIONS.MANAGE_CONTRACT_LABOUR,
+
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.MANAGE_ROSTER,
       PERMISSIONS.READ_CONTRACT,
