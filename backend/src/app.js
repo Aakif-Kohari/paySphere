@@ -60,6 +60,13 @@ const employeeCompensationRoutes = require('./routes/employeeCompensation.routes
 // company, it is computed on a wage capped by section 12 rather than on the one
 // that is paid, and it produces a Rule 5 register.
 const statutoryBonusRoutes = require('./routes/statutoryBonus.routes');
+
+// Minimum Wages Act, 1948 (#1698). Next to the statutory bonus router because
+// the two are the same kind of thing — a floor the statute sets rather than a
+// figure the company chooses — and because section 12 of the Payment of Bonus
+// Act computes on the higher of ₹7,000 and the applicable minimum wage, so this
+// is where that number now comes from.
+const minimumWagesRoutes = require('./routes/minimumWages.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
@@ -88,6 +95,7 @@ const flashcardRoutes = require('./routes/flashcard.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const integrationRoutes = require('./routes/integration.routes');
 const archiveRoutes = require('./routes/archive.routes');
+const documentVaultRoutes = require('./routes/documentVault.routes');
 const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
@@ -170,7 +178,7 @@ const salaryAdjustmentRoutes = require('./routes/salaryAdjustment.routes');
 const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
 const teamRoutes = require('./routes/team.routes');
-const serviceMilestoneRoutes = require('./routes/serviceMilestone.routes');
+const healthChallengeRoutes = require('./routes/healthChallenge.routes');
 const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
@@ -372,6 +380,12 @@ app.use('/api/compensation', employeeCompensationRoutes);
 // invites them to be confused. The router owns `/computations`, `/preview` and
 // `/ledger`.
 app.use('/api/statutory-bonus', statutoryBonusRoutes);
+
+// #1698. Its own prefix rather than a sub-path of `/api/compliance`: the
+// compliance router is about what gets filed with the tax authorities, and this
+// is about what is paid to the employee before any of that. The router owns
+// `/notifications`, `/preview` and `/assessments`.
+app.use('/api/minimum-wages', minimumWagesRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/employee-portal', employeePortalRoutes);
 app.use('/api/schedules', schedulerRoutes);
@@ -391,6 +405,9 @@ app.use('/api/pension', pensionRoutes);
 // The archive browser for soft-deleted employees (#759). Mounted by one of the
 // two duplicated route tables and not the other.
 app.use('/api/archive', archiveRoutes);
+
+// Employee Document Vault
+app.use('/api/document-vault', documentVaultRoutes);
 
 // #590 shipped the controller, the models, the router and a WorkflowBuilder
 // page, and never registered the router — so the whole engine was a 404 and the
@@ -564,8 +581,10 @@ app.use('/api/leave-closure', leaveClosureRoutes);
 app.use('/api/fbp', fbpRoutes);
 app.use('/api/team', teamRoutes);
 
-// Service Milestone & Anniversary Recognition
-app.use('/api/milestones', serviceMilestoneRoutes);
+// Peer Nomination & Awards (#peer-nominations). Employee-driven recognition
+// with category configuration, cycle management, voting, review, and analytics.
+const peerNominationRoutes = require('./routes/peerNomination.routes');
+app.use('/api/peer-nominations', peerNominationRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
