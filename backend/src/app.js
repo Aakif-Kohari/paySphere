@@ -60,6 +60,13 @@ const employeeCompensationRoutes = require('./routes/employeeCompensation.routes
 // company, it is computed on a wage capped by section 12 rather than on the one
 // that is paid, and it produces a Rule 5 register.
 const statutoryBonusRoutes = require('./routes/statutoryBonus.routes');
+
+// Minimum Wages Act, 1948 (#1698). Next to the statutory bonus router because
+// the two are the same kind of thing — a floor the statute sets rather than a
+// figure the company chooses — and because section 12 of the Payment of Bonus
+// Act computes on the higher of ₹7,000 and the applicable minimum wage, so this
+// is where that number now comes from.
+const minimumWagesRoutes = require('./routes/minimumWages.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
@@ -369,6 +376,12 @@ app.use('/api/compensation', employeeCompensationRoutes);
 // invites them to be confused. The router owns `/computations`, `/preview` and
 // `/ledger`.
 app.use('/api/statutory-bonus', statutoryBonusRoutes);
+
+// #1698. Its own prefix rather than a sub-path of `/api/compliance`: the
+// compliance router is about what gets filed with the tax authorities, and this
+// is about what is paid to the employee before any of that. The router owns
+// `/notifications`, `/preview` and `/assessments`.
+app.use('/api/minimum-wages', minimumWagesRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/employee-portal', employeePortalRoutes);
 app.use('/api/schedules', schedulerRoutes);
