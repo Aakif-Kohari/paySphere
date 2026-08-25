@@ -96,6 +96,15 @@ export const APP_ROUTES = [
     icon: 'user',
     employee: true,
   },
+  {
+    path: '/compensation-timeline',
+    component: lazy(() => import('../pages/EmployeeCompensationTimeline')),
+    label: 'Compensation timeline',
+    group: 'overview',
+    icon: 'chart',
+    employee: true,
+    appShell: true,
+  },
 
   // ── People ───────────────────────────────────────────────────────────────
   {
@@ -116,6 +125,13 @@ export const APP_ROUTES = [
     label: 'Add employee',
     group: 'people',
     icon: 'userPlus',
+  },
+  {
+    path: '/org-chart',
+    component: lazy(() => import('../pages/OrgChartBuilder')),
+    label: 'Org chart',
+    group: 'people',
+    icon: 'people',
   },
   {
     path: '/archive',
@@ -156,6 +172,23 @@ export const APP_ROUTES = [
   },
 
   // ── Payroll ──────────────────────────────────────────────────────────────
+  {
+    path: '/fbp-admin',
+    component: lazy(() => import('../features/fbp/FbpAdminDashboard')),
+    appShell: true,
+    label: 'FBP Administration',
+    group: 'payroll',
+    icon: 'wallet',
+  },
+  {
+    path: '/fbp-calculator',
+    component: lazy(() => import('../features/fbp/FbpRestructuringCalculator')),
+    appShell: true,
+    label: 'FBP Restructuring',
+    group: 'payroll',
+    icon: 'wallet',
+    employee: true,
+  },
   {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
@@ -248,6 +281,14 @@ export const APP_ROUTES = [
     employee: true,
   },
   {
+    path: '/adjudication-workspace',
+    component: lazy(() => import('../pages/AdjudicationWorkspace')),
+    appShell: true,
+    label: 'Expense Adjudication',
+    group: 'finance',
+    icon: 'checkShield',
+  },
+  {
     path: '/accounting',
     component: lazy(() => import('../pages/AccountingExport')),
     label: 'Accounting export',
@@ -302,11 +343,26 @@ export const APP_ROUTES = [
 
   // ── Workplace ────────────────────────────────────────────────────────────
   {
+    path: '/predictive-overtime',
+    component: lazy(() => import('../pages/PredictiveOvertimeDashboard')),
+    label: 'Predictive Overtime',
+    group: 'workplace',
+    icon: 'chart',
+  },
+  {
     path: '/roster',
     component: lazy(() => import('../pages/Roster')),
     label: 'Shift roster',
     group: 'workplace',
     icon: 'calendar',
+    employee: true,
+  },
+  {
+    path: '/shift-marketplace',
+    component: lazy(() => import('../pages/DynamicShiftBidding')),
+    label: 'Shift Marketplace',
+    group: 'workplace',
+    icon: 'briefcase',
     employee: true,
   },
   {
@@ -374,31 +430,73 @@ export const APP_ROUTES = [
   // ── Enterprise Suites (routed, sidebar-hidden) ──────────────────────────────
   {
     path: '/enterprise/vendor-management',
-    component: lazy(() => import('../pages/vendor/EnterpriseVendorDashboardPage')),
+    component: lazy(
+      () => import('../pages/vendor/EnterpriseVendorDashboardPage'),
+    ),
   },
   {
     path: '/enterprise/benefits-compensation',
-    component: lazy(() => import('../pages/benefits/EnterpriseBenefitsDashboardPage')),
+    component: lazy(
+      () => import('../pages/benefits/EnterpriseBenefitsDashboardPage'),
+    ),
   },
   {
     path: '/enterprise/travel-expense',
-    component: lazy(() => import('../pages/travel/EnterpriseTravelDashboardPage')),
+    component: lazy(
+      () => import('../pages/travel/EnterpriseTravelDashboardPage'),
+    ),
   },
   {
     path: '/enterprise/asset-inventory',
-    component: lazy(() => import('../pages/assets/EnterpriseAssetDashboardPage')),
+    component: lazy(
+      () => import('../pages/assets/EnterpriseAssetDashboardPage'),
+    ),
   },
   {
     path: '/enterprise/compliance-audit',
-    component: lazy(() => import('../pages/compliance/EnterpriseComplianceDashboardPage')),
+    component: lazy(
+      () => import('../pages/compliance/EnterpriseComplianceDashboardPage'),
+    ),
   },
   {
     path: '/enterprise/cybersecurity-soc',
-    component: lazy(() => import('../pages/security/EnterpriseCybersecuritySOCPage')),
+    component: lazy(
+      () => import('../pages/security/EnterpriseCybersecuritySOCPage'),
+    ),
+  },
+  {
+    path: '/enterprise/ecmo-critical-care',
+    component: lazy(() => import('../pages/ecmo/ECMOVentilationTelemetryPage')),
   },
   {
     path: '/enterprise/engagement-sentiment',
-    component: lazy(() => import('../pages/engagement/EnterpriseEngagementSentimentPage')),
+    component: lazy(
+      () => import('../pages/engagement/EnterpriseEngagementSentimentPage'),
+    ),
+  },
+  {
+    path: '/enterprise/clinical-telemetry',
+    component: lazy(
+      () => import('../pages/clinical/ICUHemodynamicsTelemetryPage'),
+    ),
+  },
+  {
+    path: '/enterprise/emergency-triage',
+    component: lazy(
+      () => import('../pages/emergency/EmergencyTriageCommandStationPage'),
+    ),
+  },
+  {
+    path: '/enterprise/cardiology-stemi',
+    component: lazy(
+      () => import('../pages/cardiology/CardiologySTEMICathLabPage'),
+    ),
+  },
+  {
+    path: '/enterprise/mechanical-circulatory-support',
+    component: lazy(
+      () => import('../pages/circulatory/MechanicalCirculatorySupportPage'),
+    ),
   },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
@@ -408,15 +506,22 @@ export const APP_ROUTES = [
   // ── Enterprise (routed but sidebar entry managed separately) ─────────────
   {
     path: '/enterprise/time-attendance',
-    component: lazy(() => import('../pages/timeattendance/EnterpriseTimeAttendanceDashboardPage')),
+    component: lazy(
+      () =>
+        import('../pages/timeattendance/EnterpriseTimeAttendanceDashboardPage'),
+    ),
   },
   {
     path: '/enterprise/learning-development',
-    component: lazy(() => import('../pages/learning/EnterpriseLearningDevelopmentPage')),
+    component: lazy(
+      () => import('../pages/learning/EnterpriseLearningDevelopmentPage'),
+    ),
   },
   {
     path: '/enterprise/onboarding-lifecycle',
-    component: lazy(() => import('../pages/onboarding/EnterpriseOnboardingLifecyclePage')),
+    component: lazy(
+      () => import('../pages/onboarding/EnterpriseOnboardingLifecyclePage'),
+    ),
   },
 
   {
@@ -444,6 +549,58 @@ export const APP_ROUTES = [
 export const UNROUTED_PAGES = {
   // Rendered by App.jsx as the catch-all `*` route, not from the registry.
   'NotFound.jsx': 'the catch-all route',
+  'AllowanceAuditDashboard.jsx': 'Work in progress',
+  'BiometricSyncDashboard.jsx': 'Work in progress',
+  'BoomerangRehireWizard.jsx': 'Work in progress',
+  'CommissionDashboard.jsx': 'Work in progress',
+  'ComplianceDashboard.jsx': 'Work in progress',
+  'ComplianceVault.jsx': 'Work in progress',
+  'EntityHierarchy.jsx': 'Work in progress',
+  'EquitySettlementDashboard.jsx': 'Work in progress',
+  'EscrowAdmin.jsx': 'Work in progress',
+  'EthicsReviewBoard.jsx': 'Work in progress',
+  'EWAPortal.jsx': 'Work in progress',
+  'ExpenseSubmission.jsx': 'Work in progress',
+  'FleetDashboard.jsx': 'Work in progress',
+  'FXPayrollDashboard.jsx': 'Work in progress',
+  'GarnishmentAdmin.jsx': 'Work in progress',
+  'GlobalMobilityDashboard.jsx': 'Work in progress',
+  'HandoverDashboard.jsx': 'Work in progress',
+  'InternalHiringPipeline.jsx': 'Work in progress',
+  'InternalJobBoard.jsx': 'Work in progress',
+  'InviteAcceptPage.jsx': 'Work in progress',
+  'KudosFeed.jsx': 'Work in progress',
+  'LoanPortal.jsx': 'Work in progress',
+  'ManagerClearance.jsx': 'Work in progress',
+  'MatrixOrgChart.jsx': 'Work in progress',
+  'OkrDashboard.jsx': 'Work in progress',
+  'OnboardingDashboard.jsx': 'Work in progress',
+  'OpenShifts.jsx': 'Work in progress',
+  'PayrollComparisonDashboard.jsx': 'Work in progress',
+  'PolicySettings.jsx': 'Work in progress',
+  'RecognitionSettings.jsx': 'Work in progress',
+  'ReconciliationDashboard.jsx': 'Work in progress',
+  'ReferralAdminDashboard.jsx': 'Work in progress',
+  'ReferralPortal.jsx': 'Work in progress',
+  'RelocationTracker.jsx': 'Work in progress',
+  'RemoteWorkerTaxReport.jsx': 'Work in progress',
+  'ReversalDashboard.jsx': 'Work in progress',
+  'RosterGenerator.jsx': 'Work in progress',
+  'ShiftMarketplace.jsx': 'Work in progress',
+  'TaxJurisdictionSettings.jsx': 'Work in progress',
+  'TimesheetTracker.jsx': 'Work in progress',
+  'TipPoolDashboard.jsx': 'Work in progress',
+  'ToilDashboard.jsx': 'Work in progress',
+  'ToilPolicySettings.jsx': 'Work in progress',
+  'TrainingCatalog.jsx': 'Work in progress',
+  'TravelDesk.jsx': 'Work in progress',
+  'TravelSettlement.jsx': 'Work in progress',
+  'TripLogger.jsx': 'Work in progress',
+  'UnionAdminDashboard.jsx': 'Work in progress',
+  'VendorComplianceVault.jsx': 'Work in progress',
+  'WCAuditDashboard.jsx': 'Work in progress',
+  'WellnessDashboard.jsx': 'Work in progress',
+  'WhistleblowerPortal.jsx': 'Work in progress',
 };
 
 /**

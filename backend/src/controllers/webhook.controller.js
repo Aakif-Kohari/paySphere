@@ -429,6 +429,46 @@ exports.retryWebhookDelivery = async (req, res, next) => {
   }
 };
 
+exports.testWebhook = async (req, res, next) => {
+  try {
+    const tenantId = requireTenant(req);
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid webhook id format" });
+    }
+
+    const webhook = await WebhookEndpoint.findOne({ _id: id, tenantId });
+    if (!webhook) {
+      return res.status(404).json({ message: "Webhook endpoint not found" });
+    }
+
+    const testPayload = {
+      event: "TEST_EVENT",
+      timestamp: new Date().toISOString(),
+      data: {
+        message: "This is a test notification from PaySphere.",
+        testId: crypto.randomBytes(8).toString("hex"),
+      },
+      resourceIds: [],
+    };
+
+    const webhookService = require("../services/webhook.service");
+    await webhookService.webhookQueue.add("deliver", {
+      endpointId: webhook._id.toString(),
+      tenantId: tenantId.toString(),
+      url: webhook.url,
+      secret: webhook.secret,
+      eventName: "TEST_EVENT",
+      payload: testPayload,
+    });
+
+    res.status(200).json({ success: true, message: "Test webhook enqueued successfully." });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.SUBSCRIBABLE_EVENTS = SUBSCRIBABLE_EVENTS;
 exports.validateUrl = validateUrl;
 exports.validateEvents = validateEvents;

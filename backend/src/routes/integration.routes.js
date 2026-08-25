@@ -68,6 +68,21 @@ router.post(
   triggerSync,
 );
 
+router.get(
+  '/:provider/mapping',
+  auth,
+  requirePermission(PERMISSIONS.MANAGE_INTEGRATIONS),
+  require('../controllers/integration.controller').getFieldMapping
+);
+
+router.put(
+  '/:provider/mapping',
+  auth,
+  requirePermission(PERMISSIONS.MANAGE_INTEGRATIONS),
+  writeRateLimiter,
+  require('../controllers/integration.controller').saveFieldMapping
+);
+
 router.delete(
   '/:provider',
   auth,

@@ -3,7 +3,8 @@ const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
 const { writeRateLimiter } = require('../middlewares/rateLimiter.middleware');
 const {
-    upsertJurisdiction, saveTaxRules, getJurisdictions, getRemoteWorkerReport
+    upsertJurisdiction, saveTaxRules, getJurisdictions, getRemoteWorkerReport,
+    syncTaxSlabs, getSyncLogs
 } = require('../controllers/regionalTax.controller');
 
 const router = express.Router();
@@ -14,5 +15,8 @@ router.get('/jurisdictions', auth, requirePermission('READ_PAYROLL'), getJurisdi
 router.post('/rules', auth, requirePermission('WRITE_PAYROLL'), writeRateLimiter, saveTaxRules);
 
 router.get('/report/remote-workers', auth, requirePermission('READ_PAYROLL'), getRemoteWorkerReport);
+
+router.post('/sync', auth, requirePermission('WRITE_PAYROLL'), writeRateLimiter, syncTaxSlabs);
+router.get('/sync-logs', auth, requirePermission('READ_PAYROLL'), getSyncLogs);
 
 module.exports = router;

@@ -8,6 +8,7 @@ import Sidebar from '../components/Sidebar';
 import EmployeePortalSkeleton from '../components/common/skeleton/EmployeePortalSkeleton';
 import api from '../services/api';
 import { useAppStore } from '../store/useAppStore';
+import ClinicalOutcomesTracker from '../components/ClinicalOutcomesTracker';
 
 export default function EmployeePortal() {
   const { t, i18n } = useTranslation();
@@ -151,6 +152,10 @@ export default function EmployeePortal() {
               )}
             </div>
 
+            <div className="mb-6">
+              <ClinicalOutcomesTracker />
+            </div>
+
             {/* Payslips History */}
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6">
               <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">
@@ -163,7 +168,10 @@ export default function EmployeePortal() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table aria-label="Payslip History Table" className="w-full text-left text-sm">
+                  <table
+                    aria-label="Payslip History Table"
+                    className="w-full text-left text-sm"
+                  >
                     <thead>
                       <tr className="border-b border-gray-200 dark:border-slate-800 text-gray-400 dark:text-slate-400 uppercase text-xs">
                         <th className="py-3 px-4">{t('portal.period', 'Period')}</th>

@@ -127,6 +127,10 @@ const AUDIT_ACTIONS = [
   'PAY_BAND_UPDATED',
   'IMPERSONATE_USER_START',
   'IMPERSONATE_USER_STOP',
+  'TEAM_INVITE_SENT',
+  'TEAM_INVITE_ACCEPTED',
+  'TEAM_INVITE_REVOKED',
+  'TEAM_MEMBER_DEACTIVATED',
 ];
 
 /** Every resource type a controller emits. Same story as the actions above. */
@@ -159,6 +163,7 @@ const AUDIT_RESOURCE_TYPES = [
   'OfficeLocation',
   'PayEquityReport',
   'PayBand',
+  'TeamInvite',
 ];
 
 const auditLogSchema = new mongoose.Schema(

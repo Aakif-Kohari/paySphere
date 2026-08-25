@@ -196,9 +196,51 @@ exports.login = async (req, res, next) => {
     const user = await User.findOne({ email: cleanEmail });
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
+    // Check account lockout status (#1275)
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      const remainingMinutes = Math.ceil((user.lockUntil - Date.now()) / (60 * 1000));
+      return res.status(403).json({
+        message: `Account is locked due to 5 consecutive failed login attempts. Please try again after ${remainingMinutes} minute(s).`,
+        isLocked: true,
+        lockUntil: user.lockUntil,
+      });
+    }
+
+    // Auto-reset expired lockout
+    if (user.lockUntil && user.lockUntil <= Date.now()) {
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(400).json({ message: 'Invalid credentials' });
+    if (!isMatch) {
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+
+      if (user.failedLoginAttempts >= 5) {
+        user.lockUntil = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes lockout
+        await user.save();
+
+        return res.status(403).json({
+          message: 'Account locked due to 5 consecutive failed login attempts. Please try again after 30 minutes.',
+          isLocked: true,
+          lockUntil: user.lockUntil,
+        });
+      }
+
+      await user.save();
+      const remaining = 5 - user.failedLoginAttempts;
+      return res.status(400).json({
+        message: 'Invalid credentials',
+        remainingAttempts: remaining,
+      });
+    }
+
+    // Reset failed login attempts on successful match
+    if (user.failedLoginAttempts > 0 || user.lockUntil) {
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+      await user.save();
+    }
 
     if (user.isTwoFactorEnabled) {
       return res.status(200).json({

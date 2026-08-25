@@ -1,4 +1,3 @@
-/* eslint-disable jsx-a11y/label-has-associated-control, jsx-a11y/anchor-is-valid */
 import React, { useState } from 'react';
 import api from '../../services/api';
 
