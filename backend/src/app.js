@@ -568,8 +568,10 @@ app.use('/api/leave-closure', leaveClosureRoutes);
 app.use('/api/fbp', fbpRoutes);
 app.use('/api/team', teamRoutes);
 
-// Employee Health Challenges & Wellness Tracking
-app.use('/api/health-challenges', healthChallengeRoutes);
+// Peer Nomination & Awards (#peer-nominations). Employee-driven recognition
+// with category configuration, cycle management, voting, review, and analytics.
+const peerNominationRoutes = require('./routes/peerNomination.routes');
+app.use('/api/peer-nominations', peerNominationRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
