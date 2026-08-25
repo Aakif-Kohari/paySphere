@@ -81,6 +81,7 @@ const MOUNTED_ROUTES = [
   ['/api/attendance', 'get', '/api/attendance'],
   ['/api/assignments', 'get', '/api/assignments'],
   ['/api/settlements', 'get', '/api/settlements'],
+  ['/api/injury-compensation', 'get', '/api/injury-compensation/claims'],
   ['/api/gratuity', 'get', '/api/gratuity/valuations'],
   ['/api/loans', 'get', '/api/loans'],
   ['/api/archive', 'get', '/api/archive/employees'],
@@ -213,6 +214,7 @@ const ROUTER_MOUNTS = {
   // rather than for a path string that does not exist.
   health: null,
 
+  injuryCompensation: '/api/injury-compensation',
   integration: '/api/integrations',
   leaveClosure: '/api/leave-closure',
   loan: '/api/loans',
