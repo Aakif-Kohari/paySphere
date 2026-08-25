@@ -494,6 +494,13 @@ export const APP_ROUTES = [
       () => import('../pages/onboarding/EnterpriseOnboardingLifecyclePage'),
     ),
   },
+  {
+    path: '/enterprise/ma-harmonization',
+    component: lazy(
+      () => import('../pages/enterprise/MAHarmonizationHubPage'),
+    ),
+    appShell: false,
+  },
 
   {
     path: '/settings',
