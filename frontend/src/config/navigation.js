@@ -592,16 +592,9 @@ export const APP_ROUTES = [
     ),
   },
   {
-    path: '/enterprise/mental-health-hub',
+    path: '/enterprise/ma-harmonization',
     component: lazy(
-      () => import('../pages/wellness/MentalHealthHubPage'),
-    ),
-    appShell: false,
-  },
-  {
-    path: '/enterprise/salary-benchmarking',
-    component: lazy(
-      () => import('../pages/compensation/SalaryBenchmarkingHubPage'),
+      () => import('../pages/enterprise/MAHarmonizationHubPage'),
     ),
     appShell: false,
   },
