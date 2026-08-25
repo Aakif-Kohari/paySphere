@@ -168,6 +168,7 @@ const salaryAdjustmentRoutes = require('./routes/salaryAdjustment.routes');
 const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
 const teamRoutes = require('./routes/team.routes');
+const serviceMilestoneRoutes = require('./routes/serviceMilestone.routes');
 const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
@@ -556,6 +557,9 @@ app.use('/api/admin', subscriptionAdminRoutes);
 app.use('/api/leave-closure', leaveClosureRoutes);
 app.use('/api/fbp', fbpRoutes);
 app.use('/api/team', teamRoutes);
+
+// Service Milestone & Anniversary Recognition
+app.use('/api/milestones', serviceMilestoneRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
