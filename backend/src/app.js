@@ -152,6 +152,7 @@ const cryptoRouter = require('./services/CryptoPayrollService').default;
 // before it — `OfferLetterBuilder.jsx` types in a name and a salary by hand
 // because there was no candidate record to draw them from.
 const recruitmentRoutes = require('./routes/recruitment.routes');
+const referralBonusRoutes = require('./routes/referralBonus.routes');
 
 // Salary disbursement (#1075). Payroll was computed to the rupee and then
 // stopped: `payroll.model.js` has a `disbursed` status and nothing in the
@@ -542,6 +543,9 @@ app.use('/api', cryptoRouter);
 // Recruitment (#1074). The router owns `/requisitions`, `/candidates` and
 // `/analytics`, so the prefix carries no noun of its own.
 app.use('/api/recruitment', recruitmentRoutes);
+
+// Referral Bonus Tracking
+app.use('/api/referral-bonuses', referralBonusRoutes);
 
 // Salary disbursement (#1075). The router owns `/batches` and `/profiles`.
 app.use('/api/disbursements', disbursementRoutes);
