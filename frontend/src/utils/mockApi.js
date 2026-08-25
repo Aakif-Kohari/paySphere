@@ -8,17 +8,17 @@
  */
 
 const MOCK_EMPLOYEES = [
-  { _id: '1', firstName: 'Alice', lastName: 'Johnson', email: 'alice@demo.com', role: 'Engineer', department: 'Engineering', salary: 85000, status: 'active', joinDate: '2024-03-15' },
-  { _id: '2', firstName: 'Bob', lastName: 'Smith', email: 'bob@demo.com', role: 'Designer', department: 'Design', salary: 78000, status: 'active', joinDate: '2024-05-20' },
-  { _id: '3', firstName: 'Carol', lastName: 'Williams', email: 'carol@demo.com', role: 'Manager', department: 'HR', salary: 92000, status: 'active', joinDate: '2023-11-01' },
-  { _id: '4', firstName: 'David', lastName: 'Brown', email: 'david@demo.com', role: 'Analyst', department: 'Finance', salary: 72000, status: 'active', joinDate: '2024-01-10' },
-  { _id: '5', firstName: 'Eva', lastName: 'Davis', email: 'eva@demo.com', role: 'Developer', department: 'Engineering', salary: 88000, status: 'active', joinDate: '2024-07-01' },
+  { _id: '1', firstName: 'Alice', lastName: 'Johnson', fullName: 'Alice Johnson', email: 'alice@demo.com', role: 'Engineer', department: 'Engineering', salary: 85000, monthlySalary: 85000, overtimeRate: 500, status: 'active', joinDate: '2024-03-15' },
+  { _id: '2', firstName: 'Bob', lastName: 'Smith', fullName: 'Bob Smith', email: 'bob@demo.com', role: 'Designer', department: 'Design', salary: 78000, monthlySalary: 78000, overtimeRate: 450, status: 'active', joinDate: '2024-05-20' },
+  { _id: '3', firstName: 'Carol', lastName: 'Williams', fullName: 'Carol Williams', email: 'carol@demo.com', role: 'Manager', department: 'HR', salary: 92000, monthlySalary: 92000, overtimeRate: 600, status: 'active', joinDate: '2023-11-01' },
+  { _id: '4', firstName: 'David', lastName: 'Brown', fullName: 'David Brown', email: 'david@demo.com', role: 'Analyst', department: 'Finance', salary: 72000, monthlySalary: 72000, overtimeRate: 400, status: 'active', joinDate: '2024-01-10' },
+  { _id: '5', firstName: 'Eva', lastName: 'Davis', fullName: 'Eva Davis', email: 'eva@demo.com', role: 'Developer', department: 'Engineering', salary: 88000, monthlySalary: 88000, overtimeRate: 550, status: 'active', joinDate: '2024-07-01' },
 ];
 
 const MOCK_PAYROLLS = MOCK_EMPLOYEES.map((emp, i) => ({
   _id: `payroll-${i + 1}`,
   employeeId: emp._id,
-  employeeName: `${emp.firstName} ${emp.lastName}`,
+  employeeName: emp.fullName,
   month: 'July',
   year: 2024,
   basicSalary: emp.salary,
@@ -29,6 +29,44 @@ const MOCK_PAYROLLS = MOCK_EMPLOYEES.map((emp, i) => ({
 }));
 
 const MOCK_ROUTES = {
+  '/api/employee-portal/profile': () => ({
+    user: {
+      fullName: 'Alice Johnson',
+      companyName: 'PaySphere',
+      email: 'alice@demo.com',
+    },
+    employee: {
+      role: 'Senior Engineer',
+      monthlySalary: 85000,
+      overtimeRate: 500,
+    },
+  }),
+
+  '/api/employee-portal/payslips': () => ({
+    payrolls: [
+      {
+        _id: 'payslip-1',
+        month: 7,
+        year: 2024,
+        baseSalary: 85000,
+        overtimePay: 2500,
+        leaveDeduction: 0,
+        netSalary: 87500,
+        status: 'Paid',
+      },
+      {
+        _id: 'payslip-2',
+        month: 6,
+        year: 2024,
+        baseSalary: 85000,
+        overtimePay: 1500,
+        leaveDeduction: 1000,
+        netSalary: 85500,
+        status: 'Paid',
+      },
+    ],
+  }),
+
   '/api/employees': (url) => {
     const params = new URL(url, 'http://localhost').searchParams;
     const page = parseInt(params.get('page') || '1', 10);
