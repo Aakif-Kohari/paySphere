@@ -78,6 +78,7 @@ const MOUNTED_ROUTES = [
   ['/api/schedules', 'get', '/api/schedules'],
   ['/api/audit-logs', 'get', '/api/audit-logs'],
   ['/api/attendance', 'get', '/api/attendance'],
+  ['/api/working-hours', 'get', '/api/working-hours/limits'],
   ['/api/assignments', 'get', '/api/assignments'],
   ['/api/settlements', 'get', '/api/settlements'],
   ['/api/gratuity', 'get', '/api/gratuity/valuations'],
@@ -239,6 +240,7 @@ const ROUTER_MOUNTS = {
   varianceReport: '/api/reports',
   vendor: '/api/vendors',
   webhook: '/api/webhooks',
+  workingHours: '/api/working-hours',
   workflow: '/api/workflows',
 };
 

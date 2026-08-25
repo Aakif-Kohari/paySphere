@@ -43,6 +43,13 @@ const AUDIT_ACTIONS = [
   // like one (#459).
   'ATTENDANCE_UPDATE',
   'ATTENDANCE_BULK_UPDATE',
+  // Working hours compliance (#1702). Next to the attendance actions because it
+  // is that ledger these are computed from. Raising a limit makes existing
+  // findings disappear without anything else recording that it happened, and a
+  // committed assessment is the establishment's own statement of what its shift
+  // patterns were doing.
+  'WORKING_HOURS_LIMITS_UPDATED',
+  'WORKING_HOURS_ASSESSMENT_COMMITTED',
   // Offboarding is a financial event: it produces a final payout and
   // removes someone from the headcount (#462).
   'EMPLOYEE_EXIT_INITIATED',
@@ -141,6 +148,8 @@ const AUDIT_RESOURCE_TYPES = [
   'User',
   'Report',
   'Attendance',
+  'WorkingHoursLimits',
+  'WorkingHoursAssessment',
   'Settlement',
   'GratuityAssumption',
   'GratuityValuation',

@@ -133,6 +133,22 @@ const PERMISSIONS = {
   READ_ROSTER: 'READ_ROSTER',
   MANAGE_ROSTER: 'MANAGE_ROSTER',
 
+  // --- Working hours compliance (#1702) ------------------------------------
+  //
+  // Next to the roster names, because the fix for a spread-over breach is a
+  // different rota. The middle name is the reason there are three: the limits
+  // decide what counts as a breach, so an establishment that raises its
+  // spread-over to thirteen hours makes every existing finding disappear and
+  // nothing in the assessment would say it had. Whoever sets them should not
+  // also be certifying the establishment against them.
+  //
+  // Deliberately not gated on the attendance permissions either, though it is
+  // computed from that ledger. Attendance answers "was this person here"; this
+  // answers "is this shift pattern lawful", which is about the employer.
+  READ_WORKING_HOURS: 'READ_WORKING_HOURS',
+  MANAGE_WORKING_HOURS_LIMITS: 'MANAGE_WORKING_HOURS_LIMITS',
+  RUN_WORKING_HOURS_ASSESSMENT: 'RUN_WORKING_HOURS_ASSESSMENT',
+
   // --- Pay equity (#1347) --------------------------------------------------
   //
   // Its own pair rather than READ_EMPLOYEE, because the gap analysis reads
@@ -415,6 +431,21 @@ const PERMISSION_DEFINITIONS = [
       'Create shift templates, assign shifts, and approve shift swaps',
   },
   {
+    name: PERMISSIONS.READ_WORKING_HOURS,
+    description:
+      'View working hours findings — daily and weekly limits, spread-over, rest intervals, weekly holidays and the quarterly overtime ceiling',
+  },
+  {
+    name: PERMISSIONS.MANAGE_WORKING_HOURS_LIMITS,
+    description:
+      'Set the establishment’s working hours limits and week start, which decide what counts as a breach',
+  },
+  {
+    name: PERMISSIONS.RUN_WORKING_HOURS_ASSESSMENT,
+    description:
+      'Commit a working hours assessment for a period, which states what the establishment was found to be doing',
+  },
+  {
     name: PERMISSIONS.READ_PAY_EQUITY,
     description:
       'View the pay gap analysis, which is computed from employees’ declared gender',
@@ -643,6 +674,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.MANAGE_ROSTER,
 
+      // #1702. All three. Setting the limits and certifying against them are
+      // the two halves of one check, and the owner is the one account allowed
+      // to be both — there is nobody above it to be the other half.
+      PERMISSIONS.READ_WORKING_HOURS,
+      PERMISSIONS.MANAGE_WORKING_HOURS_LIMITS,
+      PERMISSIONS.RUN_WORKING_HOURS_ASSESSMENT,
+
       // #1347. Both stop here. The gap analysis reads declared gender, which is
       // the only sensitive personal data in the product, and a committed report
       // is a published figure — neither is HR admin.
@@ -746,6 +784,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_VENDOR,
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.MANAGE_ROSTER,
+
+      // #1702. HR reads the findings — a spread-over breach is a rostering
+      // problem and rostering is HR's, which is why this sits directly under
+      // MANAGE_ROSTER. It does not set the limits, which decide what counts as
+      // a breach in the first place, and it does not commit the assessment.
+      PERMISSIONS.READ_WORKING_HOURS,
+
       PERMISSIONS.READ_CONTRACT,
       PERMISSIONS.READ_APPRAISAL,
       PERMISSIONS.MANAGE_APPRAISAL,
