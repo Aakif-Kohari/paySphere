@@ -1,4 +1,8 @@
 node_modules/
 .turbo/
-
+dist/
+build/
+backend/dist/
+frontend/dist/
 uploads/
+.freebuff/
