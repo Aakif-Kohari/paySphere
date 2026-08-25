@@ -494,6 +494,13 @@ export const APP_ROUTES = [
       () => import('../pages/onboarding/EnterpriseOnboardingLifecyclePage'),
     ),
   },
+  {
+    path: '/enterprise/succession-planning',
+    component: lazy(
+      () => import('../pages/enterprise/SuccessionPlanningHubPage'),
+    ),
+    appShell: false,
+  },
 
   {
     path: '/settings',
