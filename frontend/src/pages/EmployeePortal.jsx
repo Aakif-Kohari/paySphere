@@ -8,10 +8,11 @@ import Sidebar from '../components/Sidebar';
 import EmployeePortalSkeleton from '../components/common/skeleton/EmployeePortalSkeleton';
 import api from '../services/api';
 import { useAppStore } from '../store/useAppStore';
+import { formatCurrency, formatDate } from '../utils/formatLocale';
 import ClinicalOutcomesTracker from '../components/ClinicalOutcomesTracker';
 
 export default function EmployeePortal() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [employee, setEmployee] = useState(null);
@@ -49,7 +50,7 @@ export default function EmployeePortal() {
   const getMonthName = (monthNum) => {
     const date = new Date();
     date.setMonth(monthNum - 1);
-    return date.toLocaleString(i18n?.language || 'default', { month: 'long' });
+    return formatDate(date, { month: 'long' });
   };
 
   return (
@@ -137,7 +138,7 @@ export default function EmployeePortal() {
                       {t('portal.baseMonthlySalary', 'Base Monthly Salary')}
                     </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
-                      ₹{employee.monthlySalary?.toLocaleString(i18n?.language || 'en-IN') || 0}
+                      {formatCurrency(employee.monthlySalary || 0, 'INR')}
                     </p>
                   </div>
                   <div>
@@ -145,7 +146,7 @@ export default function EmployeePortal() {
                       {t('portal.overtimeRate', 'Overtime Rate')}
                     </p>
                     <p className="text-lg font-bold text-slate-900 dark:text-white mt-0.5">
-                      ₹{employee.overtimeRate || 0}/{t('portal.perHour', 'hr')}
+                      {formatCurrency(employee.overtimeRate || 0, 'INR')}/{t('portal.perHour', 'hr')}
                     </p>
                   </div>
                 </div>
@@ -194,16 +195,16 @@ export default function EmployeePortal() {
                             {getMonthName(pay.month)} {pay.year}
                           </td>
                           <td className="py-4 px-4 text-slate-600 dark:text-slate-300">
-                            ₹{pay.baseSalary?.toLocaleString(i18n?.language || 'en-IN')}
+                            {formatCurrency(pay.baseSalary, 'INR')}
                           </td>
                           <td className="py-4 px-4 text-emerald-600 dark:text-emerald-400">
-                            +₹{pay.overtimePay?.toLocaleString(i18n?.language || 'en-IN')}
+                            +{formatCurrency(pay.overtimePay, 'INR')}
                           </td>
                           <td className="py-4 px-4 text-red-500 dark:text-red-400">
-                            -₹{pay.leaveDeduction?.toLocaleString(i18n?.language || 'en-IN')}
+                            -{formatCurrency(pay.leaveDeduction, 'INR')}
                           </td>
                           <td className="py-4 px-4 font-bold text-blue-600 dark:text-blue-400">
-                            ₹{pay.netSalary?.toLocaleString(i18n?.language || 'en-IN')}
+                            {formatCurrency(pay.netSalary, 'INR')}
                           </td>
                           <td className="py-4 px-4">
                             <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
