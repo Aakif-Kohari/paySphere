@@ -51,7 +51,19 @@ const employeeSchema = new mongoose.Schema(
     },
 
     /**
-     * Pay equity attributes (#1347).
+     * Who this employee reports to, for the drag-and-drop org chart (#1287).
+     *
+     * Self-referencing so the whole hierarchy can be rebuilt from a flat
+     * list. `null` means "top of the chart" (e.g. the CEO) rather than an
+     * unset value — the org chart builder treats both the same way anyway.
+     */
+    managerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Employee',
+      default: null,
+    },
+
+    /**     * Pay equity attributes (#1347).
      *
      * All three are optional and all three are absent by default, which is the
      * only version of this that is defensible. A tenant that does not collect
@@ -107,6 +119,64 @@ const employeeSchema = new mongoose.Schema(
       default: undefined,
       min: [1, 'Contracted hours must be positive'],
       max: [400, 'Contracted hours cannot exceed 400 a month'],
+    },
+
+    /**
+     * Where this employee sits in the minimum wage schedules (#1698).
+     *
+     * Four fields rather than one because that is genuinely how many it takes
+     * to identify a notified rate. A state notifies per *scheduled employment*,
+     * within that per *area class*, and within that per *skill category*, and
+     * the schedules do not agree between states on what any of those columns
+     * contain. Collapsing them to a single "wage band" merges two different
+     * notifications, and the merged rate is wrong for at least one of the
+     * populations it now covers.
+     *
+     * Nested rather than flattened onto the root because the four are only
+     * meaningful together — an `areaClass` with no `state` names nothing — and
+     * because grouping them keeps the projection in
+     * `minimumWages.controller.js` to one field.
+     *
+     * All optional. An employee with no classification is reported as an
+     * exclusion with a reason rather than assessed against a guess.
+     */
+    statutoryClassification: {
+      /** ISO 3166-2 subdivision code without the country prefix: KA, MH, TN. */
+      state: {
+        type: String,
+        default: '',
+        uppercase: true,
+        trim: true,
+        maxlength: [8, 'State code cannot exceed 8 characters'],
+      },
+      /**
+       * The scheduled employment as the state names it. Free text, because the
+       * schedules are state-specific and a closed list here would mean a tenant
+       * in a state we have not enumerated cannot classify their own staff.
+       */
+      scheduledEmployment: {
+        type: String,
+        default: '',
+        trim: true,
+        maxlength: [120, 'Scheduled employment cannot exceed 120 characters'],
+      },
+      /**
+       * Zone I / II / III. States name these differently — Area A/B/C in
+       * Karnataka, a metro split elsewhere — but it is always an ordered
+       * classification of where the establishment is, so the notification
+       * carries the state's own label and this carries the ordering.
+       */
+      areaClass: {
+        type: String,
+        enum: ['', 'ZONE_I', 'ZONE_II', 'ZONE_III'],
+        default: '',
+      },
+      /** The four categories every state schedule is written in terms of. */
+      skillCategory: {
+        type: String,
+        enum: ['', 'UNSKILLED', 'SEMI_SKILLED', 'SKILLED', 'HIGHLY_SKILLED'],
+        default: '',
+      },
     },
 
     /**

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import CommandPalette from './components/common/CommandPalette';
+import OnboardingTour from './components/common/OnboardingTour';
 import ScrollToTop from './components/common/ScrollToTop';
 import OfflineSyncIndicator from './components/OfflineSyncIndicator';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -14,6 +15,7 @@ import RouteFallback from './components/common/RouteFallback';
 import AppPageShell from './components/Layout/AppPageShell';
 import ImpersonationBanner from './components/common/ImpersonationBanner';
 import OnboardingTooltip from './components/onboarding/OnboardingTooltip';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // DEV-ONLY: exposes window.devLogin() / window.devLogout() in browser console
 if (import.meta.env.DEV) {
@@ -106,17 +108,21 @@ function App() {
                     key={route.path}
                     path={route.path}
                     element={
-                      route.isProtected === false ? (
-                        <Page />
-                      ) : (
-                        <ProtectedRoute>
-                          {route.appShell ? (
-                            <AppPageShell><Page /></AppPageShell>
-                          ) : (
-                            <Page />
-                          )}
-                        </ProtectedRoute>
-                      )
+                      <ErrorBoundary level="page">
+                        {route.isProtected === false ? (
+                          <Page />
+                        ) : (
+                          <ProtectedRoute>
+                            {route.appShell ? (
+                              <AppPageShell>
+                                <Page />
+                              </AppPageShell>
+                            ) : (
+                              <Page />
+                            )}
+                          </ProtectedRoute>
+                        )}
+                      </ErrorBoundary>
                     }
                   />
                 );
@@ -128,6 +134,7 @@ function App() {
 
           <ScrollToTop />
           <CommandPalette />
+          <OnboardingTour />
 
           {/* Global Offline Sync Indicator (Issue #815) */}
           <OfflineSyncIndicator />
