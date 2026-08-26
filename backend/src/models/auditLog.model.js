@@ -140,6 +140,18 @@ const AUDIT_ACTIONS = [
   'CONTRACT_LABOUR_LICENCE_UPDATED',
   'CONTRACT_LABOUR_RETURN_FILED',
   'CONTRACT_LABOUR_REGISTER_EXPORTED',
+  // Apprentices Act, 1961 (#1771). Next to the contract labour actions because
+  // both concern people on the site who are not on the payroll. The recorded
+  // strength is audited because it is the denominator of the whole obligation:
+  // reducing it by ten lowers the floor and can make a shortfall disappear
+  // without a single apprentice being engaged. And the registration is audited
+  // because that one date decides whether the establishment owes provident
+  // fund, ESI, bonus and gratuity for the period.
+  'APPRENTICESHIP_RULES_UPDATED',
+  'APPRENTICESHIP_STRENGTH_RECORDED',
+  'APPRENTICE_ENGAGED',
+  'APPRENTICE_CONTRACT_REGISTERED',
+  'APPRENTICESHIP_ASSESSMENT_COMMITTED',
   // International assignments (#1348). Opening one commits the employer to
   // bearing somebody's foreign tax bill for years; a settlement moves money
   // between the employee and the company; and the two threshold events record

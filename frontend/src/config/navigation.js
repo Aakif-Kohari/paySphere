@@ -187,7 +187,7 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
 
-    {
+  {
     path: '/compensation',
     component: lazy(() => import('../pages/CompensationBenchmarkingDashboard')),
     label: 'Compensation & equity',
@@ -195,15 +195,27 @@ export const APP_ROUTES = [
     icon: 'money',
   },
 
-    {
+  {
     path: '/onboarding',
     component: lazy(() => import('../pages/OnboardingLifecycleTracker')),
     label: 'Onboarding tracker',
     group: 'people',
     icon: 'rocket',
   },
+  {
+    // In People rather than Compliance: engaging an apprentice and keeping the
+    // roll is HR work, and it sits next to onboarding because that is what it
+    // is. That an unregistered contract also produces a statutory exposure is
+    // true, and it is not what the page is used for day to day (#1771).
+    path: '/apprenticeships',
+    component: lazy(() => import('../pages/ApprenticeshipCompliance')),
+    appShell: true,
+    label: 'Apprentices',
+    group: 'people',
+    icon: 'rocket',
+  },
 
-// ── Payroll ──────────────────────────────────────────────────────────────
+  // ── Payroll ──────────────────────────────────────────────────────────────
   {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
@@ -468,7 +480,7 @@ export const APP_ROUTES = [
     employee: true,
   },
 
-    {
+  {
     path: '/team-health',
     component: lazy(() => import('../pages/TeamHealthScoreDashboard')),
     label: 'Team health',
@@ -477,7 +489,7 @@ export const APP_ROUTES = [
     employee: true,
   },
 
-// ── Learning ─────────────────────────────────────────────────────────────
+  // ── Learning ─────────────────────────────────────────────────────────────
   {
     path: '/flashcards',
     component: lazy(() => import('../pages/Flashcards')),
