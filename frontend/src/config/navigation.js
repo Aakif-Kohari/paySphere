@@ -161,7 +161,15 @@ export const APP_ROUTES = [
     icon: 'document',
   },
 
-  // ── Payroll ──────────────────────────────────────────────────────────────
+    {
+    path: '/workforce-analytics',
+    component: lazy(() => import('../pages/WorkforceAnalyticsDashboard')),
+    label: 'Workforce analytics',
+    group: 'people',
+    icon: 'chart',
+  },
+
+// ── Payroll ──────────────────────────────────────────────────────────────
   {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
