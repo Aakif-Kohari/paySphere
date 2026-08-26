@@ -13,6 +13,7 @@ const { payableStatusFilter } = payrollStatusConfig;
 import Employee = require('../models/employee.model');
 import User = require('../models/user.model');
 import logger = require('../utils/logger');
+const { getDownloadUrl, putObject } = require('../services/objectStorage.service');
 import eventBus = require('../services/event.service');
 
 import currencyUtils = require('../utils/currency');
@@ -33,12 +34,14 @@ interface AnalyticsQuery {
   startDate?: string;
   endDate?: string;
   departments?: string;
+  delivery?: string;
 }
 
 interface DownloadPDFQuery {
   month?: string;
   year?: string;
   departments?: string;
+  delivery?: string;
 }
 
 interface CustomReportFilter {
@@ -456,13 +459,43 @@ const downloadPDFReport = async (
       clearTimeout(workerTimeout);
 
       if (result.success) {
-        // Set response headers for PDF download
+        const pdfBuffer = Buffer.from(result.pdfData);
+        let storedFile: { uri: string; key: string } | null = null;
+        let signedUrl = '';
+
+        // When S3 is configured, persist the generated artifact there rather
+        // than relying on instance-local storage. The existing binary response
+        // remains backward compatible; callers that want a portable cloud URL
+        // can request `?delivery=signed-url`.
+        if (process.env.AWS_S3_BUCKET || process.env.S3_BUCKET) {
+          storedFile = await putObject({
+            key: `exports/${tenantId}/payroll-report-${monthName.toLowerCase()}-${year}-${Date.now()}.pdf`,
+            body: pdfBuffer,
+            contentType: 'application/pdf',
+          });
+          signedUrl = await getDownloadUrl(storedFile.uri, { expiresIn: 3600 });
+        }
+
+        if (String(query.delivery || '').toLowerCase() === 'signed-url') {
+          if (!signedUrl) {
+            return res.status(503).json({
+              message: 'S3 storage is not configured for signed downloads.',
+            });
+          }
+          return res.status(200).json({
+            fileUrl: signedUrl,
+            key: storedFile!.key,
+            expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+          });
+        }
+
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader(
           'Content-Disposition',
           `attachment; filename=payroll-report-${monthName}-${year}.pdf`,
         );
-        res.send(Buffer.from(result.pdfData));
+        if (signedUrl) res.setHeader('X-PaySphere-File-URL', signedUrl);
+        res.send(pdfBuffer);
 
         eventBus.emit('AUDIT_LOG', {
           userId: req.userId,

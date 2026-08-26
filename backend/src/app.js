@@ -67,6 +67,12 @@ const statutoryBonusRoutes = require('./routes/statutoryBonus.routes');
 // Act computes on the higher of ₹7,000 and the applicable minimum wage, so this
 // is where that number now comes from.
 const minimumWagesRoutes = require('./routes/minimumWages.routes');
+
+// Payment of Wages Act, 1936 (#1767). Next to the minimum wages router because
+// the two are opposite halves of one question — that one sets the floor under
+// what must be paid, this one the ceiling on what may be taken back out — and
+// because section 7(3)'s ceiling is measured on the wages that router certifies.
+const wageDeductionRoutes = require('./routes/wageDeductions.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
@@ -89,6 +95,13 @@ const settlementRoutes = require('./routes/settlement.routes');
 // taken by the longitudinal compensation timeline, which is a different subject
 // wearing three quarters of the same name.
 const injuryCompensationRoutes = require('./routes/injuryCompensation.routes');
+
+// Employees' State Insurance Act, 1948 (#1768). Next to the injury
+// compensation router because section 53 decides between them: a claim under
+// the Employees' Compensation Act is barred where ESI covers the same injury,
+// so which router applies to an employee is settled by the coverage question
+// this one answers.
+const esiRoutes = require('./routes/esi.routes');
 const severanceRoutes = require('./routes/severance.routes');
 
 // Gratuity actuarial valuation (#1344). Next to settlements on purpose: the
@@ -96,6 +109,14 @@ const severanceRoutes = require('./routes/severance.routes');
 // gratuity to somebody who is leaving; this one measures what is still owed to
 // everybody who has not.
 const gratuityRoutes = require('./routes/gratuity.routes');
+
+// Employees' Pension Scheme, 1995 (#1769). Next to the gratuity router because
+// both value a defined benefit on service and a final salary. Apart from it
+// because gratuity is the company's own liability and EPS is a funded scheme
+// run by the EPFO, where the employer's obligation ends at the ₹1,250
+// remittance — putting them together would suggest a pension liability the
+// company does not carry.
+const epsRoutes = require('./routes/eps.routes');
 const loanRoutes = require('./routes/loan.routes');
 const schedulerRoutes = require('./routes/scheduler.routes');
 const employeePortalRoutes = require('./routes/employeePortal.routes');
@@ -419,6 +440,12 @@ app.use('/api/statutory-bonus', statutoryBonusRoutes);
 // is about what is paid to the employee before any of that. The router owns
 // `/notifications`, `/preview` and `/assessments`.
 app.use('/api/minimum-wages', minimumWagesRoutes);
+
+// #1767. Its own prefix rather than a sub-path of `/api/payroll`: a payroll row
+// is what one person was paid and a finding here is about what the employer was
+// allowed to take from it, which is a question about the employer. The router
+// owns `/rules`, `/assessment`, `/registers` and `/deferred`.
+app.use('/api/wage-deductions', wageDeductionRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/employee-portal', employeePortalRoutes);
 app.use('/api/schedules', schedulerRoutes);
@@ -438,9 +465,20 @@ app.use('/api/settlements', settlementRoutes);
 // coming back. The router owns `/schedules`, `/preview` and `/claims`.
 app.use('/api/injury-compensation', injuryCompensationRoutes);
 
+// #1768. Its own prefix rather than a sub-path of `/api/compliance`: the
+// compliance router files what the tax authorities want, and this is a
+// contribution to a benefit scheme the employee draws on. The router owns
+// `/rules`, `/assessment`, `/coverage` and `/returns`.
+app.use('/api/esi', esiRoutes);
+
 // #1344. The router owns `/assumptions`, `/preview`, `/valuations` and
 // `/employees/:employeeId`, so the prefix carries no noun of its own.
 app.use('/api/gratuity', gratuityRoutes);
+
+// #1769. Its own prefix rather than a sub-path of `/api/gratuity`, for the
+// reason above. The router owns `/assumptions`, `/wage-history`, `/preview`,
+// `/valuations` and `/members/:employeeId`.
+app.use('/api/eps', epsRoutes);
 app.use('/api/loans', loanRoutes);
 app.use('/api/treasury', treasuryRoutes);
 app.use('/api/regional-tax', regionalTaxRoutes);

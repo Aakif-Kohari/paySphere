@@ -16,7 +16,9 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "prepare": "husky || true",
-    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\""
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "benchmark:api": "node scripts/benchmark-api.js",
+    "benchmark:api:example": "BENCHMARK_CONFIG=benchmarks/config.example.json node scripts/benchmark-api.js"
   },
   "lint-staged": {
     "frontend/**/*.{js,jsx,ts,tsx}": [
@@ -36,6 +38,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^17.3.0",
     "prettier": "^3.9.6",
-    "turbo": "latest"
+    "turbo": "latest",
+    "autocannon": "^8.0.0"
   }
 }

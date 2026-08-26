@@ -22,6 +22,13 @@ const {
 const { evaluateClaim } = require('../utils/policyEngine.utils');
 const { ACCOUNT_TYPE } = require('../config/accountTypes');
 const { sanitizeText } = require('../utils/validators');
+const {
+  createObjectKey,
+  deleteObject,
+  getDownloadUrl,
+  putObject,
+  isStorageUri,
+} = require('../services/objectStorage.service');
 
 /** Claims that may still be edited or acted on. */
 const PENDING = 'pending_approval';
@@ -392,29 +399,50 @@ exports.submitExpense = async (req, res, next) => {
         .status(404)
         .json({ message: 'Expense category not found or inactive' });
 
-    // Process uploaded files (Multer). `file.filename` is the generated name on
-    // disk; `originalname` is kept only as the label shown to a human.
-    const receipts = (req.files || []).map((file) => ({
-      url: `/uploads/receipts/${file.filename}`,
-      filename: sanitizeText(String(file.originalname).slice(0, 255)),
-      mimetype: file.mimetype,
-      size: file.size,
-    }));
+    // Upload receipt bytes only after the claim's tenant/employee/category
+    // checks have passed. Nothing is written to the application filesystem.
+    const uploadedReceiptUris = [];
+    let receipts = [];
+    try {
+      receipts = await Promise.all(
+        (req.files || []).map(async (file) => {
+          const extension = file.mimetype === 'application/pdf'
+            ? 'pdf'
+            : file.mimetype.split('/')[1];
+          const key = createObjectKey({
+            tenantId: req.tenantId,
+            area: 'expenses/receipts',
+            extension,
+          });
+          const stored = await putObject({
+            key,
+            body: file.buffer,
+            contentType: file.mimetype,
+          });
+          uploadedReceiptUris.push(stored.uri);
+          return {
+            url: stored.uri,
+            filename: sanitizeText(String(file.originalname).slice(0, 255)),
+            mimetype: file.mimetype,
+            size: file.size,
+          };
+        }),
+      );
 
-    const claim = await ExpenseClaim.create({
-      tenantId: req.tenantId,
-      employeeId,
-      categoryId,
-      amount: parsedAmount,
-      currency: employee.currency || 'INR',
-      expenseDate: parsedDate,
-      description: sanitizeText(String(description).slice(0, 1000)),
-      receipts,
-      status: PENDING,
-      submittedBy: req.userId,
-    });
+        const claim = await ExpenseClaim.create({
+        tenantId: req.tenantId,
+        employeeId,
+        categoryId,
+        amount: parsedAmount,
+        currency: employee.currency || 'INR',
+        expenseDate: parsedDate,
+        description: sanitizeText(String(description).slice(0, 1000)),
+        receipts,
+        status: PENDING,
+        submittedBy: req.userId,
+      });
 
-    eventBus.emit('AUDIT_LOG', {
+      eventBus.emit('AUDIT_LOG', {
       userId: req.userId,
       action: 'EXPENSE_SUBMIT',
       resourceType: 'ExpenseClaim',
@@ -423,13 +451,35 @@ exports.submitExpense = async (req, res, next) => {
       req,
     });
 
-    res
-      .status(201)
-      .json({ message: 'Expense claim submitted successfully', claim });
+      res
+        .status(201)
+        .json({
+          message: 'Expense claim submitted successfully',
+          claim: await hydrateReceiptUrls(typeof claim.toObject === 'function' ? claim.toObject() : claim),
+        });
+    } catch (error) {
+      await Promise.all(uploadedReceiptUris.map((uri) => deleteObject(uri).catch(() => false)));
+      throw error;
+    }
   } catch (error) {
     next(error);
   }
 };
+
+async function hydrateReceiptUrls(claim) {
+  if (!claim?.receipts?.length) return claim;
+  return {
+    ...claim,
+    receipts: await Promise.all(
+      claim.receipts.map(async (receipt) => ({
+        ...receipt,
+        url: isStorageUri(receipt.url)
+          ? await getDownloadUrl(receipt.url)
+          : receipt.url,
+      })),
+    ),
+  };
+}
 
 /**
  * GET /api/expenses
@@ -486,8 +536,10 @@ exports.getExpenses = async (req, res, next) => {
       ExpenseClaim.countDocuments(query),
     ]);
 
+    const hydratedClaims = await Promise.all(claims.map((claim) => hydrateReceiptUrls(claim)));
+
     res.status(200).json({
-      claims,
+      claims: hydratedClaims,
       pagination: {
         total,
         page: parsedPage,

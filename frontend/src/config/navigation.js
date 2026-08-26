@@ -187,7 +187,7 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
 
-    {
+  {
     path: '/compensation',
     component: lazy(() => import('../pages/CompensationBenchmarkingDashboard')),
     label: 'Compensation & equity',
@@ -195,7 +195,7 @@ export const APP_ROUTES = [
     icon: 'money',
   },
 
-    {
+  {
     path: '/onboarding',
     component: lazy(() => import('../pages/OnboardingLifecycleTracker')),
     label: 'Onboarding tracker',
@@ -203,7 +203,7 @@ export const APP_ROUTES = [
     icon: 'rocket',
   },
 
-// ── Payroll ──────────────────────────────────────────────────────────────
+  // ── Payroll ──────────────────────────────────────────────────────────────
   {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
@@ -227,6 +227,18 @@ export const APP_ROUTES = [
     label: 'Settlements',
     group: 'payroll',
     icon: 'exit',
+  },
+  {
+    // Directly above Gratuity: the two are the same kind of obligation and a
+    // reader comparing them is the intended case. Kept apart in the tree
+    // because gratuity is the company's own liability and this is a funded
+    // scheme where the employer's obligation ends at the remittance (#1769).
+    path: '/eps-pension',
+    component: lazy(() => import('../pages/EpsPension')),
+    appShell: true,
+    label: 'Pension scheme',
+    group: 'payroll',
+    icon: 'shield',
   },
   {
     // Next to Settlements, because the two are the same statute from opposite
@@ -293,6 +305,18 @@ export const APP_ROUTES = [
     group: 'payroll',
     icon: 'shield',
   },
+  {
+    // Directly under Minimum wages, and in Payroll rather than Compliance: the
+    // fix for a deduction total over the section 7(3) ceiling is to reschedule
+    // a loan recovery, which is a payroll action. The two are the floor and the
+    // ceiling of the same question (#1767).
+    path: '/wage-deductions',
+    component: lazy(() => import('../pages/WageDeductionRegister')),
+    appShell: true,
+    label: 'Wage deductions',
+    group: 'payroll',
+    icon: 'shield',
+  },
 
   // ── Finance ──────────────────────────────────────────────────────────────
   {
@@ -341,6 +365,18 @@ export const APP_ROUTES = [
   },
 
   // ── Compliance ───────────────────────────────────────────────────────────
+  {
+    // In Compliance rather than Payroll: the register's subject is who the
+    // scheme covers, and the fact people come to it for — that somebody above
+    // the ceiling is still covered until the period ends — is a compliance
+    // answer rather than a pay one (#1768).
+    path: '/esi',
+    component: lazy(() => import('../pages/EsiContribution')),
+    appShell: true,
+    label: 'ESI',
+    group: 'compliance',
+    icon: 'shield',
+  },
   {
     // In Compliance rather than Finance, even though a contractor is a vendor.
     // The vendor ledger's question is "what do we owe this counterparty"; this
@@ -468,7 +504,7 @@ export const APP_ROUTES = [
     employee: true,
   },
 
-    {
+  {
     path: '/team-health',
     component: lazy(() => import('../pages/TeamHealthScoreDashboard')),
     label: 'Team health',
@@ -477,7 +513,7 @@ export const APP_ROUTES = [
     employee: true,
   },
 
-// ── Learning ─────────────────────────────────────────────────────────────
+  // ── Learning ─────────────────────────────────────────────────────────────
   {
     path: '/flashcards',
     component: lazy(() => import('../pages/Flashcards')),
