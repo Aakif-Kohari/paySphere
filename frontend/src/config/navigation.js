@@ -187,7 +187,7 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
 
-    {
+  {
     path: '/compensation',
     component: lazy(() => import('../pages/CompensationBenchmarkingDashboard')),
     label: 'Compensation & equity',
@@ -195,7 +195,7 @@ export const APP_ROUTES = [
     icon: 'money',
   },
 
-    {
+  {
     path: '/onboarding',
     component: lazy(() => import('../pages/OnboardingLifecycleTracker')),
     label: 'Onboarding tracker',
@@ -203,7 +203,7 @@ export const APP_ROUTES = [
     icon: 'rocket',
   },
 
-// ── Payroll ──────────────────────────────────────────────────────────────
+  // ── Payroll ──────────────────────────────────────────────────────────────
   {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
@@ -354,6 +354,17 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
   {
+    // Next to the tax-proof portal: both decide what a Form 16 says — that one
+    // by what the employee declares, this one by what the employer provided
+    // (#1770).
+    path: '/perquisites',
+    component: lazy(() => import('../pages/PerquisiteValuation')),
+    appShell: true,
+    label: 'Perquisites',
+    group: 'compliance',
+    icon: 'shield',
+  },
+  {
     path: '/tax-proofs',
     component: lazy(() => import('../pages/TaxProofPortal')),
     label: 'My tax proofs',
@@ -468,7 +479,7 @@ export const APP_ROUTES = [
     employee: true,
   },
 
-    {
+  {
     path: '/team-health',
     component: lazy(() => import('../pages/TeamHealthScoreDashboard')),
     label: 'Team health',
@@ -477,7 +488,7 @@ export const APP_ROUTES = [
     employee: true,
   },
 
-// ── Learning ─────────────────────────────────────────────────────────────
+  // ── Learning ─────────────────────────────────────────────────────────────
   {
     path: '/flashcards',
     component: lazy(() => import('../pages/Flashcards')),

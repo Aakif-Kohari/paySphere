@@ -149,6 +149,11 @@ const contractLabourRoutes = require('./routes/contractLabour.routes');
 const grievanceRoutes = require('./routes/grievance.routes');
 const taxProofRoutes = require('./routes/taxProof.routes');
 
+// Perquisite valuation under Rule 3 (#1770). Next to the tax-proof router
+// because both decide what a Form 16 says — that one by what an employee
+// declares, this one by what the employer provided.
+const perquisiteRoutes = require('./routes/perquisites.routes');
+
 // Leave Travel Allowance (#1345). Next to the tax proofs because it is the same
 // act from the employee's side — file a document, get an exemption — and a
 // completely different rule set behind it: the entitlement is a four-year
@@ -566,6 +571,12 @@ app.use('/api/contract-labour', contractLabourRoutes);
 app.use('/api/grievances', grievanceRoutes);
 
 app.use('/api/tax-proofs', taxProofRoutes);
+
+// #1770. Its own prefix rather than a sub-path of `/api/compliance`: the
+// compliance router files what has been withheld, and this decides how much
+// there was to withhold on. The router owns `/rules`, `/grants`, `/preview`,
+// `/statements` and `/employees/:employeeId`.
+app.use('/api/perquisites', perquisiteRoutes);
 
 // #1345. The router owns `/claims`, `/preview`, `/entitlement`, `/my-claims`,
 // `/queue` and `/summary/:employeeId`.

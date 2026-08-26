@@ -230,6 +230,24 @@ const PERMISSIONS = {
   // deducted from somebody's salary.
   VERIFY_TAX_PROOF: 'VERIFY_TAX_PROOF',
 
+  // --- Perquisite valuation under Rule 3 (#1770) ---------------------------
+  //
+  // Next to the tax-proof names because both decide what a Form 16 says, and
+  // split three ways on a line that is not the usual read/write one.
+  //
+  // Recording a grant is HR work: somebody is given a flat, a car, a loan.
+  // Setting the rules is not, and the State Bank of India rate is why — it is
+  // frozen for the whole year and applied to every concessional loan in the
+  // establishment, so a figure recorded a point too low understates the
+  // perquisite for every borrower and nothing in a payslip would show it.
+  //
+  // Reading is separated from both because a perquisite statement is one
+  // person's complete tax position, in the same class as the Form 16 that
+  // READ_COMPLIANCE guards.
+  READ_PERQUISITE: 'READ_PERQUISITE',
+  MANAGE_PERQUISITE_GRANT: 'MANAGE_PERQUISITE_GRANT',
+  MANAGE_PERQUISITE_RULES: 'MANAGE_PERQUISITE_RULES',
+
   // --- Labour Welfare Fund (#1701) -----------------------------------------
   //
   // Next to the tax-proof names because both decide a deduction from somebody's
@@ -578,6 +596,21 @@ const PERMISSION_DEFINITIONS = [
       'Approve or reject submitted investment proofs, which changes the TDS deducted from that salary',
   },
   {
+    name: PERMISSIONS.READ_PERQUISITE,
+    description:
+      'View perquisite valuations and Form 12BA lines with the Rule 3 basis behind each',
+  },
+  {
+    name: PERMISSIONS.MANAGE_PERQUISITE_GRANT,
+    description:
+      'Record what an employee has been provided — accommodation, a car, a concessional loan, an exercised option — and over what period',
+  },
+  {
+    name: PERMISSIONS.MANAGE_PERQUISITE_RULES,
+    description:
+      'Set the Rule 3 accommodation bands and the frozen 1 April State Bank of India rates, and commit the year’s Form 12BA position',
+  },
+  {
     name: PERMISSIONS.READ_LWF,
     description:
       'View labour welfare fund rules, the contribution register and the collection calendar',
@@ -812,6 +845,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.SUBMIT_TAX_PROOF,
       PERMISSIONS.VERIFY_TAX_PROOF,
 
+      // #1770. All three. The rates decide what is reported under the
+      // employer's TAN, which is where MANAGE_COMPLIANCE already stops.
+      PERMISSIONS.READ_PERQUISITE,
+      PERMISSIONS.MANAGE_PERQUISITE_GRANT,
+      PERMISSIONS.MANAGE_PERQUISITE_RULES,
+
       // #1701. All three. The owner is the one account allowed to be both
       // halves of a check, because there is nobody above it to be the other.
       PERMISSIONS.READ_LWF,
@@ -945,6 +984,15 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_INVOICE,
       PERMISSIONS.SUBMIT_TAX_PROOF,
       PERMISSIONS.VERIFY_TAX_PROOF,
+
+      // #1770. HR records what somebody was given and reads the valuation —
+      // allocating a flat or a car is HR's, and so is answering "why did my
+      // taxable income go up by more than the allowance". It does not set the
+      // rates or commit the year's position: both decide what is filed under
+      // the employer's TAN, which HR does not hold for the same reason it does
+      // not hold MANAGE_COMPLIANCE.
+      PERMISSIONS.READ_PERQUISITE,
+      PERMISSIONS.MANAGE_PERQUISITE_GRANT,
 
       // #1701. HR reads the register and maintains the state rules — knowing
       // that Karnataka collects in December and Kerala every month is HR's
