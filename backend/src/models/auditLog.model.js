@@ -140,6 +140,17 @@ const AUDIT_ACTIONS = [
   'LTA_CLAIM_SUBMITTED',
   'LTA_CLAIM_APPROVED',
   'LTA_CLAIM_REJECTED',
+  // Perquisite valuation under Rule 3 (#1770). Next to the LTA actions because
+  // both decide how much of a package is taxable. The State Bank of India rate
+  // is the one worth auditing hardest: it is frozen for the year and applied to
+  // every concessional loan in the establishment, so a figure recorded a point
+  // low understates the perquisite for every borrower and nothing in a payslip
+  // would show it. Recording a grant is audited because it is a benefit given
+  // to a named person, and committing the statement fixes what reaches Form 16.
+  'PERQUISITE_RULES_UPDATED',
+  'PERQUISITE_GRANT_RECORDED',
+  'PERQUISITE_GRANT_REMOVED',
+  'PERQUISITE_STATEMENT_COMMITTED',
   // The approval workflow engine (#590, mounted in #614) emits three (#664).
   // A change to the graph that decides who may approve a payroll run is
   // exactly the kind of thing an auditor asks about.

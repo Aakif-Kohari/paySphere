@@ -390,6 +390,17 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
   {
+    // Next to the tax-proof portal: both decide what a Form 16 says — that one
+    // by what the employee declares, this one by what the employer provided
+    // (#1770).
+    path: '/perquisites',
+    component: lazy(() => import('../pages/PerquisiteValuation')),
+    appShell: true,
+    label: 'Perquisites',
+    group: 'compliance',
+    icon: 'shield',
+  },
+  {
     path: '/tax-proofs',
     component: lazy(() => import('../pages/TaxProofPortal')),
     label: 'My tax proofs',
