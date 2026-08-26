@@ -229,6 +229,18 @@ export const APP_ROUTES = [
     icon: 'exit',
   },
   {
+    // Directly above Gratuity: the two are the same kind of obligation and a
+    // reader comparing them is the intended case. Kept apart in the tree
+    // because gratuity is the company's own liability and this is a funded
+    // scheme where the employer's obligation ends at the remittance (#1769).
+    path: '/eps-pension',
+    component: lazy(() => import('../pages/EpsPension')),
+    appShell: true,
+    label: 'Pension scheme',
+    group: 'payroll',
+    icon: 'shield',
+  },
+  {
     // Next to Settlements, because the two are the same statute from opposite
     // ends: Settlements pays gratuity to a leaver, this measures what is still
     // owed to everybody who has not left (#1344).

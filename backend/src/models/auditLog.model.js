@@ -99,6 +99,17 @@ const AUDIT_ACTIONS = [
   // auditor asks "who changed this, and when" about.
   'GRATUITY_ASSUMPTIONS_UPDATED',
   'GRATUITY_VALUATION_COMMITTED',
+  // Employees' Pension Scheme, 1995 (#1769). Directly under the gratuity
+  // actions because the two are the same kind of obligation valued the same
+  // way. The assumptions decide the answer — moving the wage ceiling changes
+  // the pensionable salary of every member above the old one, for life, since a
+  // pension once fixed is not revisited. The backfill is audited although it
+  // produces no valuation: it writes the wage history every future valuation
+  // rests on, and how it resolved a month with no payroll row is the fact
+  // somebody will need years later.
+  'EPS_ASSUMPTIONS_UPDATED',
+  'EPS_WAGE_HISTORY_BACKFILLED',
+  'EPS_VALUATION_COMMITTED',
   // A salary advance commits future deductions from someone's pay, so
   // issuing, pausing and collecting against one are all financial events
   // and are audited as such (#460).

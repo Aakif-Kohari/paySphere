@@ -174,6 +174,26 @@ const PERMISSIONS = {
   RUN_GRATUITY_VALUATION: 'RUN_GRATUITY_VALUATION',
   MANAGE_GRATUITY_ASSUMPTIONS: 'MANAGE_GRATUITY_ASSUMPTIONS',
 
+  // --- Employees' Pension Scheme, 1995 (#1769) -----------------------------
+  //
+  // Directly under the gratuity names because the two are the same kind of
+  // obligation valued the same way — a defined benefit on service and a final
+  // salary — and split three ways for a sharper version of the same reason.
+  //
+  // The wage ceiling is the figure the whole capping question turns on: moving
+  // it changes the pensionable salary of every member above the old one, and a
+  // pension once fixed is not revisited, so the change is for life. That is a
+  // larger consequence than the discount rate has and it is separated for the
+  // same reason.
+  //
+  // MANAGE also gates the wage-history backfill. It produces no valuation, but
+  // every future valuation is computed from what it writes, and a backfill that
+  // resolved the ambiguous months the wrong way is harder to notice than a
+  // wrong valuation and outlives it.
+  READ_EPS_PENSION: 'READ_EPS_PENSION',
+  MANAGE_EPS_ASSUMPTIONS: 'MANAGE_EPS_ASSUMPTIONS',
+  COMMIT_EPS_VALUATION: 'COMMIT_EPS_VALUATION',
+
   // --- Employees' Compensation Act, 1923 (#1699) ---------------------------
   //
   // Next to the gratuity names because both measure what is owed when something
@@ -543,6 +563,21 @@ const PERMISSION_DEFINITIONS = [
       'Set the discount rate, salary escalation and attrition assumptions the gratuity provision is measured on',
   },
   {
+    name: PERMISSIONS.READ_EPS_PENSION,
+    description:
+      'View the EPS-95 valuation, a member’s pension statement and the sixty contributory months the pensionable salary was averaged over',
+  },
+  {
+    name: PERMISSIONS.MANAGE_EPS_ASSUMPTIONS,
+    description:
+      'Set the EPS wage ceiling, the averaging span and the early-pension factors, and backfill the wage history every valuation is computed from',
+  },
+  {
+    name: PERMISSIONS.COMMIT_EPS_VALUATION,
+    description:
+      'Commit an EPS-95 valuation as at a date, fixing the pension figure each member is quoted',
+  },
+  {
     name: PERMISSIONS.READ_EC_CLAIM,
     description:
       'View workplace injury compensation claims, including the injured employee’s age and the circumstances of the accident',
@@ -858,6 +893,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.RUN_GRATUITY_VALUATION,
       PERMISSIONS.MANAGE_GRATUITY_ASSUMPTIONS,
 
+      // #1769. All three, for the reason immediately above and one more: the
+      // backfill decides how an ambiguous month is read, and reading it wrong
+      // understates or overstates a pension for the rest of somebody's life.
+      PERMISSIONS.READ_EPS_PENSION,
+      PERMISSIONS.MANAGE_EPS_ASSUMPTIONS,
+      PERMISSIONS.COMMIT_EPS_VALUATION,
+
       // #1699. Both. Admitting a claim commits the company and depositing one
       // with the Commissioner discharges a statutory liability, which is the
       // same class of authority as APPROVE_PAYROLL.
@@ -1007,6 +1049,12 @@ const ROLE_DEFINITIONS = [
       // It does not run one and it does not set the assumptions: both decide
       // what the company reports, which is the owner's call and the auditor's.
       PERMISSIONS.READ_GRATUITY_VALUATION,
+
+      // #1769. HR reads the pension statements — "why is my pensionable salary
+      // ₹14,500 when I earned ₹40,000" is a question an employee asks HR, and
+      // the sixty-month window is the answer. It does not move the ceiling and
+      // it does not commit a valuation.
+      PERMISSIONS.READ_EPS_PENSION,
 
       // #1699. HR reads the injury register — it reports the accident, it
       // handles the employee, and "what is this going to cost" is a question it
