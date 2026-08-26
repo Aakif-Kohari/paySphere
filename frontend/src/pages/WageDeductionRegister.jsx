@@ -208,13 +208,19 @@ const WageDeductionRegister = () => {
     setBusy(true);
 
     try {
-      await api.put('/api/wage-deductions/rules', {
-        ...draft,
-        approvedActs: String(draft?.approvedActsText ?? '')
-          .split('\n')
-          .map((line) => line.trim())
-          .filter(Boolean),
-      });
+      // `approvedActsText` only exists once the textarea has been touched.
+      // Reading it unconditionally would send an empty list for anybody who
+      // opened the panel to change a number, and an empty list turns the
+      // section 8(1) check off — silently making every fine lawful.
+      const approvedActs =
+        draft?.approvedActsText === undefined
+          ? draft?.approvedActs || []
+          : draft.approvedActsText
+              .split('\n')
+              .map((line) => line.trim())
+              .filter(Boolean);
+
+      await api.put('/api/wage-deductions/rules', { ...draft, approvedActs });
       toast('Rules saved.', 'success');
       setShowRules(false);
       await load();
