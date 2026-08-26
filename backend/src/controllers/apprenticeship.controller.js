@@ -9,7 +9,7 @@
  * rather than by head, so summing it would count a contractor twice across two
  * overlapping deployments and miss one whose deployment record had closed.
  *
- * So the composition is **recorded** rather than counted, and `deriveComposition`
+ * So the composition is **recorded** rather than counted, and `resolveComposition`
  * only offers a starting figure with the direct employees filled in. Counting the
  * contract workers is somebody walking the site, which is what Rule 7A assumes.
  * Deriving a total-strength figure and presenting it as fact would put a wrong
@@ -92,7 +92,7 @@ function resolvePeriod(query) {
  * payroll.
  *
  * The derived figure fills in `directEmployees` and leaves the contract and
- * casual counts at zero, flagged as `derived`. That is deliberately an
+ * casual counts at zero, with `recorded: false`. That is deliberately an
  * *incomplete* answer rather than a plausible one — see this file's header.
  *
  * @param {mongoose.Types.ObjectId} tenantId
