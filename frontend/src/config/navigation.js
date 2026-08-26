@@ -188,31 +188,14 @@ export const APP_ROUTES = [
   },
 
     {
-    path: '/workforce-analytics',
-    component: lazy(() => import('../pages/WorkforceAnalyticsDashboard')),
-    label: 'Workforce analytics',
+    path: '/compensation',
+    component: lazy(() => import('../pages/CompensationBenchmarkingDashboard')),
+    label: 'Compensation & equity',
     group: 'people',
-    icon: 'chart',
+    icon: 'money',
   },
 
 // ── Payroll ──────────────────────────────────────────────────────────────
-  {
-    path: '/fbp-admin',
-    component: lazy(() => import('../features/fbp/FbpAdminDashboard')),
-    appShell: true,
-    label: 'FBP Administration',
-    group: 'payroll',
-    icon: 'wallet',
-  },
-  {
-    path: '/fbp-calculator',
-    component: lazy(() => import('../features/fbp/FbpRestructuringCalculator')),
-    appShell: true,
-    label: 'FBP Restructuring',
-    group: 'payroll',
-    icon: 'wallet',
-    employee: true,
-  },
   {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
