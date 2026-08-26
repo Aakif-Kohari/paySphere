@@ -67,6 +67,12 @@ const statutoryBonusRoutes = require('./routes/statutoryBonus.routes');
 // Act computes on the higher of ₹7,000 and the applicable minimum wage, so this
 // is where that number now comes from.
 const minimumWagesRoutes = require('./routes/minimumWages.routes');
+
+// Payment of Wages Act, 1936 (#1767). Next to the minimum wages router because
+// the two are opposite halves of one question — that one sets the floor under
+// what must be paid, this one the ceiling on what may be taken back out — and
+// because section 7(3)'s ceiling is measured on the wages that router certifies.
+const wageDeductionRoutes = require('./routes/wageDeductions.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
 const attendanceRoutes = require('./routes/attendance.routes');
@@ -419,6 +425,12 @@ app.use('/api/statutory-bonus', statutoryBonusRoutes);
 // is about what is paid to the employee before any of that. The router owns
 // `/notifications`, `/preview` and `/assessments`.
 app.use('/api/minimum-wages', minimumWagesRoutes);
+
+// #1767. Its own prefix rather than a sub-path of `/api/payroll`: a payroll row
+// is what one person was paid and a finding here is about what the employer was
+// allowed to take from it, which is a question about the employer. The router
+// owns `/rules`, `/assessment`, `/registers` and `/deferred`.
+app.use('/api/wage-deductions', wageDeductionRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/employee-portal', employeePortalRoutes);
 app.use('/api/schedules', schedulerRoutes);
