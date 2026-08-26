@@ -15,19 +15,15 @@
     "build": "turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "prepare": "husky || true",
+    "prepare": "husky",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\""
   },
   "lint-staged": {
-    "frontend/**/*.{js,jsx,ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
+    "*.{js,jsx,ts,tsx,css}": [
+      "prettier --write",
+      "eslint --fix"
     ],
-    "backend/**/*.{js,ts}": [
-      "eslint --fix",
-      "prettier --write"
-    ],
-    "*.{json,css,md,html}": [
+    "*.{json,md,html}": [
       "prettier --write"
     ]
   },
