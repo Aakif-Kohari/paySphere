@@ -127,7 +127,18 @@ export default function EmployeeCard({
   // mounted lazily, so a grid of employee cards does not fire a request per
   // card on load.
   const [showSalaryHistory, setShowSalaryHistory] = useState(false);
+  const [copyStatus, setCopyStatus] = useState('');
 
+  const handleCopyEmployeeId = async () => {
+    try {
+      await navigator.clipboard.writeText(emp._id);
+      setCopyStatus('success');
+    } catch {
+      setCopyStatus('error');
+    }
+
+    setTimeout(() => setCopyStatus(''), 2000);
+  };
   if (variant === 'breakdown') {
     return (
       <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-gray-200 dark:border-slate-800 shadow-sm hover:shadow-md transition duration-200">
@@ -256,7 +267,32 @@ export default function EmployeeCard({
   return (
     <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm hover:shadow-md transition flex flex-col gap-4 duration-200">
       <CardHeader emp={emp} finalized={!!p} onEdit={onEdit} />
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-gray-500 dark:text-slate-500">
+          Employee ID: {emp._id}
+        </span>
 
+        <button
+          type="button"
+          onClick={handleCopyEmployeeId}
+          className="px-2.5 py-1.5 text-xs font-semibold border border-gray-200 dark:border-slate-700 rounded-md text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors"
+          aria-label={`Copy employee ID for ${emp.fullName}`}
+        >
+          Copy
+        </button>
+      </div>
+
+      {copyStatus === 'success' && (
+        <p className="text-xs text-green-600 dark:text-green-400">
+          ✓ Employee ID copied!
+        </p>
+      )}
+
+      {copyStatus === 'error' && (
+        <p className="text-xs text-red-600 dark:text-red-400">
+          Unable to copy employee ID.
+        </p>
+      )}
       {/* Salary */}
       <div className="bg-gray-50 dark:bg-slate-950 p-3 rounded-lg transition-colors">
         <div className="flex justify-between items-baseline">

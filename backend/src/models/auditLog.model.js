@@ -38,6 +38,15 @@ const AUDIT_ACTIONS = [
   'MINIMUM_WAGE_NOTIFICATION_ADDED',
   'MINIMUM_WAGE_ASSESSMENT_COMMITTED',
   'MINIMUM_WAGE_REGISTER_EXPORTED',
+  // Payment of Wages Act, 1936 (#1767). Next to the minimum wage actions
+  // because the rules move findings the same way a notification does: raising
+  // the section 1(6) applicability ceiling takes employees out of the Act and
+  // every finding against them disappears. A committed register is the
+  // establishment's own statement of what it deducted, and writing off a
+  // deferred balance is the employer forgiving a debt it created by deferring.
+  'WAGE_DEDUCTION_RULES_UPDATED',
+  'WAGE_DEDUCTION_REGISTER_COMMITTED',
+  'WAGE_DEDUCTION_DEFERRAL_WRITTEN_OFF',
   'EMPLOYEE_CREATE',
   'EMPLOYEE_UPDATE',
   'EMPLOYEE_DELETE',
@@ -73,6 +82,16 @@ const AUDIT_ACTIONS = [
   'INJURY_CLAIM_COMPUTED',
   'INJURY_CLAIM_DEPOSITED',
   'INJURY_CLAIM_STATUS_CHANGED',
+  // Employees' State Insurance Act, 1948 (#1768). Placed next to the injury
+  // claim actions because section 53 bars a claim under the Employees'
+  // Compensation Act where ESI covers the same injury — so which of these two
+  // sets applies to an employee is decided by the coverage the first of these
+  // actions moves. Lowering the wage ceiling removes people from the scheme
+  // while they are still drawing benefit three months later, and filing the
+  // return is both a remittance and the thing that fixes each employee's
+  // coverage for the following month.
+  'ESI_RULES_UPDATED',
+  'ESI_RETURN_FILED',
   // Gratuity actuarial valuation (#1344). The assumptions decide the reported
   // provision — moving the discount rate 50 basis points moves the balance
   // sheet — and committing a valuation produces the figure carried in the
@@ -80,6 +99,17 @@ const AUDIT_ACTIONS = [
   // auditor asks "who changed this, and when" about.
   'GRATUITY_ASSUMPTIONS_UPDATED',
   'GRATUITY_VALUATION_COMMITTED',
+  // Employees' Pension Scheme, 1995 (#1769). Directly under the gratuity
+  // actions because the two are the same kind of obligation valued the same
+  // way. The assumptions decide the answer — moving the wage ceiling changes
+  // the pensionable salary of every member above the old one, for life, since a
+  // pension once fixed is not revisited. The backfill is audited although it
+  // produces no valuation: it writes the wage history every future valuation
+  // rests on, and how it resolved a month with no payroll row is the fact
+  // somebody will need years later.
+  'EPS_ASSUMPTIONS_UPDATED',
+  'EPS_WAGE_HISTORY_BACKFILLED',
+  'EPS_VALUATION_COMMITTED',
   // A salary advance commits future deductions from someone's pay, so
   // issuing, pausing and collecting against one are all financial events
   // and are audited as such (#460).
@@ -110,6 +140,17 @@ const AUDIT_ACTIONS = [
   'LTA_CLAIM_SUBMITTED',
   'LTA_CLAIM_APPROVED',
   'LTA_CLAIM_REJECTED',
+  // Perquisite valuation under Rule 3 (#1770). Next to the LTA actions because
+  // both decide how much of a package is taxable. The State Bank of India rate
+  // is the one worth auditing hardest: it is frozen for the year and applied to
+  // every concessional loan in the establishment, so a figure recorded a point
+  // low understates the perquisite for every borrower and nothing in a payslip
+  // would show it. Recording a grant is audited because it is a benefit given
+  // to a named person, and committing the statement fixes what reaches Form 16.
+  'PERQUISITE_RULES_UPDATED',
+  'PERQUISITE_GRANT_RECORDED',
+  'PERQUISITE_GRANT_REMOVED',
+  'PERQUISITE_STATEMENT_COMMITTED',
   // The approval workflow engine (#590, mounted in #614) emits three (#664).
   // A change to the graph that decides who may approve a payroll run is
   // exactly the kind of thing an auditor asks about.
@@ -140,6 +181,18 @@ const AUDIT_ACTIONS = [
   'CONTRACT_LABOUR_LICENCE_UPDATED',
   'CONTRACT_LABOUR_RETURN_FILED',
   'CONTRACT_LABOUR_REGISTER_EXPORTED',
+  // Apprentices Act, 1961 (#1771). Next to the contract labour actions because
+  // both concern people on the site who are not on the payroll. The recorded
+  // strength is audited because it is the denominator of the whole obligation:
+  // reducing it by ten lowers the floor and can make a shortfall disappear
+  // without a single apprentice being engaged. And the registration is audited
+  // because that one date decides whether the establishment owes provident
+  // fund, ESI, bonus and gratuity for the period.
+  'APPRENTICESHIP_RULES_UPDATED',
+  'APPRENTICESHIP_STRENGTH_RECORDED',
+  'APPRENTICE_ENGAGED',
+  'APPRENTICE_CONTRACT_REGISTERED',
+  'APPRENTICESHIP_ASSESSMENT_COMMITTED',
   // International assignments (#1348). Opening one commits the employer to
   // bearing somebody's foreign tax bill for years; a settlement moves money
   // between the employee and the company; and the two threshold events record

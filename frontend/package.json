@@ -15,7 +15,8 @@
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:report": "playwright show-report",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "test:e2e:critical": "playwright test e2e/critical-user-journeys.spec.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
