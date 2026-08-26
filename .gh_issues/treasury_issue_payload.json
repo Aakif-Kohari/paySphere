@@ -1,0 +1,4 @@
+{
+    "title": "feat(treasury): Enterprise Global Payroll Treasury & Forex Exchange Hub",
+    "body": "### Problem\nEnterprises struggle with cross-border payroll funding, requiring manual forex hedge trades and causing critical liquidity black holes.\n\n### Solution\nImplementing an Enterprise Payroll Treasury & Forex Exchange Hub. This feature introduces:\n- **Advanced Data Models**: `CurrencyWallet` and `ForexTrade` with compliance ledger trailing.\n- **Predictive ML Analytics**: 90-day trajectory modelling for multi-fiat outflows.\n- **Modern Stateful UI**: Extensive 1000+ line components utilizing `recharts`, `lucide-react`, and rich glassmorphism.\n- **Realtime Settlement**: Simulated real-time FX tracking and ledger balancing."
+}

@@ -5,6 +5,49 @@ const logger = require("../utils/logger");
 const { translate, normalizeLanguage } = require('../utils/i18n');
 
 /**
+ * Color palettes for the two report themes (#1288).
+ *
+ * pdfkit has no notion of a page background — by default it's just
+ * whatever the paper color is (white). Dark mode paints an explicit
+ * rect behind every page and swaps every hardcoded light-mode color to
+ * one that still reads clearly on that dark background.
+ */
+const REPORT_THEMES = {
+  light: {
+    background: "#ffffff",
+    heading: "#1e3a5f",
+    subheading: "#666666",
+    sectionTitle: "#333333",
+    label: "#555555",
+    value: "#1e3a5f",
+    divider: "#cccccc",
+    tableHeaderBg: "#e8edf3",
+    tableHeaderText: "#333333",
+    rowAltBg: "#f9fafb",
+    rowText: "#444444",
+    footer: "#aaaaaa",
+  },
+  dark: {
+    background: "#0f172a",
+    heading: "#93c5fd",
+    subheading: "#94a3b8",
+    sectionTitle: "#e2e8f0",
+    label: "#cbd5e1",
+    value: "#93c5fd",
+    divider: "#334155",
+    tableHeaderBg: "#1e293b",
+    tableHeaderText: "#e2e8f0",
+    rowAltBg: "#111827",
+    rowText: "#cbd5e1",
+    footer: "#64748b",
+  },
+};
+
+/** Falls back to light for anything that isn't exactly "dark". */
+function resolveTheme(theme) {
+  return REPORT_THEMES[theme] || REPORT_THEMES.light;
+}
+/**
  * Generates Form 16 (Part A & Part B) PDF
  * @param {Object} payload - { employee, employer, fyStartYear }
  */
@@ -104,7 +147,8 @@ async function handleForm16Generation(payload) {
  * Generates company-wide payroll summary report PDF
  */
 async function handleCompanyReportGeneration(payload) {
-  const { payrolls, employeeMap, companyName, companyLogo, monthName, year, totalBase, totalOvertime, totalBonus, totalDeductions, totalPayout, currency = "INR" } = payload;
+  const { payrolls, employeeMap, companyName, companyLogo, monthName, year, totalBase, totalOvertime, totalBonus, totalDeductions, totalPayout, currency = "INR", theme } = payload;
+  const palette = resolveTheme(theme);
 
   const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
   const buffers = [];
@@ -114,6 +158,17 @@ async function handleCompanyReportGeneration(payload) {
     parentPort.postMessage({ success: true, pdfData });
   });
 
+  // Dark mode has no "paper white" to fall back on, so every page gets an
+  // explicit background rect — including ones added later by the table's
+  // pagination below.
+  const paintPageBackground = () => {
+    doc.rect(0, 0, doc.page.width, doc.page.height).fill(palette.background);
+  };
+  if (palette.background !== "#ffffff") {
+    paintPageBackground();
+    doc.on("pageAdded", paintPageBackground);
+  }
+
   // --- Company Header ---
   if (companyLogo) {
     try {
@@ -121,16 +176,16 @@ async function handleCompanyReportGeneration(payload) {
       doc.image(logoBuffer, 40, 30, { fit: [50, 50] });
     } catch (error) { logger.error("PDF logo rendering failed in handleCompanyReportGeneration", { error: error.message || error }); }
   }
-  doc.fontSize(22).font("Helvetica-Bold").fillColor("#1e3a5f").text(companyName, { align: "center" });
-  doc.fontSize(12).font("Helvetica").fillColor("#666666").text(`Payroll Summary Report — ${monthName} ${year}`, { align: "center" });
+  doc.fontSize(22).font("Helvetica-Bold").fillColor(palette.heading).text(companyName, { align: "center" });
+  doc.fontSize(12).font("Helvetica").fillColor(palette.subheading).text(`Payroll Summary Report — ${monthName} ${year}`, { align: "center" });
   doc.moveDown(0.5);
 
   // Divider line
-  doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor("#cccccc").lineWidth(1).stroke();
+  doc.moveTo(40, doc.y).lineTo(555, doc.y).strokeColor(palette.divider).lineWidth(1).stroke();
   doc.moveDown(1);
 
   // --- Summary Section ---
-  doc.fontSize(14).font("Helvetica-Bold").fillColor("#333333").text("Financial Summary");
+  doc.fontSize(14).font("Helvetica-Bold").fillColor(palette.sectionTitle).text("Financial Summary");
   doc.moveDown(0.3);
 
   const summaryData = [
@@ -146,11 +201,11 @@ async function handleCompanyReportGeneration(payload) {
     doc
       .fontSize(10)
       .font("Helvetica")
-      .fillColor("#555555")
+      .fillColor(palette.label)
       .text(label, 60, doc.y, { continued: true, width: 200 });
     doc
       .font("Helvetica-Bold")
-      .fillColor("#1e3a5f")
+      .fillColor(palette.value)
       .text(`  ${value}`, { align: "right" });
     doc.moveDown(0.2);
   });
@@ -161,7 +216,7 @@ async function handleCompanyReportGeneration(payload) {
   doc
     .fontSize(14)
     .font("Helvetica-Bold")
-    .fillColor("#333333")
+    .fillColor(palette.sectionTitle)
     .text("Employee Payroll Details");
 
   doc.moveDown(0.5);
@@ -183,14 +238,14 @@ async function handleCompanyReportGeneration(payload) {
   // Header background
   doc
     .rect(startX, tableTop - 4, 515, 18)
-    .fill("#e8edf3");
+    .fill(palette.tableHeaderBg);
 
   let xPos = startX + 5;
   colLabels.forEach((label, i) => {
     doc
       .fontSize(8)
       .font("Helvetica-Bold")
-      .fillColor("#333333")
+      .fillColor(palette.tableHeaderText)
       .text(label, xPos, tableTop, { width: colWidths[i] });
     xPos += colWidths[i];
   });
@@ -209,7 +264,7 @@ async function handleCompanyReportGeneration(payload) {
 
     // Alternating row background
     if (idx % 2 === 0) {
-      doc.rect(startX, rowY - 2, 515, 14).fill("#f9fafb");
+      doc.rect(startX, rowY - 2, 515, 14).fill(palette.rowAltBg);
     }
 
     const rowData = [
@@ -227,7 +282,7 @@ async function handleCompanyReportGeneration(payload) {
       doc
         .fontSize(8)
         .font("Helvetica")
-        .fillColor("#444444")
+        .fillColor(palette.rowText)
         .text(cell, xPos, rowY, { width: colWidths[i] });
       xPos += colWidths[i];
     });
@@ -236,19 +291,18 @@ async function handleCompanyReportGeneration(payload) {
   });
 
   doc.moveDown(0.5);
-  doc.moveTo(startX, doc.y).lineTo(startX + 515, doc.y).strokeColor("#cccccc").lineWidth(0.5).stroke();
+  doc.moveTo(startX, doc.y).lineTo(startX + 515, doc.y).strokeColor(palette.divider).lineWidth(0.5).stroke();
   doc.moveDown(0.3);
-  doc.fontSize(9).font("Helvetica-Bold").fillColor("#1e3a5f").text(`Total Payout: ${formatCurrency(totalPayout, currency)}`, startX, doc.y, { align: "right" });
+  doc.fontSize(9).font("Helvetica-Bold").fillColor(palette.value).text(`Total Payout: ${formatCurrency(totalPayout, currency)}`, startX, doc.y, { align: "right" });
 
   const pageCount = doc.bufferedPageRange().count;
   for (let i = 0; i < pageCount; i++) {
     doc.switchToPage(i);
-    doc.fontSize(8).font("Helvetica").fillColor("#aaaaaa").text(`Generated by PaySphere • Page ${i + 1} of ${pageCount}`, 40, doc.page.height - 30, { align: "center", width: 515 });
+    doc.fontSize(8).font("Helvetica").fillColor(palette.footer).text(`Generated by PaySphere • Page ${i + 1} of ${pageCount}`, 40, doc.page.height - 30, { align: "center", width: 515 });
   }
 
   doc.end();
 }
-
 /**
  * Generates individual employee payslip PDF
  */

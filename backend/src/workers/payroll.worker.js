@@ -118,6 +118,33 @@ const payrollWorker = new Worker(
           });
         }
 
+        const { SalaryAdjustment } = require('../models/salaryAdjustment.model');
+        const pendingAdjustments = await SalaryAdjustment.find({
+          employeeId: employee._id,
+          tenantId: employee.tenantId || employee.createdBy,
+          status: 'Pending',
+        });
+
+        const retroAdjustmentSum = pendingAdjustments.reduce((sum, adj) => sum + (adj.calculatedDelta || 0), 0);
+        if (retroAdjustmentSum > 0) {
+          bonus += retroAdjustmentSum;
+        }
+
+        const estimatedBase = Math.min(Math.max(employee.monthlySalary || 0, 0), 10000000);
+        const pensionCalculator = require('../services/pensionCalculator');
+        const pensionResult = await pensionCalculator.calculatePensionContribution(
+          employee._id,
+          employee.tenantId || employee.createdBy,
+          estimatedBase,
+        );
+
+        if (pensionResult && pensionResult.employeeContribution > 0) {
+          customDeductions.push({
+            name: `${pensionResult.planName} Contribution`,
+            amount: pensionResult.employeeContribution,
+          });
+        }
+
         const { baseSalary, leaveDeduction, overtimePay, netSalary } =
           calculateNetSalary(employee, user, {
             leaveDays,
@@ -187,6 +214,25 @@ const payrollWorker = new Worker(
         });
 
         await payrollUpdate.save({ session });
+
+        // Update corresponding pending salary adjustments to Processed
+        const { SalaryAdjustment } = require('../models/salaryAdjustment.model');
+        await SalaryAdjustment.updateMany(
+          {
+            employeeId: item.employee._id,
+            tenantId: item.employee.tenantId || item.employee.createdBy,
+            status: 'Pending',
+          },
+          {
+            $set: {
+              status: 'Processed',
+              payrollMonth: currentMonth,
+              payrollYear: currentYear,
+            },
+          },
+          { session },
+        );
+
         savedRecords.push(payrollUpdate);
 
         // Update job progress

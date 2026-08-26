@@ -2,19 +2,25 @@ import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useDashboardSummary, useRecentActivity, usePayrollTrend } from '../hooks/useDashboardData';
+import {
+  useDashboardSummary,
+  useRecentActivity,
+  usePayrollTrend,
+} from '../hooks/useDashboardData';
 import EmployeeCard from '../components/EmployeeCard';
 import EmployeeExportActions from '../components/EmployeeExportActions';
 import SettingsModal from '../components/SettingsModal';
 import Sidebar from '../components/Sidebar';
 import BottomNavBar from '../components/BottomNavBar'; // Added for #1025
 import ThemeToggle from '../components/ThemeToggle';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import EmptyState from '../components/common/EmptyState';
 import DashboardSkeleton from '../components/common/skeleton/DashboardSkeleton';
 import EmployeeManagementSkeleton from '../components/common/skeleton/EmployeeManagementSkeleton';
 import PayrollTableSkeleton from '../components/common/skeleton/PayrollTableSkeleton';
 import DashboardGrid from '../components/dashboard/DashboardGrid';
 import { useAppStore } from '../store/useAppStore';
+import { useOnboardingStore } from '../store/useOnboardingStore';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 import api from '../services/api';
 import { formatCurrency, getCurrencySymbol } from '../utils/currency';
@@ -23,10 +29,11 @@ import Approvals from './Approvals';
 import Loans from './Loans';
 import Settlements from './Settlements';
 import Archive from './Archive';
-import ErrorBoundary, { ComponentFeedbackFallback } from '../components/common/ErrorBoundary';
+import ErrorBoundary, {
+  ComponentFeedbackFallback,
+} from '../components/common/ErrorBoundary';
 import VirtualizedTable from '../components/common/VirtualizedTable'; // Added for #1030
 import { EmployeeTableRow } from '../components/common/TableRow'; // Added for #1030
-
 
 // Accept international phone numbers with an optional leading "+" and
 // a national number of 7-15 digits. Mirrors backend validation behavior.
@@ -72,7 +79,8 @@ const getPhoneParts = (phone) => {
 
 // Trigger a file download from the browser
 const downloadFile = (url, filename) => {
-  api.get(url, { responseType: 'blob' })
+  api
+    .get(url, { responseType: 'blob' })
     .then((res) => {
       const blob = res.data;
       const link = document.createElement('a');
@@ -114,7 +122,7 @@ const DashboardOverview = ({
   payrolls,
   onEditEmployee,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const currency = localStorage.getItem('currency') || 'INR';
   const payrollMap = {};
@@ -141,13 +149,16 @@ const DashboardOverview = ({
   return (
     <>
       {/* Overview Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-gray-200 dark:border-slate-800">
+      <div
+        data-tour="dashboard-overview"
+        className="flex flex-col md:flex-row md:items-center justify-between mb-8 pb-6 border-b border-gray-200 dark:border-slate-800"
+      >
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400 mb-1">
-            Monthly Overview
+            {t('dashboard.monthlyOverview', 'Monthly Overview')}
           </p>
-          <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white">
-            {new Date().toLocaleString('default', {
+          <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white capitalize">
+            {new Date().toLocaleString(i18n?.language || 'en', {
               month: 'long',
               year: 'numeric',
             })}
@@ -172,6 +183,7 @@ const DashboardOverview = ({
           </button>
 
           <button
+            data-tour="run-payroll-btn"
             onClick={onAddUpdate}
             className="flex-1 cursor-pointer sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           >
@@ -182,32 +194,37 @@ const DashboardOverview = ({
 
       {/* Dynamic Dashboard Grid (Replaces manual SummaryCards/Charts) */}
       <div className="space-y-6">
-        <DashboardGrid />
+        <ErrorBoundary level="widget">
+          <DashboardGrid />
+        </ErrorBoundary>
       </div>
 
       {/* Stats */}
       <div className="flex flex-col sm:flex-row gap-4 mb-10">
         <div className="flex-1 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
           <p className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold mb-2">
-            Total Monthly Payout
+            {t('dashboard.totalMonthlyPayout', 'Total Monthly Payout')}
           </p>
           <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">
             {formatCurrency(totalPayout, currency)}
           </h2>
           <p className="text-gray-500 dark:text-slate-500 text-sm mt-2">
-            {employeeCount} employees on payroll
+            {t('dashboard.employeesOnPayroll', {
+              count: employeeCount,
+              defaultValue: `${employeeCount} employees on payroll`,
+            })}
           </p>
         </div>
 
         <div className="w-full sm:w-64 bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
           <p className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold mb-2">
-            Employees
+            {t('dashboard.employees', 'Employees')}
           </p>
           <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white">
             {employeeCount}
           </h2>
           <p className="text-gray-500 dark:text-slate-500 text-sm">
-            Active this month
+            {t('dashboard.activeThisMonth', 'Active this month')}
           </p>
         </div>
       </div>
@@ -218,35 +235,49 @@ const DashboardOverview = ({
           <button
             type="button"
             onClick={handleCloseBtn}
-            aria-label="Dismiss tutorial"
+            aria-label={t(
+              'dashboard.gettingStarted.dismiss',
+              'Dismiss tutorial',
+            )}
             className="absolute right-4 top-4 cursor-pointer rounded-full p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           >
             ✕
           </button>
 
           <h2 className="mb-2 text-2xl font-semibold text-gray-900 dark:text-white">
-            Getting Started
+            {t('dashboard.gettingStarted.title', 'Getting Started')}
           </h2>
           <p className="text-gray-600 dark:text-slate-500">
-            New to PaySphere? Watch this quick tutorial to learn how to navigate
-            the application and get started.
+            {t(
+              'dashboard.gettingStarted.desc',
+              'New to PaySphere? Watch this quick tutorial to learn how to navigate the application and get started.',
+            )}
           </p>
 
-          <a
-            href="https://youtu.be/N3SizOsiNGw"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-5 inline-flex items-center rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-          >
-            ▶ Watch Tutorial
-          </a>
+          <div className="mt-5 flex flex-wrap gap-3 items-center">
+            <a
+              href="https://youtu.be/N3SizOsiNGw"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center rounded-lg bg-blue-600 px-5 py-2.5 font-medium text-white transition-colors duration-200 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+            >
+              {t('dashboard.gettingStarted.watch', '▶ Watch Tutorial')}
+            </a>
+            <button
+              type="button"
+              onClick={() => useOnboardingStore.getState().resetTour(navigate)}
+              className="inline-flex items-center rounded-lg border border-blue-600 px-5 py-2.5 font-medium text-blue-600 dark:text-blue-400 transition-colors duration-200 hover:bg-blue-50 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 cursor-pointer"
+            >
+              ✨ Take Guided Tour
+            </button>
+          </div>
         </div>
       )}
 
       {/* Search + Role Filter + Export Roster */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-          Employee Directory
+          {t('dashboard.employeeDirectory', 'Employee Directory')}
         </h2>
 
         <div className="flex flex-wrap gap-3 items-center w-full sm:w-auto">
@@ -254,7 +285,10 @@ const DashboardOverview = ({
             <input
               value={search || ''}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search employees..."
+              placeholder={t(
+                'dashboard.searchEmployees',
+                'Search employees...',
+              )}
               className="w-full pl-9 pr-8 py-2 border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
             />
             <svg
@@ -274,7 +308,7 @@ const DashboardOverview = ({
               <button
                 type="button"
                 onClick={() => setSearch('')}
-                aria-label="Clear search"
+                aria-label={t('common.clear', 'Clear search')}
                 className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 text-xs font-bold"
               >
                 ✕
@@ -286,10 +320,10 @@ const DashboardOverview = ({
             <select
               value={roleFilter || ''}
               onChange={(e) => setRoleFilter(e.target.value)}
-              aria-label="Filter by role"
+              aria-label={t('common.filter', 'Filter by role')}
               className="px-3 py-2 border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
             >
-              <option value="">All Roles</option>
+              <option value="">{t('dashboard.allRoles', 'All Roles')}</option>
               {availableRoles.map((r) => (
                 <option key={r} value={r}>
                   {r}
@@ -307,21 +341,27 @@ const DashboardOverview = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {filtered.length === 0 && !search && !roleFilter ? (
           <EmptyState
-            title="No employees yet"
-            description="Add your first employee to get started with payroll."
+            title={t('dashboard.noEmployeesYet', 'No employees yet')}
+            description={t(
+              'dashboard.addFirstEmployee',
+              'Add your first employee to get started with payroll.',
+            )}
             action={
               <button
                 onClick={onAddEmployee}
                 className="px-6 py-2.5 bg-blue-600 cursor-pointer hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
               >
-                + Add Employee
+                {t('dashboard.addEmployee', '+ Add Employee')}
               </button>
             }
           />
         ) : filtered.length === 0 && (search || roleFilter) ? (
           <EmptyState
-            title="No employees found"
-            description={`No employees match "${search || roleFilter}". Try a different name or role.`}
+            title={t('dashboard.noEmployeesFound', 'No employees found')}
+            description={t('dashboard.noMatchFound', {
+              query: search || roleFilter,
+              defaultValue: `No employees match "${search || roleFilter}". Try a different name or role.`,
+            })}
           />
         ) : (
           filtered.map((emp) => (
@@ -338,6 +378,7 @@ const DashboardOverview = ({
 
         {(filtered.length > 0 || search || roleFilter) && (
           <div
+            data-tour="add-employee-btn"
             role="button"
             tabIndex={0}
             onKeyDown={(e) => e.key === 'Enter' && e.target.click()}
@@ -345,7 +386,7 @@ const DashboardOverview = ({
             className="border-2 border-dashed border-gray-300 dark:border-slate-800 rounded-xl flex items-center justify-center min-h-44 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-indigo-50/50 dark:hover:bg-slate-900/50 cursor-pointer transition duration-200"
           >
             <p className="text-gray-500 dark:text-slate-500 font-semibold">
-              + Add Employee
+              {t('dashboard.addEmployee', '+ Add Employee')}
             </p>
           </div>
         )}
@@ -372,6 +413,7 @@ const EmployeeManagement = ({
   onDeleteEmployee,
   onEditEmployee,
 }) => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const currency = localStorage.getItem('currency') || 'INR';
   const payrollMap = {};
@@ -394,18 +436,21 @@ const EmployeeManagement = ({
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-8 border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row justify-between items-center mb-8 gap-6 transition-colors duration-200">
         <div>
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-900/50 mb-4">
-            Payroll done in 30 seconds
+            {t('dashboard.payrollBadge', 'Payroll done in 30 seconds')}
           </span>
           <p className="text-sm text-gray-500 dark:text-slate-500 mb-1">
-            Final Summary
+            {t('dashboard.finalSummary', 'Final Summary')}
           </p>
           <h1 className="text-3xl sm:text-4xl font-serif text-gray-900 dark:text-white mb-2">
             {formatCurrency(totalNet, currency)}
           </h1>
           <p className="text-sm text-gray-500 dark:text-slate-500">
-            Total Monthly Payout for{' '}
+            {t('dashboard.totalMonthlyPayoutFor', 'Total Monthly Payout for')}{' '}
             <span className="text-gray-700 dark:text-slate-200 font-semibold">
-              {employees.length} Employee{employees.length !== 1 ? 's' : ''}
+              {t('dashboard.employeeCount', {
+                count: employees.length,
+                defaultValue: `${employees.length} Employee${employees.length !== 1 ? 's' : ''}`,
+              })}
             </span>
           </p>
         </div>
@@ -415,7 +460,7 @@ const EmployeeManagement = ({
             onClick={onAddUpdate}
             className="flex-1 sm:flex-none cursor-pointer px-5 py-3 border border-gray-200 dark:border-slate-800 rounded-xl font-semibold text-gray-700 dark:text-slate-200 hover:shadow dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
           >
-            Edit Updates
+            {t('dashboard.editUpdates', 'Edit Updates')}
           </button>
           <button
             className="flex-1 sm:flex-none cursor-pointer px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-200 dark:shadow-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
@@ -426,15 +471,26 @@ const EmployeeManagement = ({
                   month: new Date().getMonth() + 1,
                   year: new Date().getFullYear(),
                 })
-                .then(() => toast.success('Payroll submitted for review!'))
+                .then(() =>
+                  toast.success(
+                    t(
+                      'dashboard.toasts.payrollSubmitted',
+                      'Payroll submitted for review!',
+                    ),
+                  ),
+                )
                 .catch((err) =>
                   toast.error(
-                    err.response?.data?.message || 'Failed to submit payroll',
+                    err.response?.data?.message ||
+                      t(
+                        'dashboard.toasts.payrollSubmitFailed',
+                        'Failed to submit payroll',
+                      ),
                   ),
                 )
             }
           >
-            Submit for Review
+            {t('dashboard.submitReview', 'Submit for Review')}
           </button>
         </div>
       </div>
@@ -442,7 +498,7 @@ const EmployeeManagement = ({
       {/* Search & Filter Controls */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800">
         <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-          Employee Roster
+          {t('dashboard.employeeRoster', 'Employee Roster')}
         </h2>
 
         <div className="flex flex-wrap gap-3 items-center w-full sm:w-auto">
@@ -450,7 +506,10 @@ const EmployeeManagement = ({
             <input
               value={search || ''}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search employees..."
+              placeholder={t(
+                'dashboard.searchEmployees',
+                'Search employees...',
+              )}
               className="w-full pl-9 pr-8 py-2 border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
             />
             <svg
@@ -470,7 +529,7 @@ const EmployeeManagement = ({
               <button
                 type="button"
                 onClick={() => setSearch('')}
-                aria-label="Clear search"
+                aria-label={t('common.clear', 'Clear search')}
                 className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600 text-xs font-bold"
               >
                 ✕
@@ -482,10 +541,10 @@ const EmployeeManagement = ({
             <select
               value={roleFilter || ''}
               onChange={(e) => setRoleFilter(e.target.value)}
-              aria-label="Filter by role"
+              aria-label={t('common.filter', 'Filter by role')}
               className="px-3 py-2 border border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm focus:border-blue-500 outline-none transition-colors"
             >
-              <option value="">All Roles</option>
+              <option value="">{t('dashboard.allRoles', 'All Roles')}</option>
               {availableRoles.map((r) => (
                 <option key={r} value={r}>
                   {r}
@@ -510,18 +569,35 @@ const EmployeeManagement = ({
             headerHeight={44}
             header={
               <div className="flex items-center px-6 h-full text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400 min-w-[900px]">
-                <div className="w-1/4 min-w-[200px]">Employee</div>
-                <div className="w-1/5 min-w-[120px]">Role</div>
-                <div className="w-1/5 min-w-[120px]">Department</div>
-                <div className="w-1/5 text-right min-w-[100px]">Salary</div>
-                <div className="w-1/5 text-center min-w-[100px]">Status</div>
+                <div className="w-1/4 min-w-[200px]">
+                  {t('dashboard.table.employee', 'Employee')}
+                </div>
+                <div className="w-1/5 min-w-[120px]">
+                  {t('dashboard.table.role', 'Role')}
+                </div>
+                <div className="w-1/5 min-w-[120px]">
+                  {t('dashboard.table.department', 'Department')}
+                </div>
+                <div className="w-1/5 text-right min-w-[100px]">
+                  {t('dashboard.table.salary', 'Salary')}
+                </div>
+                <div className="w-1/5 text-center min-w-[100px]">
+                  {t('dashboard.table.status', 'Status')}
+                </div>
                 <div className="w-16 min-w-[60px]"></div>
               </div>
             }
             emptyState={
               <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                <p className="text-lg font-semibold text-gray-700 dark:text-slate-300">No employees found</p>
-                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Add your first employee to get started.</p>
+                <p className="text-lg font-semibold text-gray-700 dark:text-slate-300">
+                  {t('dashboard.noEmployeesFound', 'No employees found')}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                  {t(
+                    'dashboard.addFirstEmployee',
+                    'Add your first employee to get started.',
+                  )}
+                </p>
               </div>
             }
           />
@@ -536,17 +612,21 @@ const EmployeeManagement = ({
             onClick={() => setCurrentPage(currentPage - 1)}
             className="px-4 py-2 border border-gray-200 dark:border-slate-800 rounded-lg text-sm font-semibold disabled:opacity-50 text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
           >
-            Previous
+            {t('common.previous', 'Previous')}
           </button>
           <span className="text-sm text-gray-600 dark:text-slate-500">
-            Page {currentPage} of {totalPages}
+            {t('common.page', {
+              current: currentPage,
+              total: totalPages,
+              defaultValue: `Page ${currentPage} of ${totalPages}`,
+            })}
           </span>
           <button
             disabled={currentPage === totalPages}
             onClick={() => setCurrentPage(currentPage + 1)}
             className="px-4 py-2 border border-gray-200 dark:border-slate-800 rounded-lg text-sm font-semibold disabled:opacity-50 text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
           >
-            Next
+            {t('common.next', 'Next')}
           </button>
         </div>
       )}
@@ -556,6 +636,7 @@ const EmployeeManagement = ({
 
 // --- Edit Employee Modal Component ---
 const EditEmployeeModal = ({ employee, onClose, onSave }) => {
+  const { t } = useTranslation();
   const formRef = useRef(null);
   useCtrlEnterSubmit(formRef);
   const { phoneCountryCode: initialPhoneCountryCode, phone: initialPhone } =
@@ -569,7 +650,6 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
     monthlySalary: employee?.monthlySalary || '',
     overtimeRate: employee?.overtimeRate || '',
     phoneCountryCode: initialPhoneCountryCode,
-    // Phone number (#8) — optional, editable after creation.
     phone: initialPhone,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -601,21 +681,35 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
 
     // Validation Check (Step 5)
     if (salary <= 0) {
-      return setError('Monthly salary must be a positive number.');
+      return setError(
+        t(
+          'dashboard.editModal.validation.salaryPositive',
+          'Monthly salary must be a positive number.',
+        ),
+      );
     }
     if (otRate < 0) {
-      return setError('Overtime rate cannot be negative.');
+      return setError(
+        t(
+          'dashboard.editModal.validation.overtimeNonNegative',
+          'Overtime rate cannot be negative.',
+        ),
+      );
     }
 
-    // Phone is optional, but if provided it must match a valid international
-    // phone-number format.
+    // Phone validation
     const trimmedPhone = formData.phone.trim();
     const trimmedCountryCode = formData.phoneCountryCode?.trim() || '+91';
     const normalizedPhone = normalizePhoneValue(
       `${trimmedCountryCode}${trimmedPhone}`,
     );
     if (trimmedPhone && !PHONE_REGEX.test(normalizedPhone)) {
-      return setError('Enter a valid international phone number.');
+      return setError(
+        t(
+          'dashboard.editModal.validation.validPhone',
+          'Enter a valid international phone number.',
+        ),
+      );
     }
 
     try {
@@ -628,7 +722,12 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
         phone: normalizedPhone || undefined,
       });
     } catch {
-      setError('Failed to update employee details.');
+      setError(
+        t(
+          'dashboard.editModal.validation.updateFailed',
+          'Failed to update employee details.',
+        ),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -640,7 +739,7 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 transition-opacity">
       <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-200 dark:border-slate-800">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-          Edit Employee
+          {t('dashboard.editModal.title', 'Edit Employee')}
         </h2>
 
         {error && (
@@ -652,7 +751,7 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-              Full Name
+              {t('dashboard.editModal.fullName', 'Full Name')}
             </label>
             <input
               required
@@ -666,7 +765,7 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-              Role
+              {t('dashboard.editModal.role', 'Role')}
             </label>
             <input
               required
@@ -686,7 +785,7 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-              Phone Number
+              {t('dashboard.editModal.phone', 'Phone Number')}
             </label>
             <div className="flex gap-2">
               <select
@@ -716,7 +815,10 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Monthly Salary ({getCurrencySymbol(currency)})
+                {t('dashboard.editModal.monthlySalary', {
+                  currency: getCurrencySymbol(currency),
+                  defaultValue: `Monthly Salary (${getCurrencySymbol(currency)})`,
+                })}
               </label>
               <input
                 required
@@ -729,7 +831,10 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
-                Overtime Rate ({getCurrencySymbol(currency)})
+                {t('dashboard.editModal.overtimeRate', {
+                  currency: getCurrencySymbol(currency),
+                  defaultValue: `Overtime Rate (${getCurrencySymbol(currency)})`,
+                })}
               </label>
               <input
                 required
@@ -749,14 +854,16 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
               onClick={onClose}
               className="px-5 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
-              Cancel
+              {t('common.cancel', 'Cancel')}
             </button>
             <button
               type="submit"
               disabled={submitting}
               className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm disabled:opacity-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
-              {submitting ? 'Saving...' : 'Save Changes'}
+              {submitting
+                ? t('dashboard.editModal.saving', 'Saving...')
+                : t('dashboard.editModal.saveChanges', 'Save Changes')}
             </button>
           </div>
         </form>
@@ -774,6 +881,7 @@ const PayrollTable = ({
   totalCount,
   setCurrentPage,
 }) => {
+  const { t, i18n } = useTranslation();
   const PAYROLL_LIMIT = 10;
   const startIdx = (currentPage - 1) * PAYROLL_LIMIT + 1;
   const endIdx = Math.min(currentPage * PAYROLL_LIMIT, totalCount);
@@ -807,8 +915,12 @@ const PayrollTable = ({
   ];
 
   const formatStatus = (s) => {
-    if (!s) return 'Unknown';
-    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    if (!s) return t('common.unknown', 'Unknown');
+    const key = s.toLowerCase();
+    return t(
+      `dashboard.statuses.${key}`,
+      s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    );
   };
 
   if (loading) {
@@ -820,12 +932,17 @@ const PayrollTable = ({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-2">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-            Payroll History
+            {t('dashboard.payrollHistory', 'Payroll History')}
           </h1>
           {totalCount > 0 && (
             <p className="text-sm text-gray-500 dark:text-slate-500 mt-1">
-              Showing {startIdx}–{endIdx} of {totalCount} record
-              {totalCount !== 1 ? 's' : ''}
+              {t('dashboard.showingRecords', {
+                start: startIdx,
+                end: endIdx,
+                total: totalCount,
+                count: totalCount,
+                defaultValue: `Showing ${startIdx}–${endIdx} of ${totalCount} record${totalCount !== 1 ? 's' : ''}`,
+              })}
             </p>
           )}
         </div>
@@ -833,20 +950,34 @@ const PayrollTable = ({
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="hidden sm:grid grid-cols-5 px-6 py-3 bg-gray-50 dark:bg-slate-800/50 border-b border-gray-200 dark:border-slate-800 text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wide">
-          <span>Employee</span>
-          <span className="text-center">Period</span>
-          <span className="text-right">Base Salary</span>
-          <span className="text-right">Net Salary</span>
-          <span className="text-center">Status</span>
+          <span>{t('dashboard.table.employee', 'Employee')}</span>
+          <span className="text-center">
+            {t('dashboard.table.period', 'Period')}
+          </span>
+          <span className="text-right">
+            {t('dashboard.table.baseSalary', 'Base Salary')}
+          </span>
+          <span className="text-right">
+            {t('dashboard.table.netSalary', 'Net Salary')}
+          </span>
+          <span className="text-center">
+            {t('dashboard.table.status', 'Status')}
+          </span>
         </div>
 
         {payrolls.length === 0 ? (
           <div className="px-6 py-16 text-center">
             <p className="text-gray-500 dark:text-slate-500 text-sm">
-              No payroll records found for this month.
+              {t(
+                'dashboard.noPayrollRecords',
+                'No payroll records found for this month.',
+              )}
             </p>
             <p className="text-gray-400 dark:text-slate-600 text-xs mt-1">
-              Run payroll from Monthly Updates to see records here.
+              {t(
+                'dashboard.runPayrollHint',
+                'Run payroll from Monthly Updates to see records here.',
+              )}
             </p>
           </div>
         ) : (
@@ -888,17 +1019,21 @@ const PayrollTable = ({
             onClick={() => setCurrentPage(currentPage - 1)}
             className="px-4 py-2 border border-gray-200 dark:border-slate-800 rounded-lg text-sm font-semibold disabled:opacity-50 text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
           >
-            ← Previous
+            ← {t('common.previous', 'Previous')}
           </button>
           <span className="text-sm text-gray-600 dark:text-slate-500">
-            Page {currentPage} of {totalPages}
+            {t('common.page', {
+              current: currentPage,
+              total: totalPages,
+              defaultValue: `Page ${currentPage} of ${totalPages}`,
+            })}
           </span>
           <button
             disabled={currentPage === totalPages}
             onClick={() => setCurrentPage(currentPage + 1)}
             className="px-4 py-2 border border-gray-200 dark:border-slate-800 rounded-lg text-sm font-semibold disabled:opacity-50 text-slate-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
           >
-            Next →
+            {t('common.next', 'Next')} →
           </button>
         </div>
       )}
@@ -907,6 +1042,7 @@ const PayrollTable = ({
 };
 
 export default function PaySphereDashboard() {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const logout = useAppStore((state) => state.logout);
 
@@ -915,10 +1051,11 @@ export default function PaySphereDashboard() {
     data: summary,
     isLoading: loading,
     error: queryError,
-    refetch: refetchSummary
+    refetch: refetchSummary,
   } = useDashboardSummary();
 
-  const { data: recentActivity, isLoading: activityLoading } = useRecentActivity(5);
+  const { data: recentActivity, isLoading: activityLoading } =
+    useRecentActivity(5);
   const { data: trendData, isLoading: trendLoading } = usePayrollTrend(6);
 
   // Derived error state for backward compatibility with existing JSX
@@ -979,6 +1116,18 @@ export default function PaySphereDashboard() {
     }
   }, [token, navigate]);
 
+  // Auto-start onboarding tour for new users on initial load
+  useEffect(() => {
+    const { hasCompleted, hasDismissed, isActive, startTour } =
+      useOnboardingStore.getState();
+    if (token && !hasCompleted && !hasDismissed && !isActive) {
+      const timer = setTimeout(() => {
+        startTour();
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [token]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
@@ -987,7 +1136,10 @@ export default function PaySphereDashboard() {
   }, [search]);
 
   // Reset to page 1 when search term or role filter changes
-  if (debouncedSearch !== prevDebouncedSearch || roleFilter !== prevRoleFilter) {
+  if (
+    debouncedSearch !== prevDebouncedSearch ||
+    roleFilter !== prevRoleFilter
+  ) {
     setPrevDebouncedSearch(debouncedSearch);
     setPrevRoleFilter(roleFilter);
     setCurrentPage(1);
@@ -1083,10 +1235,18 @@ export default function PaySphereDashboard() {
       );
 
       setEmployeeToDelete(null);
-      toast.success('Employee deleted successfully.');
+      toast.success(
+        t('dashboard.toasts.employeeDeleted', 'Employee deleted successfully.'),
+      );
     } catch (error) {
       console.error('Delete failed:', error);
-      toast.error(error.response?.data?.message || 'Failed to delete employee');
+      toast.error(
+        error.response?.data?.message ||
+          t(
+            'dashboard.toasts.employeeDeleteFailed',
+            'Failed to delete employee',
+          ),
+      );
     } finally {
       setDeleting(false);
     }
@@ -1099,11 +1259,18 @@ export default function PaySphereDashboard() {
       setEmployees((prev) =>
         prev.map((emp) => (emp._id === id ? { ...emp, ...updatedData } : emp)),
       );
-      toast.success('Employee updated successfully.');
+      toast.success(
+        t('dashboard.toasts.employeeUpdated', 'Employee updated successfully.'),
+      );
       setEmployeeToEdit(null);
     } catch (error) {
       console.error('Failed to update employee:', error);
-      toast.error('Failed to update employee. Please try again.');
+      toast.error(
+        t(
+          'dashboard.toasts.employeeUpdateFailed',
+          'Failed to update employee. Please try again.',
+        ),
+      );
     }
   };
 
@@ -1122,8 +1289,8 @@ export default function PaySphereDashboard() {
       <Helmet>
         <title>
           {activePage === 'Dashboard'
-            ? 'Payroll Dashboard | PaySphere'
-            : 'Employee Management | PaySphere'}
+            ? `${t('nav.dashboard', 'Payroll Dashboard')} | PaySphere`
+            : `${t('nav.employees', 'Employee Management')} | PaySphere`}
         </title>
         <meta
           name="description"
@@ -1165,10 +1332,10 @@ export default function PaySphereDashboard() {
               ☰
             </button>
             <span className="font-bold text-blue-900 dark:text-blue-400 truncate">
-              Ledger Payroll
+              {t('dashboard.ledgerPayroll', 'Ledger Payroll')}
             </span>
-            <button className="hidden sm:block text-blue-600 dark:text-blue-400 font-semibold border-b-2 border-blue-600 dark:border-blue-400 pb-0.5 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
-              {new Date().toLocaleString('default', {
+            <button className="hidden sm:block text-blue-600 dark:text-blue-400 font-semibold border-b-2 border-blue-600 dark:border-blue-400 pb-0.5 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 capitalize">
+              {new Date().toLocaleString(i18n?.language || 'en', {
                 month: 'long',
                 year: 'numeric',
               })}
@@ -1176,10 +1343,11 @@ export default function PaySphereDashboard() {
           </div>
 
           <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
+            <LanguageSwitcher />
             <ThemeToggle />
             <button
               onClick={() => navigate('/profile')}
-              aria-label="Profile settings"
+              aria-label={t('settings.profile', 'Profile settings')}
               className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
               {getInitials(companyName)}
@@ -1190,85 +1358,16 @@ export default function PaySphereDashboard() {
                 localStorage.removeItem('companyName');
                 navigate('/');
               }}
-              aria-label="Sign Out"
+              aria-label={t('nav.signOut', 'Sign Out')}
               className="px-3 py-1.5 cursor-pointer text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"
             >
-              Sign Out
+              {t('nav.signOut', 'Sign Out')}
             </button>
           </div>
         </header>
-        {/* Dynamic Content */}
-        <ErrorBoundary fallback={<ComponentFeedbackFallback />}>
-          {activePage === 'Approvals' ? (
-            <Approvals />
-          ) : activePage === 'Settlements' ? (
-            <Settlements />
-          ) : activePage === 'Loans' ? (
-            <Loans />
-          ) : activePage === 'Payroll' ? (
-            <PayrollTable
-              payrolls={paginatedPayrolls}
-              loading={payrollLoading}
-              currentPage={payrollPage}
-              totalPages={payrollTotalPages}
-              totalCount={payrollTotalCount}
-              setCurrentPage={setPayrollPage}
-            />
-          ) : activePage === 'Dashboard' ? (
-            <DashboardOverview
-              search={search}
-              setSearch={setSearch}
-              roleFilter={roleFilter}
-              setRoleFilter={setRoleFilter}
-              availableRoles={availableRoles}
-              filtered={filtered}
-              navigate={navigate}
-              onAddUpdate={() => navigate('/monthly-updates')}
-              onAddEmployee={() => navigate('/add-employee')}
-              totalPayout={totalPayout}
-              employeeCount={totalEmployees}
-              loading={loading}
-              payrolls={payrolls}
-              onEditEmployee={(emp) => setEmployeeToEdit(emp)}
-            />
-          ) : activePage === 'Archive' ? (
-            <Archive />
-          ) : (
-            <EmployeeManagement
-              search={search}
-              setSearch={setSearch}
-              roleFilter={roleFilter}
-              setRoleFilter={setRoleFilter}
-              availableRoles={availableRoles}
-              employees={filtered}
-              loading={loading}
-              onAddEmployee={() => navigate('/add-employee')}
-              onAddUpdate={() => navigate('/monthly-updates')}
-              payrolls={payrolls}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              setCurrentPage={setCurrentPage}
-              onDeleteEmployee={(emp) => setEmployeeToDelete(emp)}
-              onEditEmployee={(emp) => setEmployeeToEdit(emp)}
-            />
-          )}
-        </ErrorBoundary>
 
-        {/* Edit Form Modal (Steps 2-5) */}
-        {employeeToEdit && (
-          <EditEmployeeModal
-            employee={employeeToEdit}
-            onClose={() => setEmployeeToEdit(null)}
-            onSave={handleEditSubmit}
-          />
-        )}
-
-        {/* Added BottomNavBar for mobile (Issue #1025) */}
-        <BottomNavBar />
-
-        {/* Added pb-20 on mobile to prevent content from hiding behind bottom nav */}
+        {/* Dynamic Content and Mobile Nav wrapper */}
         <div className="pb-20 md:pb-0 transition-all duration-300">
-          {/* Dynamic Content */}
           <ErrorBoundary fallback={<ComponentFeedbackFallback />}>
             {activePage === 'Approvals' ? (
               <Approvals />
@@ -1325,7 +1424,7 @@ export default function PaySphereDashboard() {
             )}
           </ErrorBoundary>
 
-          {/* Edit Form Modal (Steps 2-5) */}
+          {/* Edit Form Modal */}
           {employeeToEdit && (
             <EditEmployeeModal
               employee={employeeToEdit}
@@ -1339,17 +1438,19 @@ export default function PaySphereDashboard() {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity">
               <div className="bg-white dark:bg-slate-900 rounded-xl p-6 w-96 shadow-xl border border-gray-200 dark:border-slate-800">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Delete Employee?
+                  {t('dashboard.deleteModal.title', 'Delete Employee?')}
                 </h2>
 
                 <p className="mt-3 text-gray-600 dark:text-slate-500">
-                  Are you sure you want to delete{' '}
-                  <span className="font-semibold">
-                    {employeeToDelete.fullName}
-                  </span>
-                  ?
+                  {t('dashboard.deleteModal.confirmPlain', {
+                    name: employeeToDelete.fullName,
+                    defaultValue: `Are you sure you want to delete ${employeeToDelete.fullName}?`,
+                  })}
                   <br />
-                  Payroll records will also be deleted.
+                  {t(
+                    'dashboard.deleteModal.warning',
+                    'Payroll records will also be deleted.',
+                  )}
                 </p>
 
                 <div className="flex justify-end gap-3 mt-6">
@@ -1357,7 +1458,7 @@ export default function PaySphereDashboard() {
                     onClick={() => setEmployeeToDelete(null)}
                     className="px-4 py-2 border border-gray-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
                   >
-                    Cancel
+                    {t('common.cancel', 'Cancel')}
                   </button>
 
                   <button
@@ -1365,24 +1466,27 @@ export default function PaySphereDashboard() {
                     onClick={handleDeleteEmployee}
                     className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm disabled:opacity-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
-                    {deleting ? 'Deleting...' : 'Delete'}
+                    {deleting
+                      ? t('dashboard.deleteModal.deleting', 'Deleting...')
+                      : t('common.delete', 'Delete')}
                   </button>
                 </div>
               </div>
             </div>
           )}
         </div>
+
+        {/* Added BottomNavBar for mobile (Issue #1025) */}
+        <BottomNavBar />
       </div>
 
-      {/* Settings modal (extracted component).
-          Kept for future use; not wired to a trigger today, so
-          no visual change occurs. */}
+      {/* Settings modal (extracted component) */}
       <SettingsModal
         open={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       >
         <p className="text-sm text-gray-500 dark:text-slate-500">
-          Settings will be available here soon.
+          {t('settings.preferences', 'Settings will be available here soon.')}
         </p>
       </SettingsModal>
     </div>

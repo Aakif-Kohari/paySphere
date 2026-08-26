@@ -7,6 +7,7 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import DownloadIcon from '@mui/icons-material/Download';
 import CalculateIcon from '@mui/icons-material/Calculate';
 import { formatCurrency } from '../utils/currency';
+import { formatDate } from '../utils/formatLocale';
 
 const DEFAULT_COMPONENTS = [
     { key: 'basicSalary', label: 'Basic Salary', nature: 'Debit' },
@@ -129,7 +130,7 @@ export default function AccountingExport() {
                                         ) : vouchers.map(v => (
                                             <tr key={v._id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                                                 <td className="px-6 py-4 text-sm font-mono text-gray-900 dark:text-white">{v.voucherNumber}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-700 dark:text-slate-300">{new Date(v.voucherDate).toLocaleDateString()}</td>
+                                                <td className="px-6 py-4 text-sm text-gray-700 dark:text-slate-300">{formatDate(v.voucherDate)}</td>
                                                 <td className="px-6 py-4 text-sm text-right font-mono text-gray-900 dark:text-white">{formatCurrency(v.totalDebit, currency)}</td>
                                                 <td className="px-6 py-4 text-sm text-right font-mono text-gray-900 dark:text-white">{formatCurrency(v.totalCredit, currency)}</td>
                                                 <td className="px-6 py-4 text-center">

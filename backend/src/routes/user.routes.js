@@ -28,11 +28,13 @@ const {
   writeRateLimiter,
 } = require('../middlewares/rateLimiter.middleware');
 const validateRecaptcha = require('../middlewares/recaptcha.middleware');
+const { generateCsrfToken } = require('../middlewares/csrf.middleware');
 const router = express.Router();
 
 router.post('/signup', validateRequest(signupSchema), signup);
 router.post('/login', validateRequest(loginSchema), login);
 router.post('/google', googleAuth);
+router.get('/csrf-token', generateCsrfToken);
 
 /**
  * @openapi

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from 'react-i18next';
 import ThemeToggle from "../components/ThemeToggle";
 import EmployeeForm from "../components/EmployeeForm";
+import NotificationCenter from "../components/common/NotificationCenter";
 import { useAppStore } from "../store/useAppStore";
 import useCtrlEnterSubmit from "../hooks/useCtrlEnterSubmit";
 import api from "../services/api";
@@ -93,6 +95,7 @@ const normalizePhoneValue = (value) =>
 
 export default function AddEmployee() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const logout = useAppStore((state) => state.logout);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -276,9 +279,9 @@ export default function AddEmployee() {
   };
 
   const sidebarItems = [
-    { id: "dashboard", label: "Dashboard", path: "/dashboard", icon: <GridIcon /> },
-    { id: "employees", label: "Employees", path: "/dashboard?tab=employees", icon: <PeopleIcon /> },
-    { id: "settings", label: "Settings", path: "/settings", icon: <SupportIcon /> },
+    { id: "dashboard", label: t('nav.dashboard', 'Dashboard'), path: "/dashboard", icon: <GridIcon /> },
+    { id: "employees", label: t('nav.employees', 'Employees'), path: "/dashboard?tab=employees", icon: <PeopleIcon /> },
+    { id: "settings", label: t('nav.settings', 'Settings'), path: "/settings", icon: <SupportIcon /> },
   ];
 
   const getInitials = (name) =>
@@ -294,8 +297,8 @@ export default function AddEmployee() {
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-slate-950 flex font-sans text-slate-800 dark:text-slate-200 transition-colors duration-200">
       <Helmet>
-        <title>Add Employee | PaySphere</title>
-        <meta name="description" content="Add a new employee to your company roster." />
+        <title>{t('addEmployee.pageTitle', 'Add Employee | PaySphere')}</title>
+        <meta name="description" content={t('addEmployee.pageMeta', 'Add a new employee to your company roster.')} />
       </Helmet>
 
       {/* Sidebar Backdrop */}
@@ -351,7 +354,7 @@ export default function AddEmployee() {
             Help & Support
           </button>
           <button onClick={() => navigate("/monthly-updates")} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-md shadow-blue-200 dark:shadow-none transition">
-            Run Payroll
+            {t('dashboard.runPayroll', 'Run Payroll')}
           </button>
         </div>
       </aside>
@@ -369,7 +372,7 @@ export default function AddEmployee() {
             >
               ☰
             </button>
-            <span className="font-bold text-blue-900 dark:text-blue-400 truncate">Ledger Payroll</span>
+            <span className="font-bold text-blue-900 dark:text-blue-400 truncate">{t('dashboard.ledgerPayroll', 'Ledger Payroll')}</span>
             <button className="hidden sm:block text-blue-600 dark:text-blue-400 font-semibold border-b-2 border-blue-600 dark:border-blue-400 pb-0.5 whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
               {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
             </button>
@@ -377,7 +380,7 @@ export default function AddEmployee() {
 
           <div className="flex items-center gap-3 text-gray-500 dark:text-slate-500">
             <ThemeToggle />
-            <button aria-label="Notifications" className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><BellIcon /></button>
+            <NotificationCenter />
             <button aria-label="Help & Support" className="hidden sm:flex p-2 text-gray-500 dark:text-slate-500 hover:text-gray-700 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"><HelpCircleIcon /></button>
             <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
               {getInitials(companyName)}
@@ -402,8 +405,8 @@ export default function AddEmployee() {
 
            {/* ── LEFT: Form Section ── */}
             <div className="flex-1">
-              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 transition-colors duration-200">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Add New Employee</h1>
+              <div data-tour="add-employee-form" className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 transition-colors duration-200">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">{t('addEmployee.title', 'Add New Employee')}</h1>
                 <EmployeeForm
                   onSubmit={handleFormSubmit}
                   onCancel={() => navigate(-1)}
@@ -413,10 +416,10 @@ export default function AddEmployee() {
               {/* Bulk CSV Upload Card (Preserved) */}
               <div className="mt-8 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 transition-colors duration-200">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
-                  Bulk Upload Employees
+                  {t('addEmployee.bulkUpload', 'Bulk Upload Employees')}
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-slate-500 mb-4">
-                  Upload a CSV file to add multiple employees at once.
+                  {t('addEmployee.bulkUploadDesc', 'Upload a CSV file to add multiple employees at once.')}
                 </p>
 
                 {/* CSV Messages */}
@@ -444,13 +447,13 @@ export default function AddEmployee() {
                     <>
                       <div className="text-3xl mb-2">📄</div>
                       <p className="text-sm font-semibold text-gray-700 dark:text-slate-300">
-                        Choose CSV file
+                        {t('addEmployee.chooseCsvFile', 'Choose CSV file')}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-slate-500 mt-1 mb-3">
-                        Only .csv files are supported
+                        {t('addEmployee.csvOnly', 'Only .csv files are supported')}
                       </p>
                       <label className="inline-block cursor-pointer px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition">
-                        Browse File
+                        {t('addEmployee.browseFile', 'Browse File')}
                         <input
                           ref={fileInputRef}
                           type="file"
@@ -482,7 +485,7 @@ export default function AddEmployee() {
                           disabled={uploadingCsv}
                           className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition disabled:opacity-50"
                         >
-                          {uploadingCsv ? "Uploading..." : "Upload"}
+                          {uploadingCsv ? t('addEmployee.uploading', 'Uploading...') : t('addEmployee.upload', 'Upload')}
                         </button>
                         <button
                           type="button"
@@ -502,12 +505,12 @@ export default function AddEmployee() {
             <div className="w-full lg:w-80 flex flex-col gap-6">
               <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 p-6 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-serif font-bold text-gray-900 dark:text-white">Recent Additions</h2>
+                  <h2 className="text-lg font-serif font-bold text-gray-900 dark:text-white">{t('addEmployee.recentAdditions', 'Recent Additions')}</h2>
                   <button
                     onClick={() => navigate("/dashboard?tab=employees")}
                     className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-semibold"
                   >
-                    View All <ArrowRightIcon />
+                    {t('addEmployee.viewAll', 'View All')} <ArrowRightIcon />
                   </button>
                 </div>
 
@@ -525,7 +528,7 @@ export default function AddEmployee() {
                   </div>
                 ) : recentEmployees.length === 0 ? (
                   <p className="text-xs text-gray-500 dark:text-slate-500 text-center py-4">
-                    No employees added yet.
+                    {t('addEmployee.noEmployeesYet', 'No employees added yet.')}
                   </p>
                 ) : (
                   <div className="divide-y divide-gray-100 dark:divide-slate-800">
@@ -563,9 +566,9 @@ export default function AddEmployee() {
                                 }
                               }}
                               className="px-2 py-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 rounded hover:bg-indigo-100 transition"
-                              title={`Impersonate ${emp.fullName}`}
+                              title={`${t('addEmployee.impersonate', 'Impersonate')} ${emp.fullName}`}
                             >
-                              Impersonate
+                              {t('addEmployee.impersonate', 'Impersonate')}
                             </button>
                           )}
                         </div>

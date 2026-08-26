@@ -27,7 +27,19 @@ vi.mock("../../store/useAppStore", () => ({
 }));
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key, fallback) => fallback ?? key }),
+  useTranslation: () => ({
+    t: (key, fallbackOrOptions, maybeOptions) => {
+      if (typeof fallbackOrOptions === 'string') return fallbackOrOptions;
+      if (fallbackOrOptions && typeof fallbackOrOptions === 'object' && fallbackOrOptions.defaultValue) {
+        return fallbackOrOptions.defaultValue;
+      }
+      if (maybeOptions && typeof maybeOptions === 'object' && maybeOptions.defaultValue) {
+        return maybeOptions.defaultValue;
+      }
+      return key;
+    },
+    i18n: { language: 'en', changeLanguage: vi.fn() },
+  }),
 }));
 
 vi.mock("react-helmet-async", () => ({
@@ -90,6 +102,26 @@ vi.mock("../Approvals", () => ({ default: () => null }));
 vi.mock("../Loans", () => ({ default: () => null }));
 vi.mock("../Settlements", () => ({ default: () => null }));
 
+vi.mock("../../hooks/useDashboardData", () => ({
+  useDashboardSummary: () => ({ data: null, isLoading: false, error: null, refetch: vi.fn() }),
+  useRecentActivity: () => ({ data: [], isLoading: false }),
+  usePayrollTrend: () => ({ data: [], isLoading: false }),
+}));
+
+vi.mock("../../components/LanguageSwitcher", () => ({
+  default: () => null,
+}));
+
+vi.mock("../../components/BottomNavBar", () => ({
+  default: () => null,
+}));
+
+vi.mock("../../components/dashboard/DashboardGrid", () => ({
+  default: () => null,
+}));
+
+vi.mock("../Archive", () => ({ default: () => null }));
+
 // ── Fixtures ────────────────────────────────────────────────────────────────
 const EMPLOYEES = [
   {
@@ -139,7 +171,6 @@ beforeEach(() => {
   localStorage.setItem("currency", "INR");
   stubApi();
   navigate.mockClear();
-  dispatch.mockClear();
 });
 
 afterEach(() => {

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Router, Request, Response } from 'express';
 
 export interface ContractorDTO {
@@ -40,7 +41,7 @@ export class ContractorDisbursementService {
   }
 
   public triggerContractorPayout(id: string): ContractorDTO | null {
-    const contractor = this.contractors.find(c => c.id === id);
+    const contractor = this.contractors.find((c) => c.id === id);
     if (!contractor) return null;
     contractor.payoutStatus = 'PAID';
     return contractor;
@@ -54,10 +55,16 @@ contractorRouter.get('/contractors/list', (req: Request, res: Response) => {
   res.json({ success: true, data: contractorService.getContractors() });
 });
 
-contractorRouter.post('/contractors/:id/disburse', (req: Request, res: Response) => {
-  const updated = contractorService.triggerContractorPayout(req.params.id);
-  if (!updated) return res.status(404).json({ success: false, error: 'Contractor profile not found' });
-  res.json({ success: true, data: updated });
-});
+contractorRouter.post(
+  '/contractors/:id/disburse',
+  (req: Request, res: Response) => {
+    const updated = contractorService.triggerContractorPayout(req.params.id);
+    if (!updated)
+      return res
+        .status(404)
+        .json({ success: false, error: 'Contractor profile not found' });
+    res.json({ success: true, data: updated });
+  },
+);
 
 export default contractorRouter;

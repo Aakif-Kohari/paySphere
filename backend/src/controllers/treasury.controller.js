@@ -1,46 +1,59 @@
-const { MultiCurrencyTreasuryService } = require('../services/MultiCurrencyTreasuryService');
-const TreasuryRebalanceLog = require('../models/treasuryRebalanceLog.model');
+import treasuryService from '../services/treasuryService.js';
+import { AsyncHandler } from '../utils/asyncHandler.js';
+import { ApiResponse } from '../utils/ApiResponse.js';
 
-const treasuryService = new MultiCurrencyTreasuryService();
+export const getTreasuryWallets = AsyncHandler(async (req, res) => {
+  await treasuryService.ensureMockDataExists(); // Seeding if empty
+  const wallets = await treasuryService.getWallets();
 
-exports.getVaults = async (req, res, next) => {
-  try {
-    const vaults = await treasuryService.getDbVaults(req.tenantId);
-    res.status(200).json({ success: true, data: vaults });
-  } catch (error) {
-    next(error);
+  return res.status(200).json(
+    new ApiResponse(200, wallets, 'Wallets retrieved successfully')
+  );
+});
+
+export const getLiveExchangeRates = AsyncHandler(async (req, res) => {
+  const rates = treasuryService.getMockExchangeRates();
+  return res.status(200).json(
+    new ApiResponse(200, rates, 'Real-time exchange rates retrieved')
+  );
+});
+
+export const getForwardLiquidityForecast = AsyncHandler(async (req, res) => {
+  await treasuryService.ensureMockDataExists();
+  const forecast = await treasuryService.generateLiquidityForecast();
+  return res.status(200).json(
+    new ApiResponse(200, forecast, 'Liquidity forecast calculated successfully')
+  );
+});
+
+export const getChartSequence = AsyncHandler(async (req, res) => {
+  const chartSequence = await treasuryService.generateChartTimeSequence();
+  return res.status(200).json(
+    new ApiResponse(200, chartSequence, 'Time series data generated')
+  );
+});
+
+export const getTradeLedger = AsyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page, 10) || 1;
+  const limit = parseInt(req.query.limit, 10) || 15;
+  await treasuryService.ensureMockDataExists();
+
+  const ledgerData = await treasuryService.getTradeLedger(page, limit);
+  return res.status(200).json(
+    new ApiResponse(200, ledgerData, 'Trade ledger retrieved')
+  );
+});
+
+export const executeForexTrade = AsyncHandler(async (req, res) => {
+  const { sourceCurrency, targetCurrency, amountSold } = req.body;
+  if (!sourceCurrency || !targetCurrency || !amountSold || amountSold <= 0) {
+    return res.status(400).json(new ApiResponse(400, null, 'Invalid trade parameters'));
   }
-};
 
-exports.executeSwap = async (req, res, next) => {
-  try {
-    const { fromCurrency, toCurrency, amount } = req.body;
-    if (!fromCurrency || !toCurrency || !amount || amount <= 0) {
-      return res.status(400).json({ success: false, error: 'Invalid swap parameters' });
-    }
+  const userId = req.user ? req.user._id : null;
+  const trade = await treasuryService.executeTrade({ sourceCurrency, targetCurrency, amountSold }, userId);
 
-    const result = await treasuryService.executeDbLiquiditySwap(
-      req.tenantId,
-      fromCurrency.toUpperCase(),
-      toCurrency.toUpperCase(),
-      Number(amount)
-    );
-
-    if (!result.success) {
-      return res.status(400).json({ success: false, error: 'Insufficient vault liquidity or vault not found' });
-    }
-
-    res.status(200).json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
-};
-
-exports.getRebalanceLogs = async (req, res, next) => {
-  try {
-    const logs = await TreasuryRebalanceLog.find({ tenantId: req.tenantId }).sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: logs });
-  } catch (error) {
-    next(error);
-  }
-};
+  return res.status(200).json(
+    new ApiResponse(200, trade, 'Forex trade executed and settled')
+  );
+});

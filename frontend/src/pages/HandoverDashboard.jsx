@@ -6,6 +6,7 @@ import api from '../services/api';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import { formatDate } from '../utils/formatLocale';
 
 export default function HandoverDashboard() {
     const [plan, setPlan] = useState(null);
@@ -59,7 +60,7 @@ export default function HandoverDashboard() {
                             <div className="bg-brand-600 h-3 rounded-full transition-all" style={{ width: `${plan.clearanceScore}%` }}></div>
                         </div>
                         <p className="text-sm text-gray-600 dark:text-slate-400">
-                            Exit Date: <strong>{new Date(plan.exitDate).toLocaleDateString()}</strong> |
+                            Exit Date: <strong>{formatDate(plan.exitDate)}</strong> |
                             Status: <strong className={plan.status === 'Cleared' ? 'text-green-600' : 'text-amber-600'}>{plan.status}</strong>
                         </p>
                         {plan.isFnFBlocked && (

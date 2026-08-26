@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { useAppStore } from "../store/useAppStore";
 import ThemeToggle from "../components/ThemeToggle";
+import NotificationCenter from "../components/common/NotificationCenter";
 import api from "../services/api";
 import { useJobProgress } from "../hooks/useJobProgress";
 
@@ -455,9 +456,10 @@ export default function MonthlyUpdates() {
               borderBottom: isDark ? "2px solid #3b82f6" : "2px solid #2563EB", paddingBottom:2,
             }} className="sm:flex focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">{new Date().toLocaleString('default', { month: 'long', year: 'numeric' })} <ChevronDown /></button>
           </div>
+
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
             <ThemeToggle />
-            <button style={{ background:"none", border:"none", cursor:"pointer", display:"flex", p:2, color: isDark ? "#cbd5e1" : "#6B7280" }}><BellIcon /></button>
+            <NotificationCenter />
             <button style={{ background:"none", border:"none", cursor:"pointer", display:"flex", p:2, color: isDark ? "#cbd5e1" : "#6B7280" }}><HelpCircleIcon /></button>
             <div style={{ width:34, height:34, borderRadius:"50%", background:"#1E3A5F", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:"white", cursor:"pointer" }}>
               {getCompInitials(companyName)}
@@ -489,7 +491,7 @@ export default function MonthlyUpdates() {
           <main className="desktop-p" style={{ flex:1, padding:"30px 20px 100px", display:"flex", flexDirection:"column", alignItems:"center" }}>
 
           {/* Title */}
-          <div style={{ textAlign:"center", marginBottom:30, width:"100%", maxWidth:760 }}>
+          <div data-tour="generate-payroll-section" style={{ textAlign:"center", marginBottom:30, width:"100%", maxWidth:760 }}>
             <h1 style={{
               fontFamily:"'DM Serif Display',serif",
               fontSize:32, fontWeight:400, color: isDark ? "white" : "#111827",
