@@ -38,6 +38,15 @@ const AUDIT_ACTIONS = [
   'MINIMUM_WAGE_NOTIFICATION_ADDED',
   'MINIMUM_WAGE_ASSESSMENT_COMMITTED',
   'MINIMUM_WAGE_REGISTER_EXPORTED',
+  // Payment of Wages Act, 1936 (#1767). Next to the minimum wage actions
+  // because the rules move findings the same way a notification does: raising
+  // the section 1(6) applicability ceiling takes employees out of the Act and
+  // every finding against them disappears. A committed register is the
+  // establishment's own statement of what it deducted, and writing off a
+  // deferred balance is the employer forgiving a debt it created by deferring.
+  'WAGE_DEDUCTION_RULES_UPDATED',
+  'WAGE_DEDUCTION_REGISTER_COMMITTED',
+  'WAGE_DEDUCTION_DEFERRAL_WRITTEN_OFF',
   'EMPLOYEE_CREATE',
   'EMPLOYEE_UPDATE',
   'EMPLOYEE_DELETE',

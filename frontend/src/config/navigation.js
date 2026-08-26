@@ -187,7 +187,7 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
 
-    {
+  {
     path: '/compensation',
     component: lazy(() => import('../pages/CompensationBenchmarkingDashboard')),
     label: 'Compensation & equity',
@@ -195,7 +195,7 @@ export const APP_ROUTES = [
     icon: 'money',
   },
 
-    {
+  {
     path: '/onboarding',
     component: lazy(() => import('../pages/OnboardingLifecycleTracker')),
     label: 'Onboarding tracker',
@@ -203,7 +203,7 @@ export const APP_ROUTES = [
     icon: 'rocket',
   },
 
-// ── Payroll ──────────────────────────────────────────────────────────────
+  // ── Payroll ──────────────────────────────────────────────────────────────
   {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
@@ -290,6 +290,18 @@ export const APP_ROUTES = [
     component: lazy(() => import('../pages/MinimumWageCompliance')),
     appShell: true,
     label: 'Minimum wages',
+    group: 'payroll',
+    icon: 'shield',
+  },
+  {
+    // Directly under Minimum wages, and in Payroll rather than Compliance: the
+    // fix for a deduction total over the section 7(3) ceiling is to reschedule
+    // a loan recovery, which is a payroll action. The two are the floor and the
+    // ceiling of the same question (#1767).
+    path: '/wage-deductions',
+    component: lazy(() => import('../pages/WageDeductionRegister')),
+    appShell: true,
+    label: 'Wage deductions',
     group: 'payroll',
     icon: 'shield',
   },
@@ -468,7 +480,7 @@ export const APP_ROUTES = [
     employee: true,
   },
 
-    {
+  {
     path: '/team-health',
     component: lazy(() => import('../pages/TeamHealthScoreDashboard')),
     label: 'Team health',
@@ -477,7 +489,7 @@ export const APP_ROUTES = [
     employee: true,
   },
 
-// ── Learning ─────────────────────────────────────────────────────────────
+  // ── Learning ─────────────────────────────────────────────────────────────
   {
     path: '/flashcards',
     component: lazy(() => import('../pages/Flashcards')),

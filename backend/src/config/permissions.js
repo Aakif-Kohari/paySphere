@@ -80,6 +80,23 @@ const PERMISSIONS = {
   READ_MINIMUM_WAGE: 'READ_MINIMUM_WAGE',
   MANAGE_MINIMUM_WAGE_SCHEDULE: 'MANAGE_MINIMUM_WAGE_SCHEDULE',
   RUN_MINIMUM_WAGE_ASSESSMENT: 'RUN_MINIMUM_WAGE_ASSESSMENT',
+
+  // --- Payment of Wages Act, 1936 (#1767) ----------------------------------
+  //
+  // Next to the minimum wage names because the two are the same shape of rule
+  // — one sets the floor under what must be paid and this one sets the ceiling
+  // on what may be taken back out — and split three ways for the same reason.
+  // The rules decide what counts as a breach: raising the section 1(6)
+  // applicability ceiling takes employees out of the Act entirely and every
+  // finding against them disappears, with nothing in the register saying so.
+  //
+  // Deliberately not gated on the payroll permissions, though it is computed
+  // from those rows. Payroll answers "what was this person paid"; this answers
+  // "was the employer allowed to take that much", and the people who audit the
+  // second are not the people who run the first.
+  READ_WAGE_DEDUCTIONS: 'READ_WAGE_DEDUCTIONS',
+  MANAGE_WAGE_DEDUCTION_RULES: 'MANAGE_WAGE_DEDUCTION_RULES',
+  COMMIT_WAGE_DEDUCTION_REGISTER: 'COMMIT_WAGE_DEDUCTION_REGISTER',
   // Statutory compliance (#933, reachable since #951). Deliberately not
   // READ_REPORT: a Form 16 is one person's complete tax position and a Form 24Q
   // export is every employee's PAN, salary and tax in one file, while
@@ -423,6 +440,21 @@ const PERMISSION_DEFINITIONS = [
       'Commit a minimum wage assessment for a wage period, which states what the establishment owes',
   },
   {
+    name: PERMISSIONS.READ_WAGE_DEDUCTIONS,
+    description:
+      'View the wage deduction register — the section 7(3) aggregate ceiling, the fines realised against the section 8 three per cent, and the balances the ceiling deferred',
+  },
+  {
+    name: PERMISSIONS.MANAGE_WAGE_DEDUCTION_RULES,
+    description:
+      'Set the establishment’s deduction ceilings, its approved list of acts under section 8(1) and the section 1(6) wage above which the Act does not apply',
+  },
+  {
+    name: PERMISSIONS.COMMIT_WAGE_DEDUCTION_REGISTER,
+    description:
+      'Commit the section 13A register for a wage period, and write off a deferred balance that will not be recovered',
+  },
+  {
     name: PERMISSIONS.READ_COMPLIANCE,
     description:
       'View compliance settings and download Form 16 certificates and Form 24Q returns',
@@ -753,6 +785,14 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_MINIMUM_WAGE_SCHEDULE,
       PERMISSIONS.RUN_MINIMUM_WAGE_ASSESSMENT,
 
+      // #1767. All three, for the reason immediately above: the owner is the
+      // one account allowed to be both halves of a check. Writing off a
+      // deferred balance is forgiving a debt, which is the same class of
+      // authority as APPROVE_PAYROLL and stops here for that reason too.
+      PERMISSIONS.READ_WAGE_DEDUCTIONS,
+      PERMISSIONS.MANAGE_WAGE_DEDUCTION_RULES,
+      PERMISSIONS.COMMIT_WAGE_DEDUCTION_REGISTER,
+
       PERMISSIONS.READ_COMPLIANCE,
       PERMISSIONS.MANAGE_COMPLIANCE,
       // Held by the owner alone: a role edit changes what every other account
@@ -891,6 +931,12 @@ const ROLE_DEFINITIONS = [
       // the establishment against it.
       PERMISSIONS.READ_MINIMUM_WAGE,
       PERMISSIONS.MANAGE_MINIMUM_WAGE_SCHEDULE,
+
+      // #1767. HR reads the register — a deduction total over the ceiling is
+      // fixed by rescheduling a loan recovery, and the loans are HR's. It does
+      // not set the applicability ceiling, which decides who the Act reaches at
+      // all, and it does not commit the register or write off a balance.
+      PERMISSIONS.READ_WAGE_DEDUCTIONS,
 
       // #1011. The day-to-day half of each new area, and not the half that
       // moves money.
