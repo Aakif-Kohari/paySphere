@@ -187,7 +187,15 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
 
-  // ── Payroll ──────────────────────────────────────────────────────────────
+    {
+    path: '/workforce-analytics',
+    component: lazy(() => import('../pages/WorkforceAnalyticsDashboard')),
+    label: 'Workforce analytics',
+    group: 'people',
+    icon: 'chart',
+  },
+
+// ── Payroll ──────────────────────────────────────────────────────────────
   {
     path: '/fbp-admin',
     component: lazy(() => import('../features/fbp/FbpAdminDashboard')),
