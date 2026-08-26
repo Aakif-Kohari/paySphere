@@ -19,6 +19,7 @@ const {
   OVERTIME_RATE_MAX,
 } = require('../utils/validators');
 const logger = require('../utils/logger');
+const { getDownloadUrl, isStorageUri, putObject, uploadDataUrl } = require('../services/objectStorage.service');
 const eventBus = require('../services/event.service');
 const { getDefaultRole } = require('../seeds/rbac.seed');
 const { resolveAccountType } = require('../config/accountTypes');
@@ -294,9 +295,22 @@ exports.getSettings = async (req, res, next) => {
 
     const UserDTO = require('../utils/userDTO');
     const safeUser = UserDTO.toClient(user);
+    const responseUser = { ...safeUser };
+    if (isStorageUri(responseUser.avatar)) {
+      responseUser.avatar = await getDownloadUrl(responseUser.avatar);
+    }
+    if (responseUser.settings?.companyInfo?.companyLogo && isStorageUri(responseUser.settings.companyInfo.companyLogo)) {
+      responseUser.settings = {
+        ...responseUser.settings,
+        companyInfo: {
+          ...responseUser.settings.companyInfo,
+          companyLogo: await getDownloadUrl(responseUser.settings.companyInfo.companyLogo),
+        },
+      };
+    }
 
     res.status(200).json({
-      ...safeUser,
+      ...responseUser,
       organizationId: user._id.toString(),
       payrollId: 'PR-' + user._id.toString().slice(-6).toUpperCase(),
       employeeCount,
@@ -314,16 +328,18 @@ exports.uploadLogo = async (req, res, next) => {
       return res.status(400).json({ message: 'No image provided' });
 
     // Store as base64 string
-    const base64Data = req.file.buffer.toString('base64');
-    const mimeType = req.file.mimetype;
-    const logoDataUrl = `data:${mimeType};base64,${base64Data}`;
+    const storedLogo = await putObject({
+      key: `profiles/company-logos/${req.tenantId}/${Date.now()}-${require('crypto').randomUUID()}`,
+      body: req.file.buffer,
+      contentType: req.file.mimetype,
+    });
 
-    await User.findByIdAndUpdate(req.userId, { companyLogoData: logoDataUrl });
+    await User.findByIdAndUpdate(req.userId, { companyLogoData: storedLogo.uri });
+    const signedUrl = await getDownloadUrl(storedLogo.uri);
 
-    // Also invalidate settings cache if we had one
     res
       .status(200)
-      .json({ message: 'Logo updated successfully', logo: logoDataUrl });
+      .json({ message: 'Logo updated successfully', logo: signedUrl });
   } catch (error) {
     next(error);
   }
@@ -418,7 +434,26 @@ exports.updateSettings = async (req, res, next) => {
       user.defaultOvertimeRate = defaultOvertimeRate;
     if (defaultDailyRate !== undefined)
       user.defaultDailyRate = defaultDailyRate;
-    if (avatar !== undefined) user.avatar = avatar;
+
+    if (avatar !== undefined) {
+      if (avatar === '') {
+        user.avatar = '';
+      } else if (isStorageUri(avatar)) {
+        user.avatar = avatar;
+      } else if (typeof avatar === 'string' && avatar.startsWith('data:image/')) {
+        const storedAvatar = await uploadDataUrl({
+          dataUrl: avatar,
+          tenantId: req.tenantId,
+          area: 'profiles/avatars',
+        });
+        user.avatar = storedAvatar.uri;
+      } else {
+        // OAuth/provider avatars are already remote URLs and do not need to be
+        // copied into S3. Locally uploaded data URLs are the only values this
+        // endpoint migrates to object storage.
+        user.avatar = avatar;
+      }
+    }
 
     if (!user.settings) user.settings = {};
 
@@ -434,6 +469,15 @@ exports.updateSettings = async (req, res, next) => {
           ...(user.settings.companyInfo || {}),
           ...settings.companyInfo,
         };
+        const companyLogo = user.settings.companyInfo.companyLogo;
+        if (typeof companyLogo === 'string' && companyLogo.startsWith('data:image/')) {
+          const storedLogo = await uploadDataUrl({
+            dataUrl: companyLogo,
+            tenantId: req.tenantId,
+            area: 'profiles/company-logos',
+          });
+          user.settings.companyInfo.companyLogo = storedLogo.uri;
+        }
       }
       if (settings.payrollConfig) {
         user.settings.payrollConfig = {
@@ -464,13 +508,22 @@ exports.updateSettings = async (req, res, next) => {
       fields: Object.keys(req.body),
     });
 
+    const responseSettings = user.settings?.toObject ? user.settings.toObject() : { ...user.settings };
+    if (responseSettings.companyInfo?.companyLogo && isStorageUri(responseSettings.companyInfo.companyLogo)) {
+      responseSettings.companyInfo = {
+        ...responseSettings.companyInfo,
+        companyLogo: await getDownloadUrl(responseSettings.companyInfo.companyLogo),
+      };
+    }
+    const responseAvatar = isStorageUri(user.avatar) ? await getDownloadUrl(user.avatar) : user.avatar;
+
     res.status(200).json({
       message: 'Settings updated successfully',
-      settings: user.settings,
+      settings: responseSettings,
       fullName: user.fullName,
       email: user.email,
       companyName: user.companyName,
-      avatar: user.avatar,
+      avatar: responseAvatar,
       defaultOvertimeRate: user.defaultOvertimeRate,
       defaultDailyRate: user.defaultDailyRate,
     });
