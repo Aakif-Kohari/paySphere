@@ -469,9 +469,9 @@ export const APP_ROUTES = [
   },
 
     {
-    path: '/wellness',
-    component: lazy(() => import('../pages/EmployeeWellnessDashboard')),
-    label: 'Wellness analytics',
+    path: '/team-health',
+    component: lazy(() => import('../pages/TeamHealthScoreDashboard')),
+    label: 'Team health',
     group: 'workplace',
     icon: 'heart',
     employee: true,
