@@ -96,6 +96,14 @@ const severanceRoutes = require('./routes/severance.routes');
 // gratuity to somebody who is leaving; this one measures what is still owed to
 // everybody who has not.
 const gratuityRoutes = require('./routes/gratuity.routes');
+
+// Employees' Pension Scheme, 1995 (#1769). Next to the gratuity router because
+// both value a defined benefit on service and a final salary. Apart from it
+// because gratuity is the company's own liability and EPS is a funded scheme
+// run by the EPFO, where the employer's obligation ends at the ₹1,250
+// remittance — putting them together would suggest a pension liability the
+// company does not carry.
+const epsRoutes = require('./routes/eps.routes');
 const loanRoutes = require('./routes/loan.routes');
 const schedulerRoutes = require('./routes/scheduler.routes');
 const employeePortalRoutes = require('./routes/employeePortal.routes');
@@ -441,6 +449,11 @@ app.use('/api/injury-compensation', injuryCompensationRoutes);
 // #1344. The router owns `/assumptions`, `/preview`, `/valuations` and
 // `/employees/:employeeId`, so the prefix carries no noun of its own.
 app.use('/api/gratuity', gratuityRoutes);
+
+// #1769. Its own prefix rather than a sub-path of `/api/gratuity`, for the
+// reason above. The router owns `/assumptions`, `/wage-history`, `/preview`,
+// `/valuations` and `/members/:employeeId`.
+app.use('/api/eps', epsRoutes);
 app.use('/api/loans', loanRoutes);
 app.use('/api/treasury', treasuryRoutes);
 app.use('/api/regional-tax', regionalTaxRoutes);

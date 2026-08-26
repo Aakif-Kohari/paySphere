@@ -187,7 +187,7 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
 
-    {
+  {
     path: '/compensation',
     component: lazy(() => import('../pages/CompensationBenchmarkingDashboard')),
     label: 'Compensation & equity',
@@ -195,7 +195,7 @@ export const APP_ROUTES = [
     icon: 'money',
   },
 
-    {
+  {
     path: '/onboarding',
     component: lazy(() => import('../pages/OnboardingLifecycleTracker')),
     label: 'Onboarding tracker',
@@ -203,7 +203,7 @@ export const APP_ROUTES = [
     icon: 'rocket',
   },
 
-// ── Payroll ──────────────────────────────────────────────────────────────
+  // ── Payroll ──────────────────────────────────────────────────────────────
   {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
@@ -227,6 +227,18 @@ export const APP_ROUTES = [
     label: 'Settlements',
     group: 'payroll',
     icon: 'exit',
+  },
+  {
+    // Directly above Gratuity: the two are the same kind of obligation and a
+    // reader comparing them is the intended case. Kept apart in the tree
+    // because gratuity is the company's own liability and this is a funded
+    // scheme where the employer's obligation ends at the remittance (#1769).
+    path: '/eps-pension',
+    component: lazy(() => import('../pages/EpsPension')),
+    appShell: true,
+    label: 'Pension scheme',
+    group: 'payroll',
+    icon: 'shield',
   },
   {
     // Next to Settlements, because the two are the same statute from opposite
@@ -468,7 +480,7 @@ export const APP_ROUTES = [
     employee: true,
   },
 
-    {
+  {
     path: '/team-health',
     component: lazy(() => import('../pages/TeamHealthScoreDashboard')),
     label: 'Team health',
@@ -477,7 +489,7 @@ export const APP_ROUTES = [
     employee: true,
   },
 
-// ── Learning ─────────────────────────────────────────────────────────────
+  // ── Learning ─────────────────────────────────────────────────────────────
   {
     path: '/flashcards',
     component: lazy(() => import('../pages/Flashcards')),
