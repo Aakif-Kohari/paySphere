@@ -351,7 +351,16 @@ export const APP_ROUTES = [
     employee: true,
   },
 
-  // ── Learning ─────────────────────────────────────────────────────────────
+    {
+    path: '/team-health',
+    component: lazy(() => import('../pages/TeamHealthScoreDashboard')),
+    label: 'Team health',
+    group: 'workplace',
+    icon: 'heart',
+    employee: true,
+  },
+
+// ── Learning ─────────────────────────────────────────────────────────────
   {
     path: '/flashcards',
     component: lazy(() => import('../pages/Flashcards')),
