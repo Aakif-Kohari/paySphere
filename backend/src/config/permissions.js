@@ -223,6 +223,24 @@ const PERMISSIONS = {
   READ_CONTRACT_LABOUR: 'READ_CONTRACT_LABOUR',
   MANAGE_CONTRACT_LABOUR: 'MANAGE_CONTRACT_LABOUR',
 
+  // --- Apprentices Act, 1961 (#1771) ---------------------------------------
+  //
+  // Next to the contract labour names because both are about people on the site
+  // who are not on the payroll, and split three ways on the denominator.
+  //
+  // The band's rules and the establishment's recorded strength are the same kind
+  // of lever: reducing total strength by ten lowers the floor and can make a
+  // shortfall disappear without a single apprentice being engaged. So both sit
+  // behind MANAGE_APPRENTICESHIP_RULES, and whoever holds it does not also
+  // certify the establishment against the result.
+  //
+  // Deliberately not the employee permissions. An apprentice is not an employee
+  // — that is the whole subject — and putting the roll behind WRITE_EMPLOYEE is
+  // the first place the distinction would get lost.
+  READ_APPRENTICESHIP: 'READ_APPRENTICESHIP',
+  MANAGE_APPRENTICE: 'MANAGE_APPRENTICE',
+  MANAGE_APPRENTICESHIP_RULES: 'MANAGE_APPRENTICESHIP_RULES',
+
   READ_ROSTER: 'READ_ROSTER',
   MANAGE_ROSTER: 'MANAGE_ROSTER',
 
@@ -625,6 +643,21 @@ const PERMISSION_DEFINITIONS = [
       'Register contractors, record their licences and monthly deployments, and file the Form XXV annual return',
   },
   {
+    name: PERMISSIONS.READ_APPRENTICESHIP,
+    description:
+      'View the apprentice roll, the section 8 engagement band and the exposure created by an unregistered contract',
+  },
+  {
+    name: PERMISSIONS.MANAGE_APPRENTICE,
+    description:
+      'Engage an apprentice, record the portal registration and the monthly attendance and stipend',
+  },
+  {
+    name: PERMISSIONS.MANAGE_APPRENTICESHIP_RULES,
+    description:
+      'Set the engagement band and the Rule 11 stipends, record the establishment’s total strength, and commit the assessment',
+  },
+  {
     name: PERMISSIONS.READ_ROSTER,
     description: 'View published shift rosters',
   },
@@ -946,6 +979,14 @@ const ROLE_DEFINITIONS = [
       // contingent liability an auditor asks about.
       PERMISSIONS.READ_CONTRACT_LABOUR,
       PERMISSIONS.MANAGE_CONTRACT_LABOUR,
+
+      // #1771. All three. The recorded strength is the denominator of the whole
+      // obligation, and the owner is the one account allowed to be both halves
+      // of that check.
+      PERMISSIONS.READ_APPRENTICESHIP,
+      PERMISSIONS.MANAGE_APPRENTICE,
+      PERMISSIONS.MANAGE_APPRENTICESHIP_RULES,
+
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.MANAGE_ROSTER,
 
@@ -1111,6 +1152,14 @@ const ROLE_DEFINITIONS = [
       // moves no money.
       PERMISSIONS.READ_CONTRACT_LABOUR,
       PERMISSIONS.MANAGE_CONTRACT_LABOUR,
+
+      // #1771. HR engages apprentices and keeps the roll — recruiting them and
+      // recording their attendance is HR administration in the ordinary sense.
+      // It does not move the band or the recorded strength, both of which are
+      // the denominator the establishment is judged against, and it does not
+      // commit the assessment.
+      PERMISSIONS.READ_APPRENTICESHIP,
+      PERMISSIONS.MANAGE_APPRENTICE,
 
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.MANAGE_ROSTER,

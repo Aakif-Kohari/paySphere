@@ -202,6 +202,18 @@ export const APP_ROUTES = [
     group: 'people',
     icon: 'rocket',
   },
+  {
+    // In People rather than Compliance: engaging an apprentice and keeping the
+    // roll is HR work, and it sits next to onboarding because that is what it
+    // is. That an unregistered contract also produces a statutory exposure is
+    // true, and it is not what the page is used for day to day (#1771).
+    path: '/apprenticeships',
+    component: lazy(() => import('../pages/ApprenticeshipCompliance')),
+    appShell: true,
+    label: 'Apprentices',
+    group: 'people',
+    icon: 'rocket',
+  },
 
   // ── Payroll ──────────────────────────────────────────────────────────────
   {

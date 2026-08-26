@@ -167,6 +167,13 @@ const vendorRoutes = require('./routes/vendor.routes');
 // liability for that contractor's workmen, of whom there may be four hundred
 // behind one vendor row.
 const contractLabourRoutes = require('./routes/contractLabour.routes');
+
+// Apprentices Act, 1961 (#1771). Next to the contract labour router because
+// both are about people on the site who are not on the payroll, and apart from
+// it because the law treats them oppositely: a contract worker *is* a worker
+// and is covered by provident fund and ESI through the principal employer,
+// while section 18 says an apprentice is not.
+const apprenticeshipRoutes = require('./routes/apprenticeships.routes');
 const grievanceRoutes = require('./routes/grievance.routes');
 const taxProofRoutes = require('./routes/taxProof.routes');
 
@@ -602,6 +609,12 @@ app.use('/api/vendors', vendorRoutes);
 // #1700. The router owns `/contractors`, `/deployments`, `/assessment`,
 // `/returns` and `/registers`.
 app.use('/api/contract-labour', contractLabourRoutes);
+
+// #1771. Its own prefix rather than a sub-path of `/api/contract-labour`, for
+// the reason above — filing apprentices there would attach exactly the
+// liabilities section 18 removes. The router owns `/rules`, `/strength`,
+// `/apprentices` and `/assessments`.
+app.use('/api/apprenticeships', apprenticeshipRoutes);
 
 // POSH grievances (#958). Gated by `requireICC` rather than `requirePermission`
 // — the committee is deliberately not the same population as "HR", and admins
