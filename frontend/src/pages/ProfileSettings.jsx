@@ -3,7 +3,6 @@ import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import AvatarUpload from '../components/AvatarUpload';
 import ThemeToggle from '../components/ThemeToggle';
-import { logout } from '../features/auth/authSlice';
 import { useToast } from '../context/ToastContext';
 import { useAppStore } from '../store/useAppStore';
 

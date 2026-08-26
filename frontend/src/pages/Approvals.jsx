@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { formatCurrency } from '../utils/formatLocale';
 
 const MONTH_NAMES = [
   'January',
@@ -19,22 +20,6 @@ const MONTH_NAMES = [
 ];
 const MAX_REASON_LENGTH = 500;
 
-const formatCurrency = (value, currency = 'INR') => {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '—';
-
-  try {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    // An employee-level currency code that Intl does not recognise should not
-    // blank out the whole row.
-    return `${currency} ${amount.toLocaleString('en-IN')}`;
-  }
-};
 
 const formatPeriod = (month, year) => {
   const name = MONTH_NAMES[Number(month) - 1];

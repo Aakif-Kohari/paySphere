@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { formatCurrency, formatDate } from '../utils/formatLocale';
 
 /**
  * Pay equity (#1347).
@@ -19,20 +20,6 @@ import { useToast } from '../context/ToastContext';
  * not know how much of their workforce the analysis actually covered.
  */
 
-const formatCurrency = (value) => {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '—';
-
-  try {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    }).format(amount);
-  } catch {
-    return `₹${amount.toLocaleString('en-IN')}`;
-  }
-};
 
 const formatGap = (value) => {
   const gap = Number(value);
@@ -537,7 +524,7 @@ const PayEquityDashboard = () => {
                 className="flex flex-wrap justify-between gap-2 border-b border-gray-100 dark:border-slate-800 py-1.5"
               >
                 <span className="text-gray-900 dark:text-white">
-                  {new Date(row.asOf).toLocaleDateString('en-IN')}
+                  {formatDate(row.asOf)}
                   {row.periodLabel ? ` · ${row.periodLabel}` : ''}
                 </span>
                 <span className="text-gray-600 dark:text-slate-400">

@@ -1,5 +1,50 @@
 // EnterpriseComplianceDashboardPage — Executive dashboard for compliance & audit trail intelligence
 import React, { useState, useMemo } from 'react';
+import CompliancePolicyCard, { CompliancePolicy } from '../../components/compliance/CompliancePolicyCard';
+
+const COMPLIANCE_POLICIES: CompliancePolicy[] = [
+  {
+    id: 'POL-001',
+    policyName: 'Global GDPR Privacy Framework',
+    category: 'DATA_PRIVACY',
+    jurisdiction: 'European Union (GDPR)',
+    status: 'ACTIVE',
+    version: '1.2.0',
+    effectiveDate: '2026-01-01',
+    lastReviewedAt: '2026-08-15',
+    mandatoryAcknowledgment: true,
+    acknowledgedCount: 384,
+    totalEligibleEmployees: 400,
+    description: 'Statutory requirements governing employee data processing, processing logs, and individual consent rights under EU General Data Protection Regulations.',
+  },
+  {
+    id: 'POL-002',
+    policyName: 'Fair Labor Standards Act (FLSA)',
+    category: 'LABOR_LAW',
+    jurisdiction: 'United States (Federal)',
+    status: 'ACTIVE',
+    version: '2.1.0',
+    effectiveDate: '2026-03-01',
+    lastReviewedAt: '2026-07-20',
+    mandatoryAcknowledgment: false,
+    acknowledgedCount: 290,
+    totalEligibleEmployees: 350,
+    description: 'Federal regulations establishing minimum wage, overtime pay, recordkeeping, and youth employment standards affecting full-time and part-time workers.',
+  },
+  {
+    id: 'POL-003',
+    policyName: 'ISO 27001 Information Security Guidelines',
+    category: 'INTERNAL_GOVERNANCE',
+    jurisdiction: 'Global Compliance',
+    status: 'UNDER_REVIEW',
+    version: '3.0.1',
+    effectiveDate: '2026-09-01',
+    mandatoryAcknowledgment: true,
+    acknowledgedCount: 50,
+    totalEligibleEmployees: 400,
+    description: 'Best practice framework for establishing, implementing, maintaining, and continually improving an information security management system.',
+  }
+];
 
 const MOCK_POLICIES = [
   { id: 'CP-001', name: 'GDPR Data Processing Policy', category: 'data_privacy', owner: 'DPO Office', status: 'active', lastReviewed: '2026-03-15', nextReview: '2027-03-15', risk: 'critical', regions: ['EU', 'UK'], reqCount: 4 },
@@ -47,17 +92,36 @@ const EnterpriseComplianceDashboardPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [showModal, setShowModal] = useState(false);
+  const [policies, setPolicies] = useState<CompliancePolicy[]>(COMPLIANCE_POLICIES);
 
   const totalFindings = MOCK_AUDITS.reduce((s, a) => s + a.findings, 0);
   const openFindings = MOCK_FINDINGS.filter((f) => f.remediation === 'open' || f.remediation === 'in_progress').length;
   const avgScore = MOCK_AUDITS.filter((a) => a.score !== null).reduce((s, a, _, arr) => s + (a.score || 0) / arr.length, 0);
   const openIncidents = MOCK_INCIDENTS.filter((i) => i.status !== 'resolved' && i.status !== 'closed').length;
 
-  const filteredPolicies = useMemo(() => {
-    let d = [...MOCK_POLICIES];
-    if (search) { const q = search.toLowerCase(); d = d.filter((p) => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)); }
+  const filteredCompliancePolicies = useMemo(() => {
+    let d = [...policies];
+    if (search) {
+      const q = search.toLowerCase();
+      d = d.filter((p) => p.policyName.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
+    }
     return d;
-  }, [search]);
+  }, [policies, search]);
+
+  const handleAcknowledge = (policy: CompliancePolicy) => {
+    setPolicies(prev =>
+      prev.map(p =>
+        p.id === policy.id
+          ? { ...p, acknowledgedCount: p.acknowledgedCount + 1 }
+          : p
+      )
+    );
+  };
+
+  const handleView = (policy: CompliancePolicy) => {
+    setSelectedItem(policy);
+    setShowModal(true);
+  };
 
   const renderKPI = (label: string, value: string, icon: string, color: string) => (
     <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '16px 18px', flex: 1, minWidth: '160px' }}>
@@ -82,7 +146,7 @@ const EnterpriseComplianceDashboardPage: React.FC = () => {
       </div>
 
       <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        {renderKPI('Active Policies', MOCK_POLICIES.filter((p) => p.status === 'active').length.toString(), '📜', '#22c55e')}
+        {renderKPI('Active Policies', policies.filter((p) => p.status === 'ACTIVE').length.toString(), '📜', '#22c55e')}
         {renderKPI('Avg Audit Score', `${Math.round(avgScore)}%`, '📊', '#60a5fa')}
         {renderKPI('Open Findings', openFindings.toString(), '🔍', '#f97316')}
         {renderKPI('Open Incidents', openIncidents.toString(), '🚨', '#ef4444')}
@@ -104,38 +168,14 @@ const EnterpriseComplianceDashboardPage: React.FC = () => {
 
       {/* Policies Tab */}
       {activeTab === 'policies' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '14px' }}>
-          {filteredPolicies.map((p) => (
-            <div key={p.id} onClick={() => { setSelectedItem(p); setShowModal(true); }}
-              style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${SEV_COLORS[p.risk]}33`, borderRadius: '14px', padding: '18px', cursor: 'pointer', transition: 'all 0.2s' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '22px' }}>{CAT_ICONS[p.category] || '📜'}</span>
-                  <div>
-                    <h3 style={{ color: '#e2e8f0', margin: 0, fontSize: '14px', fontWeight: 700 }}>{p.name}</h3>
-                    <p style={{ color: '#64748b', margin: '2px 0 0', fontSize: '11px' }}>Owner: {p.owner}</p>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <span style={{ color: SEV_COLORS[p.risk], fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', background: `${SEV_COLORS[p.risk]}22`, padding: '3px 8px', borderRadius: '6px' }}>{p.risk}</span>
-                  {renderBadge(p.status)}
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
-                <div>
-                  <p style={{ color: '#64748b', margin: 0, fontSize: '10px' }}>REVIEWED</p>
-                  <p style={{ color: '#e2e8f0', margin: '2px 0 0', fontSize: '12px' }}>{p.lastReviewed}</p>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <p style={{ color: '#64748b', margin: 0, fontSize: '10px' }}>REQUIREMENTS</p>
-                  <p style={{ color: '#a78bfa', margin: '2px 0 0', fontSize: '12px', fontWeight: 600 }}>{p.reqCount}</p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ color: '#64748b', margin: 0, fontSize: '10px' }}>NEXT REVIEW</p>
-                  <p style={{ color: '#e2e8f0', margin: '2px 0 0', fontSize: '12px' }}>{p.nextReview}</p>
-                </div>
-              </div>
-            </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '18px' }}>
+          {filteredCompliancePolicies.map((p) => (
+            <CompliancePolicyCard
+              key={p.id}
+              policy={p}
+              onView={handleView}
+              onAcknowledge={handleAcknowledge}
+            />
           ))}
         </div>
       )}
@@ -237,7 +277,7 @@ const EnterpriseComplianceDashboardPage: React.FC = () => {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }} onClick={() => setShowModal(false)}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '28px', maxWidth: '560px', width: '90%', maxHeight: '80vh', overflow: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h2 style={{ color: '#e2e8f0', margin: 0, fontSize: '18px', fontWeight: 700 }}>{selectedItem.name || selectedItem.title || selectedItem.number || 'Details'}</h2>
+              <h2 style={{ color: '#e2e8f0', margin: 0, fontSize: '18px', fontWeight: 700 }}>{selectedItem.policyName || selectedItem.name || selectedItem.title || selectedItem.number || 'Details'}</h2>
               <button onClick={() => setShowModal(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#94a3b8', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '13px' }}>✕ Close</button>
             </div>
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>

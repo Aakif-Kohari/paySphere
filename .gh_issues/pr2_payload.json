@@ -1,0 +1,6 @@
+{
+  "title": "feat(workforce): Add Enterprise Workforce Intelligence & Predictive Analytics Hub",
+  "body": "## Summary\n\nAdds a full-featured Workforce Intelligence & Predictive Analytics dashboard to PaySphere.\n\n### 5 Production Files (1,278 lines)\n\n1. `workforceService.ts` (234 lines) — Types, seed data, CSV export, formatting helpers\n2. `AttritionRiskHeatmap.tsx` (110 lines) — Department x tenure risk matrix with color-coded cells\n3. `CompensationBenchmarks.tsx` (126 lines) — Salary range visualization with market band indicators\n4. `HeadcountTrendChart.tsx` (207 lines) — Stacked area chart with department breakdown\n5. `EnterpriseWorkforceIntelligencePage.tsx` (601 lines) — Main dashboard with 5 tabs, 6 KPIs\n\n### Features\n- **Overview** — Headcount stacked area chart, turnover breakdown, recent departures, attrition heatmap\n- **Attrition** — Departure records with risk scores, exit reasons, replacement costs, and category filters\n- **Compensation** — Salary benchmarks with P25/P50/P75/P90 ranges, market band indicators, budget impact\n- **Hiring Speed** — Time-to-hire by department with avg/median/P90 metrics\n- **Diversity** — Gender parity, ethnicity index, age diversity, leadership parity scores\n\n### Route\n`/enterprise/workforce-intelligence`",
+  "head": "karan-chaos:feature/enterprise-learning-development-hub",
+  "base": "main"
+}

@@ -3,6 +3,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import PendingIcon from '@mui/icons-material/Pending';
 import BlockIcon from '@mui/icons-material/Block';
+import { formatDate } from '../utils/formatLocale';
 
 const statusConfig = {
     Completed: { icon: <CheckCircleIcon className="text-green-500" />, bg: 'bg-green-50 dark:bg-green-900/20', text: 'text-green-700 dark:text-green-300' },
@@ -42,11 +43,11 @@ export default function TaskChecklist({ tasks, onStatusChange, isManager = false
                                 )}
                                 <div className="flex items-center gap-3 mt-2 text-xs">
                                     <span className={`font-medium ${isOverdue ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-slate-500'}`}>
-                                        Due: {new Date(task.dueDate).toLocaleDateString()} {isOverdue && '(Overdue)'}
+                                        Due: {formatDate(task.dueDate)} {isOverdue && '(Overdue)'}
                                     </span>
                                     {task.completedAt && (
                                         <span className="text-green-600 dark:text-green-400">
-                                            Completed: {new Date(task.completedAt).toLocaleDateString()}
+                                            Completed: {formatDate(task.completedAt)}
                                         </span>
                                     )}
                                 </div>
