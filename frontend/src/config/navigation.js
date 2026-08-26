@@ -187,7 +187,7 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
 
-    {
+  {
     path: '/compensation',
     component: lazy(() => import('../pages/CompensationBenchmarkingDashboard')),
     label: 'Compensation & equity',
@@ -195,7 +195,7 @@ export const APP_ROUTES = [
     icon: 'money',
   },
 
-    {
+  {
     path: '/onboarding',
     component: lazy(() => import('../pages/OnboardingLifecycleTracker')),
     label: 'Onboarding tracker',
@@ -203,7 +203,7 @@ export const APP_ROUTES = [
     icon: 'rocket',
   },
 
-// ── Payroll ──────────────────────────────────────────────────────────────
+  // ── Payroll ──────────────────────────────────────────────────────────────
   {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
@@ -342,6 +342,18 @@ export const APP_ROUTES = [
 
   // ── Compliance ───────────────────────────────────────────────────────────
   {
+    // In Compliance rather than Payroll: the register's subject is who the
+    // scheme covers, and the fact people come to it for — that somebody above
+    // the ceiling is still covered until the period ends — is a compliance
+    // answer rather than a pay one (#1768).
+    path: '/esi',
+    component: lazy(() => import('../pages/EsiContribution')),
+    appShell: true,
+    label: 'ESI',
+    group: 'compliance',
+    icon: 'shield',
+  },
+  {
     // In Compliance rather than Finance, even though a contractor is a vendor.
     // The vendor ledger's question is "what do we owe this counterparty"; this
     // one's is "what are we liable for on account of people we do not employ",
@@ -468,7 +480,7 @@ export const APP_ROUTES = [
     employee: true,
   },
 
-    {
+  {
     path: '/team-health',
     component: lazy(() => import('../pages/TeamHealthScoreDashboard')),
     label: 'Team health',
@@ -477,7 +489,7 @@ export const APP_ROUTES = [
     employee: true,
   },
 
-// ── Learning ─────────────────────────────────────────────────────────────
+  // ── Learning ─────────────────────────────────────────────────────────────
   {
     path: '/flashcards',
     component: lazy(() => import('../pages/Flashcards')),

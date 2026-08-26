@@ -97,6 +97,27 @@ const PERMISSIONS = {
   // what gets filed with the tax department under the employer's name. Kept
   // with the owner for the same reason MANAGE_EXPENSE_CATEGORY is.
   MANAGE_COMPLIANCE: 'MANAGE_COMPLIANCE',
+
+  // --- Employees' State Insurance Act, 1948 (#1768) ------------------------
+  //
+  // Next to the compliance names because a monthly ESI return is a filing, and
+  // split three ways because the wage ceiling is the same kind of lever the
+  // minimum wage notification is — it decides who the scheme reaches.
+  //
+  // The middle name matters more here than anywhere else in the tree. Somebody
+  // removed from the scheme keeps drawing benefit for three months, because the
+  // benefit period lags the contribution period, so a ceiling lowered quietly
+  // is a change nobody notices until a claim is rejected — and by then the
+  // contribution that would have supported it was never remitted and cannot
+  // retrospectively be.
+  //
+  // Deliberately not gated on the payroll permissions: the coverage register
+  // carries a disability flag against named employees, which the payroll role
+  // has no reason to hold.
+  READ_ESI: 'READ_ESI',
+  MANAGE_ESI_RULES: 'MANAGE_ESI_RULES',
+  FILE_ESI_RETURN: 'FILE_ESI_RETURN',
+
   IMPERSONATE_USER: 'IMPERSONATE_USER',
 
   // --- Feature areas that had no vocabulary of their own (#1011) -----------
@@ -433,6 +454,21 @@ const PERMISSION_DEFINITIONS = [
       "Set the company's TAN and PAN and record or verify employee tax declarations",
   },
   {
+    name: PERMISSIONS.READ_ESI,
+    description:
+      'View the ESI coverage register for the contribution period — who is in the scheme, who is being carried above the ceiling by the Rule 50 proviso, and the 78-day counts that decide benefit',
+  },
+  {
+    name: PERMISSIONS.MANAGE_ESI_RULES,
+    description:
+      'Set the ESI wage ceiling, the two contribution rates and the section 42(1) daily floor, which together decide who the scheme reaches',
+  },
+  {
+    name: PERMISSIONS.FILE_ESI_RETURN,
+    description:
+      'File the monthly ESI return and record its remittance, which fixes the coverage each employee carries into the next month',
+  },
+  {
     name: PERMISSIONS.MANAGE_ROLES,
     description:
       'Create, update and delete custom roles and their permission sets',
@@ -755,6 +791,14 @@ const ROLE_DEFINITIONS = [
 
       PERMISSIONS.READ_COMPLIANCE,
       PERMISSIONS.MANAGE_COMPLIANCE,
+
+      // #1768. All three. Filing the return is a remittance to a statutory
+      // body and the ceiling decides who it covers, so both halves of that
+      // check stop at the one account allowed to be both.
+      PERMISSIONS.READ_ESI,
+      PERMISSIONS.MANAGE_ESI_RULES,
+      PERMISSIONS.FILE_ESI_RETURN,
+
       // Held by the owner alone: a role edit changes what every other account
       // in the company can do.
       PERMISSIONS.MANAGE_ROLES,
@@ -875,6 +919,12 @@ const ROLE_DEFINITIONS = [
       // Issuing Form 16 at year end is HR's job. Setting the TAN the return is
       // filed under is not — that stays with the owner.
       PERMISSIONS.READ_COMPLIANCE,
+
+      // #1768. HR reads the coverage register — the 78-day count is what an
+      // employee asks HR about when a claim is refused, and the answer is a
+      // fact about their attendance. It does not move the ceiling and it does
+      // not file the return, which is a remittance.
+      PERMISSIONS.READ_ESI,
 
       // #1346. HR reads the bonus register — "what is this employee getting and
       // why" is HR's question and Form C answers it. It does not commit the
