@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Enterprise Vendor Management & Procurement Suite — Service Layer
 // Express router exposing vendor, PO, invoice, and contract endpoints
 

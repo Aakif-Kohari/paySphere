@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const softDeletePlugin = require('../utils/softDelete.plugin');
 const auditTrailPlugin = require('../middlewares/auditTrail.middleware');
+const cryptoSealPlugin = require('../middlewares/cryptoSeal.plugin');
 const {
   ALL_STATUSES,
   PAYROLL_STATUS,
@@ -14,11 +15,12 @@ const payrollUpdateSchema = new mongoose.Schema(
       ref: 'Employee',
       required: true,
     },
-employeeName: {
+    employeeName: {
       type: String,
       required: true,
       maxlength: [100, 'Employee name cannot exceed 100 characters'],
-    },    month: {
+    },
+    month: {
       type: Number, // 1-12
       required: true,
       min: [1, 'Month must be between 1 and 12'],
@@ -44,12 +46,13 @@ employeeName: {
       type: Number,
       default: null,
     },
-year: {
+    year: {
       type: Number,
       required: true,
       min: [2000, 'Year must be 2000 or later'],
       max: [2100, 'Year must be 2100 or earlier'],
-    },    baseSalary: {
+    },
+    baseSalary: {
       type: Number,
       required: true,
       min: [0, 'Base salary cannot be negative'],
@@ -74,12 +77,19 @@ year: {
       type: Number,
       default: 0,
     },
-customDeductions: [
+    customDeductions: [
       {
-        name: { type: String, maxlength: [100, 'Deduction name cannot exceed 100 characters'] },
-        amount: { type: Number, min: [0, 'Deduction amount cannot be negative'] },
+        name: {
+          type: String,
+          maxlength: [100, 'Deduction name cannot exceed 100 characters'],
+        },
+        amount: {
+          type: Number,
+          min: [0, 'Deduction amount cannot be negative'],
+        },
       },
-    ],    leaveDeduction: {
+    ],
+    leaveDeduction: {
       type: Number,
       default: 0,
     },
@@ -95,16 +105,9 @@ customDeductions: [
       type: String,
       default: 'USD',
     },
-    baseCurrency: {
-      type: String,
-      default: 'USD',
-    },
     exchangeRate: {
       type: Number,
       default: 1,
-    },
-    convertedNetSalary: {
-      type: Number,
     },
     /**
      * Who created this row. An audit fact, not a scoping key.
@@ -363,4 +366,5 @@ payrollUpdateSchema.index({ tenantId: 1, submittedBy: 1, status: 1 });
 
 payrollUpdateSchema.plugin(softDeletePlugin);
 payrollUpdateSchema.plugin(auditTrailPlugin);
+payrollUpdateSchema.plugin(cryptoSealPlugin);
 module.exports = mongoose.model('PayrollUpdate', payrollUpdateSchema);

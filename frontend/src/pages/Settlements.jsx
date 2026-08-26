@@ -3,7 +3,9 @@ import Alert from '@mui/material/Alert';
 import Pagination from '../components/common/Pagination';
 import SettlementsSkeleton from '../components/common/skeleton/SettlementsSkeleton';
 import api from '../services/api';
+import { formatCurrency, formatDate } from '../utils/formatLocale';
 import { useToast } from '../context/ToastContext';
+import HandoverWizard from '../components/handover/HandoverWizard';
 
 const STATUS_LABELS = {
   draft: 'Draft',
@@ -29,30 +31,6 @@ const EXIT_TYPES = [
   { value: 'end_of_contract', label: 'End of contract' },
 ];
 
-const formatCurrency = (value, currency = 'INR') => {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '—';
-
-  try {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toLocaleString('en-IN')}`;
-  }
-};
-
-const formatDate = (value) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-};
 
 const describeError = (error, fallback) => {
   const response = error?.response;
@@ -75,6 +53,7 @@ const Settlements = () => {
   const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
+  const [showHandoverWizard, setShowHandoverWizard] = useState(false);
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -281,15 +260,33 @@ const Settlements = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          aria-expanded={showForm}
-          aria-label={showForm ? 'Close exit form' : 'Start an exit'}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition"
-        >
-          {showForm ? 'Close' : 'Start an exit'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowHandoverWizard(true)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-sm transition"
+          >
+            Initiate Handover
+          </button>
+
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            aria-expanded={showForm}
+            aria-label={showForm ? 'Close exit form' : 'Start an exit'}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition"
+          >
+            {showForm ? 'Close' : 'Start an exit'}
+          </button>
+        </div>
       </div>
+
+      {showHandoverWizard && (
+        <HandoverWizard
+          onClose={() => setShowHandoverWizard(false)}
+          onSuccess={() => {
+            notify('success', 'Handover plan initiated successfully.');
+          }}
+        />
+      )}
 
       {showForm && (
         <form

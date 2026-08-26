@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import api from '../services/api';
+import { formatCurrency, formatDate } from '../utils/formatLocale';
 
 const REVISION_REASONS = [
   { value: 'revision', label: 'Revision' },
@@ -15,30 +17,6 @@ const REASON_STYLES = {
   correction: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
 };
 
-const formatCurrency = (value, currency = 'INR') => {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '—';
-
-  try {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toLocaleString('en-IN')}`;
-  }
-};
-
-const formatDate = (value) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-};
 
 const describeError = (error, fallback) => {
   const response = error?.response;
@@ -61,6 +39,7 @@ const describeError = (error, fallback) => {
  * an edit — so this panel only ever adds to the timeline.
  */
 const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) => {
+  const { t } = useTranslation();
   const [structure, setStructure] = useState(null);
   const [timeline, setTimeline] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,8 +56,6 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
     note: '',
   });
 
-  // The preview endpoint writes nothing, so the delta can be checked before
-  // committing to an entry that cannot be edited away.
   const [preview, setPreview] = useState(null);
 
   const load = useCallback(async () => {
@@ -98,74 +75,79 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
     } catch (error) {
       setStructure(null);
       setTimeline([]);
-      setLoadError(describeError(error, 'Could not load the salary structure.'));
+      setLoadError(describeError(error, t('common.loadSalaryStructureFailed', 'Could not load the salary structure.')));
     } finally {
       setLoading(false);
     }
-  }, [employeeId]);
+  }, [employeeId, t]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const setField = (field) => (event) => {
-    setForm((prev) => ({ ...prev, [field]: event.target.value }));
-    setPreview(null);
+  const setField = (key) => (event) => {
+    const value = event.target.value;
+    setForm((current) => ({ ...current, [key]: value }));
     setFormError('');
   };
 
   const handlePreview = async () => {
-    if (!Number(form.grossMonthly)) return;
+    if (!form.grossMonthly || Number(form.grossMonthly) <= 0) {
+      setFormError(t('common.enterGrossMonthly', 'Enter a positive gross monthly amount to preview.'));
+      return;
+    }
 
     try {
       const res = await api.post(
         `/api/employees/${employeeId}/salary-structure/preview`,
-        {
-          grossMonthly: Number(form.grossMonthly),
-          effectiveFrom: form.effectiveFrom ? new Date(form.effectiveFrom + 'T12:00:00.000Z') : undefined,
-          reason: form.reason,
-        },
+        { grossMonthly: Number(form.grossMonthly) },
       );
       setPreview(res.data);
       setFormError('');
     } catch (error) {
       setPreview(null);
-      setFormError(describeError(error, 'Could not preview the structure.'));
+      setFormError(describeError(error, t('common.previewFailed', 'Could not preview the new structure.')));
     }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (busy) return;
+
+    if (!form.grossMonthly || Number(form.grossMonthly) <= 0) {
+      setFormError(t('common.enterGrossMonthly', 'Enter a positive gross monthly amount.'));
+      return;
+    }
 
     setBusy(true);
     setFormError('');
+    setSuccessMessage('');
 
     try {
-      const res = await api.post(`/api/employees/${employeeId}/salary-revision`, {
+      await api.post(`/api/employees/${employeeId}/salary-revisions`, {
         grossMonthly: Number(form.grossMonthly),
-        effectiveFrom: form.effectiveFrom ? new Date(form.effectiveFrom + 'T12:00:00.000Z') : undefined,
+        effectiveFrom: form.effectiveFrom,
         reason: form.reason,
-        note: form.note,
+        note: form.note.trim() || undefined,
       });
 
-      setSuccessMessage(
-        res.data?.appliedImmediately
-          ? 'Revision recorded and applied.'
-          : 'Revision recorded. It takes effect on the date you set.',
-      );
+      setSuccessMessage(t('common.revisionRecorded', 'Salary revision recorded successfully.'));
       setShowForm(false);
       setPreview(null);
-      setForm((prev) => ({ ...prev, grossMonthly: '', note: '' }));
+      setForm({
+        grossMonthly: '',
+        effectiveFrom: new Date().toISOString().slice(0, 10),
+        reason: 'revision',
+        note: '',
+      });
       await load();
     } catch (error) {
-      setFormError(describeError(error, 'Could not record the revision.'));
+      setFormError(describeError(error, t('common.recordRevisionFailed', 'Could not record the revision.')));
     } finally {
       setBusy(false);
     }
   };
 
-  if (loading) {
+  if (loading && !structure) {
     return (
       <div className="space-y-3">
         <div className="h-24 rounded-xl bg-gray-100 dark:bg-slate-800/60 animate-pulse" />
@@ -183,7 +165,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
           severity="error"
           action={
             <button onClick={load} className="px-3 py-1 text-sm font-semibold underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
-              Retry
+              {t('common.retry', 'Retry')}
             </button>
           }
         >
@@ -202,21 +184,21 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
           <div className="flex flex-wrap justify-between items-start gap-4 mb-4">
             <div>
               <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-slate-500">
-                Current package{employeeName ? ` — ${employeeName}` : ''}
+                {t('common.currentPackage', 'Current package')}{employeeName ? ` — ${employeeName}` : ''}
               </p>
               <p className="text-2xl font-semibold text-gray-900 dark:text-white">
                 {formatCurrency(breakdown.grossMonthly, currency)}
                 <span className="text-sm font-normal text-gray-500 dark:text-slate-500">
                   {' '}
-                  / month
+                  / {t('common.month', 'month')}
                 </span>
               </p>
               <p className="text-sm text-gray-500 dark:text-slate-500">
-                {formatCurrency(breakdown.grossMonthly * 12, currency)} annual CTC
+                {formatCurrency(breakdown.grossMonthly * 12, currency)} {t('common.annualCtc', 'annual CTC')}
               </p>
               {structure.isSynthesised && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Derived from the stored salary — no revision recorded yet.
+                  {t('common.derivedSalaryHint', 'Derived from the stored salary — no revision recorded yet.')}
                 </p>
               )}
             </div>
@@ -224,10 +206,10 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
             <button
               onClick={() => setShowForm((v) => !v)}
               aria-expanded={showForm}
-              aria-label={showForm ? 'Cancel revision' : 'Revise salary'}
+              aria-label={showForm ? t('common.cancel', 'Cancel revision') : t('common.reviseSalary', 'Revise salary')}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm"
             >
-              {showForm ? 'Cancel' : 'Revise salary'}
+              {showForm ? t('common.cancel', 'Cancel') : t('common.reviseSalary', 'Revise salary')}
             </button>
           </div>
 
@@ -235,9 +217,9 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
             <table aria-label="Salary breakdown" className="w-full text-sm text-left">
               <thead className="text-gray-500 dark:text-slate-500 border-b border-gray-200 dark:border-slate-800">
                 <tr>
-                  <th className="py-2">Component</th>
-                  <th className="py-2">Type</th>
-                  <th className="py-2 text-right">Amount</th>
+                  <th className="py-2">{t('common.component', 'Component')}</th>
+                  <th className="py-2">{t('common.type', 'Type')}</th>
+                  <th className="py-2 text-right">{t('common.amount', 'Amount')}</th>
                 </tr>
               </thead>
               <tbody className="text-gray-800 dark:text-slate-200">
@@ -254,7 +236,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
               <tfoot className="font-semibold text-gray-900 dark:text-white">
                 <tr>
                   <td className="py-2" colSpan={2}>
-                    Gross
+                    {t('common.gross', 'Gross')}
                   </td>
                   <td className="py-2 text-right">
                     {formatCurrency(breakdown.totalEarnings, currency)}
@@ -273,7 +255,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
         >
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <label className="text-sm text-gray-700 dark:text-slate-300">
-              New gross / month
+              {t('common.newGrossPerMonth', 'New gross / month')}
               <input
                 required
                 type="number"
@@ -286,7 +268,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
             </label>
 
             <label className="text-sm text-gray-700 dark:text-slate-300">
-              Effective from
+              {t('common.effectiveFrom', 'Effective from')}
               <input
                 required
                 type="date"
@@ -297,7 +279,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
             </label>
 
             <label className="text-sm text-gray-700 dark:text-slate-300">
-              Reason
+              {t('common.reason', 'Reason')}
               <select
                 value={form.reason}
                 onChange={setField('reason')}
@@ -313,7 +295,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
           </div>
 
           <label className="text-sm text-gray-700 dark:text-slate-300">
-            Note (optional)
+            {t('common.noteOptional', 'Note (optional)')}
             <input
               type="text"
               maxLength={500}
@@ -324,8 +306,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
           </label>
 
           <p className="text-xs text-gray-500 dark:text-slate-500">
-            Revisions are append-only. A correction is recorded as a new entry so
-            the history stays intact.
+            {t('common.revisionsAppendOnly', 'Revisions are append-only. A correction is recorded as a new entry so the history stays intact.')}
           </p>
 
           {formError && <Alert severity="error">{formError}</Alert>}
@@ -369,14 +350,14 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
               disabled={!Number(form.grossMonthly)}
               className="px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
-              Preview
+              {t('common.preview', 'Preview')}
             </button>
             <button
               type="submit"
               disabled={busy}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             >
-              {busy ? 'Saving…' : 'Record revision'}
+              {busy ? t('common.saving', 'Saving…') : t('common.recordRevision', 'Record revision')}
             </button>
           </div>
         </form>
@@ -384,12 +365,12 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
 
       <div>
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-          Revision history
+          {t('common.revisionHistory', 'Revision history')}
         </h3>
 
         {timeline.length === 0 ? (
           <p className="text-sm text-gray-500 dark:text-slate-500">
-            No revisions recorded yet.
+            {t('common.noRevisionsRecorded', 'No revisions recorded yet.')}
           </p>
         ) : (
           <ol className="relative border-l border-gray-200 dark:border-slate-800 ml-2">
@@ -422,7 +403,7 @@ const SalaryStructurePanel = ({ employeeId, employeeName, currency = 'INR' }) =>
                   )}
                 </div>
                 <p className="text-xs text-gray-500 dark:text-slate-500 mt-0.5">
-                  Effective {formatDate(entry.effectiveFrom)}
+                  {t('common.effective', 'Effective')} {formatDate(entry.effectiveFrom)}
                 </p>
                 {entry.note && (
                   <p className="text-xs text-gray-500 dark:text-slate-500 mt-1 italic">

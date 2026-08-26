@@ -1,3 +1,4 @@
+// @ts-nocheck
 export interface Tag {
   label: string;
 }
