@@ -95,6 +95,13 @@ const settlementRoutes = require('./routes/settlement.routes');
 // taken by the longitudinal compensation timeline, which is a different subject
 // wearing three quarters of the same name.
 const injuryCompensationRoutes = require('./routes/injuryCompensation.routes');
+
+// Employees' State Insurance Act, 1948 (#1768). Next to the injury
+// compensation router because section 53 decides between them: a claim under
+// the Employees' Compensation Act is barred where ESI covers the same injury,
+// so which router applies to an employee is settled by the coverage question
+// this one answers.
+const esiRoutes = require('./routes/esi.routes');
 const severanceRoutes = require('./routes/severance.routes');
 
 // Gratuity actuarial valuation (#1344). Next to settlements on purpose: the
@@ -449,6 +456,12 @@ app.use('/api/settlements', settlementRoutes);
 // temporary disablement is paid to somebody who is still on the rolls and
 // coming back. The router owns `/schedules`, `/preview` and `/claims`.
 app.use('/api/injury-compensation', injuryCompensationRoutes);
+
+// #1768. Its own prefix rather than a sub-path of `/api/compliance`: the
+// compliance router files what the tax authorities want, and this is a
+// contribution to a benefit scheme the employee draws on. The router owns
+// `/rules`, `/assessment`, `/coverage` and `/returns`.
+app.use('/api/esi', esiRoutes);
 
 // #1344. The router owns `/assumptions`, `/preview`, `/valuations` and
 // `/employees/:employeeId`, so the prefix carries no noun of its own.

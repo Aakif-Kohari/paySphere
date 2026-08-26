@@ -82,6 +82,16 @@ const AUDIT_ACTIONS = [
   'INJURY_CLAIM_COMPUTED',
   'INJURY_CLAIM_DEPOSITED',
   'INJURY_CLAIM_STATUS_CHANGED',
+  // Employees' State Insurance Act, 1948 (#1768). Placed next to the injury
+  // claim actions because section 53 bars a claim under the Employees'
+  // Compensation Act where ESI covers the same injury — so which of these two
+  // sets applies to an employee is decided by the coverage the first of these
+  // actions moves. Lowering the wage ceiling removes people from the scheme
+  // while they are still drawing benefit three months later, and filing the
+  // return is both a remittance and the thing that fixes each employee's
+  // coverage for the following month.
+  'ESI_RULES_UPDATED',
+  'ESI_RETURN_FILED',
   // Gratuity actuarial valuation (#1344). The assumptions decide the reported
   // provision — moving the discount rate 50 basis points moves the balance
   // sheet — and committing a valuation produces the figure carried in the

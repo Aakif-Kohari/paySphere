@@ -354,6 +354,18 @@ export const APP_ROUTES = [
 
   // ── Compliance ───────────────────────────────────────────────────────────
   {
+    // In Compliance rather than Payroll: the register's subject is who the
+    // scheme covers, and the fact people come to it for — that somebody above
+    // the ceiling is still covered until the period ends — is a compliance
+    // answer rather than a pay one (#1768).
+    path: '/esi',
+    component: lazy(() => import('../pages/EsiContribution')),
+    appShell: true,
+    label: 'ESI',
+    group: 'compliance',
+    icon: 'shield',
+  },
+  {
     // In Compliance rather than Finance, even though a contractor is a vendor.
     // The vendor ledger's question is "what do we owe this counterparty"; this
     // one's is "what are we liable for on account of people we do not employ",
