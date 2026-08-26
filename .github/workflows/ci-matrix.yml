@@ -1,4 +1,4 @@
-name: Playwright E2E Tests
+name: CI Matrix
 
 on:
   push:
@@ -10,14 +10,67 @@ permissions:
   contents: read
 
 concurrency:
-  group: playwright-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NODE_VERSION: '20'
+
 jobs:
-  test:
+  lint:
+    name: Lint (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint workspace
+        run: npm run lint
+
+  unit-tests:
+    name: Unit tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+  e2e:
     name: E2E (${{ matrix.browser }})
-    timeout-minutes: 60
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -36,8 +89,8 @@ jobs:
     env:
       CI: true
       BASE_URL: http://localhost:5173
-      TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL || 'test@example.com' }}
-      TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD || 'testpassword' }}
+      TEST_USER_EMAIL: test@example.com
+      TEST_USER_PASSWORD: testpassword
       VITE_API_URL: http://localhost:5000
       MONGO_URI: mongodb://127.0.0.1:27017/paySphere_test
       JWT_SECRET: test_jwt_secret_change_me
@@ -52,24 +105,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright browser
+      - name: Install Playwright browsers
         working-directory: frontend
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Seed E2E test user
         working-directory: backend
         run: node src/seeds/e2eSeeder.js
-        env:
-          MONGO_URI: mongodb://127.0.0.1:27017/paySphere_test
-          TEST_USER_EMAIL: test@example.com
-          TEST_USER_PASSWORD: testpassword
 
       - name: Start backend server
         working-directory: backend
@@ -83,7 +132,7 @@ jobs:
         working-directory: frontend
         run: npx playwright test --project=${{ matrix.browser }}
 
-      - name: Upload test report
+      - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -91,7 +140,7 @@ jobs:
           path: frontend/playwright-report/
           retention-days: 30
 
-      - name: Upload test artifacts
+      - name: Upload Playwright artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
