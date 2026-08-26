@@ -1,0 +1,6 @@
+{
+  "title": "feat(engagement): Add Enterprise Engagement & Sentiment Analytics Hub",
+  "body": "## Summary\n\nAdds a full-featured Employee Engagement & Sentiment Analytics dashboard to PaySphere.\n\n### 5 Production Files (2,374 lines)\n\n1. `engagementService.ts` (483 lines) — Types, seed data, helpers, CSV export\n2. `PulseSurveyCard.tsx` (294 lines) — Interactive survey card with expandable breakdown\n3. `SentimentTimeline.tsx` (250 lines) — Activity feed with severity filters\n4. `ActionPlanModal.tsx` (470 lines) — Create/view action plans with milestones\n5. `EnterpriseEngagementSentimentPage.tsx` (877 lines) — Dashboard with 5 tabs, KPIs, sparklines\n\n### Features\n- Pulse Surveys, Department Engagement, Action Plans, Burnout Risk, Activity Feed\n- CSV Export, Search and Filter, Sentiment Trend Analysis\n\n### Route\n`/enterprise/engagement-sentiment`",
+  "head": "karan-chaos:feature/enterprise-engagement-sentiment-hub",
+  "base": "main"
+}

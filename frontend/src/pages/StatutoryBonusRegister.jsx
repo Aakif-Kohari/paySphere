@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { formatCurrency, formatDate } from '../utils/formatLocale';
 
 /**
  * The Payment of Bonus Act register (#1346).
@@ -31,26 +32,6 @@ const EXCLUSION_LABELS = {
   NO_WAGE_DATA: 'No wage data',
 };
 
-const formatCurrency = (value) => {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '—';
-
-  try {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    }).format(amount);
-  } catch {
-    return `₹${amount.toLocaleString('en-IN')}`;
-  }
-};
-
-const formatDate = (value) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-IN');
-};
 
 const describeError = (error, fallback) => {
   const response = error?.response;

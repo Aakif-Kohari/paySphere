@@ -198,7 +198,9 @@ exports.login = async (req, res, next) => {
 
     // Check account lockout status (#1275)
     if (user.lockUntil && user.lockUntil > Date.now()) {
-      const remainingMinutes = Math.ceil((user.lockUntil - Date.now()) / (60 * 1000));
+      const remainingMinutes = Math.ceil(
+        (user.lockUntil - Date.now()) / (60 * 1000),
+      );
       return res.status(403).json({
         message: `Account is locked due to 5 consecutive failed login attempts. Please try again after ${remainingMinutes} minute(s).`,
         isLocked: true,
@@ -221,7 +223,8 @@ exports.login = async (req, res, next) => {
         await user.save();
 
         return res.status(403).json({
-          message: 'Account locked due to 5 consecutive failed login attempts. Please try again after 30 minutes.',
+          message:
+            'Account locked due to 5 consecutive failed login attempts. Please try again after 30 minutes.',
           isLocked: true,
           lockUntil: user.lockUntil,
         });
@@ -289,15 +292,11 @@ exports.getSettings = async (req, res, next) => {
       tenantId: req.tenantId,
     });
 
+    const UserDTO = require('../utils/userDTO');
+    const safeUser = UserDTO.toClient(user);
+
     res.status(200).json({
-      fullName: user.fullName,
-      email: user.email,
-      avatar: user.avatar,
-      companyName: user.companyName,
-      settings: user.settings,
-      defaultOvertimeRate: user.defaultOvertimeRate || 0,
-      defaultDailyRate: user.defaultDailyRate || 0,
-      isGoogleLinked: !!user.googleId,
+      ...safeUser,
       organizationId: user._id.toString(),
       payrollId: 'PR-' + user._id.toString().slice(-6).toUpperCase(),
       employeeCount,
@@ -1329,12 +1328,16 @@ exports.impersonateUser = async (req, res, next) => {
 
     const targetUser = await User.findById(targetUserId).populate('role');
     if (!targetUser || targetUser.isActive === false) {
-      return res.status(404).json({ message: 'Target user not found or inactive' });
+      return res
+        .status(404)
+        .json({ message: 'Target user not found or inactive' });
     }
 
     const targetRoleName = targetUser.role?.name || targetUser.role;
     if (targetRoleName === 'SuperAdmin') {
-      return res.status(403).json({ message: 'Cannot impersonate another SuperAdmin' });
+      return res
+        .status(403)
+        .json({ message: 'Cannot impersonate another SuperAdmin' });
     }
 
     if (
@@ -1342,7 +1345,9 @@ exports.impersonateUser = async (req, res, next) => {
       targetUser.tenantId &&
       String(req.tenantId) !== String(targetUser.tenantId)
     ) {
-      return res.status(403).json({ message: 'Target user belongs to another organization' });
+      return res
+        .status(403)
+        .json({ message: 'Target user belongs to another organization' });
     }
 
     const tokenPayload = {
@@ -1356,7 +1361,9 @@ exports.impersonateUser = async (req, res, next) => {
       impersonatorEmail: impersonator.email,
     };
 
-    const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+      expiresIn: '1h',
+    });
 
     await createAuditLog({
       userId: impersonator._id,
@@ -1401,12 +1408,18 @@ exports.impersonateUser = async (req, res, next) => {
 exports.stopImpersonation = async (req, res, next) => {
   try {
     if (!req.isImpersonating || !req.impersonatorId) {
-      return res.status(400).json({ message: 'No active impersonation session' });
+      return res
+        .status(400)
+        .json({ message: 'No active impersonation session' });
     }
 
-    const impersonator = await User.findById(req.impersonatorId).populate('role');
+    const impersonator = await User.findById(req.impersonatorId).populate(
+      'role',
+    );
     if (!impersonator || impersonator.isActive === false) {
-      return res.status(404).json({ message: 'Original admin account not found or inactive' });
+      return res
+        .status(404)
+        .json({ message: 'Original admin account not found or inactive' });
     }
 
     const tokenPayload = {
@@ -1416,7 +1429,9 @@ exports.stopImpersonation = async (req, res, next) => {
       tokenVersion: impersonator.tokenVersion,
     };
 
-    const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '15m' });
+    const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+      expiresIn: '15m',
+    });
 
     await createAuditLog({
       userId: impersonator._id,

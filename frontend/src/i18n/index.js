@@ -1,45 +1,39 @@
-/**
- * @fileoverview i18next Configuration
- * @description Initializes react-i18next with language detection, caching, 
- * and fallback mechanisms. Supports English and Spanish.
- * 
- * Issue: #736
- */
-
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
-import HttpApi from 'i18next-http-backend';
 
-// Import translation files directly for bundling (avoids async loading issues in Vite)
 import en from './locales/en.json';
 import es from './locales/es.json';
+import fr from './locales/fr.json';
+
+const STORAGE_KEY = 'paysphere_language';
 
 i18n
-    .use(initReactI18next) // Passes i18n down to react-i18next
-    .use(LanguageDetector) // Detects user language from browser
-    .init({
-        resources: {
-            en: { translation: en },
-            es: { translation: es },
-        },
-        fallbackLng: 'en',
-        debug: process.env.NODE_ENV === 'development',
+  .use(LanguageDetector)
+  .use(initReactI18next)
+  .init({
+    resources: {
+      en: { translation: en },
+      es: { translation: es },
+      fr: { translation: fr },
+    },
+    fallbackLng: 'en',
+    detection: {
+      order: ['localStorage', 'navigator', 'htmlTag'],
+      caches: ['localStorage'],
+      lookupLocalStorage: STORAGE_KEY,
+    },
+    interpolation: {
+      escapeValue: false,
+    },
+    react: {
+      useSuspense: false,
+    },
+  });
 
-        // Language detection options
-        detection: {
-            order: ['localStorage', 'navigator', 'htmlTag'],
-            caches: ['localStorage'],
-            lookupLocalStorage: 'i18nextLng',
-        },
-
-        interpolation: {
-            escapeValue: false, // React already escapes by default
-        },
-
-        react: {
-            useSuspense: false, // Disable suspense to avoid loading wrappers
-        },
-    });
+i18n.on('languageChanged', (lng) => {
+  localStorage.setItem(STORAGE_KEY, lng);
+  localStorage.setItem('i18nextLng', lng);
+});
 
 export default i18n;

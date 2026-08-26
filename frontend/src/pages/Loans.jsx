@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import LoansSkeleton from '../components/common/skeleton/LoansSkeleton';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { formatCurrency } from '../utils/formatLocale';
 
 const MONTH_NAMES = [
   'Jan',
@@ -40,20 +41,6 @@ const STATUS_LABELS = {
   cancelled: 'Cancelled',
 };
 
-const formatCurrency = (value, currency = 'INR') => {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '—';
-
-  try {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toLocaleString('en-IN')}`;
-  }
-};
 
 const describeError = (error, fallback) => {
   const response = error?.response;

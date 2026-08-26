@@ -1,3 +1,5 @@
+import { formatDate } from '../../utils/formatLocale';
+
 export const formatTooltipDate = (value) => {
   if (!value) {
     return 'N/A';
@@ -11,7 +13,7 @@ export const formatTooltipDate = (value) => {
 
   const parsed = new Date(normalized);
   if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toLocaleDateString('en-US', {
+    return formatDate(parsed, {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -21,7 +23,7 @@ export const formatTooltipDate = (value) => {
   if (/^\d{4}-\d{2}$/.test(normalized)) {
     const [year, month] = normalized.split('-');
     const parsedMonth = new Date(Number(year), Number(month) - 1, 1);
-    return parsedMonth.toLocaleDateString('en-US', {
+    return formatDate(parsedMonth, {
       year: 'numeric',
       month: 'short',
     });
