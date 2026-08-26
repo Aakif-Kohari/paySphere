@@ -195,6 +195,14 @@ export const APP_ROUTES = [
     icon: 'money',
   },
 
+    {
+    path: '/onboarding',
+    component: lazy(() => import('../pages/OnboardingLifecycleTracker')),
+    label: 'Onboarding tracker',
+    group: 'people',
+    icon: 'rocket',
+  },
+
 // ── Payroll ──────────────────────────────────────────────────────────────
   {
     path: '/approvals',
