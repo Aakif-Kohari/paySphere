@@ -161,7 +161,15 @@ export const APP_ROUTES = [
     icon: 'document',
   },
 
-  // ── Payroll ──────────────────────────────────────────────────────────────
+    {
+    path: '/compensation',
+    component: lazy(() => import('../pages/CompensationBenchmarkingDashboard')),
+    label: 'Compensation & equity',
+    group: 'people',
+    icon: 'money',
+  },
+
+// ── Payroll ──────────────────────────────────────────────────────────────
   {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
