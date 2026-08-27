@@ -84,6 +84,7 @@ const MOUNTED_ROUTES = [
   ['/api/assignments', 'get', '/api/assignments'],
   ['/api/settlements', 'get', '/api/settlements'],
   ['/api/injury-compensation', 'get', '/api/injury-compensation/claims'],
+  ['/api/layoffs', 'get', '/api/layoffs/rules'],
   ['/api/esi', 'get', '/api/esi/rules'],
   ['/api/gratuity', 'get', '/api/gratuity/valuations'],
   ['/api/eps', 'get', '/api/eps/valuations'],
@@ -226,6 +227,7 @@ const ROUTER_MOUNTS = {
   health: null,
 
   injuryCompensation: '/api/injury-compensation',
+  layoffs: '/api/layoffs',
   integration: '/api/integrations',
   labourWelfareFund: '/api/labour-welfare-fund',
   leaveClosure: '/api/leave-closure',

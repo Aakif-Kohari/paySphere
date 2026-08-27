@@ -206,6 +206,28 @@ const PERMISSIONS = {
   READ_EC_CLAIM: 'READ_EC_CLAIM',
   MANAGE_EC_CLAIM: 'MANAGE_EC_CLAIM',
 
+  // --- Industrial Disputes Act, Chapters VA and VB (#1830) -----------------
+  //
+  // Next to the injury-compensation names because both are liabilities that
+  // arise from an event rather than from a pay period, and split on
+  // *lawfulness* rather than on money — which is unusual here and follows the
+  // chapter.
+  //
+  // Recording a spell of lay-off is register-keeping. Recording where the
+  // Chapter VB permission stands is not: that one field decides whether the
+  // establishment owes half pay for forty-five days or full wages for the whole
+  // period, and the second is several times the first. The threshold sits in
+  // the same bracket, because raising it from one hundred to three hundred
+  // turns an illegal act into a compensable one on paper without anything
+  // changing on the ground.
+  //
+  // Section 25G's selection is there too. A departure from last-in-first-out is
+  // lawful with recorded reasons and unlawful without, so who is proposed is
+  // part of the same question.
+  READ_LAYOFF: 'READ_LAYOFF',
+  MANAGE_LAYOFF_SPELL: 'MANAGE_LAYOFF_SPELL',
+  MANAGE_CHAPTER_VB_ACTION: 'MANAGE_CHAPTER_VB_ACTION',
+
   READ_VENDOR: 'READ_VENDOR',
   // Recording a vendor invoice sets the 194C/194J TDS withheld, and therefore
   // what the company remits on that contractor's behalf. Same class of
@@ -614,6 +636,22 @@ const PERMISSION_DEFINITIONS = [
       'Commit an EPS-95 valuation as at a date, fixing the pension figure each member is quoted',
   },
   {
+    name: PERMISSIONS.READ_LAYOFF,
+    description:
+      'View lay-off spells, the section 25B service behind each, the rolling 45-day ceiling and the Chapter VB position',
+  },
+  {
+    name: PERMISSIONS.MANAGE_LAYOFF_SPELL,
+    description:
+      'Record a spell of lay-off, its section 25B service days and section 25E disentitlements, and the section 25H re-employment register',
+  },
+  {
+    name: PERMISSIONS.MANAGE_CHAPTER_VB_ACTION,
+    description:
+      'Record a Chapter VB act and where its prior permission stands, set the threshold and the ceiling, propose a section 25G selection, and commit the assessment',
+  },
+
+  {
     name: PERMISSIONS.READ_EC_CLAIM,
     description:
       'View workplace injury compensation claims, including the injured employee’s age and the circumstances of the accident',
@@ -969,6 +1007,14 @@ const ROLE_DEFINITIONS = [
       // #1699. Both. Admitting a claim commits the company and depositing one
       // with the Commissioner discharges a statutory liability, which is the
       // same class of authority as APPROVE_PAYROLL.
+      // #1830. All three. Whether a Chapter VB act was lawful decides which of
+      // two liabilities applies, and certifying the establishment against the
+      // answer is the other half of the same check — the owner is the one
+      // account allowed to be both.
+      PERMISSIONS.READ_LAYOFF,
+      PERMISSIONS.MANAGE_LAYOFF_SPELL,
+      PERMISSIONS.MANAGE_CHAPTER_VB_ACTION,
+
       PERMISSIONS.READ_EC_CLAIM,
       PERMISSIONS.MANAGE_EC_CLAIM,
       PERMISSIONS.READ_VENDOR,
@@ -1141,6 +1187,14 @@ const ROLE_DEFINITIONS = [
       // is asked. It does not admit the claim: that commits the company to a
       // payment and starts a section 4A clock, which is the owner's call for
       // the same reason APPROVE_PAYROLL is.
+      // #1830. Read and the spell. Recording a lay-off, the section 25B days
+      // behind it and the section 25H register is HR administration in the
+      // ordinary sense. It does not record where the Chapter VB permission
+      // stands, which decides whether the act was lawful at all, and it does
+      // not move the threshold or propose the section 25G selection.
+      PERMISSIONS.READ_LAYOFF,
+      PERMISSIONS.MANAGE_LAYOFF_SPELL,
+
       PERMISSIONS.READ_EC_CLAIM,
 
       PERMISSIONS.READ_VENDOR,

@@ -96,6 +96,14 @@ const settlementRoutes = require('./routes/settlement.routes');
 // wearing three quarters of the same name.
 const injuryCompensationRoutes = require('./routes/injuryCompensation.routes');
 
+// Industrial Disputes Act, Chapters VA and VB (#1830). Next to the
+// injury-compensation router because both hold liabilities that arise from an
+// event rather than from a pay period, and apart from the settlement router
+// because a lay-off is not a separation: the employment subsists, and the
+// largest thing this router answers is whether the employer's act was lawful
+// rather than what it costs.
+const layoffRoutes = require('./routes/layoffs.routes');
+
 // Employees' State Insurance Act, 1948 (#1768). Next to the injury
 // compensation router because section 53 decides between them: a claim under
 // the Employees' Compensation Act is barred where ESI covers the same injury,
@@ -477,6 +485,11 @@ app.use('/api/settlements', settlementRoutes);
 // temporary disablement is paid to somebody who is still on the rolls and
 // coming back. The router owns `/schedules`, `/preview` and `/claims`.
 app.use('/api/injury-compensation', injuryCompensationRoutes);
+
+// #1830. The router owns `/rules`, `/spells`, `/actions`, `/reemployment` and
+// `/assessments`. It does not reimplement #1597's section 25F calculation —
+// where both apply, this one says whether that figure is the right one at all.
+app.use('/api/layoffs', layoffRoutes);
 
 // #1768. Its own prefix rather than a sub-path of `/api/compliance`: the
 // compliance router files what the tax authorities want, and this is a
