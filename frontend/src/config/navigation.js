@@ -390,6 +390,19 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
   {
+    // In Compliance rather than Finance, even though the numbers are project
+    // costs and contractor bills. Everything on the page is answerable to a
+    // welfare board rather than to a counterparty — the one per cent deducted
+    // at source was never the company's money — and the beneficiary register
+    // is a statutory roll rather than a ledger (#1827).
+    path: '/construction-cess',
+    component: lazy(() => import('../pages/ConstructionCessRegister')),
+    appShell: true,
+    label: 'Construction cess',
+    group: 'compliance',
+    icon: 'shield',
+  },
+  {
     // In Compliance rather than Finance, even though a contractor is a vendor.
     // The vendor ledger's question is "what do we owe this counterparty"; this
     // one's is "what are we liable for on account of people we do not employ",

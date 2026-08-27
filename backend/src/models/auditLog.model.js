@@ -38,6 +38,24 @@ const AUDIT_ACTIONS = [
   'MINIMUM_WAGE_NOTIFICATION_ADDED',
   'MINIMUM_WAGE_ASSESSMENT_COMMITTED',
   'MINIMUM_WAGE_REGISTER_EXPORTED',
+  // BOCW Welfare Cess Act, 1996 (#1827). Next to the minimum wage actions
+  // because both are levers on a base an assessment is measured against, and
+  // unlike those the base here is not a wage — it is the cost of construction,
+  // so there is no payroll figure anywhere to check a revision against.
+  //
+  // The cost revision is audited for that reason: moving the section 3 land
+  // exclusion by a crore moves the cess by a lakh and nothing else in the
+  // product would object. The assessment order is audited because recording it
+  // starts the rule 5 payment window and therefore the section 8 interest
+  // clock, so a back-dated order makes accrued interest disappear. And the
+  // beneficiary registration is audited because it is the worker's entitlement
+  // to the Board's benefits, which outlives their employment here.
+  'CESS_RULES_UPDATED',
+  'CESS_PROJECT_REGISTERED',
+  'CESS_PROJECT_COST_REVISED',
+  'CESS_ASSESSMENT_ORDER_RECORDED',
+  'CESS_BENEFICIARY_REGISTERED',
+  'CESS_ASSESSMENT_COMMITTED',
   // Payment of Wages Act, 1936 (#1767). Next to the minimum wage actions
   // because the rules move findings the same way a notification does: raising
   // the section 1(6) applicability ceiling takes employees out of the Act and

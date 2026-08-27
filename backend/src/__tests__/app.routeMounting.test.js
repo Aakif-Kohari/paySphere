@@ -119,6 +119,7 @@ const MOUNTED_ROUTES = [
   // most cases a frontend page, and no entry in the route table.
   ['/api/assets', 'get', '/api/assets'],
   ['/api/vendors', 'get', '/api/vendors/000000000000000000000000/ledger'],
+  ['/api/construction-cess', 'get', '/api/construction-cess/rules'],
   ['/api/grievances', 'get', '/api/grievances/cases'],
   ['/api/tax-proofs', 'get', '/api/tax-proofs/my-proofs'],
   ['/api/perquisites', 'get', '/api/perquisites/rules'],
@@ -256,6 +257,7 @@ const ROUTER_MOUNTS = {
   varianceReport: '/api/reports',
   esi: '/api/esi',
   vendor: '/api/vendors',
+  constructionCess: '/api/construction-cess',
   wageDeduction: '/api/wage-deductions',
   webhook: '/api/webhooks',
   workingHours: '/api/working-hours',
