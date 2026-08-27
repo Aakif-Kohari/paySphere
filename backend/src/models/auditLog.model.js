@@ -29,6 +29,24 @@ const AUDIT_ACTIONS = [
   'STATUTORY_BONUS_COMMITTED',
   'STATUTORY_BONUS_FORM_C_EXPORTED',
   'STATUTORY_BONUS_PAID',
+  // Minimum Wages Act, 1948 (#1698). A notification is the rate every
+  // assessment in that state is measured against, so adding one silently
+  // changes findings that have already been made; a committed assessment is
+  // the establishment's own statement of what it owes; and the register is
+  // every employee's wage against the notified rate in one file. All three are
+  // questions an inspection asks by name.
+  'MINIMUM_WAGE_NOTIFICATION_ADDED',
+  'MINIMUM_WAGE_ASSESSMENT_COMMITTED',
+  'MINIMUM_WAGE_REGISTER_EXPORTED',
+  // Payment of Wages Act, 1936 (#1767). Next to the minimum wage actions
+  // because the rules move findings the same way a notification does: raising
+  // the section 1(6) applicability ceiling takes employees out of the Act and
+  // every finding against them disappears. A committed register is the
+  // establishment's own statement of what it deducted, and writing off a
+  // deferred balance is the employer forgiving a debt it created by deferring.
+  'WAGE_DEDUCTION_RULES_UPDATED',
+  'WAGE_DEDUCTION_REGISTER_COMMITTED',
+  'WAGE_DEDUCTION_DEFERRAL_WRITTEN_OFF',
   'EMPLOYEE_CREATE',
   'EMPLOYEE_UPDATE',
   'EMPLOYEE_DELETE',
@@ -43,11 +61,37 @@ const AUDIT_ACTIONS = [
   // like one (#459).
   'ATTENDANCE_UPDATE',
   'ATTENDANCE_BULK_UPDATE',
+  // Working hours compliance (#1702). Next to the attendance actions because it
+  // is that ledger these are computed from. Raising a limit makes existing
+  // findings disappear without anything else recording that it happened, and a
+  // committed assessment is the establishment's own statement of what its shift
+  // patterns were doing.
+  'WORKING_HOURS_LIMITS_UPDATED',
+  'WORKING_HOURS_ASSESSMENT_COMMITTED',
   // Offboarding is a financial event: it produces a final payout and
   // removes someone from the headcount (#462).
   'EMPLOYEE_EXIT_INITIATED',
   'SETTLEMENT_CREATE',
   'SETTLEMENT_STATUS_CHANGE',
+  // Employees' Compensation Act, 1923 (#1699). Next to the settlement actions
+  // because both record what is owed when an employment event happens.
+  // Computing a claim fixes the figure a dependant is offered; depositing it
+  // with the Commissioner is the section 8 discharge, without which a death
+  // claim is not settled however much was paid; and every other transition
+  // decides whether interest is still running.
+  'INJURY_CLAIM_COMPUTED',
+  'INJURY_CLAIM_DEPOSITED',
+  'INJURY_CLAIM_STATUS_CHANGED',
+  // Employees' State Insurance Act, 1948 (#1768). Placed next to the injury
+  // claim actions because section 53 bars a claim under the Employees'
+  // Compensation Act where ESI covers the same injury — so which of these two
+  // sets applies to an employee is decided by the coverage the first of these
+  // actions moves. Lowering the wage ceiling removes people from the scheme
+  // while they are still drawing benefit three months later, and filing the
+  // return is both a remittance and the thing that fixes each employee's
+  // coverage for the following month.
+  'ESI_RULES_UPDATED',
+  'ESI_RETURN_FILED',
   // Gratuity actuarial valuation (#1344). The assumptions decide the reported
   // provision — moving the discount rate 50 basis points moves the balance
   // sheet — and committing a valuation produces the figure carried in the
@@ -55,12 +99,32 @@ const AUDIT_ACTIONS = [
   // auditor asks "who changed this, and when" about.
   'GRATUITY_ASSUMPTIONS_UPDATED',
   'GRATUITY_VALUATION_COMMITTED',
+  // Employees' Pension Scheme, 1995 (#1769). Directly under the gratuity
+  // actions because the two are the same kind of obligation valued the same
+  // way. The assumptions decide the answer — moving the wage ceiling changes
+  // the pensionable salary of every member above the old one, for life, since a
+  // pension once fixed is not revisited. The backfill is audited although it
+  // produces no valuation: it writes the wage history every future valuation
+  // rests on, and how it resolved a month with no payroll row is the fact
+  // somebody will need years later.
+  'EPS_ASSUMPTIONS_UPDATED',
+  'EPS_WAGE_HISTORY_BACKFILLED',
+  'EPS_VALUATION_COMMITTED',
   // A salary advance commits future deductions from someone's pay, so
   // issuing, pausing and collecting against one are all financial events
   // and are audited as such (#460).
   'LOAN_ISSUE',
   'LOAN_STATUS_CHANGE',
   'LOAN_REPAYMENT',
+  // Labour Welfare Fund (#1701). A state rule decides what every employee in
+  // that state owes for years, so adding one changes contributions not yet
+  // made; a committed contribution is a liability to a welfare board; the
+  // challan is its discharge; and the register is every employee's wages and
+  // amount in one file.
+  'LWF_RULE_ADDED',
+  'LWF_CONTRIBUTION_COMMITTED',
+  'LWF_REMITTANCE_RECORDED',
+  'LWF_REGISTER_EXPORTED',
   // EMPLOYEE_UPDATE records only the *names* of the fields that changed,
   // so a salary change left no trace of what it changed from. This one
   // carries the before/after (#461).
@@ -76,6 +140,17 @@ const AUDIT_ACTIONS = [
   'LTA_CLAIM_SUBMITTED',
   'LTA_CLAIM_APPROVED',
   'LTA_CLAIM_REJECTED',
+  // Perquisite valuation under Rule 3 (#1770). Next to the LTA actions because
+  // both decide how much of a package is taxable. The State Bank of India rate
+  // is the one worth auditing hardest: it is frozen for the year and applied to
+  // every concessional loan in the establishment, so a figure recorded a point
+  // low understates the perquisite for every borrower and nothing in a payslip
+  // would show it. Recording a grant is audited because it is a benefit given
+  // to a named person, and committing the statement fixes what reaches Form 16.
+  'PERQUISITE_RULES_UPDATED',
+  'PERQUISITE_GRANT_RECORDED',
+  'PERQUISITE_GRANT_REMOVED',
+  'PERQUISITE_STATEMENT_COMMITTED',
   // The approval workflow engine (#590, mounted in #614) emits three (#664).
   // A change to the graph that decides who may approve a payroll run is
   // exactly the kind of thing an auditor asks about.
@@ -97,6 +172,27 @@ const AUDIT_ACTIONS = [
   'WEBHOOK_UPDATE',
   'WEBHOOK_DELETE',
   'WEBHOOK_SECRET_REGENERATED',
+  // Contract Labour (Regulation and Abolition) Act, 1970 (#1700). A licence
+  // decides whether a deployment is lawful, so editing one changes findings
+  // already made; the Form XXV return is a statement to the labour department;
+  // and Forms XII, XIII and XVII are every contract workman's designation and
+  // wage in one file. All four are inspection questions.
+  'CONTRACT_LABOUR_CONTRACTOR_REGISTERED',
+  'CONTRACT_LABOUR_LICENCE_UPDATED',
+  'CONTRACT_LABOUR_RETURN_FILED',
+  'CONTRACT_LABOUR_REGISTER_EXPORTED',
+  // Apprentices Act, 1961 (#1771). Next to the contract labour actions because
+  // both concern people on the site who are not on the payroll. The recorded
+  // strength is audited because it is the denominator of the whole obligation:
+  // reducing it by ten lowers the floor and can make a shortfall disappear
+  // without a single apprentice being engaged. And the registration is audited
+  // because that one date decides whether the establishment owes provident
+  // fund, ESI, bonus and gratuity for the period.
+  'APPRENTICESHIP_RULES_UPDATED',
+  'APPRENTICESHIP_STRENGTH_RECORDED',
+  'APPRENTICE_ENGAGED',
+  'APPRENTICE_CONTRACT_REGISTERED',
+  'APPRENTICESHIP_ASSESSMENT_COMMITTED',
   // International assignments (#1348). Opening one commits the employer to
   // bearing somebody's foreign tax bill for years; a settlement moves money
   // between the employee and the company; and the two threshold events record
@@ -141,15 +237,22 @@ const AUDIT_RESOURCE_TYPES = [
   'User',
   'Report',
   'Attendance',
+  'WorkingHoursLimits',
+  'WorkingHoursAssessment',
   'Settlement',
+  'InjuryCompensationClaim',
   'GratuityAssumption',
   'GratuityValuation',
   'Loan',
+  'LabourWelfareFundRule',
+  'LabourWelfareFundContribution',
   'SalaryHistory',
   'LtaClaim',
   'Workflow',
   'WorkflowInstance',
   'Webhook',
+  'ContractLabourContractor',
+  'ContractLabourReturn',
   // An HRMS connection (#954) can read and write the employee directory under
   // credentials an admin installs, so configuring, syncing and removing one are
   // audited like the webhook mutations it sits next to.
@@ -161,6 +264,8 @@ const AUDIT_RESOURCE_TYPES = [
   // Editing a fence changes whose attendance is recorded as field duty, so it
   // is audited like the settings change it is.
   'OfficeLocation',
+  'MinimumWageNotification',
+  'MinimumWageAssessment',
   'PayEquityReport',
   'PayBand',
   'TeamInvite',
