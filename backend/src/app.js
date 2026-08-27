@@ -193,6 +193,7 @@ const contractRoutes = require('./routes/contract.routes');
 const forecastRoutes = require('./routes/forecast.routes');
 const accountingRoutes = require('./routes/accounting.routes');
 const clientInvoiceRoutes = require('./routes/clientInvoice.routes');
+const intercompanyBillingRoutes = require('./routes/intercompanyBilling.routes');
 const shiftRosterRoutes = require('./routes/shiftRoster.routes');
 const shiftPreferenceRoutes = require('./routes/shiftPreference.routes');
 const successionRoutes = require('./routes/succession.routes');
