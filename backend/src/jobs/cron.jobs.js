@@ -469,6 +469,17 @@ const startCronJobs = () => {
   logger.info(
     'Payroll approval escalation cron job registered (every 15 min).',
   );
+
+  // 01:30 daily — Detect Milestones (Work Anniversaries) with 7-day lead time.
+  scheduledTasks.push(
+    cron.schedule('30 1 * * *', () => {
+      const { runDetectMilestonesJob } = require('./detectMilestones.job');
+      runDetectMilestonesJob().catch((error) =>
+        logger.error('Detect milestones job threw', { error: error.message }),
+      );
+    }),
+  );
+  logger.info('Daily detect milestones cron job registered.');
 };
 
 function stopCronJobs() {
@@ -597,7 +608,8 @@ module.exports = {
   runDatabaseBackupJob,
   runDatabaseArchivalJob,
   runRetentionLifecycleJob,
-  runForexSyncJob,  runToilExpirationJob,
+  runForexSyncJob,
+  runToilExpirationJob,
   runTreasuryRebalancingJob: runTreasuryRebalancingCron,
   runTaxSyncJob: runTaxSyncCron,
   previousPeriod,

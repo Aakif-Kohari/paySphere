@@ -5,6 +5,7 @@ const User = require('../models/user.model');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const cacheService = require('../services/cache.service');
+const lifecycleEventService = require('../services/lifecycleEvent.service');
 const { sanitizeText } = require('../utils/validators');
 
 /**
@@ -253,6 +254,21 @@ exports.createSalaryHistoryManual = async (req, res, next) => {
         reason: history.reason,
       },
       req,
+    });
+
+    await lifecycleEventService.recordEvent({
+      employeeId: employee._id,
+      tenantId: req.tenantId,
+      eventType: 'SALARY_CHANGED',
+      category: 'Compensation',
+      recordedBy: req.userId,
+      previousValues: {
+        salary: prevSalaryNum,
+        currency: employee.currency || 'INR',
+      },
+      newValues: { salary: newSalaryNum, currency: employee.currency || 'INR' },
+      sourceId: history._id,
+      note: history.reason || 'Salary updated',
     });
 
     logger.info('Salary history created manually', {
