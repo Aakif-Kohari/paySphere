@@ -453,6 +453,19 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
   {
+    // Directly under Contract labour, which is its nearest neighbour: both are
+    // about people the establishment does not employ. They part company on
+    // what is owed — there, a contingent liability for a contractor's workmen;
+    // here, a share of the platform's own turnover, on account of workers
+    // section 2(35) puts outside the employment relationship entirely (#1829).
+    path: '/aggregator-contribution',
+    component: lazy(() => import('../pages/AggregatorContribution')),
+    appShell: true,
+    label: 'Aggregator contribution',
+    group: 'compliance',
+    icon: 'shield',
+  },
+  {
     // Next to the tax-proof portal: both decide what a Form 16 says — that one
     // by what the employee declares, this one by what the employer provided
     // (#1770).

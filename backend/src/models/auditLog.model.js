@@ -45,6 +45,22 @@ const AUDIT_ACTIONS = [
   'STATUTORY_BONUS_COMMITTED',
   'STATUTORY_BONUS_FORM_C_EXPORTED',
   'STATUTORY_BONUS_PAID',
+  // Code on Social Security, 2020, section 114 (#1829). Next to the bonus
+  // actions because both start from a figure the payroll cannot produce — an
+  // allocable surplus there, an aggregator's turnover here — with the
+  // difference that a turnover figure has no cross-check anywhere in this
+  // product at all.
+  //
+  // Finalising is audited separately from recording, because everything
+  // computed before it is provisional and everything after it is the assessed
+  // contribution. And the worker registration is audited because it is the
+  // worker's own entitlement, assembled from engagements across platforms this
+  // tenant does not operate and does not otherwise see.
+  'AGGREGATOR_RULES_UPDATED',
+  'AGGREGATOR_TURNOVER_RECORDED',
+  'AGGREGATOR_TURNOVER_FINALISED',
+  'GIG_WORKER_REGISTERED',
+  'AGGREGATOR_ASSESSMENT_COMMITTED',
   // Minimum Wages Act, 1948 (#1698). A notification is the rate every
   // assessment in that state is measured against, so adding one silently
   // changes findings that have already been made; a committed assessment is
