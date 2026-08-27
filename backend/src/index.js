@@ -26,7 +26,7 @@ const {
 const { initializeWebhookService } = require('./services/webhook.service');
 const { startWebhookWorker } = require('./workers/webhook.worker');
 const { startEmailWorker } = require('./workers/email.worker');
-const { isRedisAvailable } = require('./config/redis');
+const { startOutboxWorker } = require('./workers/outbox.worker');const { isRedisAvailable } = require('./config/redis');
 const { attachGraphQL } = require('./graphql');
 const logger = require('./utils/logger');
 const TelemetryService = require('./config/telemetry');
@@ -133,6 +133,7 @@ const startServer = async () => {
   if (process.env.REDIS_URL) {
     startWebhookWorker();
     startEmailWorker();
+    startOutboxWorker();
   } else if (!isRedisAvailable()) {
     logger.warn(
       'Webhook worker not started: REDIS_URL is not set. Webhook deliveries require Redis.',
@@ -140,8 +141,10 @@ const startServer = async () => {
     logger.warn(
       'Email worker not started: REDIS_URL is not set. Emails will not be sent until Redis is available.',
     );
-  } // Mount /graphql, if the packages for it are installed.
-  //
+    logger.warn(
+      'Outbox worker not started: REDIS_URL is not set. Payroll events will queue in MongoDB until Redis is available.',
+    );
+  } // Mount /graphql, if the packages for it are installed.  //
   // This used to live in app.js as a top-level `await`, which is a syntax error
   // in CommonJS and left the whole file unparseable (#792). `ApolloServer.start()`
   // really is asynchronous, so it belongs here in the startup sequence rather
