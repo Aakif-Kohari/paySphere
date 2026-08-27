@@ -317,6 +317,11 @@ const employeeSchema = new mongoose.Schema(
         maxlength: [20, 'Routing/IFSC code cannot exceed 20 characters'],
       },
     },
+    customData: {
+      type: Map,
+      of: mongoose.Schema.Types.Mixed,
+      default: () => new Map(),
+    },
   },
   { timestamps: true },
 );
