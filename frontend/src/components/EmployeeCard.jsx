@@ -37,17 +37,21 @@ const AVATAR_COLORS = [
   '#14B8A6',
 ];
 
+const safeName = (name) => (typeof name === 'string' && name.trim() ? name.trim() : 'Employee');
+
 const getAvatarColor = (name) => {
-  const idx = name
+  const str = safeName(name);
+  const idx = str
     .split('')
     .reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % AVATAR_COLORS.length;
   return AVATAR_COLORS[idx];
 };
 
 const getInitials = (name) =>
-  name
+  safeName(name)
     .split(' ')
     .map((w) => w[0])
+    .filter(Boolean)
     .join('')
     .slice(0, 2)
     .toUpperCase();
@@ -71,21 +75,23 @@ const StatusBadge = ({ finalized }) => {
 
 const CardHeader = ({ emp, finalized, onEdit }) => {
   const { t } = useTranslation();
+  const name = emp?.fullName || (emp?.firstName ? `${emp.firstName} ${emp.lastName || ''}`.trim() : '') || emp?.name || emp?.employeeName || 'Employee';
+
   return (
     <div className="flex justify-between items-center w-full">
       <div className="flex items-center gap-3">
         <div
           className="w-11 h-11 rounded-full text-white flex items-center justify-center font-bold"
-          style={{ backgroundColor: getAvatarColor(emp.fullName) }}
+          style={{ backgroundColor: getAvatarColor(name) }}
         >
-          {getInitials(emp.fullName)}
+          {getInitials(name)}
         </div>
         <div>
           <p className="font-bold text-sm text-slate-900 dark:text-white">
-            {emp.fullName}
+            {name}
           </p>
           <p className="text-xs text-gray-500 dark:text-slate-500">
-            {emp.role || t('dashboard.table.employee', 'Employee')}
+            {emp?.role || t('dashboard.table.employee', 'Employee')}
           </p>
         </div>
       </div>
@@ -96,7 +102,7 @@ const CardHeader = ({ emp, finalized, onEdit }) => {
             onClick={onEdit}
             className="pt-2 px-2 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 bg-gray-50 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             title={t('common.edit', 'Edit Employee')}
-            aria-label={`Edit ${emp.fullName}`}
+            aria-label={`Edit ${name}`}
           >
             <EditOutlinedIcon fontSize="small" className='mb-2'/>
           </button>
@@ -121,7 +127,18 @@ export default function EmployeeCard({
   // mounted lazily, so a grid of employee cards does not fire a request per
   // card on load.
   const [showSalaryHistory, setShowSalaryHistory] = useState(false);
+  const [copyStatus, setCopyStatus] = useState('');
 
+  const handleCopyEmployeeId = async () => {
+    try {
+      await navigator.clipboard.writeText(emp._id);
+      setCopyStatus('success');
+    } catch {
+      setCopyStatus('error');
+    }
+
+    setTimeout(() => setCopyStatus(''), 2000);
+  };
   if (variant === 'breakdown') {
     return (
       <div className="bg-white dark:bg-slate-900 rounded-xl p-6 border border-gray-200 dark:border-slate-800 shadow-sm hover:shadow-md transition duration-200">
@@ -250,7 +267,32 @@ export default function EmployeeCard({
   return (
     <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm hover:shadow-md transition flex flex-col gap-4 duration-200">
       <CardHeader emp={emp} finalized={!!p} onEdit={onEdit} />
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-gray-500 dark:text-slate-500">
+          Employee ID: {emp._id}
+        </span>
 
+        <button
+          type="button"
+          onClick={handleCopyEmployeeId}
+          className="px-2.5 py-1.5 text-xs font-semibold border border-gray-200 dark:border-slate-700 rounded-md text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors"
+          aria-label={`Copy employee ID for ${emp.fullName}`}
+        >
+          Copy
+        </button>
+      </div>
+
+      {copyStatus === 'success' && (
+        <p className="text-xs text-green-600 dark:text-green-400">
+          ✓ Employee ID copied!
+        </p>
+      )}
+
+      {copyStatus === 'error' && (
+        <p className="text-xs text-red-600 dark:text-red-400">
+          Unable to copy employee ID.
+        </p>
+      )}
       {/* Salary */}
       <div className="bg-gray-50 dark:bg-slate-950 p-3 rounded-lg transition-colors">
         <div className="flex justify-between items-baseline">
