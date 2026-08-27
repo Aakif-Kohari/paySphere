@@ -13,6 +13,26 @@ const PERMISSIONS = {
   READ_EMPLOYEE: 'READ_EMPLOYEE',
   WRITE_EMPLOYEE: 'WRITE_EMPLOYEE',
   DELETE_EMPLOYEE: 'DELETE_EMPLOYEE',
+  // --- Section 10A, Standing Orders Act, 1946 (#1828) ----------------------
+  //
+  // Above the payroll names because a suspended workman is neither on payroll
+  // nor off it: the employment subsists, no work is done, and the employer owes
+  // a rising statutory scale.
+  //
+  // The middle name is the module's whole subject. The attributability finding
+  // — whose conduct delayed the enquiry — decides fifty per cent against
+  // seventy-five from day ninety-one, so it sits behind its own permission
+  // rather than travelling with the suspension record. Whoever orders a
+  // suspension should not also decide that the delay in enquiring into it was
+  // nobody's fault.
+  //
+  // There is deliberately no permission for setting the *rate*. The rate is a
+  // consequence of the finding, and an overridable rate would let the stored
+  // number stop saying whether a finding was made.
+  READ_SUSPENSION: 'READ_SUSPENSION',
+  MANAGE_SUSPENSION: 'MANAGE_SUSPENSION',
+  DETERMINE_SUSPENSION_DELAY: 'DETERMINE_SUSPENSION_DELAY',
+
   READ_PAYROLL: 'READ_PAYROLL',
   WRITE_PAYROLL: 'WRITE_PAYROLL',
   // Maker–checker: the account that submits a payroll run should not be the
@@ -481,6 +501,22 @@ const PERMISSION_DEFINITIONS = [
     name: PERMISSIONS.DELETE_EMPLOYEE,
     description: 'Permanently delete an employee and their payroll history',
   },
+  {
+    name: PERMISSIONS.READ_SUSPENSION,
+    description:
+      'View suspensions pending enquiry, the section 10A tier each is in and what has been paid against what was due',
+  },
+  {
+    name: PERMISSIONS.MANAGE_SUSPENSION,
+    description:
+      'Order a suspension, record the monthly subsistence allowance paid, and record the enquiry’s outcome',
+  },
+  {
+    name: PERMISSIONS.DETERMINE_SUSPENSION_DELAY,
+    description:
+      'Record whether the delay in completing an enquiry is attributable to the workman, which decides the 50/75/100 tier, and set the scale',
+  },
+
   {
     name: PERMISSIONS.READ_PAYROLL,
     description: 'View payroll summaries and export payroll data',
@@ -969,6 +1005,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_EMPLOYEE,
       PERMISSIONS.WRITE_EMPLOYEE,
       PERMISSIONS.DELETE_EMPLOYEE,
+      // #1828. All three. Deciding whose conduct delayed an enquiry and
+      // certifying the establishment against the result are the two halves of
+      // one check, and the owner is the one account allowed to be both.
+      PERMISSIONS.READ_SUSPENSION,
+      PERMISSIONS.MANAGE_SUSPENSION,
+      PERMISSIONS.DETERMINE_SUSPENSION_DELAY,
+
       PERMISSIONS.READ_PAYROLL,
       PERMISSIONS.WRITE_PAYROLL,
       PERMISSIONS.APPROVE_PAYROLL,
@@ -1153,6 +1196,17 @@ const ROLE_DEFINITIONS = [
     permissions: [
       PERMISSIONS.READ_EMPLOYEE,
       PERMISSIONS.WRITE_EMPLOYEE,
+
+      // #1828. Read and manage. Ordering a suspension, paying the monthly
+      // allowance and recording the enquiry's result is HR administration in
+      // the ordinary sense. It does not make the attributability finding, which
+      // is a judgement about whose conduct delayed the enquiry and is worth the
+      // difference between fifty per cent and seventy-five — HR is frequently
+      // the party whose delay is in question, which is exactly why the finding
+      // sits with the owner.
+      PERMISSIONS.READ_SUSPENSION,
+      PERMISSIONS.MANAGE_SUSPENSION,
+
       PERMISSIONS.READ_PAYROLL,
       PERMISSIONS.WRITE_PAYROLL,
       PERMISSIONS.READ_REPORT,

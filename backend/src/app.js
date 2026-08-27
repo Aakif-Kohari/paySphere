@@ -85,6 +85,13 @@ const attendanceRoutes = require('./routes/attendance.routes');
 const workingHoursRoutes = require('./routes/workingHours.routes');
 const settlementRoutes = require('./routes/settlement.routes');
 
+// Section 10A of the Standing Orders Act, 1946 (#1828). Next to the settlement
+// router because both are about an employment that has stopped producing work,
+// and apart from it because this one has not ended: the workman may be
+// reinstated, and running a suspension through the full-and-final machinery
+// would close the record and make reinstatement a re-hire.
+const suspensionRoutes = require('./routes/suspensions.routes');
+
 // Employees' Compensation Act, 1923 (#1699). Next to settlements because both
 // answer "what is owed to this person now that something has happened to the
 // employment", and apart from them because a settlement is what the company
@@ -491,6 +498,11 @@ app.use('/api/attendance', attendanceRoutes);
 // `/assessments`.
 app.use('/api/working-hours', workingHoursRoutes);
 app.use('/api/settlements', settlementRoutes);
+
+// #1828. The router owns `/rules`, `/assessments` and the suspensions
+// themselves. `/assessment` is declared above `/:id` inside it, so a
+// suspension can never be addressed as one.
+app.use('/api/suspensions', suspensionRoutes);
 
 // #1699. Its own prefix rather than a sub-path of `/api/settlements`: a
 // settlement is paid to somebody who is leaving, and a compensation claim for
