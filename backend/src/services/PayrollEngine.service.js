@@ -8,8 +8,8 @@ const { calculateNetSalary } = require('../utils/salaryCalculator');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const cacheService = require('../services/cache.service');
-const { PAYROLL_STATUS, normalizeStatus } = require('../config/payrollStatus');
-const Attendance = require('../models/attendance.model');
+const outboxService = require('./outbox.service');
+const { PAYROLL_STATUS, normalizeStatus } = require('../config/payrollStatus');const Attendance = require('../models/attendance.model');
 const { derivePayrollInputs } = require('../utils/attendanceGrid');
 const Loan = require('../models/loan.model');
 const {
@@ -116,14 +116,18 @@ class PayrollEngine {
     const bonusWithTaxableExpenses =
       Math.round((bonus + empExpenses.taxable) * 100) / 100;
 
-    const { baseSalary, leaveDeduction, overtimePay, netSalary } =
-      calculateNetSalary(employee, user, {
-        leaveDays,
-        overtimeHours,
-        bonus: bonusWithTaxableExpenses,
-        deductions,
-      });
-
+    const {
+      baseSalary,
+      leaveDeduction,
+      overtimeRate,
+      overtimePay,
+      netSalary,
+    } = calculateNetSalary(employee, user, {
+      leaveDays,
+      overtimeHours,
+      bonus: bonusWithTaxableExpenses,
+      deductions,
+    });
     if (isNaN(netSalary) || !Number.isFinite(netSalary)) {
       throw new Error(
         `Invalid net salary calculation for employee "${employee.fullName}"`,
@@ -198,12 +202,12 @@ class PayrollEngine {
       reimbursedExpenseIds: empExpenses.ids,
       netSalary: finalNetSalary,
       grossNetBeforeRecovery: netSalary,
+      overtimeRate,
       loanRecoveries: recovery.recoveries,
       loanRecoveryTotal: recovery.totalRecovered,
       attendanceSource,
       salarySnapshot,
-      arrearsPayout: totalArrears,
-      arrearsBreakdown: arrearsBreakdown,
+      arrearsPayout: totalArrears,      arrearsBreakdown: arrearsBreakdown,
       arrearsLedgerIds: ledgerIds,
       shortfall: recovery.shortfall,
     };
@@ -510,9 +514,48 @@ class PayrollEngine {
           arrearsLedgerIds: item.arrearsLedgerIds,
           attendanceSource: item.attendanceSource,
           salarySnapshot: item.salarySnapshot,
+
+          calculationSnapshot: {
+            version: PAYROLL_CALCULATION_VERSION,
+            employee: {
+              fullName: item.employee.fullName,
+              email: item.employee.email,
+              role: item.employee.role,
+              companyName: item.employee.companyName,
+              language: item.employee.language,
+              version: item.employee.__v,
+            },            inputs: {
+              baseSalary: item.baseSalary,
+              overtimeRate: item.overtimeRate,
+              leaveDays: item.leaveDays,
+              overtimeHours: item.overtimeHours,
+              bonus: item.bonus,
+              deductions: item.deductions,
+              leaveDeduction: item.leaveDeduction,
+              overtimePay: item.overtimePay,
+              reimbursements: item.reimbursements,
+              loanRecoveryTotal: item.loanRecoveryTotal,
+              arrearsPayout: item.arrearsPayout,
+              exchangeRate: getRateVal(targetCurrency),
+              currency: targetCurrency,
+              targetCurrency,
+              baseCurrency: item.employee.baseCurrency || 'USD',
+              attendanceSource: item.attendanceSource,
+              defaultDailyRate: user?.defaultDailyRate || 0,
+              defaultOvertimeRate: user?.defaultOvertimeRate || 0,
+            },
+            salarySnapshot: item.salarySnapshot,
+            loanRecoveries: item.loanRecoveries,
+            arrearsBreakdown: item.arrearsBreakdown,
+            reimbursedExpenseIds: item.reimbursedExpenseIds,
+            finalAmounts: {
+              grossNetBeforeRecovery: item.grossNetBeforeRecovery,
+              netSalary: item.netSalary,
+            },
+          },
+
           tenantId,
-          status: PAYROLL_STATUS.PENDING_APPROVAL,
-          submittedBy: userId,
+          status: PAYROLL_STATUS.PENDING_APPROVAL,          submittedBy: userId,
           submittedAt: new Date(),
           approvedBy: null,
           approvedAt: null,
@@ -606,8 +649,38 @@ class PayrollEngine {
         });
       }
 
-      const results = preparedItems.map((item) => ({
-        employeeName: item.employee.fullName,
+      // Recorded inside the same transaction as the payroll writes above
+      // (#1801): a crash right after this commits still leaves the event as
+      // `pending` for workers/outbox.worker.js to pick up and publish, so
+      // payslip generation/emailing can never be silently skipped for a run
+      // that did save.
+      const finalizedPayrollIds = preparedItems
+        .map((item) => payrollMap[item.employee._id.toString()])
+        .filter(Boolean);
+      const outboxPayload = {
+        tenantId,
+        userId,
+        month: currentMonth,
+        year: currentYear,
+        payrollIds: finalizedPayrollIds,
+      };
+      await outboxService.recordEvent(
+        outboxService.OUTBOX_EVENT_TYPES.PAYROLL_FINALIZED,
+        outboxPayload,
+        { tenantId, session },
+      );
+      await outboxService.recordEvent(
+        outboxService.OUTBOX_EVENT_TYPES.PAYSLIP_GENERATION_REQUESTED,
+        outboxPayload,
+        { tenantId, session },
+      );
+      await outboxService.recordEvent(
+        outboxService.OUTBOX_EVENT_TYPES.PAYSLIP_EMAIL_REQUESTED,
+        outboxPayload,
+        { tenantId, session },
+      );
+
+      const results = preparedItems.map((item) => ({        employeeName: item.employee.fullName,
         currency: item.employee.currency || 'INR',
         baseSalary: item.baseSalary,
         leaveDays: item.leaveDays,

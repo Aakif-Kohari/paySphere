@@ -317,10 +317,17 @@ const employeeSchema = new mongoose.Schema(
         maxlength: [20, 'Routing/IFSC code cannot exceed 20 characters'],
       },
     },
+    customData: {
+      type: Map,
+      of: mongoose.Schema.Types.Mixed,
+      default: () => new Map(),
+    },
   },
-  { timestamps: true },
+  {
+    timestamps: true,
+    optimisticConcurrency: true,
+  },
 );
-
 employeeSchema.index({ tenantId: 1, fullName: 1, role: 1 }, { unique: true });
 // Note: the index above is a prefix of this one and is also unique, so it is
 // the one that decides. Adding `department` here cannot loosen a constraint the

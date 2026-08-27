@@ -251,6 +251,22 @@ export default function EmployeeCard({
           )}
         </div>
 
+        {emp.customData && Object.keys(emp.customData).length > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-800 mb-4">
+            <p className="text-xs uppercase text-gray-500 font-bold mb-2">
+              {t('common.additionalInfo', 'Additional Info')}
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-sm text-slate-700 dark:text-slate-300">
+              {Object.entries(emp.customData).map(([key, value]) => (
+                <div key={key}>
+                  <span className="text-gray-500 block text-xs">{key}</span>
+                  <span className="font-semibold">{String(value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="h-px bg-gray-200 dark:bg-slate-800 mb-4" />
 
         {/* Net */}
