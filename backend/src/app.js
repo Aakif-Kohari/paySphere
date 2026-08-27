@@ -163,6 +163,14 @@ const companyEventRoutes = require('./routes/companyEvent.routes');
 const assetRoutes = require('./routes/asset.routes');
 const vendorRoutes = require('./routes/vendor.routes');
 
+// BOCW Welfare Cess Act, 1996 (#1827). Next to the vendor router because every
+// bill the cess is deducted from is a vendor bill, and apart from it because
+// the deduction is not the company's money to withhold or release: rule 4 takes
+// one per cent at source and it belongs to a welfare board. The base is a
+// project cost rather than a wage, which is why it is not in the payroll tree
+// at all.
+const constructionCessRoutes = require('./routes/constructionCess.routes');
+
 // Contract Labour (Regulation and Abolition) Act, 1970 (#1700). Next to the
 // vendor router because a contractor is one, and separate from it because this
 // is not about the counterparty to an invoice: it is the principal employer's
@@ -619,6 +627,11 @@ app.use('/api/compliance', complianceRoutes);
 
 app.use('/api/assets', assetRoutes);
 app.use('/api/vendors', vendorRoutes);
+
+// #1827. The router owns `/rules`, `/projects`, `/beneficiaries` and
+// `/assessments`. Its own prefix rather than a sub-path of `/api/vendors`, for
+// the reason above.
+app.use('/api/construction-cess', constructionCessRoutes);
 
 // #1700. The router owns `/contractors`, `/deployments`, `/assessment`,
 // `/returns` and `/registers`.

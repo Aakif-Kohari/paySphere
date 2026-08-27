@@ -212,6 +212,24 @@ const PERMISSIONS = {
   // authority as MANAGE_COMPLIANCE.
   MANAGE_VENDOR: 'MANAGE_VENDOR',
 
+  // --- BOCW Welfare Cess Act, 1996 (#1827) ---------------------------------
+  //
+  // Next to the vendor names because every bill the cess is deducted from is a
+  // vendor bill, and split from them because the deduction is not the company's
+  // money to withhold or release: rule 4 takes one per cent at source and it
+  // goes to a welfare board.
+  //
+  // The split inside is on the *base*. This is the only levy in the product
+  // whose base is not a wage — it is one per cent of the cost of construction —
+  // so there is no payroll figure anywhere to check it against, and moving the
+  // section 3 land exclusion by a crore moves the cess by a lakh with nothing
+  // objecting. The project cost, the rate and the section 7 registration
+  // therefore sit together behind MANAGE_CESS_BASE, and whoever holds it does
+  // not also certify the establishment against the result.
+  READ_CONSTRUCTION_CESS: 'READ_CONSTRUCTION_CESS',
+  MANAGE_CESS_REGISTER: 'MANAGE_CESS_REGISTER',
+  MANAGE_CESS_BASE: 'MANAGE_CESS_BASE',
+
   // --- Contract Labour (Regulation and Abolition) Act, 1970 (#1700) --------
   //
   // Next to the vendor names, and deliberately not the same as them. The vendor
@@ -655,6 +673,21 @@ const PERMISSION_DEFINITIONS = [
       'Register contractors and record invoices, which sets the 194C/194J TDS withheld on their behalf',
   },
   {
+    name: PERMISSIONS.READ_CONSTRUCTION_CESS,
+    description:
+      'View the construction cess position per project, the advance deducted against the section 5 assessment and the beneficiary register',
+  },
+  {
+    name: PERMISSIONS.MANAGE_CESS_REGISTER,
+    description:
+      'Record contractor bills with the cess withheld at source, and the building workers’ days per employer for the section 12 register',
+  },
+  {
+    name: PERMISSIONS.MANAGE_CESS_BASE,
+    description:
+      'Set the cost of construction and its section 3 exclusions, the notified rate and the section 7 registration, record an assessment order, and commit the assessment',
+  },
+  {
     name: PERMISSIONS.READ_CONTRACT_LABOUR,
     description:
       'View the contract labour registers, the principal employer’s section 21 exposure and the wage parity comparison against directly employed staff',
@@ -989,6 +1022,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_ASSET,
       PERMISSIONS.RUN_DEPRECIATION,
 
+      // #1827. All three. The cost of construction is the entire base of the
+      // levy and there is no payroll figure to check it against, so the owner
+      // is the one account allowed to be both halves of that check.
+      PERMISSIONS.READ_CONSTRUCTION_CESS,
+      PERMISSIONS.MANAGE_CESS_REGISTER,
+      PERMISSIONS.MANAGE_CESS_BASE,
+
       // #1344. All three. MANAGE_GRATUITY_ASSUMPTIONS stops here for the same
       // reason MANAGE_COMPLIANCE does — it decides what gets reported, not who
       // gets paid.
@@ -1188,6 +1228,15 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_EC_CLAIM,
 
       PERMISSIONS.READ_VENDOR,
+
+      // #1827. Read and the register. Recording a contractor bill with the cess
+      // withheld, and keeping the building workers' days per employer for the
+      // section 12 roll, is register-keeping of the same kind as the contract
+      // labour deployments below. It does not move the cost of construction,
+      // which is the entire base of the levy, and it does not commit the
+      // assessment.
+      PERMISSIONS.READ_CONSTRUCTION_CESS,
+      PERMISSIONS.MANAGE_CESS_REGISTER,
 
       // #1700. Both. Registering a contractor and recording who is on site each
       // month is HR administration in the ordinary sense — somebody has to walk
