@@ -389,9 +389,11 @@ const payrollUpdateSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },  },
-  { timestamps: true },
+  {
+    timestamps: true,
+    optimisticConcurrency: true,
+  },
 );
-
 // Every index below leads with `tenantId` because that is what every query
 // filters on since #585. They led with `createdBy` until #613 — which meant the
 // rewritten queries had no index behind them and collection-scanned the largest
