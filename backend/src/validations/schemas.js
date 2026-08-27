@@ -115,68 +115,50 @@ const payrollFinalizeSchema = z
   })
   .strict();
 
-// Benefits enrollment validation schemas
-const BENEFIT_CATEGORIES = [
-  'health',
-  'dental',
-  'vision',
-  'retirement',
-  'life-insurance',
-  'disability',
-  'wellness',
+// Company Event validation schemas
+const EVENT_CATEGORIES = [
+  'social',
+  'team-building',
+  'workshop',
+  'holiday',
+  'celebration',
+  'town-hall',
   'other',
 ];
-const COVERAGE_TYPES = ['individual', 'individual+spouse', 'family'];
-const ENROLLMENT_STATUSES = ['enrolled', 'pending', 'cancelled', 'terminated'];
-const DEPENDENT_RELATIONSHIPS = ['spouse', 'child', 'parent'];
+const RSVP_STATUSES = ['going', 'maybe', 'not-going'];
+const RECURRENCE_FREQ = ['none', 'daily', 'weekly', 'monthly', 'yearly'];
 
-const dependentSchema = z
+const recurrenceSchema = z
   .object({
-    name: z.string().trim().min(1, 'Dependent name is required').max(100),
-    relationship: z.enum(DEPENDENT_RELATIONSHIPS),
-    dateOfBirth: dateString('Date of birth').optional().nullable(),
+    frequency: z.enum(RECURRENCE_FREQ).optional(),
+    interval: z.number().int().min(1).max(365).optional(),
+    endDate: dateString('Recurrence end date').optional().nullable(),
   })
   .strict();
 
-const createBenefitPlanSchema = z
+const createEventSchema = z
   .object({
-    name: z.string().trim().min(1, 'Plan name is required').max(100),
-    category: z.enum(BENEFIT_CATEGORIES),
-    description: z.string().max(500).optional().nullable(),
-    provider: z.string().max(100).optional().nullable(),
-    monthlyPremium: z
-      .number()
-      .finite()
-      .min(0, 'Premium must be non-negative')
-      .max(100000),
-    employerContribution: z
-      .number()
-      .finite()
-      .min(0)
-      .max(100000)
-      .optional()
-      .nullable(),
-    employeeContribution: z
-      .number()
-      .finite()
-      .min(0)
-      .max(100000)
-      .optional()
-      .nullable(),
-    coverageType: z.enum(COVERAGE_TYPES).optional(),
-    enrollmentStartDate: dateString('Enrollment start date')
-      .optional()
-      .nullable(),
-    enrollmentEndDate: dateString('Enrollment end date').optional().nullable(),
-    maxEnrollees: z.number().int().positive().max(100000).optional().nullable(),
+    title: z.string().trim().min(1, 'Title is required').max(200),
+    description: z.string().max(2000).optional().nullable(),
+    category: z.enum(EVENT_CATEGORIES).optional(),
+    location: z.string().max(200).optional().nullable(),
+    isVirtual: z.boolean().optional(),
+    meetingLink: z.string().max(500).optional().nullable(),
+    startDateTime: dateString('Start date/time'),
+    endDateTime: dateString('End date/time'),
+    allDay: z.boolean().optional(),
+    maxAttendees: z.number().int().positive().max(100000).optional().nullable(),
+    requiresApproval: z.boolean().optional(),
+    isPublic: z.boolean().optional(),
+    tags: z.array(z.string().trim().max(50)).optional().nullable(),
+    recurrence: recurrenceSchema.optional().nullable(),
   })
   .strict();
 
-const enrollSchema = z
+const rsvpSchema = z
   .object({
-    planId: z.string().trim().min(1),
-    coverageType: z.enum(COVERAGE_TYPES).optional(),
-    dependents: z.array(dependentSchema).optional().nullable(),
+    status: z.enum(RSVP_STATUSES),
+    note: z.string().max(300).optional().nullable(),
   })
   .strict();
 
@@ -185,9 +167,8 @@ module.exports = {
   loginSchema,
   employeeSchema,
   payrollFinalizeSchema,
-  createBenefitPlanSchema,
-  enrollSchema,
-  BENEFIT_CATEGORIES,
-  COVERAGE_TYPES,
-  ENROLLMENT_STATUSES,
+  createEventSchema,
+  rsvpSchema,
+  EVENT_CATEGORIES,
+  RSVP_STATUSES,
 };
