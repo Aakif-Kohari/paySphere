@@ -176,6 +176,13 @@ const contractLabourRoutes = require('./routes/contractLabour.routes');
 // and is covered by provident fund and ESI through the principal employer,
 // while section 18 says an apprentice is not.
 const apprenticeshipRoutes = require('./routes/apprenticeships.routes');
+
+// Inter-State Migrant Workmen Act, 1979 (#1826). Beside both of the above,
+// because a migrant workman is usually also a contract workman and occasionally
+// an apprentice — and apart from them because what makes this Act apply is
+// neither the site nor the trade but the fact of having been recruited in one
+// state and employed in another, which neither of the other two routers can see.
+const migrantWorkmenRoutes = require('./routes/migrantWorkmen.routes');
 const grievanceRoutes = require('./routes/grievance.routes');
 const taxProofRoutes = require('./routes/taxProof.routes');
 
@@ -622,6 +629,12 @@ app.use('/api/contract-labour', contractLabourRoutes);
 // liabilities section 18 removes. The router owns `/rules`, `/strength`,
 // `/apprentices` and `/assessments`.
 app.use('/api/apprenticeships', apprenticeshipRoutes);
+
+// #1826. Its own prefix rather than a sub-path of `/api/contract-labour`: the
+// two hold views of the same person for different reasons, and neither should
+// be reached through the other. The router owns `/rules`, `/workmen`,
+// `/facilities` and `/assessments`.
+app.use('/api/migrant-workmen', migrantWorkmenRoutes);
 
 // POSH grievances (#958). Gated by `requireICC` rather than `requirePermission`
 // — the committee is deliberately not the same population as "HR", and admins

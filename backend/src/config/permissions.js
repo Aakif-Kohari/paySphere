@@ -241,6 +241,28 @@ const PERMISSIONS = {
   MANAGE_APPRENTICE: 'MANAGE_APPRENTICE',
   MANAGE_APPRENTICESHIP_RULES: 'MANAGE_APPRENTICESHIP_RULES',
 
+  // --- Inter-State Migrant Workmen Act, 1979 (#1826) ------------------------
+  //
+  // Split on the denominators of the comparison rather than on read against
+  // write. The section 13(1)(b) comparator — what a local workman doing similar
+  // work is said to earn — is the sharpest lever here: lowering it makes a
+  // parity breach disappear without a rupee changing hands, and unlike a wage
+  // floor there is no notification anywhere to check it against. So the
+  // comparator sits with the thresholds and the section 4 registration flag
+  // behind MANAGE_MIGRANT_WAGE_BASIS, and whoever holds it does not also
+  // certify the establishment against the result.
+  //
+  // Recording an allowance that was actually paid is ordinary register-keeping,
+  // and sits with the roll under MANAGE_MIGRANT_WORKMAN.
+  //
+  // Deliberately not the contract-labour names, though a migrant workman is
+  // very often also a contract workman: #1700 answers what the principal
+  // employer owes for a contractor's workmen, and this answers what the workman
+  // is owed for having been recruited in another state.
+  READ_MIGRANT_WORKMEN: 'READ_MIGRANT_WORKMEN',
+  MANAGE_MIGRANT_WORKMAN: 'MANAGE_MIGRANT_WORKMAN',
+  MANAGE_MIGRANT_WAGE_BASIS: 'MANAGE_MIGRANT_WAGE_BASIS',
+
   READ_ROSTER: 'READ_ROSTER',
   MANAGE_ROSTER: 'MANAGE_ROSTER',
 
@@ -658,6 +680,21 @@ const PERMISSION_DEFINITIONS = [
       'Set the engagement band and the Rule 11 stipends, record the establishment’s total strength, and commit the assessment',
   },
   {
+    name: PERMISSIONS.READ_MIGRANT_WORKMEN,
+    description:
+      'View the inter-state migrant register, the section 13(1)(b) parity comparison and the displacement and journey allowances owed',
+  },
+  {
+    name: PERMISSIONS.MANAGE_MIGRANT_WORKMAN,
+    description:
+      'Record a migrant recruitment, the allowances actually paid, the return-journey accrual and the section 16 facilities',
+  },
+  {
+    name: PERMISSIONS.MANAGE_MIGRANT_WAGE_BASIS,
+    description:
+      'Set the comparable local rate a migrant workman is measured against, the section 4 and 8 thresholds and the section 4 registration, and commit the assessment',
+  },
+  {
     name: PERMISSIONS.READ_ROSTER,
     description: 'View published shift rosters',
   },
@@ -987,6 +1024,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_APPRENTICE,
       PERMISSIONS.MANAGE_APPRENTICESHIP_RULES,
 
+      // #1826. All three. The comparable local rate is the denominator of the
+      // parity comparison, and the owner is the one account allowed to be both
+      // halves of that check — there is nobody above it to be the other half.
+      PERMISSIONS.READ_MIGRANT_WORKMEN,
+      PERMISSIONS.MANAGE_MIGRANT_WORKMAN,
+      PERMISSIONS.MANAGE_MIGRANT_WAGE_BASIS,
+
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.MANAGE_ROSTER,
 
@@ -1160,6 +1204,14 @@ const ROLE_DEFINITIONS = [
       // commit the assessment.
       PERMISSIONS.READ_APPRENTICESHIP,
       PERMISSIONS.MANAGE_APPRENTICE,
+
+      // #1826. HR keeps the migrant register — recording a recruitment, the
+      // allowances that were paid and the return-journey accrual is HR
+      // administration in the ordinary sense. It does not set the comparable
+      // local rate, which is what the establishment is judged against, and it
+      // does not commit the assessment.
+      PERMISSIONS.READ_MIGRANT_WORKMEN,
+      PERMISSIONS.MANAGE_MIGRANT_WORKMAN,
 
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.MANAGE_ROSTER,

@@ -214,6 +214,19 @@ export const APP_ROUTES = [
     group: 'people',
     icon: 'rocket',
   },
+  {
+    // In People beside the apprentice roll for the same reason: recruiting
+    // somebody and keeping their register is HR work. It is not filed under
+    // Compliance even though the section 13(1)(b) comparison is the sharpest
+    // statutory finding on the page — the people who use it daily are the ones
+    // recording a recruitment, not the ones certifying the site (#1826).
+    path: '/migrant-workmen',
+    component: lazy(() => import('../pages/MigrantWorkmenCompliance')),
+    appShell: true,
+    label: 'Migrant workmen',
+    group: 'people',
+    icon: 'users',
+  },
 
   // ── Payroll ──────────────────────────────────────────────────────────────
   {

@@ -197,6 +197,23 @@ const AUDIT_ACTIONS = [
   'APPRENTICE_ENGAGED',
   'APPRENTICE_CONTRACT_REGISTERED',
   'APPRENTICESHIP_ASSESSMENT_COMMITTED',
+  // Inter-State Migrant Workmen Act, 1979 (#1826). The comparator is audited
+  // for the same reason the recorded strength above is: it is the denominator
+  // of the comparison, and lowering what a local workman is said to earn makes
+  // a section 13(1)(b) breach disappear without a rupee changing hands — and
+  // unlike a wage floor there is no notification anywhere to check it against.
+  //
+  // The displacement recovery is audited because it is the one write in the
+  // module that takes money back from a workman, against a payment section 14
+  // makes non-refundable. And the return-journey accrual is audited because the
+  // liability arises at recruitment: the date it was recognised is the fact an
+  // inspection asks for when a workman left early and was never sent home.
+  'MIGRANT_RULES_UPDATED',
+  'MIGRANT_WORKMAN_RECRUITED',
+  'MIGRANT_COMPARATOR_RECORDED',
+  'MIGRANT_DISPLACEMENT_RECOVERED',
+  'MIGRANT_RETURN_JOURNEY_ACCRUED',
+  'MIGRANT_ASSESSMENT_COMMITTED',
   // International assignments (#1348). Opening one commits the employer to
   // bearing somebody's foreign tax bill for years; a settlement moves money
   // between the employee and the company; and the two threshold events record
