@@ -748,6 +748,13 @@ export const APP_ROUTES = [
     appShell: true,
   },
   {
+    path: '/developer',
+    component: lazy(() => import('../pages/DeveloperCenter')),
+    label: 'Developer Center',
+    group: 'workplace',
+    icon: 'code',
+  },
+  {
     path: '/profile',
     component: lazy(() => import('../pages/ProfileSettings')),
   },
