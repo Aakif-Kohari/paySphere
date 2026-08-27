@@ -115,56 +115,23 @@ const payrollFinalizeSchema = z
   })
   .strict();
 
-// Company Policy validation schemas
-const POLICY_CATEGORIES = [
-  'code-of-conduct',
-  'data-security',
-  'leave',
-  'payroll',
-  'remote-work',
-  'health-safety',
-  'anti-harassment',
-  'conflict-of-interest',
-  'general',
-];
+// Holiday Calendar validation schemas
+const HOLIDAY_TYPES = ['gazetted', 'restricted', 'half-day'];
+const CALENDAR_ASSIGNMENT_TYPES = ['global', 'department', 'location'];
 
-const POLICY_STATUSES = ['draft', 'active', 'archived'];
-
-const createPolicySchema = z
+const createCalendarSchema = z
   .object({
-    policyCode: z
-      .string()
-      .trim()
-      .min(2, 'Policy code must be at least 2 characters')
-      .max(30, 'Policy code cannot exceed 30 characters')
-      .regex(
-        /^[A-Za-z0-9_-]+$/,
-        'Policy code can only contain letters, numbers, hyphens, and underscores',
-      ),
-    title: z.string().trim().min(1, 'Title is required').max(200),
-    content: z.string().min(1, 'Content is required'),
-    category: z.enum(POLICY_CATEGORIES).optional(),
-    description: z.string().max(500).optional().nullable(),
-    summary: z.string().max(500).optional().nullable(),
-    effectiveDate: dateString('Effective date').optional().nullable(),
-    expiryDate: dateString('Expiry date').optional().nullable(),
-    requiresAcknowledgment: z.boolean().optional(),
-    assignedDepartments: z.array(z.string().trim()).optional().nullable(),
+    name: z.string().trim().min(1, 'Calendar name is required').max(100),
+    assignmentType: z.enum(CALENDAR_ASSIGNMENT_TYPES).optional(),
+    assignedTo: z.array(z.string().trim()).optional().nullable(),
   })
   .strict();
 
-const publishPolicyVersionSchema = z
+const addHolidaySchema = z
   .object({
-    title: z.string().trim().min(1, 'Version title is required').max(200),
-    content: z.string().min(1, 'Version content is required'),
-    summary: z.string().max(500).optional().nullable(),
-    changeNote: z.string().max(300).optional().nullable(),
-  })
-  .strict();
-
-const policyStatusSchema = z
-  .object({
-    status: z.enum(POLICY_STATUSES),
+    date: dateString('Holiday date'),
+    name: z.string().trim().min(1, 'Holiday name is required').max(100),
+    type: z.enum(HOLIDAY_TYPES).optional(),
   })
   .strict();
 
@@ -173,9 +140,8 @@ module.exports = {
   loginSchema,
   employeeSchema,
   payrollFinalizeSchema,
-  createPolicySchema,
-  publishPolicyVersionSchema,
-  policyStatusSchema,
-  POLICY_CATEGORIES,
-  POLICY_STATUSES,
+  createCalendarSchema,
+  addHolidaySchema,
+  HOLIDAY_TYPES,
+  CALENDAR_ASSIGNMENT_TYPES,
 };
