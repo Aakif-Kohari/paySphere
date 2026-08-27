@@ -150,6 +150,8 @@ const emailRoutes = require('./routes/email.routes');
 const complianceRoutes = require('./routes/compliance.routes');
 const forexRoutes = require('./routes/forex.routes');
 const announcementRoutes = require('./routes/announcement.routes');
+const companyPolicyRoutes = require('./routes/companyPolicy.routes');
+const peerNominationRoutes = require('./routes/peerNomination.routes');
 
 // The eleven routers #1009 found unmounted. Each one had a router, a
 // controller, its models and — for most of them — a finished frontend page, and
@@ -696,9 +698,12 @@ app.use('/api/leave-closure', leaveClosureRoutes);
 app.use('/api/fbp', fbpRoutes);
 app.use('/api/team', teamRoutes);
 
+// Company Policy Management & Employee Acknowledgment. Admins create and
+// version policies; employees acknowledge them; analytics track compliance.
+app.use('/api/policies', companyPolicyRoutes);
+
 // Peer Nomination & Awards (#peer-nominations). Employee-driven recognition
 // with category configuration, cycle management, voting, review, and analytics.
-const peerNominationRoutes = require('./routes/peerNomination.routes');
 app.use('/api/peer-nominations', peerNominationRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
