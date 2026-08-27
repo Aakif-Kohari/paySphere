@@ -3,11 +3,19 @@
  * @description Manages bank mappings, NACHA originator configs, and file generation.
  * Issue: #1733
  */
-const { BankAccountMapping, NACHABatchConfiguration, DisbursementFile } = require('../models/bankDisbursement.model');
+const {
+  BankAccountMapping,
+  NACHABatchConfiguration,
+  DisbursementFile,
+} = require('../models/bankDisbursement.model');
 const Employee = require('../models/employee.model');
 const {
-  generateFileHeader, generateBatchHeader, generateEntryDetail,
-  generateBatchControl, generateFileControl, validateBalancing
+  generateFileHeader,
+  generateBatchHeader,
+  generateEntryDetail,
+  generateBatchControl,
+  generateFileControl,
+  validateBalancing,
 } = require('../utils/nachaGenerationEngine.utils');
 const logger = require('../utils/logger');
 
@@ -16,23 +24,41 @@ exports.configureOriginator = async (req, res, next) => {
     const config = await NACHABatchConfiguration.findOneAndUpdate(
       { tenantId: req.tenantId },
       { ...req.body, tenantId: req.tenantId },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
     res.status(200).json({ message: 'NACHA originator configured', config });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
 exports.mapEmployeeBank = async (req, res, next) => {
   try {
-    const { employeeId, accountNickname, routingNumber, accountNumber, accountType, splitPercentage, priority } = req.body;
+    const {
+      employeeId,
+      accountNickname,
+      routingNumber,
+      accountNumber,
+      accountType,
+      splitPercentage,
+      priority,
+    } = req.body;
 
     const mapping = await BankAccountMapping.create({
-      tenantId: req.tenantId, employeeId, accountNickname, routingNumber,
-      accountNumber, accountType, splitPercentage, priority
+      tenantId: req.tenantId,
+      employeeId,
+      accountNickname,
+      routingNumber,
+      accountNumber,
+      accountType,
+      splitPercentage,
+      priority,
     });
 
     res.status(201).json({ message: 'Bank account mapped', mapping });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
 /**
@@ -43,8 +69,13 @@ exports.mapEmployeeBank = async (req, res, next) => {
 exports.generateNachaFile = async (req, res, next) => {
   try {
     const { payrollRunId, employeePayouts, effectiveDate } = req.body;
-    const config = await NACHABatchConfiguration.findOne({ tenantId: req.tenantId });
-    if (!config) return res.status(400).json({ message: 'NACHA originator not configured.' });
+    const config = await NACHABatchConfiguration.findOne({
+      tenantId: req.tenantId,
+    });
+    if (!config)
+      return res
+        .status(400)
+        .json({ message: 'NACHA originator not configured.' });
 
     const creationDate = new Date();
     const effDate = new Date(effectiveDate);
@@ -61,11 +92,15 @@ exports.generateNachaFile = async (req, res, next) => {
 
     for (const payout of employeePayouts) {
       const bankMappings = await BankAccountMapping.find({
-        tenantId: req.tenantId, employeeId: payout.employeeId, prenoteStatus: 'Approved'
+        tenantId: req.tenantId,
+        employeeId: payout.employeeId,
+        prenoteStatus: 'Approved',
       }).sort({ priority: 1 });
 
       if (bankMappings.length === 0) {
-        logger.warn(`[NACHA] No approved bank mapping for employee ${payout.employeeId}. Generating paper check.`);
+        logger.warn(
+          `[NACHA] No approved bank mapping for employee ${payout.employeeId}. Generating paper check.`,
+        );
         continue;
       }
 
@@ -80,15 +115,24 @@ exports.generateNachaFile = async (req, res, next) => {
           // Last account gets the remainder to avoid rounding penny discrepancies
           amountCents = remainingCents;
         } else {
-          amountCents = Math.round(payout.netPay * (bank.splitPercentage / 100) * 100);
+          amountCents = Math.round(
+            payout.netPay * (bank.splitPercentage / 100) * 100,
+          );
           remainingCents -= amountCents;
         }
 
         if (amountCents <= 0) continue;
 
         entryCount++;
-        const traceNumber = config.immediateOrigin.substring(0, 8) + String(entryCount).padStart(7, '0');
-        const entryLine = generateEntryDetail(bank, amountCents, traceNumber, entryCount);
+        const traceNumber =
+          config.immediateOrigin.substring(0, 8) +
+          String(entryCount).padStart(7, '0');
+        const entryLine = generateEntryDetail(
+          bank,
+          amountCents,
+          traceNumber,
+          entryCount,
+        );
 
         fileContent += entryLine + '\n';
         totalCreditCents += amountCents;
@@ -98,10 +142,13 @@ exports.generateNachaFile = async (req, res, next) => {
 
     // Generate Batch Control
     const batchControl = generateBatchControl(
-      { companyIdentification: config.companyIdentification, immediateOrigin: config.immediateOrigin },
+      {
+        companyIdentification: config.companyIdentification,
+        immediateOrigin: config.immediateOrigin,
+      },
       entryDetails,
       totalCreditCents,
-      batchNumber
+      batchNumber,
     );
     fileContent += batchControl + '\n';
 
@@ -109,12 +156,12 @@ exports.generateNachaFile = async (req, res, next) => {
     const fileControl = generateFileControl(
       [{ entries: entryDetails }],
       entryCount,
-      totalCreditCents
+      totalCreditCents,
     );
     fileContent += fileControl + '\n';
 
     // Pad the final file to a multiple of 10 lines (940 chars) with '9's (Record Type 9 padding)
-    const lines = fileContent.split('\n').filter(l => l.length > 0);
+    const lines = fileContent.split('\n').filter((l) => l.length > 0);
     const remainder = lines.length % 10;
     if (remainder !== 0) {
       const padLines = 10 - remainder;
@@ -124,46 +171,75 @@ exports.generateNachaFile = async (req, res, next) => {
     }
 
     // Balancing Guardrail
-    const balanceCheck = validateBalancing(totalCreditCents / 100, totalCreditCents / 100);
+    const balanceCheck = validateBalancing(
+      totalCreditCents / 100,
+      totalCreditCents / 100,
+    );
     if (!balanceCheck.isBalanced) {
-      throw new Error(`File Balancing Guardrail Triggered: Discrepancy of $${balanceCheck.discrepancy}`);
+      throw new Error(
+        `File Balancing Guardrail Triggered: Discrepancy of $${balanceCheck.discrepancy}`,
+      );
     }
 
     const fileName = `NACHA_PPD_${creationDate.toISOString().split('T')[0]}_${batchNumber}.txt`;
     const disbursement = await DisbursementFile.create({
-      tenantId: req.tenantId, payrollRunId, fileName, fileContent,
-      batchCount: 1, entryCount, totalCreditAmount: totalCreditCents / 100,
-      generatedBy: req.userId
+      tenantId: req.tenantId,
+      payrollRunId,
+      fileName,
+      fileContent,
+      batchCount: 1,
+      entryCount,
+      totalCreditAmount: totalCreditCents / 100,
+      generatedBy: req.userId,
     });
 
-    logger.info(`[NACHA] Generated file ${fileName} with ${entryCount} entries.`);
-    res.status(201).json({ message: 'NACHA file generated successfully', disbursement });
-  } catch (error) { next(error); }
+    logger.info(
+      `[NACHA] Generated file ${fileName} with ${entryCount} entries.`,
+    );
+    res
+      .status(201)
+      .json({ message: 'NACHA file generated successfully', disbursement });
+  } catch (error) {
+    next(error);
+  }
 };
 
 exports.getDashboard = async (req, res, next) => {
   try {
-    const config = await NACHABatchConfiguration.findOne({ tenantId: req.tenantId });
-    const files = await DisbursementFile.find({ tenantId: req.tenantId }).sort({ createdAt: -1 }).limit(20);
+    const config = await NACHABatchConfiguration.findOne({
+      tenantId: req.tenantId,
+    });
+    const files = await DisbursementFile.find({ tenantId: req.tenantId })
+      .sort({ createdAt: -1 })
+      .limit(20);
     const mappings = await BankAccountMapping.find({ tenantId: req.tenantId })
       .populate('employeeId', 'fullName')
       .sort({ 'employeeId.fullName': 1, priority: 1 });
 
     res.status(200).json({ config, files, mappings });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
 exports.downloadFile = async (req, res, next) => {
   try {
-    const file = await DisbursementFile.findOne({ _id: req.params.fileId, tenantId: req.tenantId });
+    const file = await DisbursementFile.findOne({
+      _id: req.params.fileId,
+      tenantId: req.tenantId,
+    });
     if (!file) return res.status(404).json({ message: 'File not found' });
 
     res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.fileName}"`,
+    );
     res.send(file.fileContent);
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
-
 
 /**
  * @fileoverview Salary disbursement batch endpoints.
@@ -191,7 +267,7 @@ const {
   DisbursementLine,
 } = require('../models/disbursementBatch.model');
 const PayrollUpdate = require('../models/payroll.model');
-const Employee = require('../models/employee.model');
+
 const {
   BATCH_STATUS,
   LINE_STATUS,
@@ -206,7 +282,7 @@ const {
   toRupees,
 } = require('../utils/bankFileGenerator');
 const { PAYROLL_STATUS } = require('../config/payrollStatus');
-const logger = require('../utils/logger');
+
 const eventBus = require('../services/event.service');
 
 /**
@@ -458,11 +534,9 @@ exports.validateBatchLines = async (req, res, next) => {
       batch.status === BATCH_STATUS.RELEASED ||
       batch.status === BATCH_STATUS.RECONCILED
     ) {
-      return res
-        .status(409)
-        .json({
-          message: `Batch is already ${batch.status} and cannot be revalidated`,
-        });
+      return res.status(409).json({
+        message: `Batch is already ${batch.status} and cannot be revalidated`,
+      });
     }
 
     const lines = await loadLinesForFile(req.tenantId, batch._id);
@@ -673,11 +747,9 @@ exports.recordReturns = async (req, res, next) => {
 
     const { content } = req.body;
     if (typeof content !== 'string' || content.trim() === '') {
-      return res
-        .status(400)
-        .json({
-          message: 'content is required and must be the return file text',
-        });
+      return res.status(400).json({
+        message: 'content is required and must be the return file text',
+      });
     }
 
     const batch = await DisbursementBatch.findOne({

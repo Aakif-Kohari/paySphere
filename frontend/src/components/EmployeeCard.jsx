@@ -37,13 +37,14 @@ const AVATAR_COLORS = [
   '#14B8A6',
 ];
 
-const safeName = (name) => (typeof name === 'string' && name.trim() ? name.trim() : 'Employee');
+const safeName = (name) =>
+  typeof name === 'string' && name.trim() ? name.trim() : 'Employee';
 
 const getAvatarColor = (name) => {
   const str = safeName(name);
-  const idx = str
-    .split('')
-    .reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % AVATAR_COLORS.length;
+  const idx =
+    str.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0) %
+    AVATAR_COLORS.length;
   return AVATAR_COLORS[idx];
 };
 
@@ -68,14 +69,21 @@ const StatusBadge = ({ finalized }) => {
           : 'bg-orange-50 dark:bg-orange-950/20 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-900/50'
       }`}
     >
-      {finalized ? t('dashboard.statuses.finalized', 'Finalized') : t('dashboard.statuses.pending_approval', 'Pending')}
+      {finalized
+        ? t('dashboard.statuses.finalized', 'Finalized')
+        : t('dashboard.statuses.pending_approval', 'Pending')}
     </span>
   );
 };
 
 const CardHeader = ({ emp, finalized, onEdit }) => {
   const { t } = useTranslation();
-  const name = emp?.fullName || (emp?.firstName ? `${emp.firstName} ${emp.lastName || ''}`.trim() : '') || emp?.name || emp?.employeeName || 'Employee';
+  const name =
+    emp?.fullName ||
+    (emp?.firstName ? `${emp.firstName} ${emp.lastName || ''}`.trim() : '') ||
+    emp?.name ||
+    emp?.employeeName ||
+    'Employee';
 
   return (
     <div className="flex justify-between items-center w-full">
@@ -104,7 +112,7 @@ const CardHeader = ({ emp, finalized, onEdit }) => {
             title={t('common.edit', 'Edit Employee')}
             aria-label={`Edit ${name}`}
           >
-            <EditOutlinedIcon fontSize="small" className='mb-2'/>
+            <EditOutlinedIcon fontSize="small" className="mb-2" />
           </button>
         )}
       </div>
@@ -149,7 +157,9 @@ export default function EmployeeCard({
         {/* Breakdown */}
         <div className="space-y-2 text-sm mb-5 text-slate-700 dark:text-slate-300">
           <div className="flex justify-between">
-            <span className="text-gray-500 dark:text-slate-500">{t('dashboard.table.baseSalary', 'Base Salary')}</span>
+            <span className="text-gray-500 dark:text-slate-500">
+              {t('dashboard.table.baseSalary', 'Base Salary')}
+            </span>
             <span className="font-semibold text-gray-950 dark:text-white">
               {fmt(emp.monthlySalary, emp.currency)}
             </span>
@@ -158,7 +168,11 @@ export default function EmployeeCard({
           {p && p.leaveDays > 0 && (
             <div className="flex justify-between">
               <span className="text-red-600 dark:text-red-400">
-                − {p.leaveDays} {p.leaveDays > 1 ? t('common.days', 'days') : t('common.day', 'day')} {t('common.leave', 'leave')}
+                − {p.leaveDays}{' '}
+                {p.leaveDays > 1
+                  ? t('common.days', 'days')
+                  : t('common.day', 'day')}{' '}
+                {t('common.leave', 'leave')}
               </span>
               <span className="text-red-600 dark:text-red-400 font-semibold">
                 - {fmt(p.leaveDeduction, emp.currency)}
@@ -170,7 +184,11 @@ export default function EmployeeCard({
             <div className="flex justify-between">
               <div className="relative group flex items-center gap-1 text-blue-600 dark:text-blue-400">
                 <span className="cursor-pointer">
-                  + {p.overtimeHours} {p.overtimeHours > 1 ? t('common.hrs', 'hrs') : t('common.hr', 'hr')} {t('common.overtime', 'overtime')}
+                  + {p.overtimeHours}{' '}
+                  {p.overtimeHours > 1
+                    ? t('common.hrs', 'hrs')
+                    : t('common.hr', 'hr')}{' '}
+                  {t('common.overtime', 'overtime')}
                 </span>
 
                 <InfoOutlinedIcon
@@ -183,12 +201,23 @@ export default function EmployeeCard({
                     {t('common.overtimeCalculation', 'Overtime Calculation')}
                   </p>
                   <div className="space-y-1 text-xs text-gray-600 dark:text-slate-500">
-                    <p>{t('common.hoursWorked', 'Hours Worked')}: {p.overtimeHours}</p>
-                    <p>{t('common.overtimePay', 'Overtime Pay')}: {fmt(p.overtimePay, emp.currency)}</p>
+                    <p>
+                      {t('common.hoursWorked', 'Hours Worked')}:{' '}
+                      {p.overtimeHours}
+                    </p>
+                    <p>
+                      {t('common.overtimePay', 'Overtime Pay')}:{' '}
+                      {fmt(p.overtimePay, emp.currency)}
+                    </p>
                     <p className="font-semibold text-gray-800 dark:text-white mt-2 mb-1">
                       {t('common.formula', 'Formula')}
                     </p>
-                    <p>{t('common.overtimeFormula', 'Overtime Rate × Hours Worked')}</p>
+                    <p>
+                      {t(
+                        'common.overtimeFormula',
+                        'Overtime Rate × Hours Worked',
+                      )}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -200,7 +229,9 @@ export default function EmployeeCard({
 
           {p && p.bonus > 0 && (
             <div className="flex justify-between">
-              <span className="text-green-600 dark:text-green-400">+ {t('common.bonus', 'Bonus')}</span>
+              <span className="text-green-600 dark:text-green-400">
+                + {t('common.bonus', 'Bonus')}
+              </span>
               <span className="text-green-600 dark:text-green-400 font-semibold">
                 + {fmt(p.bonus, emp.currency)}
               </span>
@@ -209,7 +240,9 @@ export default function EmployeeCard({
 
           {p && p.deductions > 0 && (
             <div className="flex justify-between">
-              <span className="text-red-600 dark:text-red-400">− {t('common.deductions', 'Deductions')}</span>
+              <span className="text-red-600 dark:text-red-400">
+                − {t('common.deductions', 'Deductions')}
+              </span>
               <span className="text-red-600 dark:text-red-400 font-semibold">
                 - {fmt(p.deductions, emp.currency)}
               </span>
@@ -217,12 +250,30 @@ export default function EmployeeCard({
           )}
         </div>
 
+        {emp.customData && Object.keys(emp.customData).length > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-800 mb-4">
+            <p className="text-xs uppercase text-gray-500 font-bold mb-2">
+              {t('common.additionalInfo', 'Additional Info')}
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-sm text-slate-700 dark:text-slate-300">
+              {Object.entries(emp.customData).map(([key, value]) => (
+                <div key={key}>
+                  <span className="text-gray-500 block text-xs">{key}</span>
+                  <span className="font-semibold">{String(value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="h-px bg-gray-200 dark:bg-slate-800 mb-4" />
 
         {/* Net */}
         <div className="flex justify-between items-center">
           <span className="text-xs uppercase text-gray-500 dark:text-slate-500 font-bold">
-            {p ? t('dashboard.table.netSalary', 'Net Salary') : t('dashboard.table.salary', 'Monthly Salary')}
+            {p
+              ? t('dashboard.table.netSalary', 'Net Salary')
+              : t('dashboard.table.salary', 'Monthly Salary')}
           </span>
           <span className="text-2xl font-semibold text-blue-600 dark:text-blue-400">
             {fmt(p ? p.netSalary : emp.monthlySalary, emp.currency)}
@@ -233,10 +284,16 @@ export default function EmployeeCard({
         <button
           onClick={() => setShowSalaryHistory((v) => !v)}
           aria-expanded={showSalaryHistory}
-          aria-label={showSalaryHistory ? `Hide salary history for ${emp.fullName}` : `View salary package and history for ${emp.fullName}`}
+          aria-label={
+            showSalaryHistory
+              ? `Hide salary history for ${emp.fullName}`
+              : `View salary package and history for ${emp.fullName}`
+          }
           className="mt-4 w-full py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors text-sm font-medium"
         >
-          {showSalaryHistory ? t('common.hideSalaryHistory', 'Hide salary history') : t('common.salaryPackageHistory', 'Salary package & history')}
+          {showSalaryHistory
+            ? t('common.hideSalaryHistory', 'Hide salary history')
+            : t('common.salaryPackageHistory', 'Salary package & history')}
         </button>
 
         {showSalaryHistory && (
@@ -297,7 +354,9 @@ export default function EmployeeCard({
       <div className="bg-gray-50 dark:bg-slate-950 p-3 rounded-lg transition-colors">
         <div className="flex justify-between items-baseline">
           <p className="text-xs text-gray-500 dark:text-slate-500 uppercase">
-            {p ? t('dashboard.table.netSalary', 'Net Salary') : t('dashboard.table.baseSalary', 'Base Salary')}
+            {p
+              ? t('dashboard.table.netSalary', 'Net Salary')
+              : t('dashboard.table.baseSalary', 'Base Salary')}
           </p>
           {p && (p.leaveDays > 0 || p.overtimeHours > 0) && (
             <span className="text-[10px] text-gray-500 dark:text-slate-500 font-medium">
@@ -313,10 +372,16 @@ export default function EmployeeCard({
       {/* Button */}
       <button
         onClick={onAddUpdate}
-        aria-label={p ? `Edit updates for ${emp.fullName}` : `Add update for ${emp.fullName}`}
+        aria-label={
+          p
+            ? `Edit updates for ${emp.fullName}`
+            : `Add update for ${emp.fullName}`
+        }
         className="border border-gray-200 dark:border-slate-800 rounded-lg py-2 text-blue-600 dark:text-blue-400 font-semibold hover:bg-indigo-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
       >
-        {p ? t('dashboard.editUpdates', 'Edit Updates') : t('common.addUpdate', '+ Add Update')}
+        {p
+          ? t('dashboard.editUpdates', 'Edit Updates')
+          : t('common.addUpdate', '+ Add Update')}
       </button>
     </div>
   );

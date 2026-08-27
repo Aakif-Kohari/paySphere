@@ -2,19 +2,47 @@ const express = require('express');
 const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
 const { writeRateLimiter } = require('../middlewares/rateLimiter.middleware');
-const { configureOriginator, mapEmployeeBank, generateNachaFile, getDashboard, downloadFile } = require('../controllers/disbursement.controller');
+const {
+  configureOriginator,
+  mapEmployeeBank,
+  generateNachaFile,
+  getDashboard,
+  downloadFile,
+} = require('../controllers/disbursement.controller');
 
 const router = express.Router();
 
-router.post('/originator', auth, requirePermission('WRITE_PAYROLL'), writeRateLimiter, configureOriginator);
-router.post('/map-bank', auth, requirePermission('WRITE_EMPLOYEE'), writeRateLimiter, mapEmployeeBank);
-router.post('/generate', auth, requirePermission('WRITE_PAYROLL'), writeRateLimiter, generateNachaFile);
+router.post(
+  '/originator',
+  auth,
+  requirePermission('WRITE_PAYROLL'),
+  writeRateLimiter,
+  configureOriginator,
+);
+router.post(
+  '/map-bank',
+  auth,
+  requirePermission('WRITE_EMPLOYEE'),
+  writeRateLimiter,
+  mapEmployeeBank,
+);
+router.post(
+  '/generate',
+  auth,
+  requirePermission('WRITE_PAYROLL'),
+  writeRateLimiter,
+  generateNachaFile,
+);
 
 router.get('/dashboard', auth, requirePermission('READ_PAYROLL'), getDashboard);
-router.get('/download/:fileId', auth, requirePermission('READ_PAYROLL'), downloadFile);
+router.get(
+  '/download/:fileId',
+  auth,
+  requirePermission('READ_PAYROLL'),
+  downloadFile,
+);
 
 module.exports = router;
-
 
 /**
  * Salary disbursement routes — mounted at /api/disbursements (#1075).
@@ -37,11 +65,6 @@ module.exports = router;
  * permission means.
  */
 
-const express = require('express');
-
-const auth = require('../middlewares/auth.middleware');
-const { requirePermission } = require('../middlewares/rbac.middleware');
-const { writeRateLimiter } = require('../middlewares/rateLimiter.middleware');
 const { PERMISSIONS } = require('../config/permissions');
 const {
   createBatch,
@@ -53,8 +76,6 @@ const {
   recordReturns,
   getBankProfiles,
 } = require('../controllers/disbursement.controller');
-
-const router = express.Router();
 
 // Declared above `/batches/:id` so the literal segment is matched first — the
 // other way round, `getBatch` would receive `id: 'profiles'`.

@@ -21,6 +21,7 @@ const cacheService = require('../services/cache.service');
 const { invalidateStatsCaches } = require('./stats.controller');
 const Settlement = require('../models/settlement.model');
 const { Client } = require('@elastic/elasticsearch');
+const customFieldService = require('../services/customField.service');
 
 const esClient = new Client({
   node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200',
@@ -106,6 +107,7 @@ exports.addEmployee = async (req, res, next) => {
       phone,
       bankDetails,
       language,
+      customData,
     } = req.body;
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(role)) {
@@ -172,6 +174,23 @@ exports.addEmployee = async (req, res, next) => {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    let validatedCustomData = {};
+    try {
+      validatedCustomData = await customFieldService.validateCustomData(
+        'Employee',
+        req.tenantId || user.tenantId,
+        customData,
+      );
+    } catch (error) {
+      if (error.isCustomValidation) {
+        return res.status(422).json({
+          message: 'Custom field validation failed',
+          errors: error.fieldErrors,
+        });
+      }
+      throw error;
+    }
+
     const employee = new Employee({
       fullName: sanitizeText(fullName),
       role: sanitizeText(role),
@@ -189,6 +208,7 @@ exports.addEmployee = async (req, res, next) => {
       ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
       ...(normalizedPhone.value ? { phone: normalizedPhone.value } : {}),
       ...(language ? { language } : {}),
+      customData: validatedCustomData,
     });
 
     // Optionally store bank details if provided
