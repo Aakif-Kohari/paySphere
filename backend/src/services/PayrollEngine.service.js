@@ -8,8 +8,8 @@ const { calculateNetSalary } = require('../utils/salaryCalculator');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const cacheService = require('../services/cache.service');
-const { PAYROLL_STATUS, normalizeStatus } = require('../config/payrollStatus');
-const Attendance = require('../models/attendance.model');
+const outboxService = require('./outbox.service');
+const { PAYROLL_STATUS, normalizeStatus } = require('../config/payrollStatus');const Attendance = require('../models/attendance.model');
 const { derivePayrollInputs } = require('../utils/attendanceGrid');
 const Loan = require('../models/loan.model');
 const {
@@ -606,8 +606,38 @@ class PayrollEngine {
         });
       }
 
-      const results = preparedItems.map((item) => ({
-        employeeName: item.employee.fullName,
+      // Recorded inside the same transaction as the payroll writes above
+      // (#1801): a crash right after this commits still leaves the event as
+      // `pending` for workers/outbox.worker.js to pick up and publish, so
+      // payslip generation/emailing can never be silently skipped for a run
+      // that did save.
+      const finalizedPayrollIds = preparedItems
+        .map((item) => payrollMap[item.employee._id.toString()])
+        .filter(Boolean);
+      const outboxPayload = {
+        tenantId,
+        userId,
+        month: currentMonth,
+        year: currentYear,
+        payrollIds: finalizedPayrollIds,
+      };
+      await outboxService.recordEvent(
+        outboxService.OUTBOX_EVENT_TYPES.PAYROLL_FINALIZED,
+        outboxPayload,
+        { tenantId, session },
+      );
+      await outboxService.recordEvent(
+        outboxService.OUTBOX_EVENT_TYPES.PAYSLIP_GENERATION_REQUESTED,
+        outboxPayload,
+        { tenantId, session },
+      );
+      await outboxService.recordEvent(
+        outboxService.OUTBOX_EVENT_TYPES.PAYSLIP_EMAIL_REQUESTED,
+        outboxPayload,
+        { tenantId, session },
+      );
+
+      const results = preparedItems.map((item) => ({        employeeName: item.employee.fullName,
         currency: item.employee.currency || 'INR',
         baseSalary: item.baseSalary,
         leaveDays: item.leaveDays,
