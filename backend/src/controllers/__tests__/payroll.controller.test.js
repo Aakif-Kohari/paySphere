@@ -143,7 +143,61 @@ describe("Payroll Controller - submitPayrollForReview parseTagValue & Transactio
     expect(isNaN(result.netSalary)).toBe(false);
     expect(result.netSalary).toBe(50500);
   });
+test('stores calculation inputs in the payroll snapshot so later employee changes cannot alter the calculation', async () => {
+  const mockEmployee = {
+    _id: "507f1f77bcf86cd799439011",
+    fullName: "Alice Smith",
+    email: "alice@example.com",
+    role: "Developer",
+    companyName: "PaySphere",
+    language: "en",
+    monthlySalary: 50000,
+    overtimeRate: 200,
+    isActive: true,
+  };
 
+  Employee.find.mockResolvedValue([mockEmployee]);
+  User.findById.mockResolvedValue({
+    defaultDailyRate: 1000,
+    defaultOvertimeRate: 200,
+  });
+
+  PayrollUpdate.bulkWrite.mockResolvedValue({});
+  PayrollUpdate.find
+    .mockImplementationOnce(() => createQueryMock([]))
+    .mockImplementationOnce(() =>
+      createQueryMock([{ _id: "payroll1", employeeId: "emp1" }]),
+    );
+
+  req.body = {
+    activities: [
+      {
+        employeeId: mockEmployee._id,
+        name: mockEmployee.fullName,
+        tags: [{ label: "bonus 500" }],
+      },
+    ],
+    month: 7,
+    year: 2026,
+  };
+
+  await submitPayrollForReview(req, res);
+
+  const bulkOperations = PayrollUpdate.bulkWrite.mock.calls[0][0];
+  const payrollData =
+    bulkOperations[0].updateOne.update.$set;
+
+  expect(payrollData.calculationSnapshot.version).toBe("1.0.0");
+  expect(payrollData.calculationSnapshot.employee.fullName).toBe(
+    "Alice Smith",
+  );
+  expect(payrollData.calculationSnapshot.inputs.baseSalary).toBe(50000);
+  expect(payrollData.calculationSnapshot.inputs.overtimeRate).toBe(200);
+  expect(payrollData.calculationSnapshot.inputs.bonus).toBe(500);
+  expect(payrollData.calculationSnapshot.finalAmounts.netSalary).toBe(
+    payrollData.netSalary,
+  );
+});
   test("should correctly classify tags containing 'days' or 'hrs' such as 'Overtime 2 days' and 'Deduction 3 days' (#377)", async () => {
     const mockEmployee = {
       _id: "507f1f77bcf86cd799439011",
