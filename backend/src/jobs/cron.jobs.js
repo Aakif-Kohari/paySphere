@@ -10,7 +10,6 @@ const logger = require('../utils/logger');
 const { runDatabaseBackupJob } = require('./backup.job');
 const { runDatabaseArchivalJob } = require('./archival.job');
 const { runForexSyncJob } = require('./forexSync.job');
-
 const LOCK_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -396,7 +395,20 @@ const startCronJobs = () => {
     }),
   );
   logger.info('Monthly database archival cron job registered.');
-
+  // 01:00 daily — Data retention and privacy lifecycle.
+  //
+  // Runs separately from cold-storage archival so retention policy decisions
+  // can be applied per tenant without deleting historical payroll or audit data.
+  scheduledTasks.push(
+    cron.schedule('0 1 * * *', () => {
+      runRetentionLifecycleJob().catch((error) =>
+        logger.error('Retention lifecycle job threw', {
+          error: error.message,
+        }),
+      );
+    }),
+  );
+  logger.info('Daily retention lifecycle cron job registered.');
   // 04:00 daily — TOIL Expirations and Warnings.
   scheduledTasks.push(
     cron.schedule('0 4 * * *', () => {
@@ -584,8 +596,8 @@ module.exports = {
   runHrmsSyncJob,
   runDatabaseBackupJob,
   runDatabaseArchivalJob,
-  runForexSyncJob,
-  runToilExpirationJob,
+  runRetentionLifecycleJob,
+  runForexSyncJob,  runToilExpirationJob,
   runTreasuryRebalancingJob: runTreasuryRebalancingCron,
   runTaxSyncJob: runTaxSyncCron,
   previousPeriod,
