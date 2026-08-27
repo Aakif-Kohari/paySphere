@@ -267,7 +267,6 @@ const {
   DisbursementLine,
 } = require('../models/disbursementBatch.model');
 const PayrollUpdate = require('../models/payroll.model');
-
 const {
   BATCH_STATUS,
   LINE_STATUS,
@@ -282,7 +281,6 @@ const {
   toRupees,
 } = require('../utils/bankFileGenerator');
 const { PAYROLL_STATUS } = require('../config/payrollStatus');
-
 const eventBus = require('../services/event.service');
 
 /**

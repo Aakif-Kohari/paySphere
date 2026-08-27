@@ -164,9 +164,9 @@ export const APP_ROUTES = [
     icon: 'chart',
   },
   {
-    path: '/offer-letters',
-    component: lazy(() => import('../pages/OfferLetterBuilder')),
-    label: 'Offer letters',
+    path: '/templates',
+    component: lazy(() => import('../pages/LetterTemplateManager')),
+    label: 'Letter templates',
     group: 'people',
     icon: 'document',
   },

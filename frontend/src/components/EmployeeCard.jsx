@@ -127,6 +127,7 @@ export default function EmployeeCard({
   onAddUpdate,
   onDeleteEmployee,
   onEdit,
+  onGenerateLetter,
 }) {
   const { t } = useTranslation();
   const p = payroll;
@@ -316,6 +317,16 @@ export default function EmployeeCard({
             {t('common.deleteEmployee', 'Delete Employee')}
           </button>
         )}
+
+        {/* Generate Letter */}
+        {onGenerateLetter && (
+          <button
+            onClick={() => onGenerateLetter(emp)}
+            className="mt-2 w-full py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+          >
+            Generate Letter
+          </button>
+        )}
       </div>
     );
   }
@@ -383,6 +394,16 @@ export default function EmployeeCard({
           ? t('dashboard.editUpdates', 'Edit Updates')
           : t('common.addUpdate', '+ Add Update')}
       </button>
+
+      {/* Generate Letter */}
+      {onGenerateLetter && (
+        <button
+          onClick={() => onGenerateLetter(emp)}
+          className="border border-indigo-200 dark:border-indigo-800 rounded-lg py-2 bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          Generate Letter
+        </button>
+      )}
     </div>
   );
 }
