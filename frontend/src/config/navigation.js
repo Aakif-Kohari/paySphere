@@ -390,6 +390,19 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
   {
+    // In Compliance rather than Finance, even though every figure on the page
+    // is a revenue number. The turnover is there only as the base of a
+    // statutory levy, and the worker register is a roll under the Code rather
+    // than a list of counterparties — nobody comes to this page to look at how
+    // the platform is trading (#1829).
+    path: '/aggregator-contribution',
+    component: lazy(() => import('../pages/AggregatorContribution')),
+    appShell: true,
+    label: 'Aggregator contribution',
+    group: 'compliance',
+    icon: 'shield',
+  },
+  {
     // In Compliance rather than Finance, even though a contractor is a vendor.
     // The vendor ledger's question is "what do we owe this counterparty"; this
     // one's is "what are we liable for on account of people we do not employ",

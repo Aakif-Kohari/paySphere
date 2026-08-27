@@ -115,6 +115,26 @@ const PERMISSIONS = {
   // with the owner for the same reason MANAGE_EXPENSE_CATEGORY is.
   MANAGE_COMPLIANCE: 'MANAGE_COMPLIANCE',
 
+  // --- Code on Social Security, 2020, section 114 (#1829) ------------------
+  //
+  // Next to the compliance names because the turnover half has exactly
+  // MANAGE_COMPLIANCE's shape of authority: the aggregator's turnover is the
+  // base of the levy, nothing in this product produces it, and there is no
+  // payroll figure anywhere to check a stated figure against.
+  //
+  // The split follows the two axes the module keeps apart. The levy is per
+  // platform on its own turnover; the register is per *person*, because the
+  // same gig worker may be engaged by three aggregators and is one beneficiary
+  // against three contributions. Keeping the register a separate permission
+  // keeps it a separate act.
+  //
+  // Deliberately not the employee names. A gig worker is not an employee under
+  // section 2(35), and gating this on WRITE_EMPLOYEE is the first place that
+  // would be lost — the failure #1771 spent a whole module avoiding.
+  READ_AGGREGATOR_CONTRIBUTION: 'READ_AGGREGATOR_CONTRIBUTION',
+  MANAGE_GIG_WORKER_REGISTER: 'MANAGE_GIG_WORKER_REGISTER',
+  MANAGE_AGGREGATOR_TURNOVER: 'MANAGE_AGGREGATOR_TURNOVER',
+
   // --- Employees' State Insurance Act, 1948 (#1768) ------------------------
   //
   // Next to the compliance names because a monthly ESI return is a filing, and
@@ -532,6 +552,22 @@ const PERMISSION_DEFINITIONS = [
       'Commit the section 13A register for a wage period, and write off a deferred balance that will not be recovered',
   },
   {
+    name: PERMISSIONS.READ_AGGREGATOR_CONTRIBUTION,
+    description:
+      'View the section 114 contribution — the turnover limb against the payout ceiling, which one binds, and the gig worker register',
+  },
+  {
+    name: PERMISSIONS.MANAGE_GIG_WORKER_REGISTER,
+    description:
+      'Record a gig or platform worker and their engagements across aggregators, including platforms this tenant does not operate',
+  },
+  {
+    name: PERMISSIONS.MANAGE_AGGREGATOR_TURNOVER,
+    description:
+      'State the aggregator’s turnover and its Seventh Schedule split, set the rate band and the payout ceiling, finalise a year and commit the assessment',
+  },
+
+  {
     name: PERMISSIONS.READ_COMPLIANCE,
     description:
       'View compliance settings and download Form 16 certificates and Form 24Q returns',
@@ -930,6 +966,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_WAGE_DEDUCTION_RULES,
       PERMISSIONS.COMMIT_WAGE_DEDUCTION_REGISTER,
 
+      // #1829. All three. Stating the platform's turnover and certifying the
+      // contribution computed from it are the two halves of one check, and the
+      // owner is the one account allowed to be both — there is nobody above it.
+      PERMISSIONS.READ_AGGREGATOR_CONTRIBUTION,
+      PERMISSIONS.MANAGE_GIG_WORKER_REGISTER,
+      PERMISSIONS.MANAGE_AGGREGATOR_TURNOVER,
+
       PERMISSIONS.READ_COMPLIANCE,
       PERMISSIONS.MANAGE_COMPLIANCE,
 
@@ -1080,6 +1123,14 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.APPROVE_EXPENSE,
       // Issuing Form 16 at year end is HR's job. Setting the TAN the return is
       // filed under is not — that stays with the owner.
+      // #1829. Read and the register. Recording a gig worker and the days they
+      // worked across platforms is register-keeping of the ordinary kind. It
+      // does not state the aggregator's turnover, which is the base of the levy
+      // and has no cross-check anywhere in this product, and it does not commit
+      // the assessment.
+      PERMISSIONS.READ_AGGREGATOR_CONTRIBUTION,
+      PERMISSIONS.MANAGE_GIG_WORKER_REGISTER,
+
       PERMISSIONS.READ_COMPLIANCE,
 
       // #1768. HR reads the coverage register — the 78-day count is what an

@@ -148,6 +148,13 @@ const varianceReportRoutes = require('./routes/varianceReport.routes');
 const searchRoutes = require('./routes/search.routes');
 const emailRoutes = require('./routes/email.routes');
 const complianceRoutes = require('./routes/compliance.routes');
+
+// Code on Social Security, 2020, section 114 (#1829). Next to the compliance
+// router because the contribution is a filing, and apart from every other
+// statutory router here because its base is neither a wage nor a headcount: an
+// aggregator owes a share of its own turnover on account of workers who are
+// expressly not its employees.
+const aggregatorContributionRoutes = require('./routes/aggregatorContribution.routes');
 const forexRoutes = require('./routes/forex.routes');
 const announcementRoutes = require('./routes/announcement.routes');
 const companyEventRoutes = require('./routes/companyEvent.routes');
@@ -589,6 +596,12 @@ app.use('/api/search', searchRoutes);
 // so there was no URL that reached it — and consequently nobody noticed that
 // neither of the two models it requires had been committed (#951).
 app.use('/api/compliance', complianceRoutes);
+
+// #1829. The router owns `/rules`, `/turnover`, `/workers` and `/assessments`.
+// `/workers` is a register of people rather than of engagements, which is why
+// it does not live under `/api/employees` — section 2(35) puts a gig worker
+// outside the employment relationship entirely.
+app.use('/api/aggregator-contribution', aggregatorContributionRoutes);
 
 // ─── Feature routers that were never mounted (#1009) ───────────────────────
 //
