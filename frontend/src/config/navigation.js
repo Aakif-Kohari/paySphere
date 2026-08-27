@@ -390,19 +390,6 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
   {
-    // In Compliance rather than Finance, even though every figure on the page
-    // is a revenue number. The turnover is there only as the base of a
-    // statutory levy, and the worker register is a roll under the Code rather
-    // than a list of counterparties — nobody comes to this page to look at how
-    // the platform is trading (#1829).
-    path: '/aggregator-contribution',
-    component: lazy(() => import('../pages/AggregatorContribution')),
-    appShell: true,
-    label: 'Aggregator contribution',
-    group: 'compliance',
-    icon: 'shield',
-  },
-  {
     // In Compliance rather than Finance, even though a contractor is a vendor.
     // The vendor ledger's question is "what do we owe this counterparty"; this
     // one's is "what are we liable for on account of people we do not employ",
@@ -411,6 +398,19 @@ export const APP_ROUTES = [
     component: lazy(() => import('../pages/ContractLabourRegister')),
     appShell: true,
     label: 'Contract labour',
+    group: 'compliance',
+    icon: 'shield',
+  },
+  {
+    // Directly under Contract labour, which is its nearest neighbour: both are
+    // about people the establishment does not employ. They part company on
+    // what is owed — there, a contingent liability for a contractor's workmen;
+    // here, a share of the platform's own turnover, on account of workers
+    // section 2(35) puts outside the employment relationship entirely (#1829).
+    path: '/aggregator-contribution',
+    component: lazy(() => import('../pages/AggregatorContribution')),
+    appShell: true,
+    label: 'Aggregator contribution',
     group: 'compliance',
     icon: 'shield',
   },
