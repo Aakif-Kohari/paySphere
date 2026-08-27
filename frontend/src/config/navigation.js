@@ -233,6 +233,19 @@ export const APP_ROUTES = [
     icon: 'wallet',
   },
   {
+    // In Payroll and directly above Settlements, because the two are adjacent
+    // and are not the same: a settlement ends an employment, and a suspension
+    // is an employment that subsists while producing no work and owing a rising
+    // statutory scale. Filing it with leave would be worse — leave pays nothing
+    // and this pays fifty per cent rising to a hundred (#1828).
+    path: '/suspensions',
+    component: lazy(() => import('../pages/SuspensionRegister')),
+    appShell: true,
+    label: 'Suspensions',
+    group: 'payroll',
+    icon: 'clock',
+  },
+  {
     path: '/settlements',
     component: lazy(() => import('../pages/Settlements')),
     appShell: true,

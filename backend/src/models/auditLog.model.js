@@ -20,6 +20,22 @@ const AUDIT_ACTIONS = [
   // one action left untracked (#458).
   'PAYROLL_APPROVE',
   'PAYROLL_REJECT',
+  // Section 10A of the Standing Orders Act, 1946 (#1828). Next to the payroll
+  // actions because a suspension is the one state in which somebody is paid
+  // without working and without being on leave.
+  //
+  // The attributability finding is audited because it is not a rate change: it
+  // is a judgement about whose conduct delayed an enquiry, it decides fifty per
+  // cent against seventy-five from day ninety-one, and the party whose delay is
+  // in question is frequently the one recording it. The outcome is audited
+  // because it converts what has already been drawn — a set-off against back
+  // wages on reinstatement, an unrecoverable payment on dismissal — so the same
+  // ledger rows change meaning at that moment.
+  'SUBSISTENCE_RULES_UPDATED',
+  'SUSPENSION_ORDERED',
+  'SUSPENSION_ATTRIBUTABILITY_RECORDED',
+  'SUSPENSION_CONCLUDED',
+  'SUBSISTENCE_ASSESSMENT_COMMITTED',
   // Statutory bonus under the Payment of Bonus Act (#1346). Committing a year
   // declares what the establishment owes under a statute and writes a
   // set-on/set-off balance that binds the next four years; the Form C export is
