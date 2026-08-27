@@ -155,6 +155,7 @@ const notificationRoutes = require('./routes/notification.routes');
 const monthlyUpdatesRoutes = require('./routes/monthlyUpdates.routes');
 const expenseRoutes = require('./routes/expense.routes');
 const fringeBenefitsRoutes = require('./routes/fringeBenefits.routes');
+const timelineRoutes = require('./routes/timeline.routes');
 
 // Labour Welfare Fund (#1701). There is no central Act — fifteen or so state
 // enactments that agree on almost nothing — so the state rule is data and this
@@ -631,6 +632,7 @@ app.use('/api/monthly-updates', monthlyUpdatesRoutes);
 // part that belongs to this file.
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/fringe-benefits', fringeBenefitsRoutes);
+app.use('/api', timelineRoutes);
 
 // #1701. The router owns `/rules`, `/preview`, `/calendar` and
 // `/contributions`.

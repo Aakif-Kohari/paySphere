@@ -22,6 +22,7 @@ const { invalidateStatsCaches } = require('./stats.controller');
 const Settlement = require('../models/settlement.model');
 const { Client } = require('@elastic/elasticsearch');
 const customFieldService = require('../services/customField.service');
+const lifecycleEventService = require('../services/lifecycleEvent.service');
 
 const esClient = new Client({
   node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200',
@@ -866,6 +867,8 @@ exports.updateEmployee = async (req, res, next) => {
 
     // Capture old name for payroll propagation check (#253)
     const oldName = employee.fullName;
+    const oldDepartment = employee.department;
+    const oldRole = employee.role;
 
     // Apply updates only for provided fields
     if (fullName !== undefined) employee.fullName = sanitizeText(fullName);
@@ -947,6 +950,30 @@ exports.updateEmployee = async (req, res, next) => {
       }
     }
 
+    if (department !== undefined && employee.department !== oldDepartment) {
+      await lifecycleEventService.recordEvent({
+        employeeId: employee._id,
+        tenantId: employee.tenantId,
+        eventType: 'DEPARTMENT_TRANSFERRED',
+        category: 'Role',
+        recordedBy: req.userId,
+        previousValues: { department: oldDepartment },
+        newValues: { department: employee.department },
+      });
+    }
+
+    if (role !== undefined && employee.role !== oldRole) {
+      await lifecycleEventService.recordEvent({
+        employeeId: employee._id,
+        tenantId: employee.tenantId,
+        eventType: 'ROLE_CHANGED',
+        category: 'Role',
+        recordedBy: req.userId,
+        previousValues: { role: oldRole },
+        newValues: { role: employee.role },
+      });
+    }
+
     eventBus.emit('AUDIT_LOG', {
       userId: req.userId,
       action: 'EMPLOYEE_UPDATE',
@@ -982,7 +1009,7 @@ exports.updateEmployee = async (req, res, next) => {
     if (handleDuplicateEmail(error, res)) return;
     next(error);
   }
-};// TOGGLE EMPLOYEE ACTIVE STATUS
+}; // TOGGLE EMPLOYEE ACTIVE STATUS
 exports.toggleEmployeeStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
