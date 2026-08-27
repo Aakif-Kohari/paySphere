@@ -7,6 +7,9 @@ const PayrollExportService = require('../services/payrollExport.service');
 // a broken require of its own that this file was propagating to app.js at boot
 // (#792). Dropped rather than wired up: neither has an implementation to call.
 const crypto = require('crypto');
+const {
+  PAYROLL_CALCULATION_VERSION,
+} = require('../config/payrollCalculationVersion');
 const mongoose = require('mongoose');
 const Employee = require('../models/employee.model');
 const PayrollUpdate = require('../models/payroll.model');
@@ -172,8 +175,8 @@ async function transitionPayrollBatch({
   ids,
   targetStatus,
   extraFields = {},
-}) {
-  // Scoped read first. Anything the caller does not own simply never appears in
+  expectedVersions = {},
+}) {  // Scoped read first. Anything the caller does not own simply never appears in
   // this result set, and therefore lands in `notFound` — the caller cannot tell
   // "does not exist" from "belongs to someone else", which is the correct
   // answer to give.
@@ -220,9 +223,14 @@ async function transitionPayrollBatch({
     const filter = {
       _id: { $in: targetIds },
       tenantId,
-      $or: transitionable.map((r) => ({ _id: r._id, __v: r.__v })),
+      $or: transitionable.map((r) => ({
+        _id: r._id,
+        __v:
+          expectedVersions[String(r._id)] !== undefined
+            ? expectedVersions[String(r._id)]
+            : r.__v,
+      })),
     };
-
     const res = await PayrollUpdate.updateMany(filter, update, {
       runValidators: true,
     });
@@ -356,7 +364,7 @@ exports.approvePayroll = async (req, res, next) => {
         tenantId: req.tenantId,
         ids: batch.ids,
         targetStatus: PAYROLL_STATUS.APPROVED,
-        extraFields: {
+        expectedVersions: submittedVersions,        extraFields: {
           approvedBy: req.userId,
           approvedAt,
           // Clear any prior rejection so a resubmitted-then-approved row does not
@@ -374,7 +382,39 @@ exports.approvePayroll = async (req, res, next) => {
         versionConflicts,
       });
     }
+    if (applied.length > 0) {
+      const finalizedAt = new Date();
 
+      const approvedPayrolls = await PayrollUpdate.find({
+        _id: { $in: applied.map((item) => item.payrollId) },
+        tenantId: req.tenantId,
+      });
+
+      const finalizedSnapshotUpdates = approvedPayrolls.map((payroll) => ({
+        updateOne: {
+          filter: {
+            _id: payroll._id,
+            tenantId: req.tenantId,
+            'calculationSnapshot.finalizedAt': {
+              $exists: false,
+            },
+          },
+          update: {
+            $set: {
+              'calculationSnapshot.version':
+                payroll.calculationSnapshot?.version ||
+                PAYROLL_CALCULATION_VERSION,
+              'calculationSnapshot.finalizedAt': finalizedAt,
+              'calculationSnapshot.finalizedBy': req.userId,
+            },
+          },
+        },
+      }));
+
+      if (finalizedSnapshotUpdates.length > 0) {
+        await PayrollUpdate.bulkWrite(finalizedSnapshotUpdates);
+      }
+    }
     if (applied.length === 0) {
       // Nothing moved. A 409 rather than a 200 so the UI does not tell the user
       // an approval happened when it did not.
@@ -452,7 +492,45 @@ exports.rejectPayroll = async (req, res, next) => {
 
     const reason = rawReason.trim().slice(0, MAX_REJECTION_REASON_LENGTH);
     const rejectedAt = new Date();
+    const payrollsToApprove = await PayrollUpdate.find({
+      _id: { $in: batch.ids },
+      tenantId: req.tenantId,
+      status: PAYROLL_STATUS.PENDING_APPROVAL,
+    }).select('_id employeeId calculationSnapshot.employee.version');
 
+    const employeeIds = payrollsToApprove.map((payroll) => payroll.employeeId);
+
+    const employees = await Employee.find({
+      _id: { $in: employeeIds },
+      tenantId: req.tenantId,
+    }).select('_id __v');
+
+    const employeeVersions = new Map(
+      employees.map((employee) => [String(employee._id), employee.__v]),
+    );
+
+    const staleEmployeeVersions = payrollsToApprove
+      .filter((payroll) => {
+        const snapshotVersion =
+          payroll.calculationSnapshot?.employee?.version;
+
+        return (
+          snapshotVersion !== undefined &&
+          employeeVersions.get(String(payroll.employeeId)) !== snapshotVersion
+        );
+      })
+      .map((payroll) => ({
+        payrollId: String(payroll._id),
+        employeeId: String(payroll.employeeId),
+      }));
+
+    if (staleEmployeeVersions.length > 0) {
+      return res.status(409).json({
+        message:
+          'Employee compensation data changed after this payroll was calculated. Review and recalculate the affected payroll before approving it.',
+        staleEmployeeVersions,
+      });
+    }
     const { applied, notFound, invalidTransition, versionConflicts } =
       await transitionPayrollBatch({
         tenantId: req.tenantId,
@@ -539,7 +617,21 @@ exports.markPayrollPaid = async (req, res, next) => {
     if (!batch.ok) {
       return res.status(400).json({ message: batch.message });
     }
+    const submittedVersions =
+      req.body && req.body.versions && typeof req.body.versions === 'object'
+        ? req.body.versions
+        : {};
 
+    const invalidVersionIds = batch.ids.filter(
+      (id) => !Number.isInteger(submittedVersions[id]),
+    );
+
+    if (invalidVersionIds.length > 0) {
+      return res.status(400).json({
+        message: 'A valid payroll version is required for every record',
+        invalidVersionIds,
+      });
+    }
     const paidAt = new Date();
 
     const { applied, notFound, invalidTransition, versionConflicts } =

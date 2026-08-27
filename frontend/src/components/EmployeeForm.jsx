@@ -18,6 +18,7 @@ import CancelIcon from '@mui/icons-material/Cancel';
 import { useEffect } from 'react';
 import { useAutoSaveDraft, getDraft } from '../hooks/useAutoSaveDraft';
 import { db } from '../db/db';
+import CustomFieldsSection from './CustomFieldsSection';
 
 /**
  * Reusable Input Field with Label and Error Message
@@ -216,6 +217,8 @@ export default function EmployeeForm({
               </FormField>
             </div>
           </fieldset>
+
+          <CustomFieldsSection entityType="Employee" />
 
           {/* Compensation Section */}
           <fieldset className="space-y-6 border-t border-gray-200 dark:border-slate-700 pt-6">

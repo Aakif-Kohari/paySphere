@@ -80,6 +80,23 @@ const PERMISSIONS = {
   READ_MINIMUM_WAGE: 'READ_MINIMUM_WAGE',
   MANAGE_MINIMUM_WAGE_SCHEDULE: 'MANAGE_MINIMUM_WAGE_SCHEDULE',
   RUN_MINIMUM_WAGE_ASSESSMENT: 'RUN_MINIMUM_WAGE_ASSESSMENT',
+
+  // --- Payment of Wages Act, 1936 (#1767) ----------------------------------
+  //
+  // Next to the minimum wage names because the two are the same shape of rule
+  // — one sets the floor under what must be paid and this one sets the ceiling
+  // on what may be taken back out — and split three ways for the same reason.
+  // The rules decide what counts as a breach: raising the section 1(6)
+  // applicability ceiling takes employees out of the Act entirely and every
+  // finding against them disappears, with nothing in the register saying so.
+  //
+  // Deliberately not gated on the payroll permissions, though it is computed
+  // from those rows. Payroll answers "what was this person paid"; this answers
+  // "was the employer allowed to take that much", and the people who audit the
+  // second are not the people who run the first.
+  READ_WAGE_DEDUCTIONS: 'READ_WAGE_DEDUCTIONS',
+  MANAGE_WAGE_DEDUCTION_RULES: 'MANAGE_WAGE_DEDUCTION_RULES',
+  COMMIT_WAGE_DEDUCTION_REGISTER: 'COMMIT_WAGE_DEDUCTION_REGISTER',
   // Statutory compliance (#933, reachable since #951). Deliberately not
   // READ_REPORT: a Form 16 is one person's complete tax position and a Form 24Q
   // export is every employee's PAN, salary and tax in one file, while
@@ -97,6 +114,27 @@ const PERMISSIONS = {
   // what gets filed with the tax department under the employer's name. Kept
   // with the owner for the same reason MANAGE_EXPENSE_CATEGORY is.
   MANAGE_COMPLIANCE: 'MANAGE_COMPLIANCE',
+
+  // --- Employees' State Insurance Act, 1948 (#1768) ------------------------
+  //
+  // Next to the compliance names because a monthly ESI return is a filing, and
+  // split three ways because the wage ceiling is the same kind of lever the
+  // minimum wage notification is — it decides who the scheme reaches.
+  //
+  // The middle name matters more here than anywhere else in the tree. Somebody
+  // removed from the scheme keeps drawing benefit for three months, because the
+  // benefit period lags the contribution period, so a ceiling lowered quietly
+  // is a change nobody notices until a claim is rejected — and by then the
+  // contribution that would have supported it was never remitted and cannot
+  // retrospectively be.
+  //
+  // Deliberately not gated on the payroll permissions: the coverage register
+  // carries a disability flag against named employees, which the payroll role
+  // has no reason to hold.
+  READ_ESI: 'READ_ESI',
+  MANAGE_ESI_RULES: 'MANAGE_ESI_RULES',
+  FILE_ESI_RETURN: 'FILE_ESI_RETURN',
+
   IMPERSONATE_USER: 'IMPERSONATE_USER',
 
   // --- Feature areas that had no vocabulary of their own (#1011) -----------
@@ -136,6 +174,26 @@ const PERMISSIONS = {
   RUN_GRATUITY_VALUATION: 'RUN_GRATUITY_VALUATION',
   MANAGE_GRATUITY_ASSUMPTIONS: 'MANAGE_GRATUITY_ASSUMPTIONS',
 
+  // --- Employees' Pension Scheme, 1995 (#1769) -----------------------------
+  //
+  // Directly under the gratuity names because the two are the same kind of
+  // obligation valued the same way — a defined benefit on service and a final
+  // salary — and split three ways for a sharper version of the same reason.
+  //
+  // The wage ceiling is the figure the whole capping question turns on: moving
+  // it changes the pensionable salary of every member above the old one, and a
+  // pension once fixed is not revisited, so the change is for life. That is a
+  // larger consequence than the discount rate has and it is separated for the
+  // same reason.
+  //
+  // MANAGE also gates the wage-history backfill. It produces no valuation, but
+  // every future valuation is computed from what it writes, and a backfill that
+  // resolved the ambiguous months the wrong way is harder to notice than a
+  // wrong valuation and outlives it.
+  READ_EPS_PENSION: 'READ_EPS_PENSION',
+  MANAGE_EPS_ASSUMPTIONS: 'MANAGE_EPS_ASSUMPTIONS',
+  COMMIT_EPS_VALUATION: 'COMMIT_EPS_VALUATION',
+
   // --- Employees' Compensation Act, 1923 (#1699) ---------------------------
   //
   // Next to the gratuity names because both measure what is owed when something
@@ -154,6 +212,24 @@ const PERMISSIONS = {
   // authority as MANAGE_COMPLIANCE.
   MANAGE_VENDOR: 'MANAGE_VENDOR',
 
+  // --- BOCW Welfare Cess Act, 1996 (#1827) ---------------------------------
+  //
+  // Next to the vendor names because every bill the cess is deducted from is a
+  // vendor bill, and split from them because the deduction is not the company's
+  // money to withhold or release: rule 4 takes one per cent at source and it
+  // goes to a welfare board.
+  //
+  // The split inside is on the *base*. This is the only levy in the product
+  // whose base is not a wage — it is one per cent of the cost of construction —
+  // so there is no payroll figure anywhere to check it against, and moving the
+  // section 3 land exclusion by a crore moves the cess by a lakh with nothing
+  // objecting. The project cost, the rate and the section 7 registration
+  // therefore sit together behind MANAGE_CESS_BASE, and whoever holds it does
+  // not also certify the establishment against the result.
+  READ_CONSTRUCTION_CESS: 'READ_CONSTRUCTION_CESS',
+  MANAGE_CESS_REGISTER: 'MANAGE_CESS_REGISTER',
+  MANAGE_CESS_BASE: 'MANAGE_CESS_BASE',
+
   // --- Contract Labour (Regulation and Abolition) Act, 1970 (#1700) --------
   //
   // Next to the vendor names, and deliberately not the same as them. The vendor
@@ -164,6 +240,46 @@ const PERMISSIONS = {
   // designation, which is the rule 25(2)(v)(a) comparator.
   READ_CONTRACT_LABOUR: 'READ_CONTRACT_LABOUR',
   MANAGE_CONTRACT_LABOUR: 'MANAGE_CONTRACT_LABOUR',
+
+  // --- Apprentices Act, 1961 (#1771) ---------------------------------------
+  //
+  // Next to the contract labour names because both are about people on the site
+  // who are not on the payroll, and split three ways on the denominator.
+  //
+  // The band's rules and the establishment's recorded strength are the same kind
+  // of lever: reducing total strength by ten lowers the floor and can make a
+  // shortfall disappear without a single apprentice being engaged. So both sit
+  // behind MANAGE_APPRENTICESHIP_RULES, and whoever holds it does not also
+  // certify the establishment against the result.
+  //
+  // Deliberately not the employee permissions. An apprentice is not an employee
+  // — that is the whole subject — and putting the roll behind WRITE_EMPLOYEE is
+  // the first place the distinction would get lost.
+  READ_APPRENTICESHIP: 'READ_APPRENTICESHIP',
+  MANAGE_APPRENTICE: 'MANAGE_APPRENTICE',
+  MANAGE_APPRENTICESHIP_RULES: 'MANAGE_APPRENTICESHIP_RULES',
+
+  // --- Inter-State Migrant Workmen Act, 1979 (#1826) ------------------------
+  //
+  // Split on the denominators of the comparison rather than on read against
+  // write. The section 13(1)(b) comparator — what a local workman doing similar
+  // work is said to earn — is the sharpest lever here: lowering it makes a
+  // parity breach disappear without a rupee changing hands, and unlike a wage
+  // floor there is no notification anywhere to check it against. So the
+  // comparator sits with the thresholds and the section 4 registration flag
+  // behind MANAGE_MIGRANT_WAGE_BASIS, and whoever holds it does not also
+  // certify the establishment against the result.
+  //
+  // Recording an allowance that was actually paid is ordinary register-keeping,
+  // and sits with the roll under MANAGE_MIGRANT_WORKMAN.
+  //
+  // Deliberately not the contract-labour names, though a migrant workman is
+  // very often also a contract workman: #1700 answers what the principal
+  // employer owes for a contractor's workmen, and this answers what the workman
+  // is owed for having been recruited in another state.
+  READ_MIGRANT_WORKMEN: 'READ_MIGRANT_WORKMEN',
+  MANAGE_MIGRANT_WORKMAN: 'MANAGE_MIGRANT_WORKMAN',
+  MANAGE_MIGRANT_WAGE_BASIS: 'MANAGE_MIGRANT_WAGE_BASIS',
 
   READ_ROSTER: 'READ_ROSTER',
   MANAGE_ROSTER: 'MANAGE_ROSTER',
@@ -229,6 +345,24 @@ const PERMISSIONS = {
   // The HR side of the same feature: approving a proof changes the TDS
   // deducted from somebody's salary.
   VERIFY_TAX_PROOF: 'VERIFY_TAX_PROOF',
+
+  // --- Perquisite valuation under Rule 3 (#1770) ---------------------------
+  //
+  // Next to the tax-proof names because both decide what a Form 16 says, and
+  // split three ways on a line that is not the usual read/write one.
+  //
+  // Recording a grant is HR work: somebody is given a flat, a car, a loan.
+  // Setting the rules is not, and the State Bank of India rate is why — it is
+  // frozen for the whole year and applied to every concessional loan in the
+  // establishment, so a figure recorded a point too low understates the
+  // perquisite for every borrower and nothing in a payslip would show it.
+  //
+  // Reading is separated from both because a perquisite statement is one
+  // person's complete tax position, in the same class as the Form 16 that
+  // READ_COMPLIANCE guards.
+  READ_PERQUISITE: 'READ_PERQUISITE',
+  MANAGE_PERQUISITE_GRANT: 'MANAGE_PERQUISITE_GRANT',
+  MANAGE_PERQUISITE_RULES: 'MANAGE_PERQUISITE_RULES',
 
   // --- Labour Welfare Fund (#1701) -----------------------------------------
   //
@@ -423,6 +557,21 @@ const PERMISSION_DEFINITIONS = [
       'Commit a minimum wage assessment for a wage period, which states what the establishment owes',
   },
   {
+    name: PERMISSIONS.READ_WAGE_DEDUCTIONS,
+    description:
+      'View the wage deduction register — the section 7(3) aggregate ceiling, the fines realised against the section 8 three per cent, and the balances the ceiling deferred',
+  },
+  {
+    name: PERMISSIONS.MANAGE_WAGE_DEDUCTION_RULES,
+    description:
+      'Set the establishment’s deduction ceilings, its approved list of acts under section 8(1) and the section 1(6) wage above which the Act does not apply',
+  },
+  {
+    name: PERMISSIONS.COMMIT_WAGE_DEDUCTION_REGISTER,
+    description:
+      'Commit the section 13A register for a wage period, and write off a deferred balance that will not be recovered',
+  },
+  {
     name: PERMISSIONS.READ_COMPLIANCE,
     description:
       'View compliance settings and download Form 16 certificates and Form 24Q returns',
@@ -431,6 +580,21 @@ const PERMISSION_DEFINITIONS = [
     name: PERMISSIONS.MANAGE_COMPLIANCE,
     description:
       "Set the company's TAN and PAN and record or verify employee tax declarations",
+  },
+  {
+    name: PERMISSIONS.READ_ESI,
+    description:
+      'View the ESI coverage register for the contribution period — who is in the scheme, who is being carried above the ceiling by the Rule 50 proviso, and the 78-day counts that decide benefit',
+  },
+  {
+    name: PERMISSIONS.MANAGE_ESI_RULES,
+    description:
+      'Set the ESI wage ceiling, the two contribution rates and the section 42(1) daily floor, which together decide who the scheme reaches',
+  },
+  {
+    name: PERMISSIONS.FILE_ESI_RETURN,
+    description:
+      'File the monthly ESI return and record its remittance, which fixes the coverage each employee carries into the next month',
   },
   {
     name: PERMISSIONS.MANAGE_ROLES,
@@ -475,6 +639,21 @@ const PERMISSION_DEFINITIONS = [
       'Set the discount rate, salary escalation and attrition assumptions the gratuity provision is measured on',
   },
   {
+    name: PERMISSIONS.READ_EPS_PENSION,
+    description:
+      'View the EPS-95 valuation, a member’s pension statement and the sixty contributory months the pensionable salary was averaged over',
+  },
+  {
+    name: PERMISSIONS.MANAGE_EPS_ASSUMPTIONS,
+    description:
+      'Set the EPS wage ceiling, the averaging span and the early-pension factors, and backfill the wage history every valuation is computed from',
+  },
+  {
+    name: PERMISSIONS.COMMIT_EPS_VALUATION,
+    description:
+      'Commit an EPS-95 valuation as at a date, fixing the pension figure each member is quoted',
+  },
+  {
     name: PERMISSIONS.READ_EC_CLAIM,
     description:
       'View workplace injury compensation claims, including the injured employee’s age and the circumstances of the accident',
@@ -494,6 +673,21 @@ const PERMISSION_DEFINITIONS = [
       'Register contractors and record invoices, which sets the 194C/194J TDS withheld on their behalf',
   },
   {
+    name: PERMISSIONS.READ_CONSTRUCTION_CESS,
+    description:
+      'View the construction cess position per project, the advance deducted against the section 5 assessment and the beneficiary register',
+  },
+  {
+    name: PERMISSIONS.MANAGE_CESS_REGISTER,
+    description:
+      'Record contractor bills with the cess withheld at source, and the building workers’ days per employer for the section 12 register',
+  },
+  {
+    name: PERMISSIONS.MANAGE_CESS_BASE,
+    description:
+      'Set the cost of construction and its section 3 exclusions, the notified rate and the section 7 registration, record an assessment order, and commit the assessment',
+  },
+  {
     name: PERMISSIONS.READ_CONTRACT_LABOUR,
     description:
       'View the contract labour registers, the principal employer’s section 21 exposure and the wage parity comparison against directly employed staff',
@@ -502,6 +696,36 @@ const PERMISSION_DEFINITIONS = [
     name: PERMISSIONS.MANAGE_CONTRACT_LABOUR,
     description:
       'Register contractors, record their licences and monthly deployments, and file the Form XXV annual return',
+  },
+  {
+    name: PERMISSIONS.READ_APPRENTICESHIP,
+    description:
+      'View the apprentice roll, the section 8 engagement band and the exposure created by an unregistered contract',
+  },
+  {
+    name: PERMISSIONS.MANAGE_APPRENTICE,
+    description:
+      'Engage an apprentice, record the portal registration and the monthly attendance and stipend',
+  },
+  {
+    name: PERMISSIONS.MANAGE_APPRENTICESHIP_RULES,
+    description:
+      'Set the engagement band and the Rule 11 stipends, record the establishment’s total strength, and commit the assessment',
+  },
+  {
+    name: PERMISSIONS.READ_MIGRANT_WORKMEN,
+    description:
+      'View the inter-state migrant register, the section 13(1)(b) parity comparison and the displacement and journey allowances owed',
+  },
+  {
+    name: PERMISSIONS.MANAGE_MIGRANT_WORKMAN,
+    description:
+      'Record a migrant recruitment, the allowances actually paid, the return-journey accrual and the section 16 facilities',
+  },
+  {
+    name: PERMISSIONS.MANAGE_MIGRANT_WAGE_BASIS,
+    description:
+      'Set the comparable local rate a migrant workman is measured against, the section 4 and 8 thresholds and the section 4 registration, and commit the assessment',
   },
   {
     name: PERMISSIONS.READ_ROSTER,
@@ -576,6 +800,21 @@ const PERMISSION_DEFINITIONS = [
     name: PERMISSIONS.VERIFY_TAX_PROOF,
     description:
       'Approve or reject submitted investment proofs, which changes the TDS deducted from that salary',
+  },
+  {
+    name: PERMISSIONS.READ_PERQUISITE,
+    description:
+      'View perquisite valuations and Form 12BA lines with the Rule 3 basis behind each',
+  },
+  {
+    name: PERMISSIONS.MANAGE_PERQUISITE_GRANT,
+    description:
+      'Record what an employee has been provided — accommodation, a car, a concessional loan, an exercised option — and over what period',
+  },
+  {
+    name: PERMISSIONS.MANAGE_PERQUISITE_RULES,
+    description:
+      'Set the Rule 3 accommodation bands and the frozen 1 April State Bank of India rates, and commit the year’s Form 12BA position',
   },
   {
     name: PERMISSIONS.READ_LWF,
@@ -753,8 +992,24 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_MINIMUM_WAGE_SCHEDULE,
       PERMISSIONS.RUN_MINIMUM_WAGE_ASSESSMENT,
 
+      // #1767. All three, for the reason immediately above: the owner is the
+      // one account allowed to be both halves of a check. Writing off a
+      // deferred balance is forgiving a debt, which is the same class of
+      // authority as APPROVE_PAYROLL and stops here for that reason too.
+      PERMISSIONS.READ_WAGE_DEDUCTIONS,
+      PERMISSIONS.MANAGE_WAGE_DEDUCTION_RULES,
+      PERMISSIONS.COMMIT_WAGE_DEDUCTION_REGISTER,
+
       PERMISSIONS.READ_COMPLIANCE,
       PERMISSIONS.MANAGE_COMPLIANCE,
+
+      // #1768. All three. Filing the return is a remittance to a statutory
+      // body and the ceiling decides who it covers, so both halves of that
+      // check stop at the one account allowed to be both.
+      PERMISSIONS.READ_ESI,
+      PERMISSIONS.MANAGE_ESI_RULES,
+      PERMISSIONS.FILE_ESI_RETURN,
+
       // Held by the owner alone: a role edit changes what every other account
       // in the company can do.
       PERMISSIONS.MANAGE_ROLES,
@@ -767,12 +1022,26 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_ASSET,
       PERMISSIONS.RUN_DEPRECIATION,
 
+      // #1827. All three. The cost of construction is the entire base of the
+      // levy and there is no payroll figure to check it against, so the owner
+      // is the one account allowed to be both halves of that check.
+      PERMISSIONS.READ_CONSTRUCTION_CESS,
+      PERMISSIONS.MANAGE_CESS_REGISTER,
+      PERMISSIONS.MANAGE_CESS_BASE,
+
       // #1344. All three. MANAGE_GRATUITY_ASSUMPTIONS stops here for the same
       // reason MANAGE_COMPLIANCE does — it decides what gets reported, not who
       // gets paid.
       PERMISSIONS.READ_GRATUITY_VALUATION,
       PERMISSIONS.RUN_GRATUITY_VALUATION,
       PERMISSIONS.MANAGE_GRATUITY_ASSUMPTIONS,
+
+      // #1769. All three, for the reason immediately above and one more: the
+      // backfill decides how an ambiguous month is read, and reading it wrong
+      // understates or overstates a pension for the rest of somebody's life.
+      PERMISSIONS.READ_EPS_PENSION,
+      PERMISSIONS.MANAGE_EPS_ASSUMPTIONS,
+      PERMISSIONS.COMMIT_EPS_VALUATION,
 
       // #1699. Both. Admitting a claim commits the company and depositing one
       // with the Commissioner discharges a statutory liability, which is the
@@ -787,6 +1056,21 @@ const ROLE_DEFINITIONS = [
       // contingent liability an auditor asks about.
       PERMISSIONS.READ_CONTRACT_LABOUR,
       PERMISSIONS.MANAGE_CONTRACT_LABOUR,
+
+      // #1771. All three. The recorded strength is the denominator of the whole
+      // obligation, and the owner is the one account allowed to be both halves
+      // of that check.
+      PERMISSIONS.READ_APPRENTICESHIP,
+      PERMISSIONS.MANAGE_APPRENTICE,
+      PERMISSIONS.MANAGE_APPRENTICESHIP_RULES,
+
+      // #1826. All three. The comparable local rate is the denominator of the
+      // parity comparison, and the owner is the one account allowed to be both
+      // halves of that check — there is nobody above it to be the other half.
+      PERMISSIONS.READ_MIGRANT_WORKMEN,
+      PERMISSIONS.MANAGE_MIGRANT_WORKMAN,
+      PERMISSIONS.MANAGE_MIGRANT_WAGE_BASIS,
+
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.MANAGE_ROSTER,
 
@@ -811,6 +1095,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_INVOICE,
       PERMISSIONS.SUBMIT_TAX_PROOF,
       PERMISSIONS.VERIFY_TAX_PROOF,
+
+      // #1770. All three. The rates decide what is reported under the
+      // employer's TAN, which is where MANAGE_COMPLIANCE already stops.
+      PERMISSIONS.READ_PERQUISITE,
+      PERMISSIONS.MANAGE_PERQUISITE_GRANT,
+      PERMISSIONS.MANAGE_PERQUISITE_RULES,
 
       // #1701. All three. The owner is the one account allowed to be both
       // halves of a check, because there is nobody above it to be the other.
@@ -876,6 +1166,12 @@ const ROLE_DEFINITIONS = [
       // filed under is not — that stays with the owner.
       PERMISSIONS.READ_COMPLIANCE,
 
+      // #1768. HR reads the coverage register — the 78-day count is what an
+      // employee asks HR about when a claim is refused, and the answer is a
+      // fact about their attendance. It does not move the ceiling and it does
+      // not file the return, which is a remittance.
+      PERMISSIONS.READ_ESI,
+
       // #1346. HR reads the bonus register — "what is this employee getting and
       // why" is HR's question and Form C answers it. It does not commit the
       // computation: that reads the company's gross profit and binds the next
@@ -891,6 +1187,12 @@ const ROLE_DEFINITIONS = [
       // the establishment against it.
       PERMISSIONS.READ_MINIMUM_WAGE,
       PERMISSIONS.MANAGE_MINIMUM_WAGE_SCHEDULE,
+
+      // #1767. HR reads the register — a deduction total over the ceiling is
+      // fixed by rescheduling a loan recovery, and the loans are HR's. It does
+      // not set the applicability ceiling, which decides who the Act reaches at
+      // all, and it does not commit the register or write off a balance.
+      PERMISSIONS.READ_WAGE_DEDUCTIONS,
 
       // #1011. The day-to-day half of each new area, and not the half that
       // moves money.
@@ -912,6 +1214,12 @@ const ROLE_DEFINITIONS = [
       // what the company reports, which is the owner's call and the auditor's.
       PERMISSIONS.READ_GRATUITY_VALUATION,
 
+      // #1769. HR reads the pension statements — "why is my pensionable salary
+      // ₹14,500 when I earned ₹40,000" is a question an employee asks HR, and
+      // the sixty-month window is the answer. It does not move the ceiling and
+      // it does not commit a valuation.
+      PERMISSIONS.READ_EPS_PENSION,
+
       // #1699. HR reads the injury register — it reports the accident, it
       // handles the employee, and "what is this going to cost" is a question it
       // is asked. It does not admit the claim: that commits the company to a
@@ -921,6 +1229,15 @@ const ROLE_DEFINITIONS = [
 
       PERMISSIONS.READ_VENDOR,
 
+      // #1827. Read and the register. Recording a contractor bill with the cess
+      // withheld, and keeping the building workers' days per employer for the
+      // section 12 roll, is register-keeping of the same kind as the contract
+      // labour deployments below. It does not move the cost of construction,
+      // which is the entire base of the levy, and it does not commit the
+      // assessment.
+      PERMISSIONS.READ_CONSTRUCTION_CESS,
+      PERMISSIONS.MANAGE_CESS_REGISTER,
+
       // #1700. Both. Registering a contractor and recording who is on site each
       // month is HR administration in the ordinary sense — somebody has to walk
       // the site and count — and the return it feeds is a headcount statement
@@ -928,6 +1245,22 @@ const ROLE_DEFINITIONS = [
       // moves no money.
       PERMISSIONS.READ_CONTRACT_LABOUR,
       PERMISSIONS.MANAGE_CONTRACT_LABOUR,
+
+      // #1771. HR engages apprentices and keeps the roll — recruiting them and
+      // recording their attendance is HR administration in the ordinary sense.
+      // It does not move the band or the recorded strength, both of which are
+      // the denominator the establishment is judged against, and it does not
+      // commit the assessment.
+      PERMISSIONS.READ_APPRENTICESHIP,
+      PERMISSIONS.MANAGE_APPRENTICE,
+
+      // #1826. HR keeps the migrant register — recording a recruitment, the
+      // allowances that were paid and the return-journey accrual is HR
+      // administration in the ordinary sense. It does not set the comparable
+      // local rate, which is what the establishment is judged against, and it
+      // does not commit the assessment.
+      PERMISSIONS.READ_MIGRANT_WORKMEN,
+      PERMISSIONS.MANAGE_MIGRANT_WORKMAN,
 
       PERMISSIONS.READ_ROSTER,
       PERMISSIONS.MANAGE_ROSTER,
@@ -945,6 +1278,15 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_INVOICE,
       PERMISSIONS.SUBMIT_TAX_PROOF,
       PERMISSIONS.VERIFY_TAX_PROOF,
+
+      // #1770. HR records what somebody was given and reads the valuation —
+      // allocating a flat or a car is HR's, and so is answering "why did my
+      // taxable income go up by more than the allowance". It does not set the
+      // rates or commit the year's position: both decide what is filed under
+      // the employer's TAN, which HR does not hold for the same reason it does
+      // not hold MANAGE_COMPLIANCE.
+      PERMISSIONS.READ_PERQUISITE,
+      PERMISSIONS.MANAGE_PERQUISITE_GRANT,
 
       // #1701. HR reads the register and maintains the state rules — knowing
       // that Karnataka collects in December and Kerala every month is HR's

@@ -3,7 +3,7 @@ const { getIo: getPayrollIo } = require('./sockets/payroll.socket');
 const { getIo: getShiftIo } = require('./sockets/shiftMarketplace.socket');
 const { stopWebhookWorker } = require('./workers/webhook.worker');
 const { stopEmailWorker } = require('./workers/email.worker');
-const { stopCronJobs } = require('./jobs/cron.jobs');
+const { stopOutboxWorker } = require('./workers/outbox.worker');const { stopCronJobs } = require('./jobs/cron.jobs');
 const { stopReportCron } = require('./jobs/reportCron');
 const redisConnection = require('./config/redis');
 const logger = require('./utils/logger');
@@ -45,8 +45,8 @@ const initShutdownHandler = (server) => {
       await Promise.all([
         stopWebhookWorker && stopWebhookWorker(),
         stopEmailWorker && stopEmailWorker(),
+        stopOutboxWorker && stopOutboxWorker(),
       ]);
-
       logger.info('Disconnecting databases...');
       await mongoose.disconnect();
       await redisConnection.quit();
