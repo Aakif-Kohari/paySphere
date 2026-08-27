@@ -1,19 +1,91 @@
-const FlashcardDeck = require('../models/flashcardDeck.model');
-const { tenantFilter } = require('../utils/tenantScope');
-const { generateSummaryTags } = require('../utils/gemini');
+import type { NextFunction, Request, Response } from 'express';
 
-// Create a new flashcard deck
-exports.createDeck = async (req, res, next) => {
+const FlashcardDeck = require('../models/flashcardDeck.model');
+const tenantScopeUtils = require('../utils/tenantScope');
+const { tenantFilter } = tenantScopeUtils;
+const geminiUtils = require('../utils/gemini');
+const { generateSummaryTags } = geminiUtils;
+
+export interface AuthenticatedRequest extends Request {
+  userId?: string;
+  tenantId?: string;
+}
+
+export interface FlashcardCard {
+  front: string;
+  back: string;
+}
+
+export interface FlashcardDeckDocument {
+  _id: unknown;
+  title: string;
+  description?: string;
+  subject: string;
+  exam: string;
+  isPublic: boolean;
+  cards: FlashcardCard[];
+  tags: string[];
+  downloadsCount: number;
+  save: () => Promise<FlashcardDeckDocument>;
+}
+
+interface CreateDeckBody {
+  title?: string;
+  description?: string;
+  subject?: string;
+  exam?: string;
+  isPublic?: boolean;
+  cards?: FlashcardCard[];
+}
+
+interface UpdateDeckBody {
+  title?: string;
+  description?: string;
+  subject?: string;
+  exam?: string;
+  isPublic?: boolean;
+  cards?: FlashcardCard[];
+}
+
+interface DeckIdParams {
+  id: string;
+}
+
+interface CommunityDecksQuery {
+  subject?: string;
+  exam?: string;
+  minRating?: string;
+  search?: string;
+  page?: string;
+  limit?: string;
+}
+
+type CreateDeckRequest = AuthenticatedRequest & { body: CreateDeckBody };
+type UpdateDeckRequest = AuthenticatedRequest & {
+  body: UpdateDeckBody;
+  params: DeckIdParams;
+};
+type DeckIdRequest = AuthenticatedRequest & { params: DeckIdParams };
+type CommunityDecksRequest = AuthenticatedRequest & {
+  query: CommunityDecksQuery;
+};
+
+/**
+ * Create a new flashcard deck for the authenticated user's tenant.
+ */
+export async function createDeck(
+  req: CreateDeckRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<Response | void> {
   try {
     const { title, description, subject, exam, isPublic, cards } = req.body;
 
     if (!title || !subject || !exam || !cards) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'Missing required fields: title, subject, exam, and cards are required',
-        });
+      return res.status(400).json({
+        message:
+          'Missing required fields: title, subject, exam, and cards are required',
+      });
     }
 
     if (!Array.isArray(cards) || cards.length === 0) {
@@ -24,8 +96,7 @@ exports.createDeck = async (req, res, next) => {
 
     const filter = tenantFilter(req);
 
-    // Generate AI summary tags if deck is set to public
-    let tags = [];
+    let tags: string[] = [];
     if (isPublic) {
       tags = await generateSummaryTags({
         title,
@@ -48,30 +119,42 @@ exports.createDeck = async (req, res, next) => {
       tenantId: filter.tenantId,
     });
 
-    res.status(201).json(newDeck);
+    return res.status(201).json(newDeck);
   } catch (error) {
     next(error);
   }
-};
+}
 
-// Retrieve authenticated user's flashcard decks (custom and cloned)
-exports.getMyDecks = async (req, res, next) => {
+/**
+ * Retrieve the authenticated user's flashcard decks (custom and cloned).
+ */
+export async function getMyDecks(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<Response | void> {
   try {
     const filter = tenantFilter(req, { createdBy: req.userId });
     const decks = await FlashcardDeck.find(filter).sort({ createdAt: -1 });
-    res.status(200).json(decks);
+    return res.status(200).json(decks);
   } catch (error) {
     next(error);
   }
-};
+}
 
-// Update an existing deck details/cards
-exports.updateDeck = async (req, res, next) => {
+/**
+ * Update an existing deck's details/cards.
+ */
+export async function updateDeck(
+  req: UpdateDeckRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<Response | void> {
   try {
     const { id } = req.params;
     const { title, description, subject, exam, isPublic, cards } = req.body;
 
-    const deck = await FlashcardDeck.findOne({
+    const deck: FlashcardDeckDocument | null = await FlashcardDeck.findOne({
       _id: id,
       createdBy: req.userId,
     });
@@ -94,13 +177,11 @@ exports.updateDeck = async (req, res, next) => {
       deck.cards = cards;
     }
 
-    // Determine if we should generate or re-generate tags
     const prevPublic = deck.isPublic;
     if (isPublic !== undefined) {
       deck.isPublic = !!isPublic;
     }
 
-    // Re-generate tags if it became public, or if it is public and cards/metadata changed
     if (deck.isPublic && (!prevPublic || cards || title || subject || exam)) {
       deck.tags = await generateSummaryTags({
         title: deck.title,
@@ -114,14 +195,20 @@ exports.updateDeck = async (req, res, next) => {
     }
 
     await deck.save();
-    res.status(200).json(deck);
+    return res.status(200).json(deck);
   } catch (error) {
     next(error);
   }
-};
+}
 
-// Delete a deck
-exports.deleteDeck = async (req, res, next) => {
+/**
+ * Delete a deck owned by the authenticated user.
+ */
+export async function deleteDeck(
+  req: DeckIdRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<Response | void> {
   try {
     const { id } = req.params;
     const deck = await FlashcardDeck.findOneAndDelete({
@@ -133,23 +220,30 @@ exports.deleteDeck = async (req, res, next) => {
         .status(404)
         .json({ message: 'Flashcard deck not found or unauthorized' });
     }
-    res.status(200).json({ message: 'Flashcard deck deleted successfully' });
+    return res
+      .status(200)
+      .json({ message: 'Flashcard deck deleted successfully' });
   } catch (error) {
     next(error);
   }
-};
+}
 
-// Retrieve community public decks with search, filters, and pagination
-exports.getCommunityDecks = async (req, res, next) => {
+/**
+ * Retrieve community public decks with search, filters, and pagination.
+ */
+export async function getCommunityDecks(
+  req: CommunityDecksRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<Response | void> {
   try {
-    // Public browsing still requires authentication, so we have req.userId
     if (!req.userId) {
       return res.status(401).json({ message: 'Authorization required' });
     }
 
     const { subject, exam, minRating, search } = req.query;
 
-    const query = { isPublic: true };
+    const query: Record<string, unknown> = { isPublic: true };
 
     if (subject) {
       query.subject = new RegExp(subject.trim(), 'i');
@@ -175,10 +269,10 @@ exports.getCommunityDecks = async (req, res, next) => {
       ];
     }
 
-    let page = parseInt(req.query.page, 10);
+    let page = parseInt(req.query.page as string, 10);
     if (isNaN(page) || page < 1) page = 1;
 
-    let limit = parseInt(req.query.limit, 10);
+    let limit = parseInt(req.query.limit as string, 10);
     if (isNaN(limit) || limit < 1) limit = 12;
 
     const skip = (page - 1) * limit;
@@ -192,7 +286,7 @@ exports.getCommunityDecks = async (req, res, next) => {
       FlashcardDeck.countDocuments(query),
     ]);
 
-    res.status(200).json({
+    return res.status(200).json({
       decks,
       totalPages: Math.ceil(totalDecks / limit) || 1,
       currentPage: page,
@@ -201,10 +295,16 @@ exports.getCommunityDecks = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-};
+}
 
-// Clone a public deck into the authenticated user's own library
-exports.cloneDeck = async (req, res, next) => {
+/**
+ * Clone a public deck into the authenticated user's own library.
+ */
+export async function cloneDeck(
+  req: DeckIdRequest,
+  res: Response,
+  next: NextFunction,
+): Promise<Response | void> {
   try {
     const { id } = req.params;
     const filter = tenantFilter(req);
@@ -217,7 +317,8 @@ exports.cloneDeck = async (req, res, next) => {
     // The `isPublic` check below is not a substitute. "Public" means visible
     // within the company, not across companies — nothing in the product offers
     // a cross-tenant deck library.
-    const originalDeck = await FlashcardDeck.findOne({ ...filter, _id: id });
+    const originalDeck: FlashcardDeckDocument | null =
+      await FlashcardDeck.findOne({ ...filter, _id: id });
     if (!originalDeck) {
       return res
         .status(404)
@@ -230,17 +331,15 @@ exports.cloneDeck = async (req, res, next) => {
         .json({ message: 'Cannot clone private flashcard decks' });
     }
 
-    // Increment downloads count on the original deck
     originalDeck.downloadsCount += 1;
     await originalDeck.save();
 
-    // Create cloned deck in the user's library
     const clonedDeck = await FlashcardDeck.create({
       title: `${originalDeck.title} (Cloned)`,
       description: originalDeck.description,
       subject: originalDeck.subject,
       exam: originalDeck.exam,
-      isPublic: false, // cloned decks default to private in library
+      isPublic: false,
       cards: originalDeck.cards.map((c) => ({ front: c.front, back: c.back })),
       clonedFromId: originalDeck._id,
       createdBy: req.userId,
@@ -248,8 +347,8 @@ exports.cloneDeck = async (req, res, next) => {
       tags: originalDeck.tags,
     });
 
-    res.status(201).json(clonedDeck);
+    return res.status(201).json(clonedDeck);
   } catch (error) {
     next(error);
   }
-};
+}
