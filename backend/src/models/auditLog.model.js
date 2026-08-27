@@ -51,7 +51,11 @@ const AUDIT_ACTIONS = [
   'EMPLOYEE_UPDATE',
   'EMPLOYEE_DELETE',
   'EMPLOYEE_IMPORT',
-  // Deactivating someone stops their payroll, and restoring a soft-deleted
+  'RETENTION_EMPLOYEE_ANONYMIZED',
+  'RETENTION_ATTENDANCE_PURGED',
+  'RETENTION_PAYROLL_RETAINED',
+  'RETENTION_AUDIT_RETAINED',
+  'RETENTION_POLICY_UPDATED',  // Deactivating someone stops their payroll, and restoring a soft-deleted
   // record brings their history back. Both are emitted by
   // employee.controller.js and neither was accepted here (#664).
   'EMPLOYEE_STATUS_TOGGLE',
