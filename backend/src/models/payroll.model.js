@@ -326,11 +326,69 @@ const payrollUpdateSchema = new mongoose.Schema(
         },
       ],
     },
+    /**
+     * Immutable payroll calculation snapshot.
+     *
+     * This stores the exact values used by the calculation rather than relying
+     * on the employee record at the time a historical payslip is viewed.
+     */
+    calculationSnapshot: {
+      version: {
+        type: String,
+        required: true,
+      },
+      employee: {
+        fullName: String,
+        email: String,
+        role: String,
+        companyName: String,
+        language: String,
+      },
+      inputs: {
+        baseSalary: Number,
+        overtimeRate: Number,
+        leaveDays: Number,
+        overtimeHours: Number,
+        bonus: Number,
+        deductions: Number,
+        leaveDeduction: Number,
+        overtimePay: Number,
+        reimbursements: Number,
+        loanRecoveryTotal: Number,
+        arrearsPayout: Number,
+        exchangeRate: Number,
+        currency: String,
+        targetCurrency: String,
+        baseCurrency: String,
+        attendanceSource: String,
+        defaultDailyRate: Number,
+        defaultOvertimeRate: Number,
+      },
+      salarySnapshot: mongoose.Schema.Types.Mixed,
+      loanRecoveries: mongoose.Schema.Types.Mixed,
+      arrearsBreakdown: mongoose.Schema.Types.Mixed,
+      reimbursedExpenseIds: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'ExpenseClaim',
+        },
+      ],
+      finalAmounts: {
+        grossNetBeforeRecovery: Number,
+        netSalary: Number,
+      },
+      finalizedAt: {
+        type: Date,
+      },
+      finalizedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    },
     payslipEmailed: {
       type: Boolean,
       default: false,
-    },
-  },
+    },  },
   { timestamps: true },
 );
 
@@ -363,7 +421,58 @@ payrollUpdateSchema.index({ tenantId: 1, year: -1, month: -1, status: 1 });
 // queue, and the lookup an approver-is-not-the-submitter check needs (#559).
 // `submittedBy` is a user, so this one is genuinely per-actor within a company.
 payrollUpdateSchema.index({ tenantId: 1, submittedBy: 1, status: 1 });
+const snapshotIsBeingChanged = (update = {}) => {
+  const set = update.$set || {};
+  const unset = update.$unset || {};
 
+  return (
+    Object.keys(set).some((key) => key === 'calculationSnapshot' || key.startsWith('calculationSnapshot.')) ||
+    Object.keys(unset).some((key) => key === 'calculationSnapshot' || key.startsWith('calculationSnapshot.'))
+  );
+};
+
+payrollUpdateSchema.pre('save', function (next) {
+  if (
+    !this.isNew &&
+    this.get('calculationSnapshot.finalizedAt') &&
+    this.isModified('calculationSnapshot')
+  ) {
+    return next(
+      new Error('Finalized payroll calculation snapshot cannot be modified'),
+    );
+  }
+
+  next();
+});
+
+payrollUpdateSchema.pre(
+  ['updateOne', 'updateMany', 'findOneAndUpdate'],
+  async function (next) {
+    try {
+      if (!snapshotIsBeingChanged(this.getUpdate())) {
+        return next();
+      }
+
+      const query = this.getQuery();
+      const finalized = await this.model.exists({
+        ...query,
+        'calculationSnapshot.finalizedAt': { $exists: true, $ne: null },
+      });
+
+      if (finalized) {
+        return next(
+          new Error(
+            'Finalized payroll calculation snapshot cannot be modified',
+          ),
+        );
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 payrollUpdateSchema.plugin(softDeletePlugin);
 payrollUpdateSchema.plugin(auditTrailPlugin);
 payrollUpdateSchema.plugin(cryptoSealPlugin);

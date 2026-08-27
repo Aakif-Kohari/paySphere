@@ -57,23 +57,31 @@ class PayrollExportService {
     const payroll = await PayrollUpdate.findOne({ _id: payrollId, tenantId });
     if (!payroll) throw new Error('Payroll record not found');
 
-    const employee = await Employee.findById(payroll.employeeId);
-    if (!employee) throw new Error('Employee not found');
+    let employee;
 
-    if (employee.isDeleted) {
-      logger.warn(`Sending payslip email to soft-deleted employee`, {
-        userId: req.userId,
-        employeeId: employee._id,
-        employeeName: employee.fullName,
-      });
+    if (payroll.calculationSnapshot?.finalizedAt) {
+      employee = {
+        _id: payroll.employeeId,
+        ...payroll.calculationSnapshot.employee,
+      };
+    } else {
+      employee = await Employee.findById(payroll.employeeId);
+      if (!employee) throw new Error('Employee not found');
+
+      if (employee.isDeleted) {
+        logger.warn(`Sending payslip email to soft-deleted employee`, {
+          userId: req.userId,
+          employeeId: employee._id,
+          employeeName: employee.fullName,
+        });
+      }
     }
 
     if (!employee.email) {
       throw new Error('Employee does not have an email address set');
     }
 
-    if (!isEmailable(payroll.status)) {
-      const status = normalizeStatus(payroll.status) || payroll.status;
+    if (!isEmailable(payroll.status)) {      const status = normalizeStatus(payroll.status) || payroll.status;
       const error = new Error(
         `Cannot email a payslip for a payroll record that is "${status}". It must be approved first.`,
       );
@@ -81,8 +89,11 @@ class PayrollExportService {
       throw error;
     }
 
-    await enqueueEmail('payslip', { employee, payroll });
-
+    await enqueueEmail('payslip', {
+      employee,
+      payroll,
+      calculationSnapshot: payroll.calculationSnapshot,
+    });
     eventBus.emit('AUDIT_LOG', {
       userId: req.userId,
       action: 'PAYSLIP_EMAIL',

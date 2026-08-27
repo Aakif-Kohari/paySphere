@@ -7,6 +7,9 @@ const PayrollExportService = require('../services/payrollExport.service');
 // a broken require of its own that this file was propagating to app.js at boot
 // (#792). Dropped rather than wired up: neither has an implementation to call.
 const crypto = require('crypto');
+const {
+  PAYROLL_CALCULATION_VERSION,
+} = require('../config/payrollCalculationVersion');
 const mongoose = require('mongoose');
 const Employee = require('../models/employee.model');
 const PayrollUpdate = require('../models/payroll.model');
@@ -374,7 +377,39 @@ exports.approvePayroll = async (req, res, next) => {
         versionConflicts,
       });
     }
+    if (applied.length > 0) {
+      const finalizedAt = new Date();
 
+      const approvedPayrolls = await PayrollUpdate.find({
+        _id: { $in: applied.map((item) => item.payrollId) },
+        tenantId: req.tenantId,
+      });
+
+      const finalizedSnapshotUpdates = approvedPayrolls.map((payroll) => ({
+        updateOne: {
+          filter: {
+            _id: payroll._id,
+            tenantId: req.tenantId,
+            'calculationSnapshot.finalizedAt': {
+              $exists: false,
+            },
+          },
+          update: {
+            $set: {
+              'calculationSnapshot.version':
+                payroll.calculationSnapshot?.version ||
+                PAYROLL_CALCULATION_VERSION,
+              'calculationSnapshot.finalizedAt': finalizedAt,
+              'calculationSnapshot.finalizedBy': req.userId,
+            },
+          },
+        },
+      }));
+
+      if (finalizedSnapshotUpdates.length > 0) {
+        await PayrollUpdate.bulkWrite(finalizedSnapshotUpdates);
+      }
+    }
     if (applied.length === 0) {
       // Nothing moved. A 409 rather than a 200 so the UI does not tell the user
       // an approval happened when it did not.

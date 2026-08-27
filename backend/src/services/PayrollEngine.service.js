@@ -116,14 +116,18 @@ class PayrollEngine {
     const bonusWithTaxableExpenses =
       Math.round((bonus + empExpenses.taxable) * 100) / 100;
 
-    const { baseSalary, leaveDeduction, overtimePay, netSalary } =
-      calculateNetSalary(employee, user, {
-        leaveDays,
-        overtimeHours,
-        bonus: bonusWithTaxableExpenses,
-        deductions,
-      });
-
+    const {
+      baseSalary,
+      leaveDeduction,
+      overtimeRate,
+      overtimePay,
+      netSalary,
+    } = calculateNetSalary(employee, user, {
+      leaveDays,
+      overtimeHours,
+      bonus: bonusWithTaxableExpenses,
+      deductions,
+    });
     if (isNaN(netSalary) || !Number.isFinite(netSalary)) {
       throw new Error(
         `Invalid net salary calculation for employee "${employee.fullName}"`,
@@ -198,12 +202,12 @@ class PayrollEngine {
       reimbursedExpenseIds: empExpenses.ids,
       netSalary: finalNetSalary,
       grossNetBeforeRecovery: netSalary,
+      overtimeRate,
       loanRecoveries: recovery.recoveries,
       loanRecoveryTotal: recovery.totalRecovered,
       attendanceSource,
       salarySnapshot,
-      arrearsPayout: totalArrears,
-      arrearsBreakdown: arrearsBreakdown,
+      arrearsPayout: totalArrears,      arrearsBreakdown: arrearsBreakdown,
       arrearsLedgerIds: ledgerIds,
       shortfall: recovery.shortfall,
     };
@@ -510,9 +514,48 @@ class PayrollEngine {
           arrearsLedgerIds: item.arrearsLedgerIds,
           attendanceSource: item.attendanceSource,
           salarySnapshot: item.salarySnapshot,
+
+          calculationSnapshot: {
+            version: PAYROLL_CALCULATION_VERSION,
+            employee: {
+              fullName: item.employee.fullName,
+              email: item.employee.email,
+              role: item.employee.role,
+              companyName: item.employee.companyName,
+              language: item.employee.language,
+            },
+            inputs: {
+              baseSalary: item.baseSalary,
+              overtimeRate: item.overtimeRate,
+              leaveDays: item.leaveDays,
+              overtimeHours: item.overtimeHours,
+              bonus: item.bonus,
+              deductions: item.deductions,
+              leaveDeduction: item.leaveDeduction,
+              overtimePay: item.overtimePay,
+              reimbursements: item.reimbursements,
+              loanRecoveryTotal: item.loanRecoveryTotal,
+              arrearsPayout: item.arrearsPayout,
+              exchangeRate: getRateVal(targetCurrency),
+              currency: targetCurrency,
+              targetCurrency,
+              baseCurrency: item.employee.baseCurrency || 'USD',
+              attendanceSource: item.attendanceSource,
+              defaultDailyRate: user?.defaultDailyRate || 0,
+              defaultOvertimeRate: user?.defaultOvertimeRate || 0,
+            },
+            salarySnapshot: item.salarySnapshot,
+            loanRecoveries: item.loanRecoveries,
+            arrearsBreakdown: item.arrearsBreakdown,
+            reimbursedExpenseIds: item.reimbursedExpenseIds,
+            finalAmounts: {
+              grossNetBeforeRecovery: item.grossNetBeforeRecovery,
+              netSalary: item.netSalary,
+            },
+          },
+
           tenantId,
-          status: PAYROLL_STATUS.PENDING_APPROVAL,
-          submittedBy: userId,
+          status: PAYROLL_STATUS.PENDING_APPROVAL,          submittedBy: userId,
           submittedAt: new Date(),
           approvedBy: null,
           approvedAt: null,
