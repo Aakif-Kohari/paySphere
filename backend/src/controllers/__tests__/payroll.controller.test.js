@@ -198,6 +198,44 @@ test('stores calculation inputs in the payroll snapshot so later employee change
     payrollData.netSalary,
   );
 });
+test("should reject payroll approval when employee compensation data is stale", async () => {
+  const payrollId = "507f1f77bcf86cd799439011";
+  const employeeId = "507f1f77bcf86cd799439012";
+
+  PayrollUpdate.find.mockResolvedValue([
+    {
+      _id: payrollId,
+      employeeId,
+      calculationSnapshot: {
+        employee: {
+          version: 3,
+        },
+      },
+      status: "PENDING_APPROVAL",
+    },
+  ]);
+
+  Employee.find.mockResolvedValue([
+    {
+      _id: employeeId,
+      __v: 4,
+    },
+  ]);
+
+  req.body = {
+    payrollIds: [payrollId],
+  };
+
+  await approvePayroll(req, res, next);
+
+  expect(res.status).toHaveBeenCalledWith(409);
+  expect(res.json).toHaveBeenCalledWith(
+    expect.objectContaining({
+      message:
+        "Employee compensation data changed after this payroll was calculated. Review and recalculate the affected payroll before approving it.",
+    }),
+  );
+});
   test("should correctly classify tags containing 'days' or 'hrs' such as 'Overtime 2 days' and 'Deduction 3 days' (#377)", async () => {
     const mockEmployee = {
       _id: "507f1f77bcf86cd799439011",

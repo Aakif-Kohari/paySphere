@@ -523,8 +523,8 @@ class PayrollEngine {
               role: item.employee.role,
               companyName: item.employee.companyName,
               language: item.employee.language,
-            },
-            inputs: {
+              version: item.employee.__v,
+            },            inputs: {
               baseSalary: item.baseSalary,
               overtimeRate: item.overtimeRate,
               leaveDays: item.leaveDays,

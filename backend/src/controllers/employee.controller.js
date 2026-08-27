@@ -737,8 +737,8 @@ exports.updateEmployee = async (req, res, next) => {
       phone,
       bankDetails,
       language,
+      version,
     } = req.body;
-
     // `employee` used to be referenced (for the `department` update) before
     // this declaration ran, which threw a ReferenceError on every update.
     // Scoped (#1010). One file guarded three handlers three different ways —
@@ -746,7 +746,19 @@ exports.updateEmployee = async (req, res, next) => {
     // `tenantId.toString() !== req.tenantId` in `toggleActive` — and none of
     // the three was right.
     const employee = await Employee.findOne(tenantFilter(req, { _id: id }));
+    if (!Number.isInteger(version) || version < 0) {
+      return res.status(400).json({
+        message: 'A valid employee version is required',
+      });
+    }
 
+    if (employee && employee.__v !== version) {
+      return res.status(409).json({
+        message:
+          'This employee was modified by another user. Reload the employee and review the latest changes before saving again.',
+        currentVersion: employee.__v,
+      });
+    }
     if (!employee || employee.deletedAt) {
       return res.status(404).json({ message: 'Employee not found' });
     }
@@ -940,12 +952,17 @@ exports.updateEmployee = async (req, res, next) => {
       .status(200)
       .json({ message: 'Employee updated successfully', employee });
   } catch (error) {
+    if (error?.name === 'VersionError') {
+      return res.status(409).json({
+        message:
+          'This employee was modified by another user. Reload the employee and review the latest changes before saving again.',
+      });
+    }
+
     if (handleDuplicateEmail(error, res)) return;
     next(error);
   }
-};
-
-// TOGGLE EMPLOYEE ACTIVE STATUS
+};// TOGGLE EMPLOYEE ACTIVE STATUS
 exports.toggleEmployeeStatus = async (req, res, next) => {
   try {
     const { id } = req.params;

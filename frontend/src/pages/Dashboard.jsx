@@ -720,8 +720,8 @@ const EditEmployeeModal = ({ employee, onClose, onSave }) => {
         monthlySalary: salary,
         overtimeRate: otRate,
         phone: normalizedPhone || undefined,
-      });
-    } catch {
+        version: employee.__v,
+      });    } catch {
       setError(
         t(
           'dashboard.editModal.validation.updateFailed',
@@ -1265,13 +1265,22 @@ export default function PaySphereDashboard() {
       setEmployeeToEdit(null);
     } catch (error) {
       console.error('Failed to update employee:', error);
-      toast.error(
-        t(
-          'dashboard.toasts.employeeUpdateFailed',
-          'Failed to update employee. Please try again.',
-        ),
-      );
-    }
+
+      if (error.response?.status === 409) {
+        toast.error(
+          error.response?.data?.message ||
+            'This employee was changed by another user. Reload the employee and review the latest changes before saving again.',
+        );
+      } else {
+        toast.error(
+          t(
+            'dashboard.toasts.employeeUpdateFailed',
+            'Failed to update employee.',
+          ),
+        );
+      }
+
+      throw error;    }
   };
 
   const getInitials = (name) => {
