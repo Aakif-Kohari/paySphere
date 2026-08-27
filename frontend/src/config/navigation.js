@@ -186,6 +186,18 @@ export const APP_ROUTES = [
     group: 'people',
     icon: 'shield',
   },
+  {
+    // In Compliance rather than Payroll, and not beside Settlements. A lay-off
+    // is not a separation — the employment subsists — and the largest thing on
+    // the page is not a payment at all: above the Chapter VB threshold the
+    // question is whether the employer was entitled to act (#1830).
+    path: '/layoffs',
+    component: lazy(() => import('../pages/LayoffRegister')),
+    appShell: true,
+    label: 'Lay-off & Chapter VB',
+    group: 'compliance',
+    icon: 'shield',
+  },
 
   {
     path: '/compensation',

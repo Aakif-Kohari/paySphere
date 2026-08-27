@@ -219,6 +219,23 @@ const AUDIT_ACTIONS = [
   'CONTRACT_LABOUR_LICENCE_UPDATED',
   'CONTRACT_LABOUR_RETURN_FILED',
   'CONTRACT_LABOUR_REGISTER_EXPORTED',
+  // Industrial Disputes Act, Chapters VA and VB (#1830). The permission record
+  // is audited because that one field decides which of two liabilities the
+  // establishment is under: half pay for forty-five days if the act was lawful,
+  // and full wages for the whole period if it was not.
+  //
+  // The rules are audited for the neighbouring reason — raising the Chapter VB
+  // threshold from one hundred to three hundred turns an illegal act into a
+  // compensable one on paper with nothing changing on the ground. And the
+  // section 25H offer is audited because it is the discharge of a statutory
+  // preference: the workman's claim on the vacancy is answered by the fact that
+  // it was offered, whatever they then decided.
+  'LAYOFF_RULES_UPDATED',
+  'LAYOFF_SPELL_RECORDED',
+  'CHAPTER_VB_ACTION_RECORDED',
+  'CHAPTER_VB_PERMISSION_RECORDED',
+  'REEMPLOYMENT_PREFERENCE_OFFERED',
+  'LAYOFF_ASSESSMENT_COMMITTED',
   // Apprentices Act, 1961 (#1771). Next to the contract labour actions because
   // both concern people on the site who are not on the payroll. The recorded
   // strength is audited because it is the denominator of the whole obligation:
