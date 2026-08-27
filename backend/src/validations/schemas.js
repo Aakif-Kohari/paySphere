@@ -115,23 +115,43 @@ const payrollFinalizeSchema = z
   })
   .strict();
 
-// Holiday Calendar validation schemas
-const HOLIDAY_TYPES = ['gazetted', 'restricted', 'half-day'];
-const CALENDAR_ASSIGNMENT_TYPES = ['global', 'department', 'location'];
+// Onboarding validation schemas
+const ONBOARDING_DEPARTMENTS = ['HR', 'IT', 'Finance', 'Manager', 'Employee'];
+const ONBOARDING_TASK_STATUSES = [
+  'Pending',
+  'In Progress',
+  'Completed',
+  'Blocked',
+];
+const ONBOARDING_DOC_STATUSES = [
+  'Pending Verification',
+  'Verified',
+  'Rejected',
+];
 
-const createCalendarSchema = z
+const onboardingTaskSchema = z
   .object({
-    name: z.string().trim().min(1, 'Calendar name is required').max(100),
-    assignmentType: z.enum(CALENDAR_ASSIGNMENT_TYPES).optional(),
-    assignedTo: z.array(z.string().trim()).optional().nullable(),
+    title: z.string().trim().min(1, 'Title is required').max(200),
+    description: z.string().max(500).optional().nullable(),
+    department: z.enum(ONBOARDING_DEPARTMENTS),
+    dueOffsetDays: z.number().int().min(-30).max(365),
+    isMandatory: z.boolean().optional(),
   })
   .strict();
 
-const addHolidaySchema = z
+const createOnboardingPlanSchema = z
   .object({
-    date: dateString('Holiday date'),
-    name: z.string().trim().min(1, 'Holiday name is required').max(100),
-    type: z.enum(HOLIDAY_TYPES).optional(),
+    name: z.string().trim().min(1, 'Plan name is required').max(100),
+    description: z.string().max(500).optional().nullable(),
+    tasks: z.array(onboardingTaskSchema).optional().nullable(),
+  })
+  .strict();
+
+const startOnboardingSchema = z
+  .object({
+    planId: z.string().trim().min(1),
+    employeeId: z.string().trim().min(1),
+    joiningDate: dateString('Joining date'),
   })
   .strict();
 
@@ -140,8 +160,9 @@ module.exports = {
   loginSchema,
   employeeSchema,
   payrollFinalizeSchema,
-  createCalendarSchema,
-  addHolidaySchema,
-  HOLIDAY_TYPES,
-  CALENDAR_ASSIGNMENT_TYPES,
+  createOnboardingPlanSchema,
+  startOnboardingSchema,
+  ONBOARDING_DEPARTMENTS,
+  ONBOARDING_TASK_STATUSES,
+  ONBOARDING_DOC_STATUSES,
 };
