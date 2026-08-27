@@ -16,7 +16,7 @@ const {
 } = require('../utils/reversalEngine.utils');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
-
+const outboxService = require('../services/outbox.service');
 exports.initiateReversal = async (req, res, next) => {
   try {
     const { originalPayrollId, correctedData, reason, recoveryMonths, startMonth, startYear, quarter, financialYear } = req.body;
@@ -80,6 +80,7 @@ exports.getReversals = async (req, res, next) => {
 };
 
 exports.approveReversal = async (req, res, next) => {
+  let session = null;
   try {
     const reversal = await PayrollReversal.findById(req.params.id);
     if (!reversal || reversal.status !== 'Pending Approval') {
@@ -88,12 +89,45 @@ exports.approveReversal = async (req, res, next) => {
 
     const balancingCheck = verifyDoubleEntryBalancing(reversal.journalEntries || []);
 
+    try {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    } catch {
+      session = null;
+    }
+
     reversal.status = 'Recovery Active';
     reversal.approvedBy = req.userId;
     reversal.approvedAt = new Date();
-    await reversal.save();
+    await reversal.save({ session });
 
-    await PayrollUpdate.findByIdAndUpdate(reversal.originalPayrollId, { isReversed: true });
+    await PayrollUpdate.findByIdAndUpdate(
+      reversal.originalPayrollId,
+      { isReversed: true },
+      { session },
+    );
+
+    // Persisted in the same transaction as the two writes above (#1801): a
+    // crash right after this commits still leaves the row for
+    // workers/outbox.worker.js to publish, so a downstream clawback/GL job
+    // can never be silently skipped for an approval that did go through.
+    await outboxService.recordEvent(
+      outboxService.OUTBOX_EVENT_TYPES.PAYROLL_REVERSAL_REQUESTED,
+      {
+        reversalId: reversal._id,
+        originalPayrollId: reversal.originalPayrollId,
+        employeeId: reversal.employeeId,
+        netOverpaid: reversal.netOverpaid,
+        approvedBy: req.userId,
+      },
+      { tenantId: req.tenantId, session },
+    );
+
+    if (session) {
+      await session.commitTransaction();
+      session.endSession();
+      session = null;
+    }
 
     eventBus.emit('AUDIT_LOG', {
       userId: req.userId,
@@ -116,9 +150,16 @@ exports.approveReversal = async (req, res, next) => {
       reversal,
       balancingCheck,
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    if (session) {
+      try {
+        await session.abortTransaction();
+        session.endSession();
+      } catch {}
+    }
+    next(error);
+  }
 };
-
 exports.checkPayrollBlockGuard = async (req, res, next) => {
   try {
     const pendingReversals = await PayrollReversal.countDocuments({

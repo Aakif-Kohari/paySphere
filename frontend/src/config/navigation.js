@@ -141,6 +141,14 @@ export const APP_ROUTES = [
     icon: 'archive',
   },
   {
+    path: '/bulk-operations',
+    component: lazy(() => import('../pages/BulkOperationsCenter')),
+    label: 'Bulk operations',
+    group: 'people',
+    icon: 'briefcase',
+    appShell: true,
+  },
+  {
     path: '/appraisals',
     component: lazy(() => import('../pages/AppraisalDashboard')),
     label: 'Appraisals',
@@ -164,31 +172,83 @@ export const APP_ROUTES = [
     icon: 'chart',
   },
   {
-    path: '/offer-letters',
-    component: lazy(() => import('../pages/OfferLetterBuilder')),
-    label: 'Offer letters',
+    path: '/templates',
+    component: lazy(() => import('../pages/LetterTemplateManager')),
+    label: 'Letter templates',
     group: 'people',
     icon: 'document',
   },
+  {
+    // In People rather than Compliance: the subject is a colleague who was
+    // hurt at work, and the register is opened by whoever is looking after
+    // them. That it produces a statutory figure is true of half of People
+    // already (#1699).
+    //
+    // No `employee: true`. A claim carries a named individual's date of birth
+    // and the circumstances of their injury, which is the most sensitive data
+    // in the product after declared gender.
+    path: '/injury-compensation',
+    component: lazy(() => import('../pages/InjuryCompensationClaims')),
+    appShell: true,
+    label: 'Injury compensation',
+    group: 'people',
+    icon: 'shield',
+  },
+  {
+    // In Compliance rather than Payroll, and not beside Settlements. A lay-off
+    // is not a separation — the employment subsists — and the largest thing on
+    // the page is not a payment at all: above the Chapter VB threshold the
+    // question is whether the employer was entitled to act (#1830).
+    path: '/layoffs',
+    component: lazy(() => import('../pages/LayoffRegister')),
+    appShell: true,
+    label: 'Lay-off & Chapter VB',
+    group: 'compliance',
+    icon: 'shield',
+  },
+
+  {
+    path: '/compensation',
+    component: lazy(() => import('../pages/CompensationBenchmarkingDashboard')),
+    label: 'Compensation & equity',
+    group: 'people',
+    icon: 'money',
+  },
+
+  {
+    path: '/onboarding',
+    component: lazy(() => import('../pages/OnboardingLifecycleTracker')),
+    label: 'Onboarding tracker',
+    group: 'people',
+    icon: 'rocket',
+  },
+  {
+    // In People rather than Compliance: engaging an apprentice and keeping the
+    // roll is HR work, and it sits next to onboarding because that is what it
+    // is. That an unregistered contract also produces a statutory exposure is
+    // true, and it is not what the page is used for day to day (#1771).
+    path: '/apprenticeships',
+    component: lazy(() => import('../pages/ApprenticeshipCompliance')),
+    appShell: true,
+    label: 'Apprentices',
+    group: 'people',
+    icon: 'rocket',
+  },
+  {
+    // In People beside the apprentice roll for the same reason: recruiting
+    // somebody and keeping their register is HR work. It is not filed under
+    // Compliance even though the section 13(1)(b) comparison is the sharpest
+    // statutory finding on the page — the people who use it daily are the ones
+    // recording a recruitment, not the ones certifying the site (#1826).
+    path: '/migrant-workmen',
+    component: lazy(() => import('../pages/MigrantWorkmenCompliance')),
+    appShell: true,
+    label: 'Migrant workmen',
+    group: 'people',
+    icon: 'users',
+  },
 
   // ── Payroll ──────────────────────────────────────────────────────────────
-  {
-    path: '/fbp-admin',
-    component: lazy(() => import('../features/fbp/FbpAdminDashboard')),
-    appShell: true,
-    label: 'FBP Administration',
-    group: 'payroll',
-    icon: 'wallet',
-  },
-  {
-    path: '/fbp-calculator',
-    component: lazy(() => import('../features/fbp/FbpRestructuringCalculator')),
-    appShell: true,
-    label: 'FBP Restructuring',
-    group: 'payroll',
-    icon: 'wallet',
-    employee: true,
-  },
   {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
@@ -206,12 +266,37 @@ export const APP_ROUTES = [
     icon: 'wallet',
   },
   {
+    // In Payroll and directly above Settlements, because the two are adjacent
+    // and are not the same: a settlement ends an employment, and a suspension
+    // is an employment that subsists while producing no work and owing a rising
+    // statutory scale. Filing it with leave would be worse — leave pays nothing
+    // and this pays fifty per cent rising to a hundred (#1828).
+    path: '/suspensions',
+    component: lazy(() => import('../pages/SuspensionRegister')),
+    appShell: true,
+    label: 'Suspensions',
+    group: 'payroll',
+    icon: 'clock',
+  },
+  {
     path: '/settlements',
     component: lazy(() => import('../pages/Settlements')),
     appShell: true,
     label: 'Settlements',
     group: 'payroll',
     icon: 'exit',
+  },
+  {
+    // Directly above Gratuity: the two are the same kind of obligation and a
+    // reader comparing them is the intended case. Kept apart in the tree
+    // because gratuity is the company's own liability and this is a funded
+    // scheme where the employer's obligation ends at the remittance (#1769).
+    path: '/eps-pension',
+    component: lazy(() => import('../pages/EpsPension')),
+    appShell: true,
+    label: 'Pension scheme',
+    group: 'payroll',
+    icon: 'shield',
   },
   {
     // Next to Settlements, because the two are the same statute from opposite
@@ -239,6 +324,18 @@ export const APP_ROUTES = [
     icon: 'target',
   },
   {
+    // In Payroll rather than Compliance: it is a deduction that has to be in
+    // the run, and it is missed because nobody schedules it rather than because
+    // anybody computes it wrongly. Putting it where the run is planned is the
+    // whole point (#1701).
+    path: '/labour-welfare-fund',
+    component: lazy(() => import('../pages/LabourWelfareFundRegister')),
+    appShell: true,
+    label: 'Labour welfare fund',
+    group: 'payroll',
+    icon: 'book',
+  },
+  {
     // In Payroll rather than Compliance because it is money paid to employees,
     // and separate from the payroll run because the amount is fixed by the
     // Payment of Bonus Act rather than by the company (#1346).
@@ -248,6 +345,35 @@ export const APP_ROUTES = [
     label: 'Statutory bonus',
     group: 'payroll',
     icon: 'book',
+  },
+  {
+    // Next to Statutory bonus for the same reason that one is in Payroll: both
+    // are floors the statute sets on what an employee is paid, rather than
+    // figures the company chooses. Section 12 of the Payment of Bonus Act even
+    // computes on the higher of ₹7,000 and the applicable minimum wage, so the
+    // two pages answer halves of one question (#1698).
+    //
+    // No `employee: true`. The register is every colleague's wage against the
+    // notified rate in one table, and advertising it to everyone would be
+    // advertising a 403.
+    path: '/minimum-wages',
+    component: lazy(() => import('../pages/MinimumWageCompliance')),
+    appShell: true,
+    label: 'Minimum wages',
+    group: 'payroll',
+    icon: 'shield',
+  },
+  {
+    // Directly under Minimum wages, and in Payroll rather than Compliance: the
+    // fix for a deduction total over the section 7(3) ceiling is to reschedule
+    // a loan recovery, which is a payroll action. The two are the floor and the
+    // ceiling of the same question (#1767).
+    path: '/wage-deductions',
+    component: lazy(() => import('../pages/WageDeductionRegister')),
+    appShell: true,
+    label: 'Wage deductions',
+    group: 'payroll',
+    icon: 'shield',
   },
 
   // ── Finance ──────────────────────────────────────────────────────────────
@@ -281,6 +407,14 @@ export const APP_ROUTES = [
     employee: true,
   },
   {
+    path: '/adjudication-workspace',
+    component: lazy(() => import('../pages/AdjudicationWorkspace')),
+    appShell: true,
+    label: 'Expense Adjudication',
+    group: 'finance',
+    icon: 'checkShield',
+  },
+  {
     path: '/accounting',
     component: lazy(() => import('../pages/AccountingExport')),
     label: 'Accounting export',
@@ -289,6 +423,67 @@ export const APP_ROUTES = [
   },
 
   // ── Compliance ───────────────────────────────────────────────────────────
+  {
+    // In Compliance rather than Payroll: the register's subject is who the
+    // scheme covers, and the fact people come to it for — that somebody above
+    // the ceiling is still covered until the period ends — is a compliance
+    // answer rather than a pay one (#1768).
+    path: '/esi',
+    component: lazy(() => import('../pages/EsiContribution')),
+    appShell: true,
+    label: 'ESI',
+    group: 'compliance',
+    icon: 'shield',
+  },
+  {
+    // In Compliance rather than Finance, even though the numbers are project
+    // costs and contractor bills. Everything on the page is answerable to a
+    // welfare board rather than to a counterparty — the one per cent deducted
+    // at source was never the company's money — and the beneficiary register
+    // is a statutory roll rather than a ledger (#1827).
+    path: '/construction-cess',
+    component: lazy(() => import('../pages/ConstructionCessRegister')),
+    appShell: true,
+    label: 'Construction cess',
+    group: 'compliance',
+    icon: 'shield',
+  },
+  {
+    // In Compliance rather than Finance, even though a contractor is a vendor.
+    // The vendor ledger's question is "what do we owe this counterparty"; this
+    // one's is "what are we liable for on account of people we do not employ",
+    // and the answer is a contingent liability rather than an invoice (#1700).
+    path: '/contract-labour',
+    component: lazy(() => import('../pages/ContractLabourRegister')),
+    appShell: true,
+    label: 'Contract labour',
+    group: 'compliance',
+    icon: 'shield',
+  },
+  {
+    // Directly under Contract labour, which is its nearest neighbour: both are
+    // about people the establishment does not employ. They part company on
+    // what is owed — there, a contingent liability for a contractor's workmen;
+    // here, a share of the platform's own turnover, on account of workers
+    // section 2(35) puts outside the employment relationship entirely (#1829).
+    path: '/aggregator-contribution',
+    component: lazy(() => import('../pages/AggregatorContribution')),
+    appShell: true,
+    label: 'Aggregator contribution',
+    group: 'compliance',
+    icon: 'shield',
+  },
+  {
+    // Next to the tax-proof portal: both decide what a Form 16 says — that one
+    // by what the employee declares, this one by what the employer provided
+    // (#1770).
+    path: '/perquisites',
+    component: lazy(() => import('../pages/PerquisiteValuation')),
+    appShell: true,
+    label: 'Perquisites',
+    group: 'compliance',
+    icon: 'shield',
+  },
   {
     path: '/tax-proofs',
     component: lazy(() => import('../pages/TaxProofPortal')),
@@ -335,11 +530,37 @@ export const APP_ROUTES = [
 
   // ── Workplace ────────────────────────────────────────────────────────────
   {
+    // In Workplace rather than Compliance: the fix for a spread-over breach is
+    // a different rota, and rostering lives here. That it also produces a
+    // statutory finding is true of most of what this group does (#1702).
+    path: '/working-hours',
+    component: lazy(() => import('../pages/WorkingHoursCompliance')),
+    appShell: true,
+    label: 'Working hours',
+    group: 'workplace',
+    icon: 'calendar',
+  },
+  {
+    path: '/predictive-overtime',
+    component: lazy(() => import('../pages/PredictiveOvertimeDashboard')),
+    label: 'Predictive Overtime',
+    group: 'workplace',
+    icon: 'chart',
+  },
+  {
     path: '/roster',
     component: lazy(() => import('../pages/Roster')),
     label: 'Shift roster',
     group: 'workplace',
     icon: 'calendar',
+    employee: true,
+  },
+  {
+    path: '/shift-marketplace',
+    component: lazy(() => import('../pages/DynamicShiftBidding')),
+    label: 'Shift Marketplace',
+    group: 'workplace',
+    icon: 'briefcase',
     employee: true,
   },
   {
@@ -375,6 +596,15 @@ export const APP_ROUTES = [
     label: 'Announcements',
     group: 'workplace',
     icon: 'megaphone',
+    employee: true,
+  },
+
+  {
+    path: '/team-health',
+    component: lazy(() => import('../pages/TeamHealthScoreDashboard')),
+    label: 'Team health',
+    group: 'workplace',
+    icon: 'heart',
     employee: true,
   },
 
@@ -469,6 +699,12 @@ export const APP_ROUTES = [
       () => import('../pages/cardiology/CardiologySTEMICathLabPage'),
     ),
   },
+  {
+    path: '/enterprise/mechanical-circulatory-support',
+    component: lazy(
+      () => import('../pages/circulatory/MechanicalCirculatorySupportPage'),
+    ),
+  },
 
   // ── Routed, but reached from elsewhere rather than from the sidebar ───────
   //
@@ -493,6 +729,13 @@ export const APP_ROUTES = [
     component: lazy(
       () => import('../pages/onboarding/EnterpriseOnboardingLifecyclePage'),
     ),
+  },
+  {
+    path: '/enterprise/employee-relations',
+    component: lazy(
+      () => import('../pages/enterprise/EmployeeRelationsHubPage'),
+    ),
+    appShell: false,
   },
 
   {
@@ -520,6 +763,58 @@ export const APP_ROUTES = [
 export const UNROUTED_PAGES = {
   // Rendered by App.jsx as the catch-all `*` route, not from the registry.
   'NotFound.jsx': 'the catch-all route',
+  'AllowanceAuditDashboard.jsx': 'Work in progress',
+  'BiometricSyncDashboard.jsx': 'Work in progress',
+  'BoomerangRehireWizard.jsx': 'Work in progress',
+  'CommissionDashboard.jsx': 'Work in progress',
+  'ComplianceDashboard.jsx': 'Work in progress',
+  'ComplianceVault.jsx': 'Work in progress',
+  'EntityHierarchy.jsx': 'Work in progress',
+  'EquitySettlementDashboard.jsx': 'Work in progress',
+  'EscrowAdmin.jsx': 'Work in progress',
+  'EthicsReviewBoard.jsx': 'Work in progress',
+  'EWAPortal.jsx': 'Work in progress',
+  'ExpenseSubmission.jsx': 'Work in progress',
+  'FleetDashboard.jsx': 'Work in progress',
+  'FXPayrollDashboard.jsx': 'Work in progress',
+  'GarnishmentAdmin.jsx': 'Work in progress',
+  'GlobalMobilityDashboard.jsx': 'Work in progress',
+  'HandoverDashboard.jsx': 'Work in progress',
+  'InternalHiringPipeline.jsx': 'Work in progress',
+  'InternalJobBoard.jsx': 'Work in progress',
+  'InviteAcceptPage.jsx': 'Work in progress',
+  'KudosFeed.jsx': 'Work in progress',
+  'LoanPortal.jsx': 'Work in progress',
+  'ManagerClearance.jsx': 'Work in progress',
+  'MatrixOrgChart.jsx': 'Work in progress',
+  'OkrDashboard.jsx': 'Work in progress',
+  'OnboardingDashboard.jsx': 'Work in progress',
+  'OpenShifts.jsx': 'Work in progress',
+  'PayrollComparisonDashboard.jsx': 'Work in progress',
+  'PolicySettings.jsx': 'Work in progress',
+  'RecognitionSettings.jsx': 'Work in progress',
+  'ReconciliationDashboard.jsx': 'Work in progress',
+  'ReferralAdminDashboard.jsx': 'Work in progress',
+  'ReferralPortal.jsx': 'Work in progress',
+  'RelocationTracker.jsx': 'Work in progress',
+  'RemoteWorkerTaxReport.jsx': 'Work in progress',
+  'ReversalDashboard.jsx': 'Work in progress',
+  'RosterGenerator.jsx': 'Work in progress',
+  'ShiftMarketplace.jsx': 'Work in progress',
+  'TaxJurisdictionSettings.jsx': 'Work in progress',
+  'TimesheetTracker.jsx': 'Work in progress',
+  'TipPoolDashboard.jsx': 'Work in progress',
+  'ToilDashboard.jsx': 'Work in progress',
+  'ToilPolicySettings.jsx': 'Work in progress',
+  'TrainingCatalog.jsx': 'Work in progress',
+  'TravelDesk.jsx': 'Work in progress',
+  'TravelSettlement.jsx': 'Work in progress',
+  'TripLogger.jsx': 'Work in progress',
+  'UnionAdminDashboard.jsx': 'Work in progress',
+  'VendorComplianceVault.jsx': 'Work in progress',
+  'WCAuditDashboard.jsx': 'Work in progress',
+  'WellnessDashboard.jsx': 'Work in progress',
+  'WhistleblowerPortal.jsx': 'Work in progress',
 };
 
 /**
