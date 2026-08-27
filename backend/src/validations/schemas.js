@@ -115,43 +115,68 @@ const payrollFinalizeSchema = z
   })
   .strict();
 
-// Onboarding validation schemas
-const ONBOARDING_DEPARTMENTS = ['HR', 'IT', 'Finance', 'Manager', 'Employee'];
-const ONBOARDING_TASK_STATUSES = [
-  'Pending',
-  'In Progress',
-  'Completed',
-  'Blocked',
+// Benefits enrollment validation schemas
+const BENEFIT_CATEGORIES = [
+  'health',
+  'dental',
+  'vision',
+  'retirement',
+  'life-insurance',
+  'disability',
+  'wellness',
+  'other',
 ];
-const ONBOARDING_DOC_STATUSES = [
-  'Pending Verification',
-  'Verified',
-  'Rejected',
-];
+const COVERAGE_TYPES = ['individual', 'individual+spouse', 'family'];
+const ENROLLMENT_STATUSES = ['enrolled', 'pending', 'cancelled', 'terminated'];
+const DEPENDENT_RELATIONSHIPS = ['spouse', 'child', 'parent'];
 
-const onboardingTaskSchema = z
+const dependentSchema = z
   .object({
-    title: z.string().trim().min(1, 'Title is required').max(200),
-    description: z.string().max(500).optional().nullable(),
-    department: z.enum(ONBOARDING_DEPARTMENTS),
-    dueOffsetDays: z.number().int().min(-30).max(365),
-    isMandatory: z.boolean().optional(),
+    name: z.string().trim().min(1, 'Dependent name is required').max(100),
+    relationship: z.enum(DEPENDENT_RELATIONSHIPS),
+    dateOfBirth: dateString('Date of birth').optional().nullable(),
   })
   .strict();
 
-const createOnboardingPlanSchema = z
+const createBenefitPlanSchema = z
   .object({
     name: z.string().trim().min(1, 'Plan name is required').max(100),
+    category: z.enum(BENEFIT_CATEGORIES),
     description: z.string().max(500).optional().nullable(),
-    tasks: z.array(onboardingTaskSchema).optional().nullable(),
+    provider: z.string().max(100).optional().nullable(),
+    monthlyPremium: z
+      .number()
+      .finite()
+      .min(0, 'Premium must be non-negative')
+      .max(100000),
+    employerContribution: z
+      .number()
+      .finite()
+      .min(0)
+      .max(100000)
+      .optional()
+      .nullable(),
+    employeeContribution: z
+      .number()
+      .finite()
+      .min(0)
+      .max(100000)
+      .optional()
+      .nullable(),
+    coverageType: z.enum(COVERAGE_TYPES).optional(),
+    enrollmentStartDate: dateString('Enrollment start date')
+      .optional()
+      .nullable(),
+    enrollmentEndDate: dateString('Enrollment end date').optional().nullable(),
+    maxEnrollees: z.number().int().positive().max(100000).optional().nullable(),
   })
   .strict();
 
-const startOnboardingSchema = z
+const enrollSchema = z
   .object({
     planId: z.string().trim().min(1),
-    employeeId: z.string().trim().min(1),
-    joiningDate: dateString('Joining date'),
+    coverageType: z.enum(COVERAGE_TYPES).optional(),
+    dependents: z.array(dependentSchema).optional().nullable(),
   })
   .strict();
 
@@ -160,9 +185,9 @@ module.exports = {
   loginSchema,
   employeeSchema,
   payrollFinalizeSchema,
-  createOnboardingPlanSchema,
-  startOnboardingSchema,
-  ONBOARDING_DEPARTMENTS,
-  ONBOARDING_TASK_STATUSES,
-  ONBOARDING_DOC_STATUSES,
+  createBenefitPlanSchema,
+  enrollSchema,
+  BENEFIT_CATEGORIES,
+  COVERAGE_TYPES,
+  ENROLLMENT_STATUSES,
 };
