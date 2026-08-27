@@ -141,6 +141,14 @@ export const APP_ROUTES = [
     icon: 'archive',
   },
   {
+    path: '/bulk-operations',
+    component: lazy(() => import('../pages/BulkOperationsCenter')),
+    label: 'Bulk operations',
+    group: 'people',
+    icon: 'briefcase',
+    appShell: true,
+  },
+  {
     path: '/appraisals',
     component: lazy(() => import('../pages/AppraisalDashboard')),
     label: 'Appraisals',

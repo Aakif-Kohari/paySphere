@@ -26,7 +26,8 @@ const {
 const { initializeWebhookService } = require('./services/webhook.service');
 const { startWebhookWorker } = require('./workers/webhook.worker');
 const { startEmailWorker } = require('./workers/email.worker');
-const { startOutboxWorker } = require('./workers/outbox.worker');const { isRedisAvailable } = require('./config/redis');
+const { startOutboxWorker } = require('./workers/outbox.worker');
+const { isRedisAvailable } = require('./config/redis');
 const { attachGraphQL } = require('./graphql');
 const logger = require('./utils/logger');
 const TelemetryService = require('./config/telemetry');
@@ -134,6 +135,11 @@ const startServer = async () => {
     startWebhookWorker();
     startEmailWorker();
     startOutboxWorker();
+
+    const {
+      startBulkOperationWorker,
+    } = require('./workers/bulkOperation.worker');
+    startBulkOperationWorker();
   } else if (!isRedisAvailable()) {
     logger.warn(
       'Webhook worker not started: REDIS_URL is not set. Webhook deliveries require Redis.',

@@ -438,6 +438,10 @@ app.use('/api/auth', userRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/custom-fields', customFieldRoutes);
 app.use('/api/employees', employeeImportRoutes);
+
+const bulkOperationRoutes = require('./routes/bulkOperation.routes');
+app.use('/api/bulk-operations', bulkOperationRoutes);
+
 app.use('/api/payroll', payrollRoutes);
 app.use('/api/payroll', payrollApprovalRoutes);
 app.use('/api/payroll-comparison', payrollComparisonRoutes);
