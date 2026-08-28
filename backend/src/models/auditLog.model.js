@@ -110,7 +110,7 @@ const AUDIT_ACTIONS = [
   'RETENTION_ATTENDANCE_PURGED',
   'RETENTION_PAYROLL_RETAINED',
   'RETENTION_AUDIT_RETAINED',
-  'RETENTION_POLICY_UPDATED',  // Deactivating someone stops their payroll, and restoring a soft-deleted
+  'RETENTION_POLICY_UPDATED', // Deactivating someone stops their payroll, and restoring a soft-deleted
   // record brings their history back. Both are emitted by
   // employee.controller.js and neither was accepted here (#664).
   'EMPLOYEE_STATUS_TOGGLE',
@@ -174,6 +174,20 @@ const AUDIT_ACTIONS = [
   // and are audited as such (#460).
   'LOAN_ISSUE',
   'LOAN_STATUS_CHANGE',
+  // Article 276 and the state professional tax enactments (#1876). The rule is
+  // audited because it carries an effective date: backdating one rewrites the
+  // deduction on payslips already issued, and the employee's copy and ours then
+  // disagree with nothing having failed.
+  //
+  // The payment is audited because section 16(iii) allows professional tax
+  // *actually paid*, so the date on that row decides which year an employee may
+  // deduct it in — and the period it discharges can be in the other one.
+  'PROFESSIONAL_TAX_RULE_RECORDED',
+  'PROFESSIONAL_TAX_PROFILE_RECORDED',
+  'PROFESSIONAL_TAX_REGISTRATION_RECORDED',
+  'PROFESSIONAL_TAX_PAYMENT_RECORDED',
+  'PROFESSIONAL_TAX_ASSESSMENT_COMMITTED',
+
   'LOAN_REPAYMENT',
   // Labour Welfare Fund (#1701). A state rule decides what every employee in
   // that state owes for years, so adding one changes contributions not yet
