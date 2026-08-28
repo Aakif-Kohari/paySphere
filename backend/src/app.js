@@ -315,6 +315,7 @@ const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
 const teamRoutes = require('./routes/team.routes');
 const healthChallengeRoutes = require('./routes/healthChallenge.routes');
+const offboardingRoutes = require('./routes/offboarding.routes');
 const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
@@ -851,6 +852,11 @@ app.use('/api/policies', companyPolicyRoutes);
 // Peer Nomination & Awards (#peer-nominations). Employee-driven recognition
 // with category configuration, cycle management, voting, review, and analytics.
 app.use('/api/peer-nominations', peerNominationRoutes);
+
+// Employee Offboarding & Exit Clearance Tracker (#1374). The router
+// owns `/dashboard`, `/reports/attrition`, `/checklist`, `/assets`,
+// `/knowledge-transfer`, `/exit-interview` and `/settlement` sub-paths.
+app.use('/api/offboarding', offboardingRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
