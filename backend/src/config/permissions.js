@@ -472,6 +472,24 @@ const PERMISSIONS = {
   // Reading is separated from both because a perquisite statement is one
   // person's complete tax position, in the same class as the Form 16 that
   // READ_COMPLIANCE guards.
+  // --- EDLI paragraph 22, the assurance benefit (#1878) --------------------
+  //
+  // The split is on what each name decides for a family. MANAGE_EPF_NOMINATION
+  // decides *who* receives the assurance, and it is the one thing here a member
+  // states for themselves — so it sits apart from everything that decides how
+  // much.
+  //
+  // MANAGE_EDLI_CLAIM commits the figure a family is quoted and holds the two
+  // inputs that move it most: the section 17(2A) exemption, which decides
+  // whether the group policy or the scheme is the measure, and prior service at
+  // another establishment, which decides whether the ₹2,50,000 floor applies at
+  // all. They are together on purpose — an account that could record fourteen
+  // months of unverified prior service and then commit the resulting claim is
+  // the whole risk in this feature.
+  READ_EDLI: 'READ_EDLI',
+  MANAGE_EPF_NOMINATION: 'MANAGE_EPF_NOMINATION',
+  MANAGE_EDLI_CLAIM: 'MANAGE_EDLI_CLAIM',
+
   READ_PERQUISITE: 'READ_PERQUISITE',
   MANAGE_PERQUISITE_GRANT: 'MANAGE_PERQUISITE_GRANT',
   MANAGE_PERQUISITE_RULES: 'MANAGE_PERQUISITE_RULES',
@@ -966,6 +984,22 @@ const PERMISSION_DEFINITIONS = [
       'View the pay gap analysis, which is computed from employees’ declared gender',
   },
   {
+    name: PERMISSIONS.MANAGE_EPF_NOMINATION,
+    description:
+      'Record a member’s EPF Form 2 nomination, the family and the legal heirs — who the assurance is paid to',
+  },
+  {
+    name: PERMISSIONS.MANAGE_EDLI_CLAIM,
+    description:
+      'Record the section 17(2A) exemption and its policy, record prior service at another establishment, and commit the assurance claim',
+  },
+  {
+    name: PERMISSIONS.READ_EDLI,
+    description:
+      'View EDLI nominations, the twelve-month averaging window behind a claim, the computed assurance benefit and the section 17(2A) comparison',
+  },
+
+  {
     name: PERMISSIONS.MANAGE_PAY_EQUITY,
     description:
       'Commit a pay equity report and set the salary bands every compa-ratio is measured against',
@@ -1337,6 +1371,13 @@ const ROLE_DEFINITIONS = [
       // the only sensitive personal data in the product, and a committed report
       // is a published figure — neither is HR admin.
       PERMISSIONS.READ_PAY_EQUITY,
+      // #1878. All three. Recording prior service and committing the claim it
+      // qualifies for are the two halves of the same check, and the owner is
+      // the one account allowed to be on both sides of it.
+      PERMISSIONS.READ_EDLI,
+      PERMISSIONS.MANAGE_EPF_NOMINATION,
+      PERMISSIONS.MANAGE_EDLI_CLAIM,
+
       PERMISSIONS.MANAGE_PAY_EQUITY,
       PERMISSIONS.READ_CONTRACT,
       PERMISSIONS.MANAGE_CONTRACT,
@@ -1576,6 +1617,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_CONTRACT,
       PERMISSIONS.READ_APPRAISAL,
       PERMISSIONS.MANAGE_APPRAISAL,
+      // #1878. Read and the nomination. Recording who a member has nominated is
+      // ordinary HR administration and the member states it themselves. It does
+      // not record prior service at another establishment, which decides whether
+      // the ₹2,50,000 floor applies, and it does not commit the claim.
+      PERMISSIONS.READ_EDLI,
+      PERMISSIONS.MANAGE_EPF_NOMINATION,
+
       PERMISSIONS.READ_OWN_APPRAISAL,
       PERMISSIONS.READ_INVOICE,
       PERMISSIONS.SUBMIT_TAX_PROOF,

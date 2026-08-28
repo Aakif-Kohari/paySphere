@@ -290,6 +290,23 @@ const AUDIT_ACTIONS = [
   'CONTRACT_LABOUR_CONTRACTOR_REGISTERED',
   'CONTRACT_LABOUR_LICENCE_UPDATED',
   'CONTRACT_LABOUR_RETURN_FILED',
+  // EDLI paragraph 22 (#1878). The nomination is audited because it decides
+  // who receives the assurance, and a nomination summing to less than a hundred
+  // per cent sends the remainder to a different limb of the scheme — a change
+  // of payee rather than of amount.
+  //
+  // Prior service is audited because those months decide whether the ₹2,50,000
+  // floor applies at all, and the gap flag decides whether they aggregate. Both
+  // are on the line.
+  //
+  // And the exemption is audited because it decides whether the group policy or
+  // paragraph 22 is the measure — where the policy pays less, the difference is
+  // the establishment's liability rather than the insurer's.
+  'EPF_NOMINATION_RECORDED',
+  'EDLI_EXEMPTION_RECORDED',
+  'EDLI_PRIOR_SERVICE_RECORDED',
+  'EDLI_CLAIM_COMMITTED',
+
   'CONTRACT_LABOUR_REGISTER_EXPORTED',
   // Industrial Disputes Act, Chapters VA and VB (#1830). The permission record
   // is audited because that one field decides which of two liabilities the
