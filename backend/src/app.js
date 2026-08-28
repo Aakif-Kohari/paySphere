@@ -165,6 +165,7 @@ const salaryAdjustmentRoutes = require('./routes/salaryAdjustment.routes');
 const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
 const teamRoutes = require('./routes/team.routes');
+const deptBudgetRoutes = require('./routes/deptBudget.routes');
 const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
@@ -551,6 +552,11 @@ app.use('/api/admin', subscriptionAdminRoutes);
 app.use('/api/leave-closure', leaveClosureRoutes);
 app.use('/api/fbp', fbpRoutes);
 app.use('/api/team', teamRoutes);
+
+// Department Budget Management & Variance Analysis (#1372). The router
+// owns `/cost-centers`, `/categories`, `/alerts`, `/reports` and individual
+// budget endpoints with line-item, transaction, and approval sub-paths.
+app.use('/api/dept-budgets', deptBudgetRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
