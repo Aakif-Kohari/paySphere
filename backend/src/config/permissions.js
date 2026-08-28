@@ -268,6 +268,23 @@ const PERMISSIONS = {
   MANAGE_LAYOFF_SPELL: 'MANAGE_LAYOFF_SPELL',
   MANAGE_CHAPTER_VB_ACTION: 'MANAGE_CHAPTER_VB_ACTION',
 
+  // --- Sections 7Q and 14B, EPF & MP Act, 1952 (#1875) ---------------------
+  //
+  // The split is on what a name can make disappear rather than on what it
+  // touches. Keeping the remittance ledger is administration:
+  // MANAGE_EPF_REMITTANCE records what a wage month owed and what was paid
+  // against it, and every figure it writes is checkable against a challan.
+  //
+  // MANAGE_EPF_WAIVER is not that. A paragraph 32B order can take a period's
+  // damages to nil, and the resulting figure is indistinguishable from a
+  // liability that never arose. The rules are in the same bracket because
+  // `graceDays` does the same thing by a different route — the five days that
+  // followed the fifteenth were withdrawn in 2016, and restoring them turns a
+  // five-day default into a compliant remittance without a rupee moving.
+  READ_EPF_REMITTANCE: 'READ_EPF_REMITTANCE',
+  MANAGE_EPF_REMITTANCE: 'MANAGE_EPF_REMITTANCE',
+  MANAGE_EPF_WAIVER: 'MANAGE_EPF_WAIVER',
+
   READ_VENDOR: 'READ_VENDOR',
   // Recording a vendor invoice sets the 194C/194J TDS withheld, and therefore
   // what the company remits on that contractor's behalf. Same class of
@@ -609,6 +626,23 @@ const PERMISSION_DEFINITIONS = [
     description:
       'Create and edit expense categories, including whether a category is taxable',
   },
+  {
+    name: PERMISSIONS.MANAGE_EPF_REMITTANCE,
+    description:
+      'Record what a wage month owed to each EPF account and the payments made against it, including a section 7A determination for a past period',
+  },
+  {
+    name: PERMISSIONS.MANAGE_EPF_WAIVER,
+    description:
+      'Record a paragraph 32B damages waiver, set the interest rate, the paragraph 32A slabs and the grace period, and commit an assessment',
+  },
+
+  {
+    name: PERMISSIONS.READ_EPF_REMITTANCE,
+    description:
+      'View the EPF remittance ledger, the section 7Q interest and section 14B damages on each default, and the member share deducted and not remitted',
+  },
+
   {
     name: PERMISSIONS.READ_STATUTORY_BONUS,
     description:
@@ -1099,6 +1133,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_EXPENSE_CATEGORY,
 
       // #1346.
+      // #1875. All three. A paragraph 32B waiver reduces a liability the same
+      // account will later be asked to certify, and the owner is the one
+      // account allowed to be on both sides of that.
+      PERMISSIONS.READ_EPF_REMITTANCE,
+      PERMISSIONS.MANAGE_EPF_REMITTANCE,
+      PERMISSIONS.MANAGE_EPF_WAIVER,
+
       PERMISSIONS.READ_STATUTORY_BONUS,
       PERMISSIONS.MANAGE_STATUTORY_BONUS,
 
@@ -1312,6 +1353,15 @@ const ROLE_DEFINITIONS = [
       // does not state the aggregator's turnover, which is the base of the levy
       // and has no cross-check anywhere in this product, and it does not commit
       // the assessment.
+      // #1875. Read and the ledger. Recording what a wage month owed and what
+      // was remitted against it is administration and every figure is
+      // checkable against a challan. It does not record a paragraph 32B
+      // waiver, which can take a period's damages to nil, and it does not move
+      // the grace period, which does the same thing by making the default
+      // disappear instead.
+      PERMISSIONS.READ_EPF_REMITTANCE,
+      PERMISSIONS.MANAGE_EPF_REMITTANCE,
+
       PERMISSIONS.READ_AGGREGATOR_CONTRIBUTION,
       PERMISSIONS.MANAGE_GIG_WORKER_REGISTER,
 

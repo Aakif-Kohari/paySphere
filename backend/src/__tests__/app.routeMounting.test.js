@@ -79,6 +79,8 @@ const MOUNTED_ROUTES = [
   ['/api/schedules', 'get', '/api/schedules'],
   ['/api/audit-logs', 'get', '/api/audit-logs'],
   ['/api/attendance', 'get', '/api/attendance'],
+  ['/api/epf-remittance', 'get', '/api/epf-remittance/rules'],
+
   ['/api/wage-deductions', 'get', '/api/wage-deductions/rules'],
   ['/api/working-hours', 'get', '/api/working-hours/limits'],
   ['/api/assignments', 'get', '/api/assignments'],
@@ -208,6 +210,8 @@ const ROUTER_MOUNTS = {
   clientInvoice: '/api/clients',
   compliance: '/api/compliance',
   aggregatorContribution: '/api/aggregator-contribution',
+  epfRemittance: '/api/epf-remittance',
+
   contract: '/api/contracts',
   apprenticeship: '/api/apprenticeships',
   contractLabour: '/api/contract-labour',
