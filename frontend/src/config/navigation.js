@@ -564,6 +564,19 @@ export const APP_ROUTES = [
     employee: true,
   },
   {
+    // In Compliance rather than beside Settlements, though a death in service
+    // triggers both. A settlement is what the employer owes; this is what the
+    // scheme pays out of contributions already remitted, and the employer only
+    // files the claim (#1878).
+    path: '/edli',
+    component: lazy(() => import('../pages/EdliAssuranceRegister')),
+    appShell: true,
+    label: 'EDLI assurance',
+    group: 'compliance',
+    icon: 'shield',
+  },
+
+  {
     // In Workplace rather than Payroll: the desk is about where people are
     // working and under what arrangement, and the money follows from that
     // rather than the other way round (#1348).

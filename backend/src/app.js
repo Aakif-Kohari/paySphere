@@ -215,6 +215,12 @@ const apprenticeshipRoutes = require('./routes/apprenticeships.routes');
 // neither the site nor the trade but the fact of having been recruited in one
 // state and employed in another, which neither of the other two routers can see.
 const migrantWorkmenRoutes = require('./routes/migrantWorkmen.routes');
+// EDLI paragraph 22, the assurance benefit (#1878). Apart from the settlement
+// router even though a death in service also triggers a full and final: that
+// one answers what the employer owes, and this answers what the scheme pays out
+// of contributions already remitted, where the employer only files the claim.
+const edliRoutes = require('./routes/edli.routes');
+
 const grievanceRoutes = require('./routes/grievance.routes');
 const taxProofRoutes = require('./routes/taxProof.routes');
 
@@ -686,6 +692,12 @@ app.use('/api/construction-cess', constructionCessRoutes);
 
 // #1700. The router owns `/contractors`, `/deployments`, `/assessment`,
 // `/returns` and `/registers`.
+// #1878. The router owns `/rules`, `/nominations`, `/exemption`,
+// `/prior-service`, `/preview` and `/claims`. It does not recompute the 0.5 per
+// cent contribution — `ecrGenerator.utils.js` stays the single place for that —
+// and it will not commit a claim with no payee resolved.
+app.use('/api/edli', edliRoutes);
+
 app.use('/api/contract-labour', contractLabourRoutes);
 
 // #1771. Its own prefix rather than a sub-path of `/api/contract-labour`, for

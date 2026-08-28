@@ -122,6 +122,8 @@ const MOUNTED_ROUTES = [
   // Mounted in #1009. Each of these had a router, a controller, models and in
   // most cases a frontend page, and no entry in the route table.
   ['/api/assets', 'get', '/api/assets'],
+  ['/api/edli', 'get', '/api/edli/rules'],
+
   ['/api/vendors', 'get', '/api/vendors/000000000000000000000000/ledger'],
   ['/api/construction-cess', 'get', '/api/construction-cess/rules'],
   ['/api/grievances', 'get', '/api/grievances/cases'],
@@ -246,6 +248,8 @@ const ROUTER_MOUNTS = {
   payroll: '/api/payroll',
   pyq: '/api/pyqs',
   recruitment: '/api/recruitment',
+  edli: '/api/edli',
+
   regionalTax: '/api/regional-tax',
   reports: '/api/reports',
   role: '/api/roles',
