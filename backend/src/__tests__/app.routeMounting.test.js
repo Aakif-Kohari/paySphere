@@ -103,6 +103,8 @@ const MOUNTED_ROUTES = [
   ['/api/webhooks', 'get', '/api/webhooks'],
   ['/api/dashboard', 'get', '/api/dashboard/layout'],
   ['/api/pay-equity', 'get', '/api/pay-equity/reports'],
+  ['/api/young-persons', 'get', '/api/young-persons/rules'],
+
   ['/api/labour-welfare-fund', 'get', '/api/labour-welfare-fund/rules'],
   ['/api/notifications', 'get', '/api/notifications'],
   [
@@ -244,6 +246,8 @@ const ROUTER_MOUNTS = {
   layoffs: '/api/layoffs',
   integration: '/api/integrations',
   labourWelfareFund: '/api/labour-welfare-fund',
+  youngPersons: '/api/young-persons',
+
   leaveClosure: '/api/leave-closure',
   loan: '/api/loans',
   lta: '/api/lta',

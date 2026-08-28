@@ -475,6 +475,19 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
   {
+    // In Compliance, and deliberately not beside the working-hours page even
+    // though section 7 is about hours. That page answers an excess hour with a
+    // rate; this one has no currency on it at all, because an underage
+    // engagement has no compensable amount (#1877).
+    path: '/young-persons',
+    component: lazy(() => import('../pages/YoungPersonsRegister')),
+    appShell: true,
+    label: 'Children & adolescents',
+    group: 'compliance',
+    icon: 'shield',
+  },
+
+  {
     // In Compliance rather than Finance, even though a contractor is a vendor.
     // The vendor ledger's question is "what do we owe this counterparty"; this
     // one's is "what are we liable for on account of people we do not employ",

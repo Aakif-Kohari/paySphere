@@ -245,6 +245,25 @@ const AUDIT_ACTIONS = [
   // The approval workflow engine (#590, mounted in #614) emits three (#664).
   // A change to the graph that decides who may approve a payroll run is
   // exactly the kind of thing an auditor asks about.
+  // Child and Adolescent Labour Act, 1986 (#1877). The age is audited because
+  // that one date decides whether section 3's total bar applies at all —
+  // moving it by a year moves somebody across the fourteen or the eighteen
+  // boundary, and nothing else in the record would change.
+  //
+  // The register entry is audited because of one field on it: a claimed section
+  // 3 exception turns a prohibited engagement into a permitted one on paper,
+  // and the claim is about a relationship and about schooling rather than about
+  // a job title.
+  //
+  // None of these lines carries an amount. An underage engagement has no
+  // compensable figure, and section 14's fine is a criminal penalty on
+  // conviction rather than a liability that accrues.
+  'YOUNG_PERSON_AGE_RECORDED',
+  'YOUNG_PERSON_REGISTER_RECORDED',
+  'YOUNG_PERSON_DAYS_RECORDED',
+  'YOUNG_PERSON_FINDING_RESOLVED',
+  'YOUNG_PERSON_ASSESSMENT_COMMITTED',
+
   'WORKFLOW_CREATE',
   'WORKFLOW_INSTANCE_START',
   'WORKFLOW_TRANSITION',

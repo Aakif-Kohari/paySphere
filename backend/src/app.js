@@ -173,6 +173,12 @@ const timelineRoutes = require('./routes/timeline.routes');
 // Labour Welfare Fund (#1701). There is no central Act — fifteen or so state
 // enactments that agree on almost nothing — so the state rule is data and this
 // router is the calendar and the register built on top of it.
+// Child and Adolescent Labour Act, 1986 (#1877). Apart from the working-hours
+// router even though the section 7 limits look like its subject: that engine
+// answers an excess hour by computing the section 59 double rate, and for
+// anybody under eighteen there is no rate at which the hour becomes lawful.
+const youngPersonRoutes = require('./routes/youngPersons.routes');
+
 const labourWelfareFundRoutes = require('./routes/labourWelfareFund.routes');
 const varianceReportRoutes = require('./routes/varianceReport.routes');
 const searchRoutes = require('./routes/search.routes');
@@ -644,6 +650,12 @@ app.use('/api/public/verification', publicVerificationRoutes);
 // ever called, so until #896 *no* route had security headers or an access log —
 // the dashboard was not a special case, it was just the one that got noticed.
 app.use('/api/dashboard', dashboardRoutes);
+// #1877. The router owns `/rules`, `/age-records`, `/register`, `/findings` and
+// `/assessments`. No endpoint on it returns a monetary figure: an underage
+// engagement has no compensable amount, and a rupee here would be summed into a
+// compliance provision by the first report that read it.
+app.use('/api/young-persons', youngPersonRoutes);
+
 app.use('/api/stats', statsRoutes);
 
 // #1347. The router owns `/preview`, `/reports`, `/compa-ratio` and `/bands`.
