@@ -356,6 +356,22 @@ const PERMISSIONS = {
   // very often also a contract workman: #1700 answers what the principal
   // employer owes for a contractor's workmen, and this answers what the workman
   // is owed for having been recruited in another state.
+  // --- Article 276 and the state professional tax enactments (#1876) -------
+  //
+  // The split is on which name can change what a payslip already issued says.
+  // MANAGE_PROFESSIONAL_TAX records a work state, a certificate and a
+  // remittance, and every figure it writes is checkable against a document.
+  //
+  // MANAGE_PT_RULE writes the slab table, and a slab table carries an effective
+  // date. Backdating one silently rewrites the deduction on payslips already
+  // issued — the employee's copy and ours then disagree with nothing having
+  // failed. Committing the year is in the same bracket because it fixes the
+  // section 16(iii) figure the salary computation deducts, and therefore the
+  // TDS in Form 24Q.
+  READ_PROFESSIONAL_TAX: 'READ_PROFESSIONAL_TAX',
+  MANAGE_PROFESSIONAL_TAX: 'MANAGE_PROFESSIONAL_TAX',
+  MANAGE_PT_RULE: 'MANAGE_PT_RULE',
+
   READ_MIGRANT_WORKMEN: 'READ_MIGRANT_WORKMEN',
   MANAGE_MIGRANT_WORKMAN: 'MANAGE_MIGRANT_WORKMAN',
   MANAGE_MIGRANT_WAGE_BASIS: 'MANAGE_MIGRANT_WAGE_BASIS',
@@ -729,6 +745,22 @@ const PERMISSION_DEFINITIONS = [
     description:
       'Create, update and delete custom roles and their permission sets',
   },
+  {
+    name: PERMISSIONS.MANAGE_PROFESSIONAL_TAX,
+    description:
+      'Record an employee’s work state and exemptions, the enrolment and registration certificates, and the remittances made under them',
+  },
+  {
+    name: PERMISSIONS.MANAGE_PT_RULE,
+    description:
+      'Write a state professional tax slab table with its effective date, and commit the year’s assessment that fixes the section 16(iii) deduction',
+  },
+  {
+    name: PERMISSIONS.READ_PROFESSIONAL_TAX,
+    description:
+      'View the professional tax slab rules in force, the per-employee work state and deduction, and the remittances against each registration certificate',
+  },
+
   {
     name: PERMISSIONS.IMPERSONATE_USER,
     description:
@@ -1178,6 +1210,13 @@ const ROLE_DEFINITIONS = [
       // Held by the owner alone: a role edit changes what every other account
       // in the company can do.
       PERMISSIONS.MANAGE_ROLES,
+      // #1876. All three. Backdating a slab table rewrites a payslip already
+      // issued, and the owner is the one account allowed to do that and to
+      // certify the result.
+      PERMISSIONS.READ_PROFESSIONAL_TAX,
+      PERMISSIONS.MANAGE_PROFESSIONAL_TAX,
+      PERMISSIONS.MANAGE_PT_RULE,
+
       PERMISSIONS.IMPERSONATE_USER,
 
       // #1011. The owner holds everything, including the three that stop at
@@ -1413,6 +1452,13 @@ const ROLE_DEFINITIONS = [
       // to cost us" is an HR question and the per-employee schedule answers it.
       // It does not run one and it does not set the assumptions: both decide
       // what the company reports, which is the owner's call and the auditor's.
+      // #1876. Read and the administration. Recording where somebody works and
+      // what was remitted is ordinary HR work. It does not write a slab table
+      // with an effective date, which can rewrite a payslip already issued, and
+      // it does not commit the year that fixes the section 16(iii) deduction.
+      PERMISSIONS.READ_PROFESSIONAL_TAX,
+      PERMISSIONS.MANAGE_PROFESSIONAL_TAX,
+
       PERMISSIONS.READ_GRATUITY_VALUATION,
 
       // #1769. HR reads the pension statements — "why is my pensionable salary

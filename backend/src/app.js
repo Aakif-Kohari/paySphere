@@ -144,6 +144,12 @@ const schedulerRoutes = require('./routes/scheduler.routes');
 const employeePortalRoutes = require('./routes/employeePortal.routes');
 const workflowRoutes = require('./routes/workflow.routes');
 const salaryHistoryRoutes = require('./routes/salaryHistory.routes');
+// Professional tax, Article 276 and the state enactments (#1876). Apart from
+// the tax router because that one answers to the Income-tax Act, while this
+// answers to a different state for every office — and the state that applies is
+// the state of the place of work rather than of the registered office.
+const professionalTaxRoutes = require('./routes/professionalTax.routes');
+
 const dashboardRoutes = require('./routes/dashboard.routes');
 
 // Pay equity analytics (#1347). Next to the dashboard and stats routers because
@@ -570,6 +576,13 @@ app.use('/api/loans', loanRoutes);
 app.use('/api/treasury', treasuryRoutes);
 app.use('/api/regional-tax', regionalTaxRoutes);
 app.use('/api/salary-adjustments', salaryAdjustmentRoutes);
+// #1876. The router owns `/rules`, `/profiles`, `/registrations`, `/payments`,
+// `/assessment` and `/section-16iii`. It returns one remittance per
+// registration certificate and no total across them — a company with offices in
+// two states remits to two authorities on two schedules, and a combined figure
+// is not a number anyone can pay.
+app.use('/api/professional-tax', professionalTaxRoutes);
+
 app.use('/api/deferred-compensation', deferredCompensationRoutes);
 app.use('/api/pension', pensionRoutes);
 

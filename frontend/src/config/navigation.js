@@ -330,6 +330,19 @@ export const APP_ROUTES = [
     icon: 'chart',
   },
   {
+    // In Compliance rather than Payroll, though the deduction lands on a
+    // payslip. The page is organised by registration certificate rather than by
+    // employee, because the state that applies is the state of the place of
+    // work and a company with two offices remits to two authorities (#1876).
+    path: '/professional-tax',
+    component: lazy(() => import('../pages/ProfessionalTaxRegister')),
+    appShell: true,
+    label: 'Professional tax',
+    group: 'compliance',
+    icon: 'shield',
+  },
+
+  {
     path: '/budget',
     component: lazy(() => import('../pages/BudgetPlanner')),
     label: 'Budget planner',
