@@ -315,6 +315,7 @@ const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
 const teamRoutes = require('./routes/team.routes');
 const healthChallengeRoutes = require('./routes/healthChallenge.routes');
+const salaryRevisionRoutes = require('./routes/salaryRevision.routes');
 const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
@@ -851,6 +852,11 @@ app.use('/api/policies', companyPolicyRoutes);
 // Peer Nomination & Awards (#peer-nominations). Employee-driven recognition
 // with category configuration, cycle management, voting, review, and analytics.
 app.use('/api/peer-nominations', peerNominationRoutes);
+
+// Salary Revision Simulator & Budget Impact Analyzer (#1373). The
+// router owns `/scenarios`, `/line-items`, `/batches`, `/dashboard`,
+// `/compare` and `/audit`.
+app.use('/api/salary-revisions', salaryRevisionRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
