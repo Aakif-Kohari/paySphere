@@ -132,7 +132,7 @@ async function handleAuditEvent(eventData) {
           endpointId: endpoint._id.toString(),
           tenantId: tenantId.toString(),
           url: endpoint.url,
-          secret: endpoint.secret,
+          signingSecret: endpoint.signingSecret,
           eventName: webhookEvent,
           payload,
         },
@@ -214,7 +214,7 @@ async function retryDlqJob(deliveryLogId, tenantId) {
     endpointId: endpoint._id.toString(),
     tenantId: tenantId.toString(),
     url: endpoint.url,
-    secret: endpoint.secret,
+    signingSecret: endpoint.signingSecret,
     eventName: delivery.eventName,
     payload: delivery.payload,
   });
