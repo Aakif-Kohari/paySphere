@@ -148,6 +148,7 @@ const statsRoutes = require('./routes/stats.routes');
 const departmentsRoutes = require('./routes/departments.routes');
 const flashcardRoutes = require('./routes/flashcard.routes');
 const webhookRoutes = require('./routes/webhook.routes');
+const apiKeyRoutes = require('./routes/apiKey.routes');
 const integrationRoutes = require('./routes/integration.routes');
 const archiveRoutes = require('./routes/archive.routes');
 const documentVaultRoutes = require('./routes/documentVault.routes');
@@ -583,6 +584,9 @@ app.use('/api/events', companyEventRoutes);
 // payroll and employee events. The controller and models were written in #645
 // but never mounted here, so the whole feature was a 404.
 app.use('/api/webhooks', webhookRoutes);
+
+// API Keys for B2B system-to-system integrations
+app.use('/api/api-keys', apiKeyRoutes);
 
 // HRMS integrations (#954). `src/integrations/` has held a working adapter
 // layer — BambooHR, Workday, a registry that validates them — with no

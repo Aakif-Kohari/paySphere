@@ -52,11 +52,12 @@ const customBackoffStrategy = (attemptsMade) => {
  * BullMQ worker (which would need a real Redis connection).
  */
 async function processWebhookJob(job) {
-  const { endpointId, tenantId, url, secret, eventName, payload } = job.data;
+  const { endpointId, tenantId, url, signingSecret, eventName, payload } =
+    job.data;
   const attempt = job.attemptsMade + 1;
 
   // 1. Generate HMAC Signature
-  const signature = generateSignature(payload, secret);
+  const signature = generateSignature(payload, signingSecret);
 
   // 2. Prepare Delivery Log Entry
   const deliveryLog = {

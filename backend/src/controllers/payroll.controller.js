@@ -804,6 +804,9 @@ exports.getExchangeRates = async (req, res, next) => {
 };
 
 exports.submitPayrollForReview = async (req, res, next) => {
+  let lockAcquired = false;
+  let lockKey = '';
+
   try {
     const { activities, month, year } = req.body;
     if (!activities || !Array.isArray(activities) || activities.length === 0) {
@@ -836,6 +839,10 @@ exports.submitPayrollForReview = async (req, res, next) => {
       return res.status(409).json({ message: error.message, ...error.details });
     }
     next(error);
+  } finally {
+    if (lockAcquired) {
+      await releaseLock(lockKey);
+    }
   }
 };
 
