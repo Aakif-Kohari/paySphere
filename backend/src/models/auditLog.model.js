@@ -110,7 +110,7 @@ const AUDIT_ACTIONS = [
   'RETENTION_ATTENDANCE_PURGED',
   'RETENTION_PAYROLL_RETAINED',
   'RETENTION_AUDIT_RETAINED',
-  'RETENTION_POLICY_UPDATED',  // Deactivating someone stops their payroll, and restoring a soft-deleted
+  'RETENTION_POLICY_UPDATED', // Deactivating someone stops their payroll, and restoring a soft-deleted
   // record brings their history back. Both are emitted by
   // employee.controller.js and neither was accepted here (#664).
   'EMPLOYEE_STATUS_TOGGLE',
@@ -284,6 +284,21 @@ const AUDIT_ACTIONS = [
   'MIGRANT_WORKMAN_RECRUITED',
   'MIGRANT_COMPARATOR_RECORDED',
   'MIGRANT_DISPLACEMENT_RECOVERED',
+  // Employment Exchanges (CNV) Act, 1959 (#1879). The determination is audited
+  // because the section 3 ground on it removes the vacancy from the Act
+  // entirely — and a ground of "less than three months' duration" is
+  // contradicted later by the engagement's own length, which is the record an
+  // inspection asks about.
+  //
+  // The headcount is audited for the neighbouring reason: twenty-four as at the
+  // date a requisition opened takes every requisition that month below the
+  // threshold, with nothing else changing.
+  'CNV_HEADCOUNT_RECORDED',
+  'CNV_DETERMINATION_RECORDED',
+  'CNV_OUTCOME_RECORDED',
+  'CNV_VACANCY_NOTIFIED',
+  'CNV_RETURN_FILED',
+
   'MIGRANT_RETURN_JOURNEY_ACCRUED',
   'MIGRANT_ASSESSMENT_COMMITTED',
   // International assignments (#1348). Opening one commits the employer to

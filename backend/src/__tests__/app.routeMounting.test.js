@@ -132,6 +132,8 @@ const MOUNTED_ROUTES = [
   ['/api/contracts', 'post', '/api/contracts/issue'],
   ['/api/forecasts', 'get', '/api/forecasts'],
   ['/api/accounting', 'get', '/api/accounting/mappings'],
+  ['/api/vacancy-notification', 'get', '/api/vacancy-notification/rules'],
+
   ['/api/clients', 'get', '/api/clients/invoices/dashboard'],
   ['/api/shifts', 'get', '/api/shifts/roster'],
   ['/api/pyqs', 'get', '/api/pyqs'],
@@ -257,6 +259,8 @@ const ROUTER_MOUNTS = {
   suspensions: '/api/suspensions',
   shiftRoster: '/api/shifts',
   minimumWages: '/api/minimum-wages',
+  vacancyNotification: '/api/vacancy-notification',
+
   statutoryBonus: '/api/statutory-bonus',
   perquisite: '/api/perquisites',
   taxProof: '/api/tax-proofs',
