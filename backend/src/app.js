@@ -315,6 +315,7 @@ const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
 const teamRoutes = require('./routes/team.routes');
 const healthChallengeRoutes = require('./routes/healthChallenge.routes');
+const deptBudgetRoutes = require('./routes/deptBudget.routes');
 const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
@@ -851,6 +852,11 @@ app.use('/api/policies', companyPolicyRoutes);
 // Peer Nomination & Awards (#peer-nominations). Employee-driven recognition
 // with category configuration, cycle management, voting, review, and analytics.
 app.use('/api/peer-nominations', peerNominationRoutes);
+
+// Department Budget Management & Variance Analysis (#1372). The router
+// owns `/cost-centers`, `/categories`, `/alerts`, `/reports` and individual
+// budget endpoints with line-item, transaction, and approval sub-paths.
+app.use('/api/dept-budgets', deptBudgetRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
