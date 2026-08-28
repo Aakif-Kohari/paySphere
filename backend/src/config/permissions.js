@@ -382,6 +382,23 @@ const PERMISSIONS = {
   // everybody at that grade is checked against.
   MANAGE_PAY_EQUITY: 'MANAGE_PAY_EQUITY',
 
+  // --- Child and Adolescent Labour Act, 1986 (#1877) -----------------------
+  //
+  // The split is on which field can turn a prohibited engagement into a
+  // permitted one. MANAGE_YOUNG_PERSON_REGISTER keeps the section 11 register —
+  // who is engaged, in what work, for which hours — and every entry in it is
+  // checkable against the person standing in the establishment.
+  //
+  // MANAGE_AGE_RECORD writes the date of birth, and that one date decides
+  // whether section 3's total bar applies at all: moving it by a year moves
+  // somebody across the fourteen or the eighteen boundary. Resolving a finding
+  // is in the same bracket, so that no single account can both create the
+  // appearance of lawfulness and close the finding that would have said
+  // otherwise.
+  READ_YOUNG_PERSON: 'READ_YOUNG_PERSON',
+  MANAGE_YOUNG_PERSON_REGISTER: 'MANAGE_YOUNG_PERSON_REGISTER',
+  MANAGE_AGE_RECORD: 'MANAGE_AGE_RECORD',
+
   READ_CONTRACT: 'READ_CONTRACT',
   // Issuing an offer letter commits the company to a salary. Kept apart from
   // WRITE_EMPLOYEE for the same reason APPROVE_PAYROLL is kept apart from
@@ -783,6 +800,22 @@ const PERMISSION_DEFINITIONS = [
       'Register contractors and record invoices, which sets the 194C/194J TDS withheld on their behalf',
   },
   {
+    name: PERMISSIONS.MANAGE_YOUNG_PERSON_REGISTER,
+    description:
+      'Keep the section 11 register — the engagement, the nature of the work, the daily spells and intervals, and the notified weekly day off',
+  },
+  {
+    name: PERMISSIONS.MANAGE_AGE_RECORD,
+    description:
+      'Record a person’s date of birth and what it rests on, resolve a finding, and commit the assessment',
+  },
+  {
+    name: PERMISSIONS.READ_YOUNG_PERSON,
+    description:
+      'View the register of children and adolescents engaged, the section 7 hours against each, and the prohibited engagements',
+  },
+
+  {
     name: PERMISSIONS.READ_CONSTRUCTION_CESS,
     description:
       'View the construction cess position per project, the advance deducted against the section 5 assessment and the beneficiary register',
@@ -1179,6 +1212,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_CHAPTER_VB_ACTION,
 
       PERMISSIONS.READ_EC_CLAIM,
+      // #1877. All three. Writing an age and closing the finding that age
+      // produced are the two halves of the same check, and the owner is the one
+      // account allowed to be on both sides of it.
+      PERMISSIONS.READ_YOUNG_PERSON,
+      PERMISSIONS.MANAGE_YOUNG_PERSON_REGISTER,
+      PERMISSIONS.MANAGE_AGE_RECORD,
+
       PERMISSIONS.MANAGE_EC_CLAIM,
       PERMISSIONS.READ_VENDOR,
       PERMISSIONS.MANAGE_VENDOR,
@@ -1410,6 +1450,13 @@ const ROLE_DEFINITIONS = [
       // It does not move the band or the recorded strength, both of which are
       // the denominator the establishment is judged against, and it does not
       // commit the assessment.
+      // #1877. Read and the register. Recording who is engaged, in what work
+      // and for which hours is ordinary establishment administration. It does
+      // not write the date of birth, which decides whether the total bar under
+      // section 3 applies at all, and it does not close a finding.
+      PERMISSIONS.READ_YOUNG_PERSON,
+      PERMISSIONS.MANAGE_YOUNG_PERSON_REGISTER,
+
       PERMISSIONS.READ_APPRENTICESHIP,
       PERMISSIONS.MANAGE_APPRENTICE,
 
