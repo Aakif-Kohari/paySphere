@@ -804,11 +804,26 @@ exports.getExchangeRates = async (req, res, next) => {
 };
 
 exports.submitPayrollForReview = async (req, res, next) => {
+  let lockAcquired = false;
+  let lockKey = '';
+
   try {
     const { activities, month, year } = req.body;
     if (!activities || !Array.isArray(activities) || activities.length === 0) {
       return res.status(400).json({ message: 'No activities to process' });
     }
+    if (!month || !year || isNaN(month) || isNaN(year)) {
+      return res.status(400).json({ message: 'Invalid month or year' });
+    }
+
+    lockKey = `payroll_lock:${req.tenantId}:${year}:${month}`;
+    lockAcquired = await acquireLock(lockKey, 300000);
+    if (!lockAcquired) {
+      return res.status(409).json({
+        message: 'Another payroll process is currently running for this period. Please wait.',
+      });
+    }
+
     const result = await PayrollEngine.executeRun(req, {
       activities,
       month,
@@ -829,6 +844,10 @@ exports.submitPayrollForReview = async (req, res, next) => {
       return res.status(409).json({ message: error.message, ...error.details });
     }
     next(error);
+  } finally {
+    if (lockAcquired) {
+      await releaseLock(lockKey);
+    }
   }
 };
 
