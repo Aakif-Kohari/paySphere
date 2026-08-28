@@ -40,6 +40,7 @@ const REVISION_REASON = {
    * is what makes the history tamper-evident, the same property AuditLog has.
    */
   CORRECTION: 'correction',
+  FBP_REVISION: 'fbp_revision',
 };
 
 const ALL_REVISION_REASONS = Object.values(REVISION_REASON);

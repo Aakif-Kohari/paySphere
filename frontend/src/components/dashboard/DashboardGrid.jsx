@@ -5,6 +5,7 @@
  * Issue: #932
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 // `react-grid-layout@2` dropped the `WidthProvider` HOC and exports a
 // width-aware `ResponsiveGridLayout` instead. package.json has asked for
 // `^2.2.4` while this file used the v1 API, so the build failed here:
@@ -25,6 +26,7 @@ import api from '../../services/api';
 import { WIDGET_REGISTRY, DEFAULT_LAYOUT } from './WidgetRegistry';
 
 export default function DashboardGrid() {
+  const { t } = useTranslation();
   const [layout, setLayout] = useState(DEFAULT_LAYOUT);
   const [isEditMode, setIsEditMode] = useState(false);
   // Derived from a module-level constant that never changes, so this was
@@ -107,7 +109,7 @@ export default function DashboardGrid() {
       {/* Toolbar */}
       <div className="flex justify-between items-center bg-white dark:bg-slate-800 p-3 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
         <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-          Dashboard Overview
+          {t('dashboard.widgets.overview', 'Dashboard Overview')}
         </h2>
         <div className="flex gap-2">
           {isEditMode ? (
@@ -119,9 +121,10 @@ export default function DashboardGrid() {
                 }}
                 className="px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                 defaultValue=""
+                aria-label={t('dashboard.widgets.addWidget', '+ Add Widget')}
               >
                 <option value="" disabled>
-                  + Add Widget
+                  {t('dashboard.widgets.addWidget', '+ Add Widget')}
                 </option>
                 {availableWidgets.map((wId) => (
                   <option
@@ -137,7 +140,7 @@ export default function DashboardGrid() {
                 onClick={() => setIsEditMode(false)}
                 className="flex items-center gap-1 px-3 py-1.5 bg-brand-600 text-white rounded-lg text-sm font-semibold hover:bg-brand-700"
               >
-                <SaveIcon fontSize="small" /> Done
+                <SaveIcon fontSize="small" /> {t('dashboard.widgets.done', 'Done')}
               </button>
             </>
           ) : (
@@ -145,7 +148,7 @@ export default function DashboardGrid() {
               onClick={() => setIsEditMode(true)}
               className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300 rounded-lg text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700"
             >
-              <EditIcon fontSize="small" /> Edit Layout
+              <EditIcon fontSize="small" /> {t('dashboard.widgets.editLayout', 'Edit Layout')}
             </button>
           )}
         </div>
@@ -185,7 +188,7 @@ export default function DashboardGrid() {
                     <button
                       onClick={() => removeWidget(item.i)}
                       className="text-red-500 hover:text-red-700 p-1"
-                      aria-label="Remove widget"
+                      aria-label={t('dashboard.widgets.remove', 'Remove widget')}
                     >
                       <CancelIcon fontSize="small" />
                     </button>

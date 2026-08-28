@@ -34,8 +34,7 @@ if (process.env.REDIS_URL) {
       removeOnFail: { count: 5000 },
       attempts: 5,
       backoff: {
-        type: 'exponential',
-        delay: 60000,
+        type: 'custom',
       },
     },
   });
@@ -132,7 +131,7 @@ async function handleAuditEvent(eventData) {
           endpointId: endpoint._id.toString(),
           tenantId: tenantId.toString(),
           url: endpoint.url,
-          secret: endpoint.secret,
+          signingSecret: endpoint.signingSecret,
           eventName: webhookEvent,
           payload,
         },
@@ -214,7 +213,7 @@ async function retryDlqJob(deliveryLogId, tenantId) {
     endpointId: endpoint._id.toString(),
     tenantId: tenantId.toString(),
     url: endpoint.url,
-    secret: endpoint.secret,
+    signingSecret: endpoint.signingSecret,
     eventName: delivery.eventName,
     payload: delivery.payload,
   });

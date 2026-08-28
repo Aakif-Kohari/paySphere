@@ -21,6 +21,8 @@ const cacheService = require('../services/cache.service');
 const { invalidateStatsCaches } = require('./stats.controller');
 const Settlement = require('../models/settlement.model');
 const { Client } = require('@elastic/elasticsearch');
+const customFieldService = require('../services/customField.service');
+const lifecycleEventService = require('../services/lifecycleEvent.service');
 
 const esClient = new Client({
   node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200',
@@ -106,6 +108,7 @@ exports.addEmployee = async (req, res, next) => {
       phone,
       bankDetails,
       language,
+      customData,
     } = req.body;
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(role)) {
@@ -172,6 +175,23 @@ exports.addEmployee = async (req, res, next) => {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    let validatedCustomData = {};
+    try {
+      validatedCustomData = await customFieldService.validateCustomData(
+        'Employee',
+        req.tenantId || user.tenantId,
+        customData,
+      );
+    } catch (error) {
+      if (error.isCustomValidation) {
+        return res.status(422).json({
+          message: 'Custom field validation failed',
+          errors: error.fieldErrors,
+        });
+      }
+      throw error;
+    }
+
     const employee = new Employee({
       fullName: sanitizeText(fullName),
       role: sanitizeText(role),
@@ -189,6 +209,7 @@ exports.addEmployee = async (req, res, next) => {
       ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
       ...(normalizedPhone.value ? { phone: normalizedPhone.value } : {}),
       ...(language ? { language } : {}),
+      customData: validatedCustomData,
     });
 
     // Optionally store bank details if provided
@@ -409,7 +430,7 @@ exports.updateEmployeeManager = async (req, res, next) => {
       }
       if (visited.has(nextId)) break; // already-corrupt chain; don't loop forever
       visited.add(nextId);
-      // eslint-disable-next-line no-await-in-loop
+
       cursor = await Employee.findOne(
         req.tenantId
           ? { _id: nextId, tenantId: req.tenantId }
@@ -426,7 +447,8 @@ exports.updateEmployeeManager = async (req, res, next) => {
   }
 };
 
-exports.importEmployees = async (req, res, next) => {  try {
+exports.importEmployees = async (req, res, next) => {
+  try {
     if (!req.file) {
       return res.status(400).json({
         message: 'No CSV file uploaded',
@@ -736,8 +758,8 @@ exports.updateEmployee = async (req, res, next) => {
       phone,
       bankDetails,
       language,
+      version,
     } = req.body;
-
     // `employee` used to be referenced (for the `department` update) before
     // this declaration ran, which threw a ReferenceError on every update.
     // Scoped (#1010). One file guarded three handlers three different ways —
@@ -745,7 +767,19 @@ exports.updateEmployee = async (req, res, next) => {
     // `tenantId.toString() !== req.tenantId` in `toggleActive` — and none of
     // the three was right.
     const employee = await Employee.findOne(tenantFilter(req, { _id: id }));
+    if (!Number.isInteger(version) || version < 0) {
+      return res.status(400).json({
+        message: 'A valid employee version is required',
+      });
+    }
 
+    if (employee && employee.__v !== version) {
+      return res.status(409).json({
+        message:
+          'This employee was modified by another user. Reload the employee and review the latest changes before saving again.',
+        currentVersion: employee.__v,
+      });
+    }
     if (!employee || employee.deletedAt) {
       return res.status(404).json({ message: 'Employee not found' });
     }
@@ -833,6 +867,8 @@ exports.updateEmployee = async (req, res, next) => {
 
     // Capture old name for payroll propagation check (#253)
     const oldName = employee.fullName;
+    const oldDepartment = employee.department;
+    const oldRole = employee.role;
 
     // Apply updates only for provided fields
     if (fullName !== undefined) employee.fullName = sanitizeText(fullName);
@@ -914,6 +950,30 @@ exports.updateEmployee = async (req, res, next) => {
       }
     }
 
+    if (department !== undefined && employee.department !== oldDepartment) {
+      await lifecycleEventService.recordEvent({
+        employeeId: employee._id,
+        tenantId: employee.tenantId,
+        eventType: 'DEPARTMENT_TRANSFERRED',
+        category: 'Role',
+        recordedBy: req.userId,
+        previousValues: { department: oldDepartment },
+        newValues: { department: employee.department },
+      });
+    }
+
+    if (role !== undefined && employee.role !== oldRole) {
+      await lifecycleEventService.recordEvent({
+        employeeId: employee._id,
+        tenantId: employee.tenantId,
+        eventType: 'ROLE_CHANGED',
+        category: 'Role',
+        recordedBy: req.userId,
+        previousValues: { role: oldRole },
+        newValues: { role: employee.role },
+      });
+    }
+
     eventBus.emit('AUDIT_LOG', {
       userId: req.userId,
       action: 'EMPLOYEE_UPDATE',
@@ -939,12 +999,17 @@ exports.updateEmployee = async (req, res, next) => {
       .status(200)
       .json({ message: 'Employee updated successfully', employee });
   } catch (error) {
+    if (error?.name === 'VersionError') {
+      return res.status(409).json({
+        message:
+          'This employee was modified by another user. Reload the employee and review the latest changes before saving again.',
+      });
+    }
+
     if (handleDuplicateEmail(error, res)) return;
     next(error);
   }
-};
-
-// TOGGLE EMPLOYEE ACTIVE STATUS
+}; // TOGGLE EMPLOYEE ACTIVE STATUS
 exports.toggleEmployeeStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1349,7 +1414,9 @@ exports.searchEmployees = async (req, res) => {
       data: hits,
     });
   } catch (error) {
-    logger.error('Elasticsearch query failed', { error: error.message || error });
+    logger.error('Elasticsearch query failed', {
+      error: error.message || error,
+    });
     res.status(500).json({ success: false, message: 'Search engine error' });
   }
 };

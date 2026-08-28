@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 import api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { formatCurrency } from '../utils/formatLocale';
 
 const MONTH_NAMES = [
   'January',
@@ -19,22 +20,6 @@ const MONTH_NAMES = [
 ];
 const MAX_REASON_LENGTH = 500;
 
-const formatCurrency = (value, currency = 'INR') => {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '—';
-
-  try {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    // An employee-level currency code that Intl does not recognise should not
-    // blank out the whole row.
-    return `${currency} ${amount.toLocaleString('en-IN')}`;
-  }
-};
 
 const formatPeriod = (month, year) => {
   const name = MONTH_NAMES[Number(month) - 1];
@@ -58,7 +43,22 @@ const describeError = (error, fallback) => {
   if (response.status === 403) {
     return "You do not have permission to approve payroll. Ask an account owner to grant you the 'Approve payroll' permission.";
   }
+  if (response.status === 409) {
+    if (
+      Array.isArray(response.data?.staleEmployeeVersions) &&
+      response.data.staleEmployeeVersions.length > 0
+    ) {
+      return (
+        response.data.message ||
+        'Employee data changed after the payroll was calculated. Review and recalculate the affected payroll before approving it.'
+      );
+    }
 
+    return (
+      response.data?.message ||
+      'This payroll was changed by another user. Reload the approvals list and review it before trying again.'
+    );
+  }
   const data = response.data || {};
   const parts = [];
 
@@ -177,8 +177,16 @@ const Approvals = () => {
 
     setBusy(true);
     try {
-      const res = await api.post('/api/payroll/approve', { payrollIds: ids });
-      const {
+      const versions = Object.fromEntries(
+        pending
+          .filter((payroll) => ids.includes(payroll._id))
+          .map((payroll) => [payroll._id, payroll.__v]),
+      );
+
+      const res = await api.post('/api/payroll/approve', {
+        payrollIds: ids,
+        versions,
+      });      const {
         approvedCount = 0,
         notFound = [],
         invalidTransition = [],
