@@ -809,6 +809,10 @@ exports.submitPayrollForReview = async (req, res, next) => {
     if (!activities || !Array.isArray(activities) || activities.length === 0) {
       return res.status(400).json({ message: 'No activities to process' });
     }
+    if (!month || !year || isNaN(month) || isNaN(year)) {
+      return res.status(400).json({ message: 'Invalid month or year' });
+    }
+
     const result = await PayrollEngine.executeRun(req, {
       activities,
       month,
@@ -820,6 +824,9 @@ exports.submitPayrollForReview = async (req, res, next) => {
       errors: result.errors,
     });
   } catch (error) {
+    if (error.message && error.message.includes('Another payroll process is currently running')) {
+      return res.status(409).json({ message: error.message });
+    }
     if (error.validationErrors) {
       return res
         .status(400)
