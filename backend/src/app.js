@@ -76,6 +76,12 @@ const minimumWagesRoutes = require('./routes/minimumWages.routes');
 const wageDeductionRoutes = require('./routes/wageDeductions.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const auditRoutes = require('./routes/audit.routes');
+// EPF belated remittance, sections 7Q and 14B (#1875). Next to the layoff
+// router because both hold a liability that arises from a date rather than
+// from a pay period, and apart from the compliance router because that one
+// files what is owed while this one answers what the delay in paying it cost.
+const epfRemittanceRoutes = require('./routes/epfRemittance.routes');
+
 const attendanceRoutes = require('./routes/attendance.routes');
 
 // Working hours compliance (#1702). Next to attendance because it reads that
@@ -511,6 +517,14 @@ app.use('/api/minimum-wages', minimumWagesRoutes);
 app.use('/api/wage-deductions', wageDeductionRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/employee-portal', employeePortalRoutes);
+// #1875. The router owns `/rules`, `/months`, `/waivers`, `/position` and
+// `/assessments`. It does not recompute what a wage month owed —
+// `ecrGenerator.utils.js` stays the single place that decides that — and no
+// endpoint on it returns section 7Q interest and section 14B damages added
+// together, because one of the two cannot be waived and the other can be
+// waived to nil.
+app.use('/api/epf-remittance', epfRemittanceRoutes);
+
 app.use('/api/schedules', schedulerRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/attendance', attendanceRoutes);

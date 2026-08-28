@@ -110,7 +110,7 @@ const AUDIT_ACTIONS = [
   'RETENTION_ATTENDANCE_PURGED',
   'RETENTION_PAYROLL_RETAINED',
   'RETENTION_AUDIT_RETAINED',
-  'RETENTION_POLICY_UPDATED',  // Deactivating someone stops their payroll, and restoring a soft-deleted
+  'RETENTION_POLICY_UPDATED', // Deactivating someone stops their payroll, and restoring a soft-deleted
   // record brings their history back. Both are emitted by
   // employee.controller.js and neither was accepted here (#664).
   'EMPLOYEE_STATUS_TOGGLE',
@@ -126,6 +126,24 @@ const AUDIT_ACTIONS = [
   // committed assessment is the establishment's own statement of what its shift
   // patterns were doing.
   'WORKING_HOURS_LIMITS_UPDATED',
+  // Sections 7Q and 14B, EPF & MP Act, 1952 (#1875). The waiver is audited
+  // because a paragraph 32B order takes a period's damages to nil and the
+  // resulting figure is indistinguishable from a liability that never arose —
+  // the audit line is the only place the difference survives.
+  //
+  // The rules are audited for the neighbouring reason. `graceDays` was five
+  // until 2016 and is zero now; restoring it turns a five-day default into a
+  // compliant remittance on paper with nothing moving on the ground.
+  //
+  // And the remittance is audited because it is the discharge: the date on that
+  // row decides which paragraph 32A slab the arrear falls in, and the slabs run
+  // from five per cent to twenty-five.
+  'EPF_REMITTANCE_RULES_UPDATED',
+  'EPF_REMITTANCE_MONTH_RECORDED',
+  'EPF_REMITTANCE_RECORDED',
+  'EPF_DAMAGES_WAIVER_RECORDED',
+  'EPF_REMITTANCE_ASSESSMENT_COMMITTED',
+
   'WORKING_HOURS_ASSESSMENT_COMMITTED',
   // Offboarding is a financial event: it produces a final payout and
   // removes someone from the headcount (#462).

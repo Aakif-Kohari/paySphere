@@ -195,6 +195,19 @@ export const APP_ROUTES = [
     icon: 'shield',
   },
   {
+    // In Compliance rather than Payroll. The contribution itself is a payroll
+    // figure and the ECR already owns it; what this page holds is the liability
+    // that arises from the *date* the contribution was remitted, which is not a
+    // payroll number and is not owed to the employee (#1875).
+    path: '/epf-remittance',
+    component: lazy(() => import('../pages/EpfRemittanceLedger')),
+    appShell: true,
+    label: 'EPF remittance & 7Q/14B',
+    group: 'compliance',
+    icon: 'shield',
+  },
+
+  {
     // In Compliance rather than Payroll, and not beside Settlements. A lay-off
     // is not a separation — the employment subsists — and the largest thing on
     // the page is not a payment at all: above the Chapter VB threshold the
