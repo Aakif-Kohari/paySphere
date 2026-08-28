@@ -34,8 +34,7 @@ if (process.env.REDIS_URL) {
       removeOnFail: { count: 5000 },
       attempts: 5,
       backoff: {
-        type: 'exponential',
-        delay: 60000,
+        type: 'custom',
       },
     },
   });
