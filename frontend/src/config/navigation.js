@@ -329,6 +329,15 @@ export const APP_ROUTES = [
     label: 'Employee Wellness',
     group: 'payroll',
     icon: 'health',
+  },
+  {
+    path: '/pulse-survey',
+    component: lazy(() => import('../components/EmployeePulseSurvey')),
+    label: 'Pulse Survey',
+    group: 'payroll',
+    icon: 'clipboard',
+  },
+  {
     // In Payroll rather than Compliance: it is a deduction that has to be in
     // the run, and it is missed because nobody schedules it rather than because
     // anybody computes it wrongly. Putting it where the run is planned is the
