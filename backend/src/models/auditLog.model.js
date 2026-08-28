@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Audit Log Schema and Actions Enumeration
+ * @description Defines the schema, compound indexes, and event taxonomy for system audits.
+ * Issue: #1845
+ */
 const mongoose = require('mongoose');
 const softDeletePlugin = require('../utils/softDelete.plugin');
 
