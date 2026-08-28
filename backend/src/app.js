@@ -274,6 +274,12 @@ const travelRoutes = require('./routes/travel.routes');
 // assignment runs for years, changes where the employee is tax resident and is
 // the reason the employer files in a second country. The two share a plane and
 // nothing else.
+// Employment Exchanges (CNV) Act, 1959 (#1879). Apart from the recruitment
+// router because it owns nothing there: it reads a requisition's category,
+// intended fill date and expected duration, writes nothing back, and section 5
+// means notifying a vacancy creates no obligation about who is hired.
+const vacancyNotificationRoutes = require('./routes/vacancyNotification.routes');
+
 const assignmentRoutes = require('./routes/assignment.routes');
 
 // Stock option schemes, grants, vesting and exercises (#1073). Equity was the
@@ -790,6 +796,13 @@ app.use('/api/shift-preferences', shiftPreferenceRoutes);
 
 // Succession Planning Hub
 app.use('/api/succession', successionRoutes);
+
+// #1879. The router owns `/rules`, `/headcounts`, `/determinations`,
+// `/notifications`, `/returns` and `/position`. It does not block a hire made
+// without a notification — the Act does not make the appointment invalid, and a
+// product that blocked it would assert a consequence the statute does not
+// create.
+app.use('/api/vacancy-notification', vacancyNotificationRoutes);
 
 app.use('/api/pyqs', pyqRoutes);
 

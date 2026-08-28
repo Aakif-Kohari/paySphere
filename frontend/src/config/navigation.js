@@ -712,6 +712,19 @@ export const APP_ROUTES = [
     ),
   },
   {
+    // In Compliance rather than in Recruitment. The page owns nothing in the
+    // hiring pipeline and section 5 means notifying a vacancy creates no
+    // obligation about who is hired — putting it beside the requisitions would
+    // imply the opposite (#1879).
+    path: '/vacancy-notification',
+    component: lazy(() => import('../pages/VacancyNotificationRegister')),
+    appShell: true,
+    label: 'Vacancy notification',
+    group: 'compliance',
+    icon: 'shield',
+  },
+
+  {
     path: '/enterprise/compliance-audit',
     component: lazy(
       () => import('../pages/compliance/EnterpriseComplianceDashboardPage'),

@@ -546,6 +546,22 @@ const PERMISSIONS = {
   // years, and can create a filing obligation in a second country. Approving a
   // per-diem and approving that are not the same act and are not the same
   // people.
+  // --- Employment Exchanges (CNV) Act, 1959 (#1879) ------------------------
+  //
+  // The split is on which name can take a vacancy out of the Act.
+  // MANAGE_VACANCY_NOTIFICATION records that the exchange was told and files
+  // ER-I and ER-II; every row it writes is checkable against an
+  // acknowledgement.
+  //
+  // MANAGE_CNV_DETERMINATION records the section 3 ground, and marking a
+  // vacancy "to be filled by promotion" removes it from the Act entirely. The
+  // headcount is in the same bracket because it does the same thing by a
+  // different route: twenty-four as at the date a requisition opened takes
+  // every requisition that month below the threshold.
+  READ_VACANCY_NOTIFICATION: 'READ_VACANCY_NOTIFICATION',
+  MANAGE_VACANCY_NOTIFICATION: 'MANAGE_VACANCY_NOTIFICATION',
+  MANAGE_CNV_DETERMINATION: 'MANAGE_CNV_DETERMINATION',
+
   READ_ASSIGNMENT: 'READ_ASSIGNMENT',
   MANAGE_ASSIGNMENT: 'MANAGE_ASSIGNMENT',
   // Kept apart from MANAGE_ASSIGNMENT for the same maker-checker reason as
@@ -1080,6 +1096,22 @@ const PERMISSION_DEFINITIONS = [
       'File a Leave Travel Allowance journey and see the exemption it earns under section 10(5)',
   },
   {
+    name: PERMISSIONS.MANAGE_VACANCY_NOTIFICATION,
+    description:
+      'Record that a vacancy was notified to the employment exchange, record how it turned out, and file ER-I and ER-II',
+  },
+  {
+    name: PERMISSIONS.MANAGE_CNV_DETERMINATION,
+    description:
+      'Record a section 3 exclusion against a requisition and the establishment’s headcount as at a date — the two things that take a vacancy outside the Act',
+  },
+  {
+    name: PERMISSIONS.READ_VACANCY_NOTIFICATION,
+    description:
+      'View the notification window on each open requisition, the section 3 determinations, and the ER-I and ER-II return schedule',
+  },
+
+  {
     name: PERMISSIONS.VERIFY_LTA_CLAIM,
     description:
       'Approve or reject an LTA journey, which decides how much of the allowance escapes tax',
@@ -1403,6 +1435,13 @@ const ROLE_DEFINITIONS = [
 
       // #1345.
       PERMISSIONS.SUBMIT_LTA_CLAIM,
+      // #1879. All three. Recording the ground that takes a vacancy out of the
+      // Act and filing the return that would have reported it are two halves of
+      // the same check, and the owner is the one account allowed to be both.
+      PERMISSIONS.READ_VACANCY_NOTIFICATION,
+      PERMISSIONS.MANAGE_VACANCY_NOTIFICATION,
+      PERMISSIONS.MANAGE_CNV_DETERMINATION,
+
       PERMISSIONS.VERIFY_LTA_CLAIM,
 
       PERMISSIONS.READ_PYQ,
@@ -1650,6 +1689,14 @@ const ROLE_DEFINITIONS = [
       // employee's salary for the rest of the year.
       PERMISSIONS.SUBMIT_LTA_CLAIM,
       PERMISSIONS.VERIFY_LTA_CLAIM,
+
+      // #1879. Read and the notifications. Telling the exchange about a vacancy
+      // and filing the quarterly return is clerical work checkable against an
+      // acknowledgement. It does not record the section 3 ground that takes a
+      // vacancy out of the Act, and it does not set the headcount the threshold
+      // is tested against.
+      PERMISSIONS.READ_VACANCY_NOTIFICATION,
+      PERMISSIONS.MANAGE_VACANCY_NOTIFICATION,
 
       PERMISSIONS.READ_PYQ,
 
