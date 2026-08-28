@@ -212,6 +212,13 @@ export const APP_ROUTES = [
     icon: 'target',
   },
   {
+    path: '/wellness',
+    component: lazy(() => import('../components/EmployeeWellnessDashboard')),
+    label: 'Employee Wellness',
+    group: 'payroll',
+    icon: 'health',
+  },
+  {
     // In Payroll rather than Compliance because it is money paid to employees,
     // and separate from the payroll run because the amount is fixed by the
     // Payment of Bonus Act rather than by the company (#1346).
