@@ -816,14 +816,6 @@ exports.submitPayrollForReview = async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid month or year' });
     }
 
-    lockKey = `payroll_lock:${req.tenantId}:${year}:${month}`;
-    lockAcquired = await acquireLock(lockKey, 300000);
-    if (!lockAcquired) {
-      return res.status(409).json({
-        message: 'Another payroll process is currently running for this period. Please wait.',
-      });
-    }
-
     const result = await PayrollEngine.executeRun(req, {
       activities,
       month,
@@ -835,6 +827,9 @@ exports.submitPayrollForReview = async (req, res, next) => {
       errors: result.errors,
     });
   } catch (error) {
+    if (error.message && error.message.includes('Another payroll process is currently running')) {
+      return res.status(409).json({ message: error.message });
+    }
     if (error.validationErrors) {
       return res
         .status(400)
