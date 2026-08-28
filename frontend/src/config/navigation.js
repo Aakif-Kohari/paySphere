@@ -368,10 +368,16 @@ export const APP_ROUTES = [
     component: lazy(() => import('../components/EmployeeRecognitionWall')),
     label: 'Recognition Wall',
     group: 'payroll',
-    icon: 'trophy',
+  },
   },
   {
+    path: '/team-performance',
+    component: lazy(() => import('../components/TeamPerformanceDashboard')),
+    label: 'Team Performance',
+    group: 'payroll',
+    icon: 'chart',
   },
+  {
   {
     // In Payroll rather than Compliance: it is a deduction that has to be in
     // the run, and it is missed because nobody schedules it rather than because
