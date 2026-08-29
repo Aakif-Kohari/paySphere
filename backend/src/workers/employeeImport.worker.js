@@ -22,8 +22,8 @@ async function findDuplicates(batchRows, tenantId) {
   const emailsInBatch = new Set();
   const emailsInDb = new Set(
     (await Employee.find({ tenantId }, { email: 1 }))
-      .map(e => e.email)
-      .filter(e => e)
+      .map((e) => e.email)
+      .filter((e) => e),
   );
 
   for (const row of batchRows) {
@@ -32,7 +32,7 @@ async function findDuplicates(batchRows, tenantId) {
         duplicates.push({
           email: row.email,
           fullName: row.fullName,
-          message: `Duplicate email: ${row.email}`
+          message: `Duplicate email: ${row.email}`,
         });
       } else {
         emailsInBatch.add(row.email);
@@ -58,13 +58,15 @@ async function processBatch(job) {
 
   // Skip if already processed
   if (importJob.processedBatches.includes(batchIndex)) {
-    logger.info(`Batch ${batchIndex} already processed, skipping`, { importJobId });
+    logger.info(`Batch ${batchIndex} already processed, skipping`, {
+      importJobId,
+    });
     return { skipped: true, batchIndex };
   }
 
   const startIdx = batchIndex * importJob.batchSize;
   const endIdx = startIdx + importJob.batchSize;
-  const batchRows = importJob.validatedRows.slice(startIdx, endIdx);
+  let batchRows = importJob.validatedRows.slice(startIdx, endIdx);
 
   if (batchRows.length === 0) {
     return { processed: 0, batchIndex };
@@ -77,7 +79,7 @@ async function processBatch(job) {
     importJob.duplicateCount += batchDuplicates.length;
     // Filter out duplicates for insertion
     batchRows = batchRows.filter(
-      row => !batchDuplicates.some(dup => dup.email === row.email)
+      (row) => !batchDuplicates.some((dup) => dup.email === row.email),
     );
   }
 
@@ -87,17 +89,17 @@ async function processBatch(job) {
   let createdCount = 0;
 
   try {
-    const employeesToInsert = batchRows.map(row => ({
+    const employeesToInsert = batchRows.map((row) => ({
       ...row,
       tenantId,
       createdBy,
       importBatchId: importJobId,
-      monthlySalary: parseFloat(row.monthlySalary)
+      monthlySalary: parseFloat(row.monthlySalary),
     }));
 
     const docs = await Employee.insertMany(employeesToInsert, { session });
     createdCount = docs.length;
-    importJob.importedEmployeeIds.push(...docs.map(d => d._id));
+    importJob.importedEmployeeIds.push(...docs.map((d) => d._id));
 
     await session.commitTransaction();
 
@@ -109,19 +111,19 @@ async function processBatch(job) {
     logger.info(`Batch ${batchIndex} completed`, {
       importJobId,
       inserted: createdCount,
-      duplicates: batchDuplicates.length
+      duplicates: batchDuplicates.length,
     });
 
     return {
       processed: createdCount,
       duplicates: batchDuplicates.length,
-      batchIndex
+      batchIndex,
     };
   } catch (err) {
     await session.abortTransaction();
     logger.error(`Batch ${batchIndex} failed`, {
       importJobId,
-      error: err.message
+      error: err.message,
     });
     throw err;
   } finally {
@@ -135,7 +137,7 @@ async function processBatch(job) {
 async function retryHandler(job, err, attemptsMade) {
   logger.warn(`Job retry attempt ${attemptsMade}`, {
     jobId: job.id,
-    error: err.message
+    error: err.message,
   });
 
   if (attemptsMade < 3) {
@@ -149,5 +151,5 @@ async function retryHandler(job, err, attemptsMade) {
 module.exports = {
   processBatch,
   retryHandler,
-  BATCH_SIZE
+  BATCH_SIZE,
 };

@@ -22,6 +22,10 @@
  * drop a router without a test going red.
  */
 
+const mongoose = require('mongoose');
+const piiMaskingPlugin = require('./utils/piiMaskingPlugin');
+mongoose.plugin(piiMaskingPlugin);
+
 const express = require('express');
 const cors = require('cors');
 const Sentry = require('@sentry/node');
@@ -310,6 +314,7 @@ const leaveClosureRoutes = require('./routes/leaveClosure.routes');
 const treasuryRoutes = require('./routes/treasury.routes');
 const regionalTaxRoutes = require('./routes/regionalTax.routes');
 const salaryAdjustmentRoutes = require('./routes/salaryAdjustment.routes');
+const compensationCycleRoutes = require('./routes/compensationCycle.routes');
 const deferredCompensationRoutes = require('./routes/deferredCompensation.routes');
 const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
@@ -320,6 +325,7 @@ const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
 } = require('./routes/subscription.routes');
+const skillInventoryRoutes = require('./routes/skillInventory.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -351,7 +357,8 @@ const app = express();
 app.disable('x-powered-by');
 
 app.use(auditContextMiddleware);
-
+app.use('/api/audit', require('./routes/audit.routes'));
+app.use('/api/audit', require('./routes/auditIntegrity.routes'));
 // Sentry user context configuration (#770)
 app.use((req, res, next) => {
   if (req.auditContext) {
@@ -505,9 +512,14 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 const healthRoutes = require('./routes/health.routes');
 app.use(healthRoutes);
 
+const { apiGateway } = require('./middlewares/apiGateway.middleware');
+app.use('/api', apiGateway);
 app.use('/api', generalRateLimiter);
 app.use('/api/auth', userRoutes);
 app.use('/api/employees', employeeRoutes);
+
+const probationRoutes = require('./routes/probation.routes');
+app.use('/api/probation', probationRoutes);
 app.use('/api/custom-fields', customFieldRoutes);
 app.use('/api/employees', employeeImportRoutes);
 
@@ -521,6 +533,9 @@ app.use('/api/compensation', employeeCompensationRoutes);
 
 const letterTemplateRoutes = require('./routes/letterTemplate.routes');
 app.use('/api/templates', letterTemplateRoutes);
+
+const payslipTemplateRoutes = require('./routes/payslipTemplate.routes');
+app.use('/api/payslip-templates', payslipTemplateRoutes);
 
 // #1346. Its own prefix rather than a sub-path of `/api/payroll`: the
 // discretionary bonus on a payroll row and the statutory bonus under the Act
@@ -595,6 +610,7 @@ app.use('/api/loans', loanRoutes);
 app.use('/api/treasury', treasuryRoutes);
 app.use('/api/regional-tax', regionalTaxRoutes);
 app.use('/api/salary-adjustments', salaryAdjustmentRoutes);
+app.use('/api/compensation-cycles', compensationCycleRoutes);
 // #1876. The router owns `/rules`, `/profiles`, `/registrations`, `/payments`,
 // `/assessment` and `/section-16iii`. It returns one remittance per
 // registration certificate and no total across them — a company with offices in
@@ -857,6 +873,9 @@ app.use('/api/peer-nominations', peerNominationRoutes);
 // owns `/dashboard`, `/reports/attrition`, `/checklist`, `/assets`,
 // `/knowledge-transfer`, `/exit-interview` and `/settlement` sub-paths.
 app.use('/api/offboarding', offboardingRoutes);
+
+// Skill Inventory & Competency Framework
+app.use('/api/skills', skillInventoryRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
