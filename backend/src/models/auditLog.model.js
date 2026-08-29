@@ -263,6 +263,7 @@ const AUDIT_ACTIONS = [
   'YOUNG_PERSON_DAYS_RECORDED',
   'YOUNG_PERSON_FINDING_RESOLVED',
   'YOUNG_PERSON_ASSESSMENT_COMMITTED',
+  'COMPLIANCE_VIOLATION',
 
   'WORKFLOW_CREATE',
   'WORKFLOW_INSTANCE_START',
@@ -493,11 +494,11 @@ const auditLogSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
       },
     ],
-    details: {
-      type: mongoose.Schema.Types.Mixed,
-      default: {},
-    },
-    result: {
+    details:   { type: mongoose.Schema.Types.Mixed, default: {} },
+    // Integrity chain fields
+    recordHash: { type: String, default: null, index: true },
+    previousHash: { type: String, default: null },
+    hashChainValid: { type: Boolean, default: true },    result: {
       type: String,
       enum: ['success', 'failure', 'partial'],
       default: 'success',
