@@ -317,8 +317,7 @@ exports.startOnboarding = async (req, res, next) => {
     const employee = await Employee.findOne({
       _id: employeeId,
       tenantId: req.tenantId,
-      deletedAt: null,
-    });
+      });
     if (!employee)
       return res.status(404).json({ message: 'Employee not found' });
 
@@ -592,8 +591,7 @@ exports.uploadDocument = async (req, res, next) => {
     const employee = await Employee.findOne({
       _id: employeeId,
       tenantId: req.tenantId,
-      deletedAt: null,
-    });
+      });
     if (!employee)
       return res.status(404).json({ message: 'Employee not found' });
 

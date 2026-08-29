@@ -19,5 +19,6 @@ router.post(
   submitPayrollForReview,
 );
 router.get('/summary', auth, requireScope('payroll:read'), getPayrollSummary);
-
+router.post('/payroll/:payrollId/generate-payslips', authMiddleware, rbacMiddleware, payrollController.generatePayslips);
+router.get('/payslip/:jobHash/status', authMiddleware, payrollController.getPayslipStatus);
 module.exports = router;

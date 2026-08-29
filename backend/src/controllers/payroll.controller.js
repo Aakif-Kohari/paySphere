@@ -1024,3 +1024,42 @@ exports.getMerkleProofHandler = async (req, res, next) => {
     next(error);
   }
 };
+async function generatePayslips(req, res) {
+  try {
+    const { payrollId } = req.params;
+    const { employeeIds } = req.body;
+    
+    const payroll = await Payroll.findOne({ _id: payrollId, ...tenantFilter(req) });
+    if (!payroll) return res.status(404).json({ message: 'Payroll not found.' });
+    
+    if (payroll.status !== 'finalized') {
+      return res.status(400).json({ message: 'Only finalized payrolls can be processed.' });
+    }
+
+    const payslipService = require('../services/payslipGeneration.service');
+    const results = [];
+    
+    for (const empId of employeeIds) {
+      const result = await payslipService.queuePayslipGeneration(payrollId, empId, req.tenantId);
+      results.push(result);
+    }
+
+    return res.json({ message: 'Payslips queued for generation.', results });
+  } catch (err) {
+    logger.error('generatePayslips error', { error: err.message });
+    return res.status(500).json({ message: 'Failed to queue payslip generation.' });
+  }
+}
+
+async function getPayslipStatus(req, res) {
+  try {
+    const { jobHash } = req.params;
+    const payslipService = require('../services/payslipGeneration.service');
+    const status = await payslipService.getGenerationStatus(jobHash);
+    
+    return res.json(status);
+  } catch (err) {
+    logger.error('getPayslipStatus error', { error: err.message });
+    return res.status(500).json({ message: 'Could not fetch payslip status.' });
+  }
+}

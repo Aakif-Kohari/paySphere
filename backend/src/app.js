@@ -22,6 +22,10 @@
  * drop a router without a test going red.
  */
 
+const mongoose = require('mongoose');
+const piiMaskingPlugin = require('./utils/piiMaskingPlugin');
+mongoose.plugin(piiMaskingPlugin);
+
 const express = require('express');
 const cors = require('cors');
 const Sentry = require('@sentry/node');
@@ -315,8 +319,7 @@ const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
 const teamRoutes = require('./routes/team.routes');
 const healthChallengeRoutes = require('./routes/healthChallenge.routes');
-const compOffRoutes = require('./routes/compOff.routes');
-const docRequestRoutes = require('./routes/docRequest.routes');
+const offboardingRoutes = require('./routes/offboarding.routes');
 const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
@@ -352,7 +355,8 @@ const app = express();
 app.disable('x-powered-by');
 
 app.use(auditContextMiddleware);
-
+app.use('/api/audit', require('./routes/audit.routes'));
+app.use('/api/audit', require('./routes/auditIntegrity.routes'));
 // Sentry user context configuration (#770)
 app.use((req, res, next) => {
   if (req.auditContext) {
@@ -506,6 +510,8 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 const healthRoutes = require('./routes/health.routes');
 app.use(healthRoutes);
 
+const { apiGateway } = require('./middlewares/apiGateway.middleware');
+app.use('/api', apiGateway);
 app.use('/api', generalRateLimiter);
 app.use('/api/auth', userRoutes);
 app.use('/api/employees', employeeRoutes);
@@ -854,15 +860,10 @@ app.use('/api/policies', companyPolicyRoutes);
 // with category configuration, cycle management, voting, review, and analytics.
 app.use('/api/peer-nominations', peerNominationRoutes);
 
-// Compensatory Off management (#1370). The router owns `/policies`,
-// `/requests`, `/balance`, `/ledger` and `/reports`.
-app.use('/api/comp-off', compOffRoutes);
-
-// Document Request & E-Signature Workflow (#1371). The router owns
-// `/templates`, `/pending-manager`, `/pending-hr`, `/escalated`, `/queue`,
-// `/reports` and individual request endpoints with approval, signature
-// and delivery sub-paths.
-app.use('/api/doc-requests', docRequestRoutes);
+// Employee Offboarding & Exit Clearance Tracker (#1374). The router
+// owns `/dashboard`, `/reports/attrition`, `/checklist`, `/assets`,
+// `/knowledge-transfer`, `/exit-interview` and `/settlement` sub-paths.
+app.use('/api/offboarding', offboardingRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
