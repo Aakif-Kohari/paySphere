@@ -146,13 +146,8 @@ const payrollUpdateSchema = new mongoose.Schema(
     // written by either older revision keep validating.
     blockchainTxHash: { type: String },
     merkleRoot: { type: String },
-    status: {
-      type: String,
-      enum: ALL_STATUSES,
-      default: PAYROLL_STATUS.PENDING_APPROVAL,
-      set: (value) => normalizeStatus(value) || value,
-    },
-    /**
+    status:    { type: String, enum: PAYROLL_STATUSES, default: 'draft' },
+    finalizedAt: { type: Date, default: null },    /**
      * The maker–checker trail (#559).
      *
      * #458 mounted the approval routes and wired the controller to write these
