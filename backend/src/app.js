@@ -325,6 +325,7 @@ const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
 } = require('./routes/subscription.routes');
+const skillInventoryRoutes = require('./routes/skillInventory.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -869,6 +870,9 @@ app.use('/api/peer-nominations', peerNominationRoutes);
 // owns `/dashboard`, `/reports/attrition`, `/checklist`, `/assets`,
 // `/knowledge-transfer`, `/exit-interview` and `/settlement` sub-paths.
 app.use('/api/offboarding', offboardingRoutes);
+
+// Skill Inventory & Competency Framework
+app.use('/api/skills', skillInventoryRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
