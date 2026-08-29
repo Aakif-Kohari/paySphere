@@ -369,7 +369,6 @@ export const APP_ROUTES = [
     label: 'Recognition Wall',
     group: 'payroll',
   },
-  },
   {
     path: '/team-performance',
     component: lazy(() => import('../components/TeamPerformanceDashboard')),
@@ -377,8 +376,7 @@ export const APP_ROUTES = [
     group: 'payroll',
     icon: 'chart',
   },
-    // In Payroll rather than Compliance: it is a deduction that has to be in
-  },
+  // In Payroll rather than Compliance: it is a deduction that has to be in
   {
     path: '/learning',
     component: lazy(() => import('../components/EmployeeLearningTracker')),
