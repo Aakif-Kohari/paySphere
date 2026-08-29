@@ -115,6 +115,28 @@ const PERMISSIONS = {
   // "was the employer allowed to take that much", and the people who audit the
   // second are not the people who run the first.
   READ_WAGE_DEDUCTIONS: 'READ_WAGE_DEDUCTIONS',
+
+  // --- National and Festival Holidays Acts (#1970) ------------------------
+  //
+  // Split on which name can take a paid day away from somebody.
+  //
+  // MANAGE_HOLIDAY_CALENDAR opens the year, declares the festival holidays and
+  // settles the list with the Inspector. Clerical: the three national days are
+  // seeded rather than typed, the festival count is measured against the
+  // state's figure, and the settlement date is checkable against the Rules.
+  //
+  // MANAGE_HOLIDAY_SUBSTITUTION is separate because it is the only power in the
+  // module that changes which day an employee gets off — and because the engine
+  // refuses it outright against the three national days. Folding the two
+  // together would make that refusal read as a setting somebody forgot to
+  // switch on rather than as a limit on the employer's power.
+  //
+  // Deliberately not the leave permissions. Leave is applied for, approved and
+  // deducted from a balance; a holiday is none of those, cannot be refused, and
+  // one of the three cannot even be moved.
+  READ_HOLIDAY_CALENDAR: 'READ_HOLIDAY_CALENDAR',
+  MANAGE_HOLIDAY_CALENDAR: 'MANAGE_HOLIDAY_CALENDAR',
+  MANAGE_HOLIDAY_SUBSTITUTION: 'MANAGE_HOLIDAY_SUBSTITUTION',
   MANAGE_WAGE_DEDUCTION_RULES: 'MANAGE_WAGE_DEDUCTION_RULES',
   COMMIT_WAGE_DEDUCTION_REGISTER: 'COMMIT_WAGE_DEDUCTION_REGISTER',
   // Statutory compliance (#933, reachable since #951). Deliberately not
@@ -761,6 +783,21 @@ const PERMISSION_DEFINITIONS = [
       'Record a gig or platform worker and their engagements across aggregators, including platforms this tenant does not operate',
   },
   {
+    name: PERMISSIONS.READ_HOLIDAY_CALENDAR,
+    description:
+      'View the year’s national and festival holidays, the list’s settlement position with the Inspector, and what each holiday worked is owed',
+  },
+  {
+    name: PERMISSIONS.MANAGE_HOLIDAY_CALENDAR,
+    description:
+      'Open a year’s holiday calendar, declare the state’s festival holidays, settle the list with the Inspector, and record a holiday worked',
+  },
+  {
+    name: PERMISSIONS.MANAGE_HOLIDAY_SUBSTITUTION,
+    description:
+      'Substitute a festival holiday for another day against the employee’s recorded agreement — the three national holidays cannot be substituted at all',
+  },
+  {
     name: PERMISSIONS.MANAGE_AGGREGATOR_TURNOVER,
     description:
       'State the aggregator’s turnover and its Seventh Schedule split, set the rate band and the payout ceiling, finalise a year and commit the assessment',
@@ -1280,6 +1317,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_MINIMUM_WAGE,
       PERMISSIONS.MANAGE_MINIMUM_WAGE_SCHEDULE,
       PERMISSIONS.RUN_MINIMUM_WAGE_ASSESSMENT,
+      // #1970. All three. Declaring the list and moving a day off it are two
+      // halves of the same check, and the owner is the one account allowed to
+      // be both.
+      PERMISSIONS.READ_HOLIDAY_CALENDAR,
+      PERMISSIONS.MANAGE_HOLIDAY_CALENDAR,
+      PERMISSIONS.MANAGE_HOLIDAY_SUBSTITUTION,
 
       // #1767. All three, for the reason immediately above: the owner is the
       // one account allowed to be both halves of a check. Writing off a
@@ -1580,6 +1623,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_PROFESSIONAL_TAX,
 
       PERMISSIONS.READ_GRATUITY_VALUATION,
+      // #1970. Read and the calendar, not the substitutions. Declaring the
+      // festival list and settling it with the Inspector is clerical work
+      // measured against the state's own figure; moving a day an employee has
+      // already been told they are getting off is not, and the same permission
+      // holding both would let one person do it end to end.
+      PERMISSIONS.READ_HOLIDAY_CALENDAR,
+      PERMISSIONS.MANAGE_HOLIDAY_CALENDAR,
 
       // #1769. HR reads the pension statements — "why is my pensionable salary
       // ₹14,500 when I earned ₹40,000" is a question an employee asks HR, and

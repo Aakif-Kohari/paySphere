@@ -120,6 +120,19 @@ export const APP_ROUTES = [
     icon: 'people',
   },
   {
+    // In People rather than in Payroll, and deliberately not beside Leave. A
+    // holiday is not leave — it is not applied for, cannot be refused, is not
+    // deducted from a balance, and three of them cannot be moved at all.
+    // Filing it under Leave would put a substitute control next to days that
+    // have none (#1970).
+    path: '/holiday-calendar',
+    component: lazy(() => import('../pages/HolidayCalendarRegister')),
+    appShell: true,
+    label: 'Holiday calendar',
+    group: 'people',
+    icon: 'calendar',
+  },
+  {
     path: '/add-employee',
     component: lazy(() => import('../pages/AddEmployee')),
     label: 'Add employee',
@@ -368,7 +381,7 @@ export const APP_ROUTES = [
     component: lazy(() => import('../components/EmployeeRecognitionWall')),
     label: 'Recognition Wall',
     group: 'payroll',
-  },
+    icon: 'trophy',
   },
   {
     path: '/team-performance',
@@ -376,8 +389,6 @@ export const APP_ROUTES = [
     label: 'Team Performance',
     group: 'payroll',
     icon: 'chart',
-  },
-    // In Payroll rather than Compliance: it is a deduction that has to be in
   },
   {
     path: '/learning',
@@ -387,6 +398,7 @@ export const APP_ROUTES = [
     icon: 'book',
   },
   {
+    // In Payroll rather than Compliance: it is a deduction that has to be in
     // the run, and it is missed because nobody schedules it rather than because
     // anybody computes it wrongly. Putting it where the run is planned is the
     // whole point (#1701).
