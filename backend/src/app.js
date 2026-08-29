@@ -315,8 +315,7 @@ const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
 const teamRoutes = require('./routes/team.routes');
 const healthChallengeRoutes = require('./routes/healthChallenge.routes');
-const compOffRoutes = require('./routes/compOff.routes');
-const docRequestRoutes = require('./routes/docRequest.routes');
+const deptBudgetRoutes = require('./routes/deptBudget.routes');
 const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
@@ -854,15 +853,10 @@ app.use('/api/policies', companyPolicyRoutes);
 // with category configuration, cycle management, voting, review, and analytics.
 app.use('/api/peer-nominations', peerNominationRoutes);
 
-// Compensatory Off management (#1370). The router owns `/policies`,
-// `/requests`, `/balance`, `/ledger` and `/reports`.
-app.use('/api/comp-off', compOffRoutes);
-
-// Document Request & E-Signature Workflow (#1371). The router owns
-// `/templates`, `/pending-manager`, `/pending-hr`, `/escalated`, `/queue`,
-// `/reports` and individual request endpoints with approval, signature
-// and delivery sub-paths.
-app.use('/api/doc-requests', docRequestRoutes);
+// Department Budget Management & Variance Analysis (#1372). The router
+// owns `/cost-centers`, `/categories`, `/alerts`, `/reports` and individual
+// budget endpoints with line-item, transaction, and approval sub-paths.
+app.use('/api/dept-budgets', deptBudgetRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
