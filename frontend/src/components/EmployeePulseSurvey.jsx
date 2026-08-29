@@ -736,7 +736,7 @@ export default function EmployeePulseSurvey() {
                     const deptResponses = MOCK_RESPONSES.filter(
                       (r) => r.department === dept,
                     ).length;
-                    const deptTotal = (dept.charCodeAt(0) % 5) + 20;
+                    const deptTotal = 20 + (dept.length % 5); // Deterministic total for purity
                     const rate = Math.round((deptResponses / deptTotal) * 100);
                     return (
                       <div

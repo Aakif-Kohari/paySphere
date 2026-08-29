@@ -12,6 +12,7 @@ const {
   getSection16iii,
   listAssessments,
   commitAssessment,
+  getStateSummary,
 } = require('../controllers/professionalTax.controller');
 const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
@@ -112,6 +113,14 @@ router.get(
   auth,
   requirePermission(PERMISSIONS.READ_PROFESSIONAL_TAX),
   getSection16iii,
+);
+
+// Consolidated returns report by state.
+router.get(
+  '/state-summary',
+  auth,
+  requirePermission(PERMISSIONS.READ_PROFESSIONAL_TAX),
+  getStateSummary,
 );
 
 router.get(

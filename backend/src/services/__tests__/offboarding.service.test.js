@@ -77,9 +77,11 @@ describe('Offboarding Service', () => {
   describe('getProcess', () => {
     it('should return process with populated fields', async () => {
       OffboardingProcess.findOne.mockReturnValue({
-        populate: jest.fn().mockResolvedValue({
-          _id: 'o1',
-          status: 'InProgress',
+        populate: jest.fn().mockReturnValue({
+          populate: jest.fn().mockResolvedValue({
+            _id: 'o1',
+            status: 'InProgress',
+          }),
         }),
       });
 
@@ -89,7 +91,9 @@ describe('Offboarding Service', () => {
 
     it('should throw 404 when not found', async () => {
       OffboardingProcess.findOne.mockReturnValue({
-        populate: jest.fn().mockResolvedValue(null),
+        populate: jest.fn().mockReturnValue({
+          populate: jest.fn().mockResolvedValue(null),
+        }),
       });
 
       await expect(
