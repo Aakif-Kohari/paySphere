@@ -510,6 +510,8 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 const healthRoutes = require('./routes/health.routes');
 app.use(healthRoutes);
 
+const { apiGateway } = require('./middlewares/apiGateway.middleware');
+app.use('/api', apiGateway);
 app.use('/api', generalRateLimiter);
 app.use('/api/auth', userRoutes);
 app.use('/api/employees', employeeRoutes);
