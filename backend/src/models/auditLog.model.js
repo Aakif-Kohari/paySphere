@@ -493,11 +493,11 @@ const auditLogSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
       },
     ],
-    details: {
-      type: mongoose.Schema.Types.Mixed,
-      default: {},
-    },
-    result: {
+    details:   { type: mongoose.Schema.Types.Mixed, default: {} },
+    // Integrity chain fields
+    recordHash: { type: String, default: null, index: true },
+    previousHash: { type: String, default: null },
+    hashChainValid: { type: Boolean, default: true },    result: {
       type: String,
       enum: ['success', 'failure', 'partial'],
       default: 'success',
