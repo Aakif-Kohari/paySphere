@@ -22,6 +22,10 @@
  * drop a router without a test going red.
  */
 
+const mongoose = require('mongoose');
+const piiMaskingPlugin = require('./utils/piiMaskingPlugin');
+mongoose.plugin(piiMaskingPlugin);
+
 const express = require('express');
 const cors = require('cors');
 const Sentry = require('@sentry/node');
