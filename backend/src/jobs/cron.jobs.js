@@ -496,16 +496,20 @@ const startCronJobs = () => {
   );
   logger.info('Daily detect milestones cron job registered.');
 
-  // 02:00 daily — Probation Reminders
+  // 02:30 daily — Certification Expiry Notifications.
   scheduledTasks.push(
-    cron.schedule('0 2 * * *', () => {
-      const { runProbationReminders } = require('./probationReminder.job');
-      runProbationReminders().catch((error) =>
-        logger.error('Probation reminders job threw', { error: error.message }),
+    cron.schedule('30 2 * * *', () => {
+      const {
+        runCertificationExpiryJob,
+      } = require('./certificationExpiry.job');
+      runCertificationExpiryJob().catch((error) =>
+        logger.error('Certification expiry job threw', {
+          error: error.message,
+        }),
       );
     }),
   );
-  logger.info('Daily probation reminders cron job registered.');
+  logger.info('Daily certification expiry cron job registered.');
 };
 
 function stopCronJobs() {
