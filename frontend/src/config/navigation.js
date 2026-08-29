@@ -391,6 +391,7 @@ export const APP_ROUTES = [
     group: 'payroll',
     icon: 'chart',
   },
+
   {
     path: '/learning',
     component: lazy(() => import('../components/EmployeeLearningTracker')),
