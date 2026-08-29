@@ -11,8 +11,12 @@ const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
 const cacheService = require('../services/cache.service');
 const outboxService = require('./outbox.service');
-const { PAYROLL_STATUS, normalizeStatus } = require('../config/payrollStatus');const Attendance = require('../models/attendance.model');
-const { derivePayrollInputs } = require('../utils/attendanceGrid');
+const { PAYROLL_STATUS, normalizeStatus } = require('../config/payrollStatus');
+const Attendance = require('../models/attendance.model');
+const {
+  getActiveCalculationRule,
+  normalizeCalculationRule,
+} = require('./payrollCalculationRule.service');const { derivePayrollInputs } = require('../utils/attendanceGrid');
 const Loan = require('../models/loan.model');
 const {
   LOAN_STATUS,
@@ -53,9 +57,12 @@ class PayrollEngine {
     tenantId,
     currentMonth,
     currentYear,
+    calculationRule = null,
   }) {
-    let leaveDays = 0,
-      overtimeHours = 0,
+    const resolvedCalculationRule =
+      normalizeCalculationRule(calculationRule);
+
+    let leaveDays = 0,      overtimeHours = 0,
       bonus = 0,
       deductions = 0;
 
@@ -115,8 +122,12 @@ class PayrollEngine {
       ids: [],
     };
 
-    const bonusWithTaxableExpenses =
-      Math.round((bonus + empExpenses.taxable) * 100) / 100;
+    const includeTaxableExpenses =
+      resolvedCalculationRule.rules.bonus.includeTaxableExpenses !== false;
+
+    const bonusWithTaxableExpenses = Math.round(
+      (bonus + (includeTaxableExpenses ? empExpenses.taxable : 0)) * 100,
+    ) / 100;
 
     const {
       baseSalary,
@@ -129,8 +140,8 @@ class PayrollEngine {
       overtimeHours,
       bonus: bonusWithTaxableExpenses,
       deductions,
-    });
-    if (isNaN(netSalary) || !Number.isFinite(netSalary)) {
+      calculationRule: resolvedCalculationRule,
+    });    if (isNaN(netSalary) || !Number.isFinite(netSalary)) {
       throw new Error(
         `Invalid net salary calculation for employee "${employee.fullName}"`,
       );
@@ -209,10 +220,11 @@ class PayrollEngine {
       loanRecoveryTotal: recovery.totalRecovered,
       attendanceSource,
       salarySnapshot,
-      arrearsPayout: totalArrears,      arrearsBreakdown: arrearsBreakdown,
+      calculationRule: resolvedCalculationRule,
+      arrearsPayout: totalArrears,
+      arrearsBreakdown: arrearsBreakdown,
       arrearsLedgerIds: ledgerIds,
-      shortfall: recovery.shortfall,
-    };
+      shortfall: recovery.shortfall,    };
   }
 
   /**
@@ -291,8 +303,10 @@ class PayrollEngine {
 
       const user = await User.findById(userId);
 
-      let attendanceByEmployee = new Map();
-      try {
+      const calculationRule =
+        await getActiveCalculationRule(tenantId);
+
+      let attendanceByEmployee = new Map();      try {
         const attendanceRecords = await Attendance.find({
           tenantId,
           year: currentYear,
@@ -436,8 +450,8 @@ class PayrollEngine {
             tenantId,
             currentMonth,
             currentYear,
+            calculationRule,
           });
-
           if (computed.shortfall > 0) {
             errors.push(
               `Loan recovery for "${employee.fullName}" was short by ${computed.shortfall}; the balance carries forward`,
@@ -535,9 +549,10 @@ class PayrollEngine {
           salarySnapshot: item.salarySnapshot,
 
           calculationSnapshot: {
-            version: PAYROLL_CALCULATION_VERSION,
-            employee: {
-              fullName: item.employee.fullName,
+            version: item.calculationRule.version,
+            ruleId: item.calculationRule.ruleId,
+            rules: item.calculationRule.rules,
+            employee: {              fullName: item.employee.fullName,
               email: item.employee.email,
               role: item.employee.role,
               companyName: item.employee.companyName,
