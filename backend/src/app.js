@@ -326,6 +326,7 @@ const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
 } = require('./routes/subscription.routes');
+const skillInventoryRoutes = require('./routes/skillInventory.routes');
 
 // #896. `app.use('/api/roles', roleRoutes)` was in the route table below and
 // this line was not, so `roleRoutes` was a free variable and evaluating this
@@ -517,6 +518,9 @@ app.use('/api', apiGateway);
 app.use('/api', generalRateLimiter);
 app.use('/api/auth', userRoutes);
 app.use('/api/employees', employeeRoutes);
+
+const probationRoutes = require('./routes/probation.routes');
+app.use('/api/probation', probationRoutes);
 app.use('/api/custom-fields', customFieldRoutes);
 app.use('/api/employees', employeeImportRoutes);
 
@@ -530,6 +534,9 @@ app.use('/api/compensation', employeeCompensationRoutes);
 
 const letterTemplateRoutes = require('./routes/letterTemplate.routes');
 app.use('/api/templates', letterTemplateRoutes);
+
+const payslipTemplateRoutes = require('./routes/payslipTemplate.routes');
+app.use('/api/payslip-templates', payslipTemplateRoutes);
 
 // #1346. Its own prefix rather than a sub-path of `/api/payroll`: the
 // discretionary bonus on a payroll row and the statutory bonus under the Act
@@ -868,6 +875,9 @@ app.use('/api/peer-nominations', peerNominationRoutes);
 // owns `/dashboard`, `/reports/attrition`, `/checklist`, `/assets`,
 // `/knowledge-transfer`, `/exit-interview` and `/settlement` sub-paths.
 app.use('/api/offboarding', offboardingRoutes);
+
+// Skill Inventory & Competency Framework
+app.use('/api/skills', skillInventoryRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.

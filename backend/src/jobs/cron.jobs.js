@@ -495,6 +495,21 @@ const startCronJobs = () => {
     }),
   );
   logger.info('Daily detect milestones cron job registered.');
+
+  // 02:30 daily — Certification Expiry Notifications.
+  scheduledTasks.push(
+    cron.schedule('30 2 * * *', () => {
+      const {
+        runCertificationExpiryJob,
+      } = require('./certificationExpiry.job');
+      runCertificationExpiryJob().catch((error) =>
+        logger.error('Certification expiry job threw', {
+          error: error.message,
+        }),
+      );
+    }),
+  );
+  logger.info('Daily certification expiry cron job registered.');
 };
 
 function stopCronJobs() {
