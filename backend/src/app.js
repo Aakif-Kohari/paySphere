@@ -351,7 +351,8 @@ const app = express();
 app.disable('x-powered-by');
 
 app.use(auditContextMiddleware);
-
+app.use('/api/audit', require('./routes/audit.routes'));
+app.use('/api/audit', require('./routes/auditIntegrity.routes'));
 // Sentry user context configuration (#770)
 app.use((req, res, next) => {
   if (req.auditContext) {
