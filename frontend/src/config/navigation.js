@@ -368,7 +368,7 @@ export const APP_ROUTES = [
     component: lazy(() => import('../components/EmployeeRecognitionWall')),
     label: 'Recognition Wall',
     group: 'payroll',
-  },
+    icon: 'trophy',
   },
   {
     path: '/team-performance',
@@ -376,8 +376,6 @@ export const APP_ROUTES = [
     label: 'Team Performance',
     group: 'payroll',
     icon: 'chart',
-  },
-    // In Payroll rather than Compliance: it is a deduction that has to be in
   },
   {
     path: '/learning',
@@ -387,6 +385,7 @@ export const APP_ROUTES = [
     icon: 'book',
   },
   {
+    // In Payroll rather than Compliance: it is a deduction that has to be in
     // the run, and it is missed because nobody schedules it rather than because
     // anybody computes it wrongly. Putting it where the run is planned is the
     // whole point (#1701).
@@ -485,6 +484,18 @@ export const APP_ROUTES = [
   },
 
   // ── Compliance ───────────────────────────────────────────────────────────
+  {
+    // In Compliance rather than in Payroll. The figures are payroll figures,
+    // but the thing that has to be watched is a certificate lapsing on a date
+    // nobody is looking at — and that belongs beside the other obligations with
+    // deadlines rather than beside the run (#1971).
+    path: '/international-workers',
+    component: lazy(() => import('../pages/InternationalWorkerRegister')),
+    appShell: true,
+    label: 'International workers',
+    group: 'compliance',
+    icon: 'globe',
+  },
   {
     // In Compliance rather than Payroll: the register's subject is who the
     // scheme covers, and the fact people come to it for — that somebody above

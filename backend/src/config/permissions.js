@@ -244,6 +244,26 @@ const PERMISSIONS = {
   // non-discretionary payment accruing interest at twelve percent from the date
   // of the accident.
   READ_EC_CLAIM: 'READ_EC_CLAIM',
+
+  // --- EPF International Workers, paragraph 83 (#1971) --------------------
+  //
+  // The split is on which name can take the ₹15,000 wage ceiling off — or put
+  // it back on.
+  //
+  // MANAGE_IW_DETERMINATION records the paragraph 83 status and the Certificate
+  // of Coverage. Both move a remittance by a factor of forty, in opposite
+  // directions: the determination removes the ceiling and the certificate stops
+  // the contribution altogether. Nothing else in the product moves that much
+  // money on the strength of one field.
+  //
+  // MANAGE_IW_CONTRIBUTION computes a month's basis and files IW-1. Clerical
+  // against the determination — the basis follows the status and the pay.
+  //
+  // Deliberately not the EPF permissions. Those cover the domestic ECR where
+  // the ceiling always applies; these cover the members it never applies to.
+  READ_INTERNATIONAL_WORKER: 'READ_INTERNATIONAL_WORKER',
+  MANAGE_IW_CONTRIBUTION: 'MANAGE_IW_CONTRIBUTION',
+  MANAGE_IW_DETERMINATION: 'MANAGE_IW_DETERMINATION',
   MANAGE_EC_CLAIM: 'MANAGE_EC_CLAIM',
 
   // --- Industrial Disputes Act, Chapters VA and VB (#1830) -----------------
@@ -916,6 +936,21 @@ const PERMISSION_DEFINITIONS = [
   },
 
   {
+    name: PERMISSIONS.READ_INTERNATIONAL_WORKER,
+    description:
+      'View the paragraph 83 register, each Certificate of Coverage as a countdown, the full-pay contribution against what the ceiling would have given, and the withdrawal position',
+  },
+  {
+    name: PERMISSIONS.MANAGE_IW_CONTRIBUTION,
+    description:
+      'Compute an international worker’s monthly contribution on full pay and file the IW-1 return',
+  },
+  {
+    name: PERMISSIONS.MANAGE_IW_DETERMINATION,
+    description:
+      'Record the paragraph 83 status and the Certificate of Coverage — the two determinations that take the statutory wage ceiling off a member, or stop their contribution entirely',
+  },
+  {
     name: PERMISSIONS.READ_CONSTRUCTION_CESS,
     description:
       'View the construction cess position per project, the advance deducted against the section 5 assessment and the beneficiary register',
@@ -1331,6 +1366,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_CONSTRUCTION_CESS,
       PERMISSIONS.MANAGE_CESS_REGISTER,
       PERMISSIONS.MANAGE_CESS_BASE,
+      // #1971. All three. Determining that a member is outside the wage ceiling
+      // and computing the contribution that follows are two halves of the same
+      // check, and the owner is the one account allowed to be both.
+      PERMISSIONS.READ_INTERNATIONAL_WORKER,
+      PERMISSIONS.MANAGE_IW_CONTRIBUTION,
+      PERMISSIONS.MANAGE_IW_DETERMINATION,
 
       // #1344. All three. MANAGE_GRATUITY_ASSUMPTIONS stops here for the same
       // reason MANAGE_COMPLIANCE does — it decides what gets reported, not who
@@ -1601,6 +1642,13 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.MANAGE_LAYOFF_SPELL,
 
       PERMISSIONS.READ_EC_CLAIM,
+      // #1971. Read and the contribution, not the determination. Computing a
+      // month's basis follows mechanically from the status and the pay; the
+      // status itself takes the ₹15,000 ceiling off a member, and a certificate
+      // stops their contribution altogether. One person should not be able to
+      // decide that and then compute against it.
+      PERMISSIONS.READ_INTERNATIONAL_WORKER,
+      PERMISSIONS.MANAGE_IW_CONTRIBUTION,
 
       PERMISSIONS.READ_VENDOR,
 

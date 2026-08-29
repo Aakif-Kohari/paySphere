@@ -216,6 +216,11 @@ const vendorRoutes = require('./routes/vendor.routes');
 // project cost rather than a wage, which is why it is not in the payroll tree
 // at all.
 const constructionCessRoutes = require('./routes/constructionCess.routes');
+// EPF International Workers, paragraph 83 (#1971). Apart from the EPF routers
+// because it covers the members the ₹15,000 wage ceiling never applies to. It
+// supplies the contribution basis and does not build the ECR — `ecrGenerator`
+// keeps that — and a shortfall it finds is fed to #1875 rather than recomputed.
+const internationalWorkerRoutes = require('./routes/internationalWorkerPf.routes');
 
 // Contract Labour (Regulation and Abolition) Act, 1970 (#1700). Next to the
 // vendor router because a contractor is one, and separate from it because this
@@ -734,6 +739,13 @@ app.use('/api/aggregator-contribution', aggregatorContributionRoutes);
 // the two line up. Most are unsurprising; the two that are not are called out.
 
 app.use('/api/assets', assetRoutes);
+
+// #1971. The router owns `/rules`, `/status`, `/certificates`,
+// `/certificates/expiring`, `/contributions`, `/withdrawal`, `/iw-1` and
+// `/position`. It refuses a withdrawal on two months' unemployment with the
+// reason attached rather than a bare no — that ground reaches a domestic member
+// and not this one.
+app.use('/api/international-workers', internationalWorkerRoutes);
 app.use('/api/vendors', vendorRoutes);
 
 // #1827. The router owns `/rules`, `/projects`, `/beneficiaries` and
