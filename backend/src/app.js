@@ -315,6 +315,7 @@ const pensionRoutes = require('./routes/pension.routes');
 const fbpRoutes = require('./routes/fbp.routes');
 const teamRoutes = require('./routes/team.routes');
 const healthChallengeRoutes = require('./routes/healthChallenge.routes');
+const compOffRoutes = require('./routes/compOff.routes');
 const {
   tenantRouter: subscriptionTenantRoutes,
   adminRouter: subscriptionAdminRoutes,
@@ -851,6 +852,10 @@ app.use('/api/policies', companyPolicyRoutes);
 // Peer Nomination & Awards (#peer-nominations). Employee-driven recognition
 // with category configuration, cycle management, voting, review, and analytics.
 app.use('/api/peer-nominations', peerNominationRoutes);
+
+// Compensatory Off management (#1370). The router owns `/policies`,
+// `/requests`, `/balance`, `/ledger` and `/reports`.
+app.use('/api/comp-off', compOffRoutes);
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────
 // Must be registered AFTER all valid routes but BEFORE error handlers.
