@@ -480,6 +480,17 @@ const startCronJobs = () => {
     }),
   );
   logger.info('Daily detect milestones cron job registered.');
+
+  // 02:00 daily — Probation Reminders
+  scheduledTasks.push(
+    cron.schedule('0 2 * * *', () => {
+      const { runProbationReminders } = require('./probationReminder.job');
+      runProbationReminders().catch((error) =>
+        logger.error('Probation reminders job threw', { error: error.message }),
+      );
+    }),
+  );
+  logger.info('Daily probation reminders cron job registered.');
 };
 
 function stopCronJobs() {

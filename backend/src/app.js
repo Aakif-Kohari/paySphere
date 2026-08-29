@@ -508,6 +508,9 @@ app.use(healthRoutes);
 app.use('/api', generalRateLimiter);
 app.use('/api/auth', userRoutes);
 app.use('/api/employees', employeeRoutes);
+
+const probationRoutes = require('./routes/probation.routes');
+app.use('/api/probation', probationRoutes);
 app.use('/api/custom-fields', customFieldRoutes);
 app.use('/api/employees', employeeImportRoutes);
 
