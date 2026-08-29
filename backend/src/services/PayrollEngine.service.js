@@ -4,6 +4,8 @@ const PayrollUpdate = require('../models/payroll.model');
 const User = require('../models/user.model');
 const ExchangeRate = require('../models/exchangeRate.model');
 const { acquireLock, releaseLock } = require('../utils/lockManager');
+const { EmploymentFinding } = require('../models/adolescentEmployment.model');
+const { SEVERITY } = require('../utils/adolescentEmployment');
 const { calculateNetSalary } = require('../utils/salaryCalculator');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
@@ -261,6 +263,23 @@ class PayrollEngine {
         throw new Error(
           'Another payroll process is currently running for this company and month. Please try again later.',
         );
+      }
+
+      // Check for unresolved adolescent worker scheduling violations
+      const startOfMonth = new Date(Date.UTC(currentYear, currentMonth - 1, 1));
+      const endOfMonth = new Date(Date.UTC(currentYear, currentMonth, 0, 23, 59, 59, 999));
+
+      const unresolvedViolations = await EmploymentFinding.find({
+        tenantId,
+        resolvedOn: null,
+        severity: { $in: [SEVERITY.PROHIBITED, SEVERITY.BREACH] },
+        occurredOn: { $gte: startOfMonth, $lte: endOfMonth },
+      }).lean();
+
+      if (unresolvedViolations.length > 0) {
+        const error = new Error('Adolescent scheduling violations must be resolved before payroll finalization.');
+        error.status = 400;
+        throw error;
       }
 
       const employees = await Employee.find({

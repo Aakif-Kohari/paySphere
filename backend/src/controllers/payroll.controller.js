@@ -830,6 +830,9 @@ exports.submitPayrollForReview = async (req, res, next) => {
     if (error.message && error.message.includes('Another payroll process is currently running')) {
       return res.status(409).json({ message: error.message });
     }
+    if (error.status === 400 || error.message.includes('Adolescent scheduling violations')) {
+      return res.status(400).json({ message: error.message });
+    }
     if (error.validationErrors) {
       return res
         .status(400)
