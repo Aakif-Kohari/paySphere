@@ -70,6 +70,7 @@ const app = require('../app');
  */
 const MOUNTED_ROUTES = [
   ['/api/auth', 'post', '/api/auth/login'],
+  ['/api/section-89-relief', 'get', '/api/section-89-relief/rules'],
   ['/api/employees', 'get', '/api/employees'],
   ['/api/payroll', 'get', '/api/payroll/summary'],
   ['/api/statutory-bonus', 'get', '/api/statutory-bonus/ledger'],
@@ -209,6 +210,7 @@ const PUBLIC_ROUTES = new Set(['/api/auth/login', '/api/email/webhooks']);
  */
 const ROUTER_MOUNTS = {
   accounting: '/api/accounting',
+  sectionEightyNineRelief: '/api/section-89-relief',
   appraisal: '/api/appraisals',
   archive: '/api/archive',
   asset: '/api/assets',

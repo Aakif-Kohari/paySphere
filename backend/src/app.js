@@ -101,6 +101,13 @@ const settlementRoutes = require('./routes/settlement.routes');
 // reinstated, and running a suspension through the full-and-final machinery
 // would close the record and make reinstatement a re-hire.
 const suspensionRoutes = require('./routes/suspensions.routes');
+// Section 89(1) relief on salary arrears (#1969). Apart from the payroll router
+// because it owns nothing there: it reads an arrear's amount, the period it
+// relates to and the date of receipt, writes nothing back, and never reopens a
+// closed period. Section 192(2A) makes the employer's authority to give the
+// relief conditional on the employee's Form 10E, which is the one thing the
+// router refuses on.
+const sectionEightyNineReliefRoutes = require('./routes/sectionEightyNineRelief.routes');
 
 // Employees' Compensation Act, 1923 (#1699). Next to settlements because both
 // answer "what is owed to this person now that something has happened to the
@@ -546,6 +553,13 @@ app.use('/api/minimum-wages', minimumWagesRoutes);
 // owns `/rules`, `/assessment`, `/registers` and `/deferred`.
 app.use('/api/wage-deductions', wageDeductionRoutes);
 app.use('/api/reports', reportsRoutes);
+
+// #1969. The router owns `/rules`, `/rate-tables`, `/assessed-years`,
+// `/claims`, `/claims/:id/form-10e`, `/claims/:id/apply` and `/position`. It
+// computes the relief unconditionally and *gives* it only against a recorded
+// Form 10E — a payroll that reduced the deduction without one has
+// short-deducted, and the section 201(1A) interest is the employer's.
+app.use('/api/section-89-relief', sectionEightyNineReliefRoutes);
 app.use('/api/employee-portal', employeePortalRoutes);
 // #1875. The router owns `/rules`, `/months`, `/waivers`, `/position` and
 // `/assessments`. It does not recompute what a wage month owed —
