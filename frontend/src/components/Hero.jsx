@@ -1,8 +1,9 @@
+import styles from './Hero.module.css';
 import { Link } from "react-router-dom";
 
 export default function Hero() {
   return (
-    <section id="hero" className="pt-28 sm:pt-36 md:pt-44 pb-16 sm:pb-20 px-4 sm:px-6">
+    <section id="hero" className={styles.container}>
       <div className="max-w-4xl mx-auto text-center">
 
         {/* Badge */}
@@ -27,6 +28,7 @@ export default function Hero() {
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center animate-in fade-in slide-in-from-bottom-10 duration-1000">
             <Link 
               to="/auth?mode=signup"
+              aria-label="Start your free trial"
               className="bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold px-10 py-4 rounded-xl shadow-2xl shadow-blue-200 dark:shadow-none transition-all hover:scale-105 active:scale-95"
             >
               Start your free trial

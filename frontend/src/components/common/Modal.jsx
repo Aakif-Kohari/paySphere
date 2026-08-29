@@ -1,19 +1,28 @@
 /**
- * @fileoverview WCAG 2.1 AA Compliant Modal Component
- * @description A robust modal wrapper that enforces strict accessibility standards.
- * Implements focus trapping, Escape key handling, and ARIA attributes to ensure
- * the modal is fully usable via keyboard and screen readers.
+ * @fileoverview Accessible Modal Component
+ * @description A fully accessible modal wrapper utilizing the useFocusTrap hook.
+ * Handles backdrop clicks, Escape key closing, and ARIA attributes.
+ * Supports both Light and Dark modes.
  * 
- * Issue: #686
+ * Issue: #1020
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import CloseIcon from '@mui/icons-material/Close';
 
 /**
  * Accessible Modal Component
+ * 
+ * @param {Object} props - Component props
+ * @param {boolean} props.isOpen - Controls visibility
+ * @param {Function} props.onClose - Callback when modal requests closing
+ * @param {string} props.title - Accessible title for the modal
+ * @param {React.ReactNode} props.children - Modal content
+ * @param {React.ReactNode} props.footer - Optional footer actions
+ * @param {string} props.maxWidth - Tailwind max-width class
  */
 export default function Modal({
   isOpen,
@@ -22,90 +31,74 @@ export default function Modal({
   children,
   footer,
   maxWidth = 'max-w-lg',
-  closeOnBackdropClick = true
+  closeOnBackdrop = true
 }) {
-  const modalRef = useRef(null);
-  const previousActiveElement = useRef(null);
+  // Initialize focus trap with scroll locking
+  const modalRef = useFocusTrap(isOpen, { returnFocus: true, lockScroll: true });
+
+  // Unique per-instance ids so aria-labelledby/aria-describedby don't collide
+  // when more than one Modal is mounted at once.
+  const generatedId = useId();
+  const titleId = `modal-title-${generatedId}`;
+  const descriptionId = `modal-description-${generatedId}`;
 
   /**
-   * Traps focus inside the modal. When the user tabs past the last element,
-   * focus wraps to the first element. Shift+Tab wraps backwards.
+   * Handles Escape key to close the modal
    */
-  const handleTabKey = useCallback((e) => {
-    if (e.key !== 'Tab' || !modalRef.current) return;
-
-    const focusableElements = modalRef.current.querySelectorAll(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-    
-    if (focusableElements.length === 0) return;
-
-    const firstElement = focusableElements[0];
-    const lastElement = focusableElements[focusableElements.length - 1];
-
-    if (e.shiftKey) {
-      if (document.activeElement === firstElement) {
-        lastElement.focus();
-        e.preventDefault();
-      }
-    } else {
-      if (document.activeElement === lastElement) {
-        firstElement.focus();
-        e.preventDefault();
-      }
+  const handleEscapeKey = useCallback((event) => {
+    if (event.key === 'Escape' && isOpen) {
+      onClose();
     }
-  }, []);
-
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Escape') onClose();
-    handleTabKey(e);
-  }, [onClose, handleTabKey]);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (isOpen) {
-      previousActiveElement.current = document.activeElement;
-      document.body.style.overflow = 'hidden';
-      document.addEventListener('keydown', handleKeyDown);
-      
-      // Focus the modal container itself to announce it to screen readers
-      setTimeout(() => modalRef.current?.focus(), 50);
-    } else {
-      document.body.style.overflow = 'unset';
-      document.removeEventListener('keydown', handleKeyDown);
-      if (previousActiveElement.current) {
-        previousActiveElement.current.focus();
-      }
+      document.addEventListener('keydown', handleEscapeKey);
     }
-
     return () => {
-      document.body.style.overflow = 'unset';
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleEscapeKey);
     };
-  }, [isOpen, handleKeyDown]);
+  }, [isOpen, handleEscapeKey]);
+
+  /**
+   * Handles clicks on the backdrop (outside the modal content)
+   */
+  const handleBackdropClick = (event) => {
+    if (closeOnBackdrop && event.target === event.currentTarget) {
+      onClose();
+    }
+  };
 
   if (!isOpen) return null;
 
-  const handleBackdropClick = (e) => {
-    if (closeOnBackdropClick && e.target === e.currentTarget) onClose();
-  };
-
   const modalContent = (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
       onClick={handleBackdropClick}
       role="presentation"
     >
       <div
         ref={modalRef}
-        tabIndex={-1} // Allows the div itself to receive focus for screen reader announcement
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
-        aria-describedby="modal-description"
-        className={`relative w-full ${maxWidth} mx-4 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 max-h-[90vh] flex flex-col outline-none`}
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        className={`
+          relative w-full ${maxWidth} 
+          bg-white dark:bg-slate-800 
+          rounded-2xl shadow-2xl 
+          border border-gray-200 dark:border-slate-700 
+          max-h-[90vh] flex flex-col 
+          outline-none
+          animate-slideUp
+        `}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700">
-          <h2 id="modal-title" className="text-lg font-bold text-gray-900 dark:text-white">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex-shrink-0">
+          <h2
+            id={titleId}
+            className="text-lg font-bold text-gray-900 dark:text-white"
+          >
             {title}
           </h2>
           <button
@@ -117,12 +110,17 @@ export default function Modal({
           </button>
         </div>
 
-        <div id="modal-description" className="px-6 py-4 overflow-y-auto flex-1 text-sm text-gray-700 dark:text-slate-300">
+        {/* Body */}
+        <div
+          id={descriptionId}
+          className="px-6 py-4 overflow-y-auto flex-1 text-sm text-gray-700 dark:text-slate-300"
+        >
           {children}
         </div>
 
+        {/* Footer */}
         {footer && (
-          <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 rounded-b-2xl flex justify-end gap-3">
+          <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 rounded-b-2xl flex justify-end gap-3 flex-shrink-0">
             {footer}
           </div>
         )}
@@ -140,5 +138,5 @@ Modal.propTypes = {
   children: PropTypes.node.isRequired,
   footer: PropTypes.node,
   maxWidth: PropTypes.string,
-  closeOnBackdropClick: PropTypes.bool
+  closeOnBackdrop: PropTypes.bool
 };

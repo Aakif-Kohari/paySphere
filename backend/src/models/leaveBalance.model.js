@@ -54,6 +54,42 @@ const leaveBalanceSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+
+    // --- Year-end closure record (#1159) ------------------------------------
+    //
+    // The close has to be idempotent. With no record of which leave year has
+    // already been closed for this balance, a second run carries forward and
+    // encashes a second time, and the employee is paid twice for days they
+    // earned once.
+    closedForYear: {
+      type: Number,
+      default: null,
+    },
+    closedAt: {
+      type: Date,
+      default: null,
+    },
+    /**
+     * What the close paid out and wrote off.
+     *
+     * Kept on the balance rather than only in the response, so HR can answer
+     * "why did I lose eight days?" from the record months later.
+     */
+    encashedDays: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    encashedAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    lapsedDays: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { timestamps: true },
 );

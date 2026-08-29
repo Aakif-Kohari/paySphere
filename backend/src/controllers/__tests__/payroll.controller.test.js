@@ -4,9 +4,35 @@ const PayrollUpdate = require("../../models/payroll.model");
 const User = require("../../models/user.model");
 const mongoose = require("mongoose");
 
+jest.mock("../../utils/lockManager", () => ({
+  acquireLock: jest.fn().mockResolvedValue(true),
+  releaseLock: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock("../../models/exchangeRate.model", () => ({
+  findOne: jest.fn(() => ({ sort: jest.fn().mockResolvedValue(null) })),
+}));
+
 jest.mock("../../models/employee.model");
 jest.mock("../../models/payroll.model");
 jest.mock("../../models/user.model");
+// Read once per employee in a run, to bundle anything owed from a backdated
+// salary revision (#931). Mocked as a factory rather than automocked so the
+// query never reaches Mongoose: unmocked, it buffers against a database this
+// suite never connects to and every test in the file times out (#950).
+jest.mock('../../models/arrearsLedger.model', () => ({
+  // Plain functions rather than jest.fn: this suite calls jest.resetAllMocks()
+  // in every beforeEach, which strips implementations off factory mocks.
+  find: () => ({ sort: () => ({ lean: async () => [] }) }),
+  updateMany: async () => ({ modifiedCount: 0 }),
+  insertMany: async () => [],
+}));
+// Expense claims are read for every employee in a run since #719. Same reason
+// as the mock above: unmocked it buffers and the whole suite times out.
+jest.mock('../../models/expenseClaim.model', () => ({
+  find: () => ({ populate: () => ({ lean: async () => [] }) }),
+  bulkWrite: async () => ({}),
+}));
 // submitPayrollForReview now consults the attendance ledger (#459). Stubbed so
 // the payroll unit tests stay free of the attendance collection; the ledger's
 // own behaviour is covered in attendance.controller.test.js.
@@ -117,7 +143,99 @@ describe("Payroll Controller - submitPayrollForReview parseTagValue & Transactio
     expect(isNaN(result.netSalary)).toBe(false);
     expect(result.netSalary).toBe(50500);
   });
+test('stores calculation inputs in the payroll snapshot so later employee changes cannot alter the calculation', async () => {
+  const mockEmployee = {
+    _id: "507f1f77bcf86cd799439011",
+    fullName: "Alice Smith",
+    email: "alice@example.com",
+    role: "Developer",
+    companyName: "PaySphere",
+    language: "en",
+    monthlySalary: 50000,
+    overtimeRate: 200,
+    isActive: true,
+  };
 
+  Employee.find.mockResolvedValue([mockEmployee]);
+  User.findById.mockResolvedValue({
+    defaultDailyRate: 1000,
+    defaultOvertimeRate: 200,
+  });
+
+  PayrollUpdate.bulkWrite.mockResolvedValue({});
+  PayrollUpdate.find
+    .mockImplementationOnce(() => createQueryMock([]))
+    .mockImplementationOnce(() =>
+      createQueryMock([{ _id: "payroll1", employeeId: "emp1" }]),
+    );
+
+  req.body = {
+    activities: [
+      {
+        employeeId: mockEmployee._id,
+        name: mockEmployee.fullName,
+        tags: [{ label: "bonus 500" }],
+      },
+    ],
+    month: 7,
+    year: 2026,
+  };
+
+  await submitPayrollForReview(req, res);
+
+  const bulkOperations = PayrollUpdate.bulkWrite.mock.calls[0][0];
+  const payrollData =
+    bulkOperations[0].updateOne.update.$set;
+
+  expect(payrollData.calculationSnapshot.version).toBe("1.0.0");
+  expect(payrollData.calculationSnapshot.employee.fullName).toBe(
+    "Alice Smith",
+  );
+  expect(payrollData.calculationSnapshot.inputs.baseSalary).toBe(50000);
+  expect(payrollData.calculationSnapshot.inputs.overtimeRate).toBe(200);
+  expect(payrollData.calculationSnapshot.inputs.bonus).toBe(500);
+  expect(payrollData.calculationSnapshot.finalAmounts.netSalary).toBe(
+    payrollData.netSalary,
+  );
+});
+test("should reject payroll approval when employee compensation data is stale", async () => {
+  const payrollId = "507f1f77bcf86cd799439011";
+  const employeeId = "507f1f77bcf86cd799439012";
+
+  PayrollUpdate.find.mockResolvedValue([
+    {
+      _id: payrollId,
+      employeeId,
+      calculationSnapshot: {
+        employee: {
+          version: 3,
+        },
+      },
+      status: "PENDING_APPROVAL",
+    },
+  ]);
+
+  Employee.find.mockResolvedValue([
+    {
+      _id: employeeId,
+      __v: 4,
+    },
+  ]);
+
+  req.body = {
+    payrollIds: [payrollId],
+  };
+
+  await approvePayroll(req, res, next);
+
+  expect(res.status).toHaveBeenCalledWith(409);
+  expect(res.json).toHaveBeenCalledWith(
+    expect.objectContaining({
+      message:
+        "Employee compensation data changed after this payroll was calculated. Review and recalculate the affected payroll before approving it.",
+    }),
+  );
+});
   test("should correctly classify tags containing 'days' or 'hrs' such as 'Overtime 2 days' and 'Deduction 3 days' (#377)", async () => {
     const mockEmployee = {
       _id: "507f1f77bcf86cd799439011",
@@ -579,5 +697,79 @@ describe("sendAllPayslipsEmailHandler — req.body.year undefined guard (#352)",
       { _id: "payroll1" },
       { payslipEmailed: true }
     );
+  });
+});
+
+describe("submitPayrollForReview — Concurrent Mutex Lock (#1091)", () => {
+  const lockManager = require("../../utils/lockManager");
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test("should reject request with 409 Conflict if lock is already held", async () => {
+    lockManager.acquireLock.mockResolvedValueOnce(false); // Lock acquisition fails
+
+    const req = {
+      tenantId: "tenant123",
+      userId: "user123",
+      body: {
+        activities: [{ employeeId: "emp1", tags: [{ label: "10 hours overtime" }] }],
+        month: 8,
+        year: 2026,
+      },
+    };
+
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    };
+
+    await submitPayrollForReview(req, res, jest.fn());
+
+    expect(lockManager.acquireLock).toHaveBeenCalledWith(
+      expect.stringContaining("payroll_lock:tenant123:2026:8"),
+      300000
+    );
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining("Another payroll process is currently running"),
+      })
+    );
+  });
+
+  test("should acquire and release lock on successful processing", async () => {
+    lockManager.acquireLock.mockResolvedValueOnce(true);
+
+    const mockEmployee = { _id: "emp1", fullName: "John Doe", isActive: true, targetCurrency: "USD" };
+    Employee.find.mockResolvedValueOnce([mockEmployee]);
+    User.findById.mockResolvedValueOnce({ _id: "user123" });
+
+    // Mock count & find stubs
+    PayrollUpdate.find.mockResolvedValueOnce([]); // no locked records
+    PayrollUpdate.bulkWrite.mockResolvedValueOnce({});
+    PayrollUpdate.find.mockResolvedValueOnce([{ _id: "p1", employeeId: "emp1" }]); // return updated
+
+    const req = {
+      tenantId: "tenant123",
+      userId: "user123",
+      body: {
+        activities: [{ employeeId: "emp1", tags: [] }],
+        month: 8,
+        year: 2026,
+      },
+    };
+
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn().mockReturnThis(),
+    };
+
+    await submitPayrollForReview(req, res, jest.fn());
+
+    expect(lockManager.acquireLock).toHaveBeenCalled();
+    expect(lockManager.releaseLock).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
   });
 });

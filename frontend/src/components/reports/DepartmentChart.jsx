@@ -1,4 +1,4 @@
-import { useSelector } from 'react-redux';
+import { useAppStore } from '../../store/useAppStore';
 import {
     Bar,
     BarChart,
@@ -11,8 +11,8 @@ import {
 import { formatCurrency } from '../../utils/currency';
 import { createChartTooltip } from './chartTooltip';
 
-export default function DepartmentChart({ data }) {
-  const themeMode = useSelector((state) => state.ui.themeMode);
+export default function DepartmentChart({ data = [] }) {
+  const themeMode = useAppStore((state) => state.themeMode);
   const isDark = themeMode === 'dark';
   const tooltipContent = createChartTooltip({
     isDark,

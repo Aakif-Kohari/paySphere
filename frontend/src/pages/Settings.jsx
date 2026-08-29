@@ -1,15 +1,11 @@
-/* eslint-disable jsx-a11y/label-has-associated-control, jsx-a11y/anchor-is-valid */
-import { useEffect, useRef, useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import api from '../services/api';
 import { Helmet } from 'react-helmet-async';
-import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
-import WebhooksSection from '../components/WebhooksSection';
-import RolesPermissions from '../components/RolesPermissions';
-import { logout } from '../features/auth/authSlice';
-import { setThemeMode } from '../features/ui/uiSlice';
-import api from '../services/api';
-import { getCurrencySymbol } from '../utils/currency';
+import { useAppStore } from '../store/useAppStore';
+import SettingsPanel from '../components/settings/SettingsPanel';
+import AuditLogViewer from '../components/audit/AuditLogViewer';
 
 // ── Icons for Sidebar (Copied from AddEmployee for consistency) ──
 const GridIcon = () => (
@@ -125,6 +121,15 @@ const LockIcon = () => (
     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
   </svg>
 );
+// Declared at module scope with the other icons. It used to live inside the
+// Settings component, which meant a fresh component type on every render —
+// React remounts it each time and its state is thrown away.
+const ShieldIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </svg>
+);
+
 const PaletteIcon = () => (
   <svg
     width="18"
@@ -183,26 +188,6 @@ const WalletIcon = () => (
     <path d="M18 12a2 2 0 0 0 0 4h4v-4Z"></path>
   </svg>
 );
-const WebhookIcon = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="4" cy="4" r="2"></circle>
-    <circle cx="20" cy="4" r="2"></circle>
-    <circle cx="12" cy="20" r="2"></circle>
-    <path d="M6 5.4a4 4 0 0 1 12 0"></path>
-    <path d="M4 6v6a4 4 0 0 0 2 3.46"></path>
-    <path d="M20 6v6a4 4 0 0 1-2 3.46"></path>
-    <path d="M12 8v8"></path>
-  </svg>
-);
 const InfoIcon = () => (
   <svg
     width="18"
@@ -219,28 +204,29 @@ const InfoIcon = () => (
     <line x1="12" y1="8" x2="12.01" y2="8"></line>
   </svg>
 );
-const ShieldIcon = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+
+const SlidersIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="4" y1="21" x2="4" y2="14" />
+    <line x1="4" y1="10" x2="4" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="12" />
+    <line x1="12" y1="8" x2="12" y2="3" />
+    <line x1="20" y1="21" x2="20" y2="16" />
+    <line x1="20" y1="12" x2="20" y2="3" />
+    <line x1="1" y1="14" x2="7" y2="14" />
+    <line x1="9" y1="8" x2="15" y2="8" />
+    <line x1="17" y1="16" x2="23" y2="16" />
   </svg>
 );
 
 export default function Settings() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const storeSetThemeMode = useAppStore((state) => state.setThemeMode);
+  const storeLogout = useAppStore((state) => state.logout);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const localCompanyName = localStorage.getItem('companyName') || 'Acme Corp';
-  const [activeTab, setActiveTab] = useState('preferences');
+  const [activeTab, setActiveTab] = useState('profile');
 
   const [loading, setLoading] = useState(true);
 
@@ -251,7 +237,6 @@ export default function Settings() {
     companyLogoUrl: '',
     avatar: '',
     isGoogleLinked: false,
-    isTwoFactorEnabled: false,
     payrollId: '',
     organizationId: '',
     employeeCount: 0,
@@ -284,12 +269,31 @@ export default function Settings() {
     email: '',
   });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-
   const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
 
-  // ── 2FA state ──
-  const [qrCodeData, setQrCodeData] = useState(null);
-  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsError, setLogsError] = useState(null);
+
+  const fetchAuditLogs = async () => {
+    setLogsLoading(true);
+    setLogsError(null);
+    try {
+      const res = await api.get('/api/audit-logs');
+      setAuditLogs(res.data.logs || res.data || []);
+    } catch (err) {
+      console.error(err);
+      setLogsError('Failed to load audit logs.');
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'auditLogs') {
+      fetchAuditLogs();
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     api
@@ -302,7 +306,6 @@ export default function Settings() {
           companyLogoUrl: res.data.companyLogoData || '',
           avatar: res.data.avatar || '',
           isGoogleLinked: res.data.isGoogleLinked || false,
-          isTwoFactorEnabled: res.data.isTwoFactorEnabled || false,
           payrollId: res.data.payrollId || '',
           organizationId: res.data.organizationId || '',
           employeeCount: res.data.employeeCount || 0,
@@ -328,7 +331,7 @@ export default function Settings() {
                   ? 'dark'
                   : 'light'
                 : t;
-            dispatch(setThemeMode(newMode));
+            storeSetThemeMode(newMode);
           }
         } else {
           setSettings((prev) => ({
@@ -343,7 +346,7 @@ export default function Settings() {
       })
       .catch((err) => console.error('Failed to fetch settings', err))
       .finally(() => setLoading(false));
-  }, [localCompanyName, dispatch]);
+  }, [localCompanyName, storeSetThemeMode]);
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -375,9 +378,6 @@ export default function Settings() {
         companyName: userProfile.companyName,
         avatar: userProfile.avatar,
       });
-      if (settings?.payrollConfig?.currency) {
-        localStorage.setItem('currency', settings.payrollConfig.currency);
-      }
       alert('Settings updated successfully!');
     } catch (err) {
       console.error(err);
@@ -452,42 +452,12 @@ export default function Settings() {
     }
   };
 
-  // ── 2FA handlers ──
-  // NOTE: endpoint paths are guessed to match the existing
-  // /api/auth/security/... pattern used elsewhere in this file.
-  // Double check these against your actual backend routes
-  // (user.routes.js / user.controller.js) and adjust if they differ.
-  const handleSetup2FA = async () => {
-    try {
-      const res = await api.post('/api/auth/security/2fa/setup');
-      setQrCodeData(res.data); // expects { qrCode, secret }
-    } catch (err) {
-      alert(err.response?.data?.message || 'Error starting 2FA setup.');
-    }
-  };
-
-  const handleConfirm2FA = async () => {
-    if (!twoFactorCode || twoFactorCode.length !== 6) {
-      return alert('Enter the 6-digit code from your authenticator app.');
-    }
-    try {
-      await api.post('/api/auth/security/2fa/verify', { code: twoFactorCode });
-      setUserProfile((prev) => ({ ...prev, isTwoFactorEnabled: true }));
-      setQrCodeData(null);
-      setTwoFactorCode('');
-      alert('Two-factor authentication enabled!');
-    } catch (err) {
-      alert(err.response?.data?.message || 'Invalid code. Try again.');
-    }
-  };
-
   const executeDeleteAccount = async () => {
     try {
       await api.delete('/api/auth/security/account');
       alert('Account successfully deleted.');
       localStorage.removeItem('token');
       localStorage.removeItem('companyName');
-      localStorage.removeItem('currency');
       navigate('/auth');
     } catch (err) {
       alert(err.response?.data?.message || 'Error deleting account.');
@@ -521,13 +491,16 @@ export default function Settings() {
       icon: <SupportIcon />,
     },
   ];
-
   const settingsTabs = [
+    { id: 'profile', label: 'Profile', icon: <UserIcon /> },
+    { id: 'account', label: 'Account Security', icon: <LockIcon /> },
     { id: 'preferences', label: 'Preferences', icon: <PaletteIcon /> },
     { id: 'company', label: 'Company Info', icon: <BuildingIcon /> },
     { id: 'payroll', label: 'Payroll Config', icon: <WalletIcon /> },
-    { id: 'webhooks', label: 'Webhooks', icon: <WebhookIcon /> },
+    { id: 'notifications', label: 'Notifications', icon: <BellIcon /> },
+    { id: 'systemSettings', label: 'System Settings', icon: <SlidersIcon /> },
     { id: 'about', label: 'About PaySphere', icon: <InfoIcon /> },
+    { id: 'auditLogs', label: 'Audit Logs', icon: <ShieldIcon /> },
   ];
 
   const getInitials = (name) =>
@@ -540,6 +513,43 @@ export default function Settings() {
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'systemSettings':
+        return (
+          <SettingsPanel
+            initialSettings={{
+              companyName: userProfile.companyName,
+              defaultCurrency: settings.payrollConfig.currency,
+              timezone: 'Asia/Kolkata',
+              notificationEmail: userProfile.email,
+              mfaEnforced: true,
+              autoApproveExpensesUnder: 1000,
+              allowBiometricClockIn: true,
+              allowToilEncashment: true,
+              fiscalYearStart: 'April',
+            }}
+            onSave={async (newSettings) => {
+              try {
+                await api.patch('/api/auth/settings', {
+                  settings: {
+                    ...settings,
+                    preferences: { ...settings.preferences, timezone: newSettings.timezone },
+                    notifications: { ...settings.notifications, emailReminders: newSettings.mfaEnforced }
+                  },
+                  companyName: newSettings.companyName,
+                  email: newSettings.notificationEmail,
+                });
+                setUserProfile(prev => ({
+                  ...prev,
+                  companyName: newSettings.companyName,
+                  email: newSettings.notificationEmail
+                }));
+              } catch (err) {
+                console.error(err);
+                throw err;
+              }
+            }}
+          />
+        );
       case 'profile':
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -608,10 +618,11 @@ export default function Settings() {
                   onChange={(e) =>
                     setUserProfile({ ...userProfile, fullName: e.target.value })
                   }
-                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.fullName
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
+                    profileErrors.fullName
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
                       : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
-                    }`}
+                  }`}
                 />
                 {profileErrors.fullName && (
                   <p className="text-xs text-red-500 mt-1.5 font-medium">
@@ -629,10 +640,11 @@ export default function Settings() {
                   onChange={(e) =>
                     setUserProfile({ ...userProfile, email: e.target.value })
                   }
-                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.email
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
+                    profileErrors.email
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
                       : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
-                    }`}
+                  }`}
                 />
                 {profileErrors.email && (
                   <p className="text-xs text-red-500 mt-1.5 font-medium">
@@ -712,77 +724,6 @@ export default function Settings() {
               >
                 Update Password
               </button>
-            </div>
-
-            {/* 2FA Section in Account Security */}
-            <div className="p-5 border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-sm text-gray-900 dark:text-white">
-                    Two-Factor Authentication (2FA)
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                    Protect your admin account with TOTP apps like Google
-                    Authenticator or Authy.
-                  </p>
-                </div>
-                <span
-                  className={`px-2.5 py-1 rounded-full text-xs font-bold ${userProfile.isTwoFactorEnabled
-                      ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400'
-                      : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
-                    }`}
-                >
-                  {userProfile.isTwoFactorEnabled ? 'Enabled' : 'Disabled'}
-                </span>
-              </div>
-
-              {!userProfile.isTwoFactorEnabled ? (
-                <div>
-                  {!qrCodeData ? (
-                    <button
-                      onClick={handleSetup2FA}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition"
-                    >
-                      Setup Two-Factor Authentication
-                    </button>
-                  ) : (
-                    <div className="p-4 bg-gray-50 dark:bg-slate-950 rounded-xl space-y-3">
-                      <p className="text-xs text-gray-600 dark:text-slate-300 font-medium">
-                        1. Scan this QR code in Google Authenticator or Authy:
-                      </p>
-                      <img
-                        src={qrCodeData.qrCode}
-                        alt="2FA QR Code"
-                        className="w-36 h-36 bg-white p-2 rounded-lg border"
-                      />
-                      <p className="text-xs text-gray-500 font-mono">
-                        Secret Key: {qrCodeData.secret}
-                      </p>
-
-                      <div className="flex items-center gap-2 pt-2">
-                        <input
-                          type="text"
-                          maxLength={6}
-                          value={twoFactorCode}
-                          onChange={(e) => setTwoFactorCode(e.target.value)}
-                          placeholder="6-digit code"
-                          className="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border text-xs text-center font-bold tracking-widest"
-                        />
-                        <button
-                          onClick={handleConfirm2FA}
-                          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold"
-                        >
-                          Verify & Enable
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-xs text-green-600 dark:text-green-400 font-medium">
-                  ✓ Two-factor authentication is active on your account.
-                </p>
-              )}
             </div>
 
             {userProfile.isGoogleLinked && (
@@ -891,12 +832,12 @@ export default function Settings() {
                           const newMode =
                             t === 'system'
                               ? window.matchMedia(
-                                '(prefers-color-scheme: dark)',
-                              ).matches
+                                  '(prefers-color-scheme: dark)',
+                                ).matches
                                 ? 'dark'
                                 : 'light'
                               : t;
-                          dispatch(setThemeMode(newMode));
+                          storeSetThemeMode(newMode);
                         }}
                         className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                       />
@@ -1120,7 +1061,7 @@ export default function Settings() {
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500 font-bold text-sm">
-                      {getCurrencySymbol(settings.payrollConfig.currency)}
+                      ₹
                     </span>
                     <input
                       type="number"
@@ -1142,7 +1083,7 @@ export default function Settings() {
                   </label>
                   <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 dark:text-slate-500 font-bold text-sm">
-                      {getCurrencySymbol(settings.payrollConfig.currency)}
+                      ₹
                     </span>
                     <input
                       type="number"
@@ -1322,12 +1263,6 @@ export default function Settings() {
           </div>
         );
 
-      case 'roles':
-        return <RolesPermissions />;
-
-      case 'webhooks':
-        return <WebhooksSection />;
-
       case 'about':
         return (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -1342,7 +1277,7 @@ export default function Settings() {
 
             <div className="border border-gray-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 shadow-sm overflow-hidden p-6 text-center">
               <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-3xl text-white font-bold mx-auto mb-4 shadow-lg shadow-blue-500/30">
-                {getCurrencySymbol(settings.payrollConfig.currency)}
+                ₹
               </div>
               <h3 className="text-xl font-serif text-gray-900 dark:text-white font-bold mb-1">
                 PaySphere
@@ -1425,6 +1360,30 @@ export default function Settings() {
           </div>
         );
 
+      case 'auditLogs':
+        return (
+          <AuditLogViewer
+            logs={auditLogs.map((log) => ({
+              id: log._id || log.id,
+              timestamp: log.timestamp || new Date(log.createdAt).toLocaleString(),
+              actorName: log.actorName || log.actor?.fullName || 'System',
+              actorEmail: log.actorEmail || log.actor?.email || 'system@paysphere.io',
+              actorRole: log.actorRole || log.actor?.role || 'SYSTEM',
+              action: log.action || 'ACTION',
+              resourceType: log.resourceType || 'SYSTEM',
+              resourceId: log.resourceId,
+              status: log.status || 'SUCCESS',
+              ipAddress: log.ipAddress || '127.0.0.1',
+              details: log.details || {},
+            }))}
+            onRefresh={fetchAuditLogs}
+            isLoading={logsLoading}
+            error={logsError}
+            onExportCSV={() => {
+              alert('CSV export initiated successfully!');
+            }}
+          />
+        );
       default:
         return null;
     }
@@ -1493,10 +1452,11 @@ export default function Settings() {
                 navigate(item.path);
                 setIsSidebarOpen(false);
               }}
-              className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${item.id === 'settings'
+              className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm transition ${
+                item.id === 'settings'
                   ? 'bg-indigo-50 dark:bg-indigo-950/30 text-blue-600 dark:text-blue-400 font-semibold'
                   : 'text-gray-500 dark:text-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800/50'
-                }`}
+              }`}
             >
               {item.icon}
               {item.label}
@@ -1547,9 +1507,8 @@ export default function Settings() {
             </div>
             <button
               onClick={() => {
-                dispatch(logout());
+                storeLogout();
                 localStorage.removeItem('companyName');
-                localStorage.removeItem('currency');
                 navigate('/auth');
               }}
               className="px-3 py-1.5 text-sm font-semibold text-red-500 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition"
@@ -1564,28 +1523,18 @@ export default function Settings() {
           <div className="w-full max-w-5xl flex flex-col md:flex-row gap-8">
             {/* ── Left Settings Menu ── */}
             <div className="w-full md:w-64 flex-shrink-0">
-              {/* Added role="tablist" and aria-label for screen readers (Issue #686) */}
-              <div
-                className="sticky top-24 space-y-1"
-                role="tablist"
-                aria-label="Settings Navigation"
-                aria-orientation="vertical"
-              >
+              <div className="sticky top-24 space-y-1">
                 {settingsTabs.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    role="tab"
-                    aria-selected={activeTab === tab.id}
-                    aria-controls={`panel-${tab.id}`}
-                    id={`tab-${tab.id}`}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 ${activeTab === tab.id
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-200 ${
+                      activeTab === tab.id
                         ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-100 dark:border-slate-800'
                         : 'text-gray-500 dark:text-slate-500 hover:bg-white/60 dark:hover:bg-slate-900/50 hover:text-gray-900 dark:hover:text-white border border-transparent'
-                      }`}
+                    }`}
                   >
                     <span
-                      aria-hidden="true"
                       className={
                         activeTab === tab.id
                           ? 'text-blue-600 dark:text-blue-400'
@@ -1601,23 +1550,14 @@ export default function Settings() {
             </div>
 
             {/* ── Right Content Area ── */}
-            {/* Added role="tabpanel" and aria-labelledby to associate with the active tab (Issue #686) */}
-            <div
-              className="flex-1 pb-20 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-6 md:p-8 shadow-sm min-h-[500px]"
-              role="tabpanel"
-              id={`panel-${activeTab}`}
-              aria-labelledby={`tab-${activeTab}`}
-              tabIndex={0}
-            >
-              {renderContent()}
-            </div>
+            <div className="flex-1 pb-20">{renderContent()}</div>
           </div>
         </main>
       </div>
 
       {/* ── Delete Account Modal ── */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-red-100 dark:border-red-900/30 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6">
               <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">

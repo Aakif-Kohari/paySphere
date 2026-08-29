@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import api from '../services/api';
+import zxcvbn from '../utils/zxcvbn';
 
 import { Helmet } from 'react-helmet-async';
-import { useGoogleLogin } from '@react-oauth/google';
 import ThemeToggle from '../components/ThemeToggle';
+import LanguageSwitcher from '../components/LanguageSwitcher';
+import { useAppStore } from '../store/useAppStore';
 
 const GoogleIcon = () => (
   <svg width="20" height="20" viewBox="0 0 48 48">
@@ -26,7 +29,9 @@ const GitHubIcon = () => (
 );
 
 export default function PaySphereLogin() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
+  const setCredentials = useAppStore((state) => state.setCredentials);
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get('mode') === 'signup' ? 'signup' : 'login';
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -43,6 +48,11 @@ export default function PaySphereLogin() {
   const [companyName, setCompanyName] = useState('');
   const [password, setPassword] = useState('');
 
+  const passwordStrength = useMemo(() => {
+    if (!password) return null;
+    return zxcvbn(password);
+  }, [password]);
+
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -50,6 +60,50 @@ export default function PaySphereLogin() {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Pre-load reCAPTCHA v3 script in background if site key is present
+  useEffect(() => {
+    const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+    if (siteKey && !window.grecaptcha) {
+      const script = document.createElement('script');
+      script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
+      script.async = true;
+      script.defer = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  const executeRecaptcha = async (action) => {
+    const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+    if (!siteKey) {
+      return null;
+    }
+
+    return new Promise((resolve) => {
+      const runTokenGen = () => {
+        window.grecaptcha.ready(async () => {
+          try {
+            const token = await window.grecaptcha.execute(siteKey, { action });
+            resolve(token);
+          } catch (e) {
+            console.error('reCAPTCHA execution error:', e);
+            resolve(null);
+          }
+        });
+      };
+
+      if (!window.grecaptcha) {
+        const script = document.createElement('script');
+        script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
+        script.async = true;
+        script.defer = true;
+        script.onload = runTokenGen;
+        document.body.appendChild(script);
+      } else {
+        runTokenGen();
+      }
+    });
+  };
 
   const handleGitHubCallback = async (code) => {
     setLoading(true);
@@ -73,7 +127,7 @@ export default function PaySphereLogin() {
         setActiveTab('signup');
       } else {
         const { token, companyName: savedCompanyName } = response.data;
-        localStorage.setItem('token', token);
+        setCredentials({ user: response.data.user || null, token });
         localStorage.setItem('companyName', savedCompanyName);
         if (response.data.currency) {
           localStorage.setItem('currency', response.data.currency);
@@ -101,11 +155,31 @@ export default function PaySphereLogin() {
     setError('');
     setLoading(true);
 
+    if (activeTab === 'signup') {
+      const strength = zxcvbn(password);
+      if (strength.score < 3) {
+        setError(`Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`);
+        setLoading(false);
+        return;
+      }
+    }
+
+    const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+    let recaptchaToken = null;
+    if (siteKey) {
+      recaptchaToken = await executeRecaptcha(activeTab === 'signup' ? 'signup' : 'login');
+      if (!recaptchaToken) {
+        setError('Failed to generate security verification. Please try again.');
+        setLoading(false);
+        return;
+      }
+    }
+
     const endpoint = activeTab === 'signup' ? '/signup' : '/login';
     const payload =
       activeTab === 'signup'
-        ? { fullName, email, companyName, password }
-        : { email, password };
+        ? { fullName, email, companyName, password, recaptchaToken }
+        : { email, password, recaptchaToken };
 
     try {
       const response = await api.post(`/api/auth${endpoint}`, payload);
@@ -113,7 +187,7 @@ export default function PaySphereLogin() {
       const { token, companyName: savedCompanyName } = response.data;
 
       // Save to localStorage
-      localStorage.setItem('token', token);
+      setCredentials({ user: response.data.user || null, token });
       localStorage.setItem('companyName', savedCompanyName);
       if (response.data.currency) {
         localStorage.setItem('currency', response.data.currency);
@@ -155,50 +229,6 @@ export default function PaySphereLogin() {
     }
   };
 
-  const handleGoogleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setLoading(true);
-      setError('');
-      try {
-        const payload = {
-          accessToken: tokenResponse.access_token,
-        };
-
-        if (activeTab === 'signup') {
-          payload.companyName = companyName;
-        }
-
-        const response = await api.post(`/api/auth/google`, payload);
-
-        if (response.status === 202 && response.data.needsCompanyName) {
-          setError(response.data.message);
-          setActiveTab('signup');
-        } else {
-          const { token, companyName: savedCompanyName } = response.data;
-          localStorage.setItem('token', token);
-          localStorage.setItem('companyName', savedCompanyName);
-          if (response.data.currency) {
-            localStorage.setItem('currency', response.data.currency);
-          }
-          navigate('/dashboard');
-        }
-      } catch (err) {
-        setError(err.response?.data?.message || 'Google Login failed.');
-      } finally {
-        setLoading(false);
-      }
-    },
-    onError: () => setError('Google Login failed.'),
-  });
-
-  const onGoogleClick = () => {
-    if (activeTab === 'signup' && !companyName) {
-      setError('Please enter your Company Name to sign up with Google.');
-      return;
-    }
-    handleGoogleLogin();
-  };
-
   const onGitHubClick = () => {
     if (activeTab === 'signup') {
       if (!companyName) {
@@ -222,21 +252,22 @@ export default function PaySphereLogin() {
       <Helmet>
         <title>
           {activeTab === 'signup'
-            ? 'Create Account | PaySphere'
-            : 'Login | PaySphere'}
+            ? t('auth.createAccountTitle', 'Create Account | PaySphere')
+            : t('auth.loginTitle', 'Login | PaySphere')}
         </title>
         <meta
           name="description"
           content={
             activeTab === 'signup'
-              ? 'Join PaySphere and automate your payroll today.'
-              : 'Login to your PaySphere account to manage your employees.'
+              ? t('auth.signupMeta', 'Join PaySphere and automate your payroll today.')
+              : t('auth.loginMeta', 'Login to your PaySphere account to manage your employees.')
           }
         />
       </Helmet>
 
-      {/* Floating Theme Toggle */}
-      <div className="absolute top-4 right-4 z-50">
+      {/* Floating Theme Toggle & Language Switcher */}
+      <div className="absolute top-4 right-4 z-50 flex items-center gap-2">
+        <LanguageSwitcher />
         <ThemeToggle />
       </div>
 
@@ -251,22 +282,22 @@ export default function PaySphereLogin() {
               <div className="flex items-center gap-2 mb-12 lg:mb-16">
                 <div className="w-8 h-8 bg-blue-600 rounded-lg shadow-sm" />
                 <span className="font-bold text-lg text-gray-900 dark:text-white">
-                  PaySphere
+                  {t('common.appName', 'PaySphere')}
                 </span>
               </div>
 
               <h1 className="text-3xl lg:text-4xl font-serif text-gray-900 dark:text-white mb-4 leading-tight">
-                Back to <br /> simplicity.
+                {t('auth.tagline', 'Back to simplicity.')}
               </h1>
 
               <p className="text-gray-500 dark:text-slate-450 text-sm max-w-xs leading-relaxed">
-                Experience the digital ledger for modern Bharat.
+                {t('auth.subtitle', 'Experience the digital ledger for modern Bharat.')}
               </p>
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-xl p-4 lg:p-5 shadow-md border border-transparent dark:border-slate-800/80 relative z-10">
               <p className="text-sm text-gray-500 dark:text-slate-500 mb-2">
-                Last Month Payout
+                {t('auth.lastMonthPayout', 'Last Month Payout')}
               </p>
               <h2 className="text-xl lg:text-2xl font-serif text-gray-900 dark:text-white">
                 ₹12,45,000
@@ -277,8 +308,10 @@ export default function PaySphereLogin() {
           {/* RIGHT PANEL */}
           <div className="w-full md:flex-1 px-5 sm:px-8 md:px-12 py-8 sm:py-10 flex flex-col justify-center text-slate-800 dark:text-slate-200">
             {/* tabs */}
-            <div className="flex bg-gray-100 dark:bg-slate-950 rounded-xl p-1 mb-6 sm:mb-8 transition-colors">
+            <div role="tablist" aria-label="Account type" className="flex bg-gray-100 dark:bg-slate-950 rounded-xl p-1 mb-6 sm:mb-8 transition-colors">
               <button
+                role="tab"
+                aria-selected={activeTab === 'login'}
                 onClick={() => {
                   setActiveTab('login');
                   resetFormState();
@@ -289,10 +322,12 @@ export default function PaySphereLogin() {
                     : 'text-gray-500 dark:text-slate-450 hover:text-gray-700 dark:hover:text-slate-200'
                 }`}
               >
-                Login
+                {t('auth.login', 'Login')}
               </button>
 
               <button
+                role="tab"
+                aria-selected={activeTab === 'signup'}
                 onClick={() => {
                   setActiveTab('signup');
                   resetFormState();
@@ -303,7 +338,7 @@ export default function PaySphereLogin() {
                     : 'text-gray-500 dark:text-slate-450 hover:text-gray-700 dark:hover:text-slate-200'
                 }`}
               >
-                Create Account
+                {t('auth.createAccount', 'Create Account')}
               </button>
             </div>
 
@@ -313,11 +348,10 @@ export default function PaySphereLogin() {
                 {isForgotPassword ? (
                   <>
                     <h2 className="text-2xl font-serif text-gray-900 dark:text-white mb-1">
-                      Reset Password
+                      {t('auth.resetPassword', 'Reset Password')}
                     </h2>
                     <p className="text-gray-500 dark:text-slate-500 text-sm mb-6">
-                      Enter your registered email to receive a password reset
-                      link.
+                      {t('auth.resetPasswordDesc', 'Enter your registered email to receive a password reset link.')}
                     </p>
 
                     <form onSubmit={handleForgotPassword}>
@@ -346,7 +380,7 @@ export default function PaySphereLogin() {
                         type="submit"
                         className="w-full py-3 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-bold rounded-lg transition shadow-lg shadow-brand-500/30"
                       >
-                        {loading ? 'Sending...' : 'Send Reset Link'}
+                        {loading ? t('auth.sending', 'Sending...') : t('auth.sendResetLink', 'Send Reset Link')}
                       </button>
                     </form>
 
@@ -360,17 +394,17 @@ export default function PaySphereLogin() {
                         }}
                         className="text-sm text-blue-600 dark:text-blue-450 hover:underline font-semibold"
                       >
-                        Back to Login
+                        {t('auth.backToLogin', 'Back to Login')}
                       </button>
                     </div>
                   </>
                 ) : (
                   <>
                     <h2 className="text-2xl font-serif text-gray-900 dark:text-white mb-1">
-                      Welcome back
+                      {t('auth.welcomeBack', 'Welcome back')}
                     </h2>
                     <p className="text-gray-500 dark:text-slate-500 text-sm mb-6">
-                      Enter your credentials
+                      {t('auth.enterCredentials', 'Enter your credentials')}
                     </p>
 
                     <form onSubmit={handleAuth}>
@@ -408,12 +442,12 @@ export default function PaySphereLogin() {
                           }}
                           className="text-xs cursor-pointer text-blue-600 dark:text-blue-450 hover:underline font-semibold"
                         >
-                          Forgot Password?
+                          {t('auth.forgotPassword', 'Forgot Password?')}
                         </button>
                       </div>
 
                       {error && (
-                        <p className="text-red-500 text-xs mb-4">{error}</p>
+                        <p className="text-red-500 text-xs mb-4" role="alert">{error}</p>
                       )}
 
                       <button
@@ -421,7 +455,7 @@ export default function PaySphereLogin() {
                         disabled={loading}
                         className="w-full bg-blue-600 cursor-pointer hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition mb-5 text-center disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                       >
-                        {loading ? 'Logging in...' : 'Login'}
+                        {loading ? t('auth.loggingIn', 'Logging in...') : t('auth.login', 'Login')}
                       </button>
                     </form>
                   </>
@@ -430,24 +464,25 @@ export default function PaySphereLogin() {
                 <div className="flex items-center gap-3 mb-5">
                   <div className="flex-1 h-px bg-gray-200 dark:bg-slate-800" />
                   <span className="text-xs text-gray-500 dark:text-slate-500 font-semibold">
-                    OR
+                    {t('auth.or', 'OR')}
                   </span>
                   <div className="flex-1 h-px bg-gray-200 dark:bg-slate-800" />
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3">
                   <button
-                    onClick={onGoogleClick}
-                    disabled={loading}
+                    disabled
+                    aria-label="Sign in with Google"
                     className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     <GoogleIcon />
-                    Google
+                    {t('auth.googleUnavailable', 'Google (unavailable)')}
                   </button>
 
                   <button
                     onClick={onGitHubClick}
                     disabled={loading}
+                    aria-label="Sign in with GitHub"
                     className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     <GitHubIcon />
@@ -457,8 +492,8 @@ export default function PaySphereLogin() {
 
                 <p className="text-center text-sm text-gray-600 dark:text-slate-400 mt-6">
                   {activeTab === 'login'
-                    ? "Don't have an account?"
-                    : 'Already have an account?'}
+                    ? t('auth.noAccount', "Don't have an account?")
+                    : t('auth.hasAccount', 'Already have an account?')}
                   {/* Fixed: Replaced anchor with button for valid semantics (Issue #660) */}
                   <button
                     type="button"
@@ -468,17 +503,17 @@ export default function PaySphereLogin() {
                     }}
                     className="ml-1 font-bold text-brand-600 dark:text-brand-400 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500 rounded"
                   >
-                    {activeTab === 'login' ? 'Sign Up' : 'Login'}
+                    {activeTab === 'login' ? t('auth.signUp', 'Sign Up') : t('auth.login', 'Login')}
                   </button>
                 </p>
               </>
             ) : (
               <>
                 <h2 className="text-2xl font-serif text-gray-900 dark:text-white mb-1">
-                  Create your account
+                  {t('auth.createYourAccount', 'Create your account')}
                 </h2>
                 <p className="text-gray-500 dark:text-slate-500 text-sm mb-6">
-                  Set up your company roster
+                  {t('auth.setupRoster', 'Set up your company roster')}
                 </p>
 
                 <form onSubmit={handleAuth}>
@@ -487,7 +522,7 @@ export default function PaySphereLogin() {
                     id="signup-fullname"
                     name="fullName"
                     aria-label="Full name"
-                    placeholder="Full Name"
+                    placeholder={t('auth.fullName', 'Full Name')}
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     required
@@ -499,7 +534,7 @@ export default function PaySphereLogin() {
                     id="signup-email"
                     name="email"
                     aria-label="Email address"
-                    placeholder="Email"
+                    placeholder={t('auth.email', 'Email')}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -511,7 +546,7 @@ export default function PaySphereLogin() {
                     id="signup-company"
                     name="companyName"
                     aria-label="Company name"
-                    placeholder="Company Name"
+                    placeholder={t('auth.companyName', 'Company Name')}
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
                     required
@@ -523,12 +558,46 @@ export default function PaySphereLogin() {
                     id="signup-password"
                     name="password"
                     aria-label="Password"
-                    placeholder="Password"
+                    placeholder={t('auth.password', 'Password')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     className="w-full mb-4 px-4 py-3 rounded-lg bg-gray-100 dark:bg-slate-950 text-gray-950 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 border border-transparent dark:border-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:border-blue-500 dark:focus:border-blue-500 outline-none transition-colors"
                   />
+
+                  {password && passwordStrength && (
+                    <div className="mb-4 text-left">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-gray-500 dark:text-slate-455">{t('auth.passwordStrength', 'Password Strength:')}</span>
+                        <span className={`text-xs font-bold ${
+                          passwordStrength.score < 2 ? 'text-red-500' :
+                          passwordStrength.score === 2 ? 'text-yellow-500' :
+                          passwordStrength.score === 3 ? 'text-blue-500' : 'text-green-500'
+                        }`}>
+                          {passwordStrength.score === 0 && t('auth.veryWeak', 'Very Weak')}
+                          {passwordStrength.score === 1 && t('auth.weak', 'Weak')}
+                          {passwordStrength.score === 2 && t('auth.fair', 'Fair')}
+                          {passwordStrength.score === 3 && t('auth.good', 'Good')}
+                          {passwordStrength.score === 4 && t('auth.strong', 'Strong')}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            passwordStrength.score < 2 ? 'bg-red-500' :
+                            passwordStrength.score === 2 ? 'bg-yellow-500' :
+                            passwordStrength.score === 3 ? 'bg-blue-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${(passwordStrength.score + 1) * 20}%` }}
+                        />
+                      </div>
+                      {passwordStrength.feedback.suggestions.length > 0 && (
+                        <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1 leading-normal">
+                          💡 {passwordStrength.feedback.suggestions[0]}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {error && (
                     <p className="text-red-500 text-xs mb-4">{error}</p>
@@ -539,31 +608,32 @@ export default function PaySphereLogin() {
                     disabled={loading}
                     className="w-full bg-blue-600 cursor-pointer hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition mb-5 text-center disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
-                    {loading ? 'Creating Account...' : 'Create Account'}
+                    {loading ? t('auth.creatingAccount', 'Creating Account...') : t('auth.createAccount', 'Create Account')}
                   </button>
                 </form>
 
                 <div className="flex items-center gap-3 mb-5">
                   <div className="flex-1 h-px bg-gray-200 dark:bg-slate-800" />
                   <span className="text-xs text-gray-500 dark:text-slate-500 font-semibold">
-                    OR
+                    {t('auth.or', 'OR')}
                   </span>
                   <div className="flex-1 h-px bg-gray-200 dark:bg-slate-800" />
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3">
                   <button
-                    onClick={onGoogleClick}
-                    disabled={loading}
+                    disabled
+                    aria-label="Sign up with Google"
                     className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     <GoogleIcon />
-                    Google
+                    {t('auth.googleUnavailable', 'Google (unavailable)')}
                   </button>
 
                   <button
                     onClick={onGitHubClick}
                     disabled={loading}
+                    aria-label="Sign up with GitHub"
                     className="flex-1 border cursor-pointer border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     <GitHubIcon />
@@ -573,8 +643,8 @@ export default function PaySphereLogin() {
 
                 <p className="text-center text-sm text-gray-600 dark:text-slate-400 mt-6">
                   {activeTab === 'login'
-                    ? "Don't have an account?"
-                    : 'Already have an account?'}
+                    ? t('auth.noAccount', "Don't have an account?")
+                    : t('auth.hasAccount', 'Already have an account?')}
                   {/* Fixed: Replaced anchor with button for valid semantics (Issue #660) */}
                   <button
                     type="button"
@@ -584,7 +654,7 @@ export default function PaySphereLogin() {
                     }}
                     className="ml-1 font-bold text-brand-600 dark:text-brand-400 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500 rounded"
                   >
-                    {activeTab === 'login' ? 'Sign Up' : 'Login'}
+                    {activeTab === 'login' ? t('auth.signUp', 'Sign Up') : t('auth.login', 'Login')}
                   </button>
                 </p>
               </>

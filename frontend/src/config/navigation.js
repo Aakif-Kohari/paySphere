@@ -376,7 +376,6 @@ export const APP_ROUTES = [
     group: 'payroll',
     icon: 'chart',
   },
-  // In Payroll rather than Compliance: it is a deduction that has to be in
   {
     path: '/learning',
     component: lazy(() => import('../components/EmployeeLearningTracker')),

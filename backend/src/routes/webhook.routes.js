@@ -7,6 +7,7 @@ const {
   deleteWebhook,
   regenerateWebhookSecret,
   getWebhookDeliveries,
+  retryWebhookDelivery,
 } = require("../controllers/webhook.controller");
 const auth = require("../middlewares/auth.middleware");
 const { requirePermission } = require("../middlewares/rbac.middleware");
@@ -59,6 +60,22 @@ router.patch(
   requirePermission(PERMISSIONS.MANAGE_WEBHOOKS),
   writeRateLimiter,
   updateWebhook,
+);
+
+router.post(
+  "/:id/test",
+  auth,
+  requirePermission(PERMISSIONS.MANAGE_WEBHOOKS),
+  writeRateLimiter,
+  require("../controllers/webhook.controller").testWebhook
+);
+
+router.post(
+  "/deliveries/:id/retry",
+  auth,
+  requirePermission(PERMISSIONS.MANAGE_WEBHOOKS),
+  writeRateLimiter,
+  retryWebhookDelivery,
 );
 
 router.delete(

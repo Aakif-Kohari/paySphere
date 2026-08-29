@@ -1,6 +1,6 @@
-/* eslint-disable jsx-a11y/label-has-associated-control */
 import { useEffect, useState } from 'react';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 const getErrorMessage = (err) =>
   err.response?.data?.message || 'Something went wrong. Please try again.';
@@ -35,6 +35,7 @@ const LockIcon = () => (
  * create/edit form.
  */
 export default function RolesPermissions() {
+  const { toast } = useToast();
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +55,7 @@ export default function RolesPermissions() {
         setRoles(res.data?.roles || []);
         setPermissions(res.data?.permissions || []);
       })
-      .catch((err) => alert(getErrorMessage(err)))
+      .catch((err) => toast.error(getErrorMessage(err)))
       .finally(() => setLoading(false));
   };
 
@@ -109,10 +110,10 @@ export default function RolesPermissions() {
       };
       if (editingRole) {
         await api.patch(`/api/roles/${editingRole._id}`, payload);
-        alert('Role updated successfully!');
+        toast.success('Role updated successfully!');
       } else {
         await api.post('/api/roles', payload);
-        alert('Role created successfully!');
+        toast.success('Role created successfully!');
       }
       closeForm();
       loadRoles();
@@ -133,7 +134,7 @@ export default function RolesPermissions() {
       await api.patch(`/api/roles/${role._id}`, { permissions: next });
       loadRoles();
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -143,9 +144,10 @@ export default function RolesPermissions() {
       return;
     try {
       await api.delete(`/api/roles/${role._id}`);
+      toast.success('Role deleted successfully.');
       loadRoles();
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -163,6 +165,7 @@ export default function RolesPermissions() {
         </div>
         <button
           onClick={openCreate}
+          aria-label="Add new role"
           className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
         >
           Add Role
@@ -192,6 +195,7 @@ export default function RolesPermissions() {
               onChange={(e) => setFormName(e.target.value)}
               maxLength={50}
               placeholder="e.g. Payroll Manager"
+              aria-label="Role name"
               className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
@@ -214,6 +218,7 @@ export default function RolesPermissions() {
                     type="checkbox"
                     checked={formPermissions.includes(permission.name)}
                     onChange={() => toggleFormPermission(permission.name)}
+                    aria-label={`${permission.name} permission`}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-0.5"
                   />
                   <span>
@@ -232,12 +237,13 @@ export default function RolesPermissions() {
           </div>
 
           {formError && (
-            <p className="text-sm text-red-500 font-medium">{formError}</p>
+            <p className="text-sm text-red-500 font-medium" role="alert">{formError}</p>
           )}
 
           <div className="flex gap-3 justify-end pt-2 border-t border-gray-100 dark:border-slate-800">
             <button
               onClick={closeForm}
+              aria-label="Cancel editing role"
               className="px-5 py-2.5 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-bold transition hover:bg-gray-50 dark:hover:bg-slate-700"
             >
               Cancel
@@ -337,6 +343,7 @@ export default function RolesPermissions() {
                             type="checkbox"
                             checked={held.has(permission.name)}
                             onChange={() => togglePermission(role, permission)}
+                            aria-label={`Toggle ${permission.name} for ${role.name}`}
                             className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                           />
                         )}
@@ -347,6 +354,7 @@ export default function RolesPermissions() {
                         <>
                           <button
                             onClick={() => openEdit(role)}
+                            aria-label={`Edit ${role.name} role`}
                             className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline mr-3"
                           >
                             Edit
@@ -354,6 +362,7 @@ export default function RolesPermissions() {
                           <button
                             onClick={() => deleteRole(role)}
                             disabled={role.userCount > 0}
+                            aria-label={`Delete ${role.name} role`}
                             className={`text-xs font-semibold hover:underline ${
                               role.userCount > 0
                                 ? 'text-gray-400 dark:text-slate-600 cursor-not-allowed'

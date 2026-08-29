@@ -15,10 +15,16 @@ mongoose.connection.on('disconnected', () => {
 });
 
 const connectDB = async (retries = 5, delay = 1000) => {
+  // Support both names used by local .env files and hosted deployments.
+  const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
+  if (!mongoUri) {
+    throw new Error('MongoDB connection string is missing. Set MONGO_URI or MONGODB_URI.');
+  }
+
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       logger.info(`Attempting MongoDB connection (Attempt ${attempt}/${retries})...`);
-      await mongoose.connect(process.env.MONGO_URI);
+      await mongoose.connect(mongoUri);
       logger.info('MongoDB connected successfully');
       return;
     } catch (err) {

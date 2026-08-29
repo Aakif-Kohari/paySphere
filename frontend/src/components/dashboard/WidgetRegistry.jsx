@@ -7,6 +7,7 @@ import DepartmentChart from '../reports/DepartmentChart';
 import OvertimeChart from '../reports/OvertimeChart';
 import PayrollTrendChart from '../reports/PayrollTrendChart';
 import SummaryCards from '../reports/SummaryCards';
+
 // Analytics widgets — Issue #757
 import AttritionRateWidget from './AttritionRateWidget';
 import DepartmentBudgetWidget from './DepartmentBudgetWidget';
@@ -20,7 +21,8 @@ const PendingApprovalsWidget = () => (
     Pending Approvals List (Fetches independently)
   </div>
 );
-/* eslint-disable react-refresh/only-export-components */
+
+// eslint-disable-next-line react-refresh/only-export-components
 const RecentActivityWidget = () => (
   <div className="flex items-center justify-center h-full text-gray-500 dark:text-slate-400 text-sm">
     Recent Activity Feed
@@ -76,7 +78,8 @@ export const WIDGET_REGISTRY = {
     minW: 4,
     minH: 3,
   },
-  // --- Analytics widgets (Issue #757) ---
+
+  // Analytics widgets (Issue #757)
   'employee-growth': {
     title: 'Employee Growth',
     component: EmployeeGrowthWidget,
@@ -117,6 +120,7 @@ export const DEFAULT_LAYOUT = [
   { i: 'department-breakdown', x: 6, y: 2, w: 6, h: 4, minW: 4, minH: 3 },
   { i: 'pending-approvals', x: 0, y: 6, w: 6, h: 4, minW: 4, minH: 3 },
   { i: 'recent-activity', x: 6, y: 6, w: 6, h: 4, minW: 4, minH: 3 },
+
   // Analytics widgets (Issue #757)
   { i: 'employee-growth', x: 0, y: 10, w: 6, h: 4, minW: 4, minH: 3 },
   { i: 'salary-distribution', x: 6, y: 10, w: 6, h: 4, minW: 4, minH: 3 },

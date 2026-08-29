@@ -1,5 +1,5 @@
 /**
- * Expense claim routes (#719).
+ * Expense claim routes (#719, #1082).
  *
  * Mounted at /api/expenses by app.js — it was not mounted anywhere until #792,
  * so every endpoint here was a 404 from the day the file was written, and the
@@ -23,9 +23,78 @@ const {
   getCategories,
   createCategory,
   updateCategory,
+  parseReceipt,
+  getPolicy,
+  updatePolicy,
+  submitClaim,
+  getMyClaims,
+  createCustomReport,
+  getMyReports,
+  exportExpenseReport,
+  updateReportStatus,
+  getFraudClaims,
+  adjudicateClaimStatus,
 } = require('../controllers/expense.controller');
 
 const router = express.Router();
+
+// --- Policy Management (#1082) --------------------------------------------
+//
+// Declared before parameterized routes so `/policy` cannot be swallowed by
+// `/:id/status`. Policy read uses READ_EMPLOYEE since all employees need to
+// see limits; policy write uses WRITE_PAYROLL since it controls reimbursement.
+
+router.get('/policy', auth, requirePermission('READ_EMPLOYEE'), getPolicy);
+
+router.post(
+  '/policy',
+  auth,
+  requirePermission('WRITE_PAYROLL'),
+  writeRateLimiter,
+  updatePolicy,
+);
+
+// --- Claims (New Policy-Driven Workflow, #1082) ---------------------------
+//
+// `/claims/my` must be declared before any `/:id` route to avoid being
+// interpreted as an ID parameter. submitClaim does not require WRITE_EXPENSE
+// because employees submit their own claims through this endpoint; ownership
+// is enforced inside the controller via req.userId.
+
+router.post('/claims', auth, writeRateLimiter, submitClaim);
+
+router.get('/claims/my', auth, getMyClaims);
+
+router.get(
+  '/claims/fraud',
+  auth,
+  requirePermission(PERMISSIONS.READ_PAYROLL),
+  getFraudClaims,
+);
+
+router.put(
+  '/claims/:id/adjudicate',
+  auth,
+  requirePermission(PERMISSIONS.APPROVE_EXPENSE),
+  writeRateLimiter,
+  adjudicateClaimStatus,
+);
+
+// --- Custom Expense Reports (#1285) ----------------------------------------
+
+router.post('/reports/custom', auth, writeRateLimiter, createCustomReport);
+
+router.get('/reports/my', auth, getMyReports);
+
+router.get('/reports/export', auth, exportExpenseReport);
+
+router.patch(
+  '/reports/:id/status',
+  auth,
+  requirePermission(PERMISSIONS.APPROVE_EXPENSE),
+  writeRateLimiter,
+  updateReportStatus,
+);
 
 // --- Categories -----------------------------------------------------------
 //
@@ -60,7 +129,7 @@ router.patch(
   updateCategory,
 );
 
-// --- Claims ---------------------------------------------------------------
+// --- Legacy Claims --------------------------------------------------------
 
 router.post(
   '/',
@@ -79,6 +148,14 @@ router.patch(
   requirePermission(PERMISSIONS.APPROVE_EXPENSE),
   writeRateLimiter,
   updateExpenseStatus,
+);
+
+router.post(
+  '/parse-receipt',
+  auth,
+  requirePermission(PERMISSIONS.WRITE_EXPENSE),
+  receiptUpload.single('receipt'),
+  parseReceipt,
 );
 
 module.exports = router;

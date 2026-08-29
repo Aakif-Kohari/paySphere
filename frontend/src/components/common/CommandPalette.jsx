@@ -1,7 +1,6 @@
 /* eslint-disable */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
 import { Command } from 'cmdk';
 import SearchIcon from '@mui/icons-material/Search';
 import GridViewIcon from '@mui/icons-material/GridView';
@@ -15,9 +14,15 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LogoutIcon from '@mui/icons-material/Logout';
+import ShieldIcon from '@mui/icons-material/Shield';
+import ReceiptIcon from '@mui/icons-material/Receipt';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import CategoryIcon from '@mui/icons-material/Category';
+import LocalShippingIcon from '@mui/icons-material/LocalShipping';
+import DescriptionIcon from '@mui/icons-material/Description';
+import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import api from '../../services/api';
-import { toggleTheme } from '../../features/ui/uiSlice';
-import { logout } from '../../features/auth/authSlice';
+import { useAppStore } from '../../store/useAppStore';
 
 const NAV_COMMANDS = [
   {
@@ -26,7 +31,6 @@ const NAV_COMMANDS = [
     keywords: 'home overview payroll summary',
     icon: <GridViewIcon fontSize="small" />,
     path: '/dashboard',
-    tab: 'Dashboard',
   },
   {
     id: 'employees',
@@ -34,7 +38,6 @@ const NAV_COMMANDS = [
     keywords: 'people roster team members directory',
     icon: <PeopleIcon fontSize="small" />,
     path: '/dashboard?tab=employees',
-    tab: 'Employees',
   },
   {
     id: 'approvals',
@@ -42,15 +45,13 @@ const NAV_COMMANDS = [
     keywords: 'approve reject review pending',
     icon: <FactCheckIcon fontSize="small" />,
     path: '/dashboard?tab=approvals',
-    tab: 'Approvals',
   },
   {
     id: 'advances',
-    label: 'Advances',
+    label: 'Advances & Loans',
     keywords: 'loans salary advance credit',
     icon: <AccountBalanceWalletIcon fontSize="small" />,
     path: '/dashboard?tab=loans',
-    tab: 'Loans',
   },
   {
     id: 'monthly-updates',
@@ -58,7 +59,27 @@ const NAV_COMMANDS = [
     keywords: 'payroll run salary process',
     icon: <CalendarMonthIcon fontSize="small" />,
     path: '/monthly-updates',
-    tab: null,
+  },
+  {
+    id: 'expense-reports',
+    label: 'Custom Expense Reports',
+    keywords: 'expenses claims reimbursement receipts report',
+    icon: <ReceiptIcon fontSize="small" />,
+    path: '/expense-reports',
+  },
+  {
+    id: 'audit-logs',
+    label: 'Audit Logs & Trail',
+    keywords: 'audit system logs security actions history compliance',
+    icon: <ShieldIcon fontSize="small" />,
+    path: '/audit-logs',
+  },
+  {
+    id: 'announcements',
+    label: 'Company Announcements',
+    keywords: 'announcements news wysiwyg hr posts updates',
+    icon: <CampaignIcon fontSize="small" />,
+    path: '/announcements',
   },
   {
     id: 'add-employee',
@@ -66,15 +87,41 @@ const NAV_COMMANDS = [
     keywords: 'new hire onboarding create employee',
     icon: <PersonAddIcon fontSize="small" />,
     path: '/add-employee',
-    tab: null,
+  },
+  {
+    id: 'assets',
+    label: 'Asset Inventory',
+    keywords: 'assets equipment devices hardware tracking',
+    icon: <CategoryIcon fontSize="small" />,
+    path: '/assets',
+  },
+  {
+    id: 'vendors',
+    label: 'Vendor Management',
+    keywords: 'vendors suppliers contracts procurement',
+    icon: <LocalShippingIcon fontSize="small" />,
+    path: '/vendors',
+  },
+  {
+    id: 'client-invoices',
+    label: 'Client Invoices',
+    keywords: 'invoices billing clients payment receivable',
+    icon: <DescriptionIcon fontSize="small" />,
+    path: '/client-invoices',
+  },
+  {
+    id: 'grievances',
+    label: 'Grievance Portal',
+    keywords: 'grievances complaints issues HR support ticket',
+    icon: <ReportProblemIcon fontSize="small" />,
+    path: '/grievances',
   },
   {
     id: 'reports',
-    label: 'Reports',
+    label: 'Reports & Analytics',
     keywords: 'analytics export pdf xlsx csv',
     icon: <AssessmentIcon fontSize="small" />,
     path: '/reports',
-    tab: null,
   },
   {
     id: 'settings',
@@ -82,21 +129,21 @@ const NAV_COMMANDS = [
     keywords: 'preferences company profile account notifications',
     icon: <SettingsIcon fontSize="small" />,
     path: '/settings',
-    tab: null,
   },
 ];
 
 const CommandPalette = () => {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const toggleTheme = useAppStore((state) => state.toggleTheme);
+  const logout = useAppStore((state) => state.logout);
 
   const [open, setOpen] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [search, setSearch] = useState('');
 
-  const reduxToken = useSelector((state) => state.auth.token);
-  const token = reduxToken || localStorage.getItem('token');
+  const token =
+    useAppStore((state) => state.token) || localStorage.getItem('token');
 
   // Open on Cmd/Ctrl+K and index employees fresh each time
   useEffect(() => {
@@ -176,11 +223,32 @@ const CommandPalette = () => {
         path: '/monthly-updates',
       },
       {
+        id: 'create-expense-report',
+        label: 'Create Expense Report',
+        keywords: 'expense custom claim reimbursement',
+        icon: <ReceiptIcon fontSize="small" />,
+        path: '/expense-reports',
+      },
+      {
+        id: 'compose-announcement',
+        label: 'Compose Announcement',
+        keywords: 'announcement post publish hr update',
+        icon: <CampaignIcon fontSize="small" />,
+        path: '/announcements',
+      },
+      {
+        id: 'view-audit-logs',
+        label: 'View Audit Logs',
+        keywords: 'audit logs trail history actions',
+        icon: <ShieldIcon fontSize="small" />,
+        path: '/audit-logs',
+      },
+      {
         id: 'toggle-theme',
         label: 'Toggle Theme',
         keywords: 'dark light mode appearance',
         icon: <DarkModeIcon fontSize="small" />,
-        action: () => dispatch(toggleTheme()),
+        action: toggleTheme,
       },
       {
         id: 'sign-out',
@@ -188,13 +256,13 @@ const CommandPalette = () => {
         keywords: 'logout exit',
         icon: <LogoutIcon fontSize="small" />,
         action: () => {
-          dispatch(logout());
+          logout();
           localStorage.removeItem('companyName');
           navigate('/');
         },
       },
     ],
-    [dispatch, navigate],
+    [logout, navigate, toggleTheme],
   );
 
   if (!token) return null;
@@ -203,6 +271,9 @@ const CommandPalette = () => {
     open && (
       <div
         className="fixed inset-0 z-[1000] flex items-start justify-center bg-black/50 backdrop-blur-sm pt-[12vh] px-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
         onMouseDown={() => setOpen(false)}
       >
         <Command
@@ -215,9 +286,10 @@ const CommandPalette = () => {
             <Command.Input
               value={search}
               onValueChange={setSearch}
-              // eslint-disable-next-line jsx-a11y/no-autofocus
+
               autoFocus
               placeholder="Type a command or search employees…"
+              aria-label="Search commands and employees"
               className="w-full bg-transparent py-3.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 outline-none"
             />
             <kbd className="hidden sm:inline-flex px-1.5 py-0.5 text-[10px] font-mono text-gray-400 dark:text-slate-500 border border-gray-200 dark:border-slate-700 rounded">
@@ -282,12 +354,8 @@ const CommandPalette = () => {
               {employees.map((emp) => {
                 const matches =
                   !search.trim() ||
-                  emp.fullName
-                    .toLowerCase()
-                    .includes(search.toLowerCase()) ||
-                  (emp.role || '')
-                    .toLowerCase()
-                    .includes(search.toLowerCase());
+                  emp.fullName.toLowerCase().includes(search.toLowerCase()) ||
+                  (emp.role || '').toLowerCase().includes(search.toLowerCase());
                 if (!matches) return null;
 
                 return (

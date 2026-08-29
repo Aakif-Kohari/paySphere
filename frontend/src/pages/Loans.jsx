@@ -1,7 +1,8 @@
-import { Alert, Snackbar } from '@mui/material';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import LoanSkeleton from '../components/common/skeleton/LoanSkeleton';
+import LoansSkeleton from '../components/common/skeleton/LoansSkeleton';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
+import { formatCurrency } from '../utils/formatLocale';
 
 const MONTH_NAMES = [
   'Jan',
@@ -40,20 +41,6 @@ const STATUS_LABELS = {
   cancelled: 'Cancelled',
 };
 
-const formatCurrency = (value, currency = 'INR') => {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '—';
-
-  try {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    return `${currency} ${amount.toLocaleString('en-IN')}`;
-  }
-};
 
 const describeError = (error, fallback) => {
   const response = error?.response;
@@ -95,16 +82,14 @@ const Loans = () => {
   // before committing to a deduction that runs for months.
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState('');
-
-  const [toast, setToast] = useState({
-    open: false,
-    severity: 'success',
-    message: '',
-  });
+  const { toast: globalToast } = useToast();
 
   const notify = useCallback((severity, message) => {
-    setToast({ open: true, severity, message });
-  }, []);
+    if (severity === 'success') globalToast.success(message);
+    else if (severity === 'error') globalToast.error(message);
+    else if (severity === 'warning') globalToast.warning(message);
+    else globalToast.info(message);
+  }, [globalToast]);
 
   const fetchLoans = useCallback(async () => {
     setLoading(true);
@@ -249,6 +234,8 @@ const Loans = () => {
 
         <button
           onClick={() => setShowForm((v) => !v)}
+          aria-expanded={showForm}
+          aria-label={showForm ? 'Close advance form' : 'Issue an advance'}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition"
         >
           {showForm ? 'Close' : 'Issue an advance'}
@@ -470,6 +457,7 @@ const Loans = () => {
           <button
             key={status || 'all'}
             onClick={() => setStatusFilter(status)}
+            aria-label={`Filter by ${status ? STATUS_LABELS[status] : 'All'} status`}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition ${
               statusFilter === status
                 ? 'bg-blue-600 text-white'
@@ -499,7 +487,7 @@ const Loans = () => {
       )}
 
       {loading ? (
-        <LoanSkeleton />
+        <LoansSkeleton />
       ) : loans.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
           <p className="text-gray-500 dark:text-slate-500">
@@ -542,6 +530,7 @@ const Loans = () => {
                       <button
                         disabled={busy}
                         onClick={() => handleStatusChange(loan._id, 'on_hold')}
+                        aria-label={`Pause advance for ${loan.employeeName}`}
                         className="px-3 py-1.5 border border-amber-500 text-amber-600 dark:text-amber-400 rounded-lg text-sm font-semibold disabled:opacity-50"
                       >
                         Pause
@@ -550,6 +539,7 @@ const Loans = () => {
                       <button
                         disabled={busy}
                         onClick={() => handleStatusChange(loan._id, 'active')}
+                        aria-label={`Resume advance for ${loan.employeeName}`}
                         className="px-3 py-1.5 border border-green-500 text-green-600 dark:text-green-400 rounded-lg text-sm font-semibold disabled:opacity-50"
                       >
                         Resume
@@ -558,6 +548,7 @@ const Loans = () => {
                     <button
                       disabled={busy}
                       onClick={() => handleStatusChange(loan._id, 'cancelled')}
+                      aria-label={`Cancel advance for ${loan.employeeName}`}
                       className="px-3 py-1.5 border border-red-500 text-red-600 dark:text-red-400 rounded-lg text-sm font-semibold disabled:opacity-50"
                     >
                       Cancel
@@ -583,21 +574,6 @@ const Loans = () => {
           ))}
         </div>
       )}
-
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={5000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          severity={toast.severity}
-          onClose={() => setToast((t) => ({ ...t, open: false }))}
-          variant="filled"
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </div>
   );
 };

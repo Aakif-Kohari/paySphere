@@ -138,9 +138,20 @@ describe("requirePermission", () => {
   // what the merge broke.
   let req, res, next;
 
+  let originalNodeEnv;
+
+  beforeAll(() => {
+    originalNodeEnv = process.env.NODE_ENV;
+  });
+
+  afterAll(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.RBAC_STRICT;
+    process.env.NODE_ENV = originalNodeEnv;
 
     req = { userId: "user123" };
     res = {
@@ -342,13 +353,25 @@ describe("requirePermission", () => {
   });
 
   describe("unseeded database", () => {
-    test("lets the request through and logs loudly when no default role exists", async () => {
-      // Denying here would re-create the exact outage this issue reports.
-      // Controllers already scope every query by createdBy: req.userId.
-      getDefaultRole.mockResolvedValue(null);
-      mockFindById({ _id: "user123", role: null });
+    test("lets the request through and logs loudly when no default role exists in development", async () => {
+      // In development mode, we bypass check if default role does not exist
+      process.env.NODE_ENV = "development";
+      let devRequirePermission;
+      let DevUser;
+      let devGetDefaultRole;
 
-      await requirePermission("READ_EMPLOYEE")(req, res, next);
+      jest.isolateModules(() => {
+        DevUser = require("../../models/user.model");
+        ({ getDefaultRole: devGetDefaultRole } = require("../../seeds/rbac.seed"));
+        ({ requirePermission: devRequirePermission } = require("../rbac.middleware"));
+      });
+
+      devGetDefaultRole.mockResolvedValue(null);
+      DevUser.findById.mockReturnValue({
+        populate: jest.fn().mockResolvedValue({ _id: "user123", role: null }),
+      });
+
+      await devRequirePermission("READ_EMPLOYEE")(req, res, next);
 
       expect(next).toHaveBeenCalled();
       expect(logger.warn).toHaveBeenCalledWith(
@@ -381,6 +404,34 @@ describe("requirePermission", () => {
       });
 
       await strictRequirePermission("READ_EMPLOYEE")(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        message: "Access denied. No role assigned.",
+      });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    test("denies by default in non-development environments", async () => {
+      process.env.NODE_ENV = "test";
+      delete process.env.RBAC_STRICT;
+
+      let testRequirePermission;
+      let TestUser;
+      let testGetDefaultRole;
+
+      jest.isolateModules(() => {
+        TestUser = require("../../models/user.model");
+        ({ getDefaultRole: testGetDefaultRole } = require("../../seeds/rbac.seed"));
+        ({ requirePermission: testRequirePermission } = require("../rbac.middleware"));
+      });
+
+      testGetDefaultRole.mockResolvedValue(null);
+      TestUser.findById.mockReturnValue({
+        populate: jest.fn().mockResolvedValue({ _id: "user123", role: null }),
+      });
+
+      await testRequirePermission("READ_EMPLOYEE")(req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({

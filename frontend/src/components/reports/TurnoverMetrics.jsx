@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useAppStore } from '../../store/useAppStore';
 import {
   Bar,
   BarChart,
@@ -11,13 +11,12 @@ import {
   YAxis,
 } from 'recharts';
 import api from '../../services/api';
-import TurnoverMetricSkeleton from '../common/skeleton/TurnoverMetricSkeleton';
 import { createChartTooltip } from './chartTooltip';
 const TurnoverMetrics = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const themeMode = useSelector((state) => state.ui.themeMode);
+  const themeMode = useAppStore((state) => state.themeMode);
   const isDark = themeMode === 'dark';
 
   useEffect(() => {
@@ -25,7 +24,6 @@ const TurnoverMetrics = () => {
       try {
         const res = await api.get('/api/reports/turnover');
         setData(res.data);
-        // eslint-disable-next-line no-unused-vars
       } catch (err) {
         setError('Failed to fetch turnover metrics.');
       } finally {
@@ -36,7 +34,7 @@ const TurnoverMetrics = () => {
   }, []);
 
   if (loading) {
-    return <TurnoverMetricSkeleton />;
+    return <TurnoverMetricsSkeleton />;
   }
 
   if (error || !data) {

@@ -9,6 +9,7 @@ const express = require('express');
 const auth = require('../middlewares/auth.middleware');
 const { requirePermission } = require('../middlewares/rbac.middleware');
 const { getDashboardSummary } = require('../controllers/dashboard.controller');
+const { getAuditLogs } = require('../controllers/audit.controller');
 const {
   getLayout,
   saveLayout,
@@ -54,6 +55,17 @@ router.get(
   auth,
   requirePermission('READ_EMPLOYEE'),
   getDashboardSummary
+);
+
+/**
+ * GET /api/dashboard/recent-activity
+ * Retrieves recent audit logs/activity feed for the dashboard.
+ */
+router.get(
+  '/recent-activity',
+  auth,
+  requirePermission('READ_EMPLOYEE'),
+  getAuditLogs
 );
 
 module.exports = router;

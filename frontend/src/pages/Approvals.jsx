@@ -1,8 +1,8 @@
-import { Alert, Snackbar } from '@mui/material';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import ApprovalSkeleton from '../components/common/skeleton/ApprovalSkeleton';
 import useCtrlEnterSubmit from '../hooks/useCtrlEnterSubmit';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
+import { formatCurrency } from '../utils/formatLocale';
 
 const MONTH_NAMES = [
   'January',
@@ -20,22 +20,6 @@ const MONTH_NAMES = [
 ];
 const MAX_REASON_LENGTH = 500;
 
-const formatCurrency = (value, currency = 'INR') => {
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '—';
-
-  try {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  } catch {
-    // An employee-level currency code that Intl does not recognise should not
-    // blank out the whole row.
-    return `${currency} ${amount.toLocaleString('en-IN')}`;
-  }
-};
 
 const formatPeriod = (month, year) => {
   const name = MONTH_NAMES[Number(month) - 1];
@@ -59,7 +43,22 @@ const describeError = (error, fallback) => {
   if (response.status === 403) {
     return "You do not have permission to approve payroll. Ask an account owner to grant you the 'Approve payroll' permission.";
   }
+  if (response.status === 409) {
+    if (
+      Array.isArray(response.data?.staleEmployeeVersions) &&
+      response.data.staleEmployeeVersions.length > 0
+    ) {
+      return (
+        response.data.message ||
+        'Employee data changed after the payroll was calculated. Review and recalculate the affected payroll before approving it.'
+      );
+    }
 
+    return (
+      response.data?.message ||
+      'This payroll was changed by another user. Reload the approvals list and review it before trying again.'
+    );
+  }
   const data = response.data || {};
   const parts = [];
 
@@ -97,16 +96,14 @@ const Approvals = () => {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [rejectTargets, setRejectTargets] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
-
-  const [toast, setToast] = useState({
-    open: false,
-    severity: 'success',
-    message: '',
-  });
+  const { toast: globalToast } = useToast();
 
   const notify = useCallback((severity, message) => {
-    setToast({ open: true, severity, message });
-  }, []);
+    if (severity === 'success') globalToast.success(message);
+    else if (severity === 'error') globalToast.error(message);
+    else if (severity === 'warning') globalToast.warning(message);
+    else globalToast.info(message);
+  }, [globalToast]);
 
   const fetchPending = useCallback(async () => {
     setLoading(true);
@@ -180,8 +177,16 @@ const Approvals = () => {
 
     setBusy(true);
     try {
-      const res = await api.post('/api/payroll/approve', { payrollIds: ids });
-      const {
+      const versions = Object.fromEntries(
+        pending
+          .filter((payroll) => ids.includes(payroll._id))
+          .map((payroll) => [payroll._id, payroll.__v]),
+      );
+
+      const res = await api.post('/api/payroll/approve', {
+        payrollIds: ids,
+        versions,
+      });      const {
         approvedCount = 0,
         notFound = [],
         invalidTransition = [],
@@ -297,7 +302,7 @@ const Approvals = () => {
       )}
 
       {loading ? (
-        <ApprovalSkeleton />
+        <ApprovalsSkeleton />
       ) : pending.length === 0 && !loadError ? (
         <div className="p-10 text-center border border-dashed border-gray-300 dark:border-slate-700 rounded-xl">
           <p className="text-gray-500 dark:text-slate-500">
@@ -355,6 +360,7 @@ const Approvals = () => {
                       type="checkbox"
                       checked={selectedIds.has(p._id)}
                       onChange={() => toggleOne(p._id)}
+                      aria-label={`Select ${p.employeeName}`}
                       className="w-4 h-4"
                     />
                     <div>
@@ -377,6 +383,7 @@ const Approvals = () => {
                     <button
                       disabled={busy}
                       onClick={() => handleApprove([p._id])}
+                      aria-label={`Approve ${p.employeeName}`}
                       className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm transition"
                     >
                       Approve
@@ -384,6 +391,7 @@ const Approvals = () => {
                     <button
                       disabled={busy}
                       onClick={() => setRejectTargets([p._id])}
+                      aria-label={`Reject ${p.employeeName}`}
                       className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm transition"
                     >
                       Reject
@@ -397,7 +405,7 @@ const Approvals = () => {
       )}
 
       {rejectTargets && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="Reject payroll record" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-900 p-6 rounded-xl w-full max-w-md">
             <h3 className="text-lg font-bold mb-1 text-gray-900 dark:text-white">
               Reject {rejectTargets.length} payroll record
@@ -412,6 +420,7 @@ const Approvals = () => {
               <textarea
                 className="w-full p-2 border border-gray-300 dark:border-slate-700 rounded-lg bg-transparent mb-1 text-gray-900 dark:text-white min-h-24 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 placeholder="Reason for rejection…"
+                aria-label="Reason for rejection"
                 value={rejectReason}
                 maxLength={MAX_REASON_LENGTH}
                 onChange={(e) => setRejectReason(e.target.value)}
@@ -444,21 +453,6 @@ const Approvals = () => {
           </div>
         </div>
       )}
-
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={5000}
-        onClose={() => setToast((t) => ({ ...t, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          severity={toast.severity}
-          onClose={() => setToast((t) => ({ ...t, open: false }))}
-          variant="filled"
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
     </div>
   );
 };

@@ -1,20 +1,34 @@
 /**
  * @fileoverview Expense Claims Controller
- * @description Handles CRUD operations for expense claims, including receipt
- * uploads, approval workflows, and status transitions, plus the categories a
- * claim has to be filed under.
+ * @description Handles policy configuration, OCR receipt uploads, claim workflows,
+ * approval workflows, status transitions, and expense category management.
  *
- * Issues: #719, #794.
+ * Issues: #719, #794, #1082
  */
 
 const mongoose = require('mongoose');
 const ExpenseClaim = require('../models/expenseClaim.model');
 const ExpenseCategory = require('../models/expenseCategory.model');
+const { ExpensePolicy } = require('../models/expensePolicy.model');
+const ExpenseReport = require('../models/expenseReport.model');
 const Employee = require('../models/employee.model');
 const logger = require('../utils/logger');
 const eventBus = require('../services/event.service');
+const OCRService = require('../services/ocr.service');
+const {
+  extractReceiptData,
+  isConfidenceReliable,
+} = require('../services/ocr.service');
+const { evaluateClaim } = require('../utils/policyEngine.utils');
 const { ACCOUNT_TYPE } = require('../config/accountTypes');
 const { sanitizeText } = require('../utils/validators');
+const {
+  createObjectKey,
+  deleteObject,
+  getDownloadUrl,
+  putObject,
+  isStorageUri,
+} = require('../services/objectStorage.service');
 
 /** Claims that may still be edited or acted on. */
 const PENDING = 'pending_approval';
@@ -35,13 +49,287 @@ const PENDING = 'pending_approval';
  */
 function pinnedEmployeeId(req) {
   if (req.accountType !== ACCOUNT_TYPE.EMPLOYEE) return null;
-
   return req.user?.employeeId ? String(req.user.employeeId) : null;
 }
 
+// ============================================================================
+// POLICY MANAGEMENT (#1082)
+// ============================================================================
+
+/**
+ * GET /api/expenses/policy
+ * Retrieve current expense policy for the tenant. Initializes defaults if missing.
+ */
+exports.getPolicy = async (req, res, next) => {
+  try {
+    let policy = await ExpensePolicy.findOne({ tenantId: req.tenantId });
+    if (!policy) {
+      // Initialize default policy if none exists
+      policy = await ExpensePolicy.create({
+        tenantId: req.tenantId,
+        categories: [
+          {
+            category: 'Meals',
+            maxLimitPerClaim: 1500,
+            maxLimitPerMonth: 5000,
+            requiresReceipt: true,
+            receiptThreshold: 200,
+            weekendAllowed: false,
+          },
+          {
+            category: 'Travel',
+            maxLimitPerClaim: 10000,
+            maxLimitPerMonth: 30000,
+            requiresReceipt: true,
+            receiptThreshold: 0,
+            weekendAllowed: true,
+          },
+          {
+            category: 'Office Supplies',
+            maxLimitPerClaim: 5000,
+            maxLimitPerMonth: 10000,
+            requiresReceipt: true,
+            receiptThreshold: 500,
+            weekendAllowed: false,
+          },
+        ],
+      });
+    }
+    res.status(200).json({ policy });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PUT/PATCH /api/expenses/policy
+ * Update expense policy configuration.
+ */
+exports.updatePolicy = async (req, res, next) => {
+  try {
+    const { categories, autoApprovalThreshold, currency } = req.body;
+    const policy = await ExpensePolicy.findOneAndUpdate(
+      { tenantId: req.tenantId },
+      { categories, autoApprovalThreshold, currency, updatedAt: new Date() },
+      { upsert: true, new: true },
+    );
+    res.status(200).json({ message: 'Policy updated', policy });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// CLAIM SUBMISSION WITH OCR & POLICY EVALUATION (#1082)
+// ============================================================================
+
+/**
+ * POST /api/expenses/claim
+ * Submit a new expense claim with optional OCR receipt processing and policy evaluation.
+ */
+exports.submitClaim = async (req, res, next) => {
+  try {
+    const { category, amount, expenseDate, description, receiptUrl } = req.body;
+
+    const employee = await Employee.findOne({
+      userId: req.userId,
+      tenantId: req.tenantId,
+    });
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee profile not found' });
+    }
+
+    const policy = await ExpensePolicy.findOne({ tenantId: req.tenantId });
+    if (!policy) {
+      return res
+        .status(400)
+        .json({ message: 'Expense policy not configured by HR.' });
+    }
+
+    let merchant = '';
+    let ocrConfidence = 0;
+    let ocrRawText = '';
+    let extractedDate = new Date(expenseDate);
+
+    // Run OCR if receipt is provided
+    if (receiptUrl) {
+      const ocrResult = await extractReceiptData(receiptUrl);
+      merchant = ocrResult.merchant;
+      ocrConfidence = ocrResult.confidence;
+      ocrRawText = ocrResult.rawText;
+
+      // If OCR is highly confident, override manual date/amount inputs to prevent fraud
+      if (isConfidenceReliable(ocrConfidence)) {
+        extractedDate = ocrResult.date;
+      }
+    }
+
+    const { calculateImageHash } = require('../utils/imageHasher');
+    const imageHash =
+      req.body.imageHash ||
+      (receiptUrl ? calculateImageHash(Buffer.from(receiptUrl, 'utf8')) : '');
+
+    const ocrMetadata = req.body.ocrMetadata || {
+      extractedAmount:
+        req.body.ocrAmount !== undefined
+          ? Number(req.body.ocrAmount)
+          : undefined,
+      extractedDate: req.body.ocrDate ? new Date(req.body.ocrDate) : undefined,
+      extractedCurrency: req.body.ocrCurrency || undefined,
+    };
+
+    // Find category ID
+    const ExpenseCategory = require('../models/expenseCategory.model');
+    const categoryDoc = await ExpenseCategory.findOne({
+      tenantId: req.tenantId,
+      $or: [
+        { name: category },
+        { _id: mongoose.Types.ObjectId.isValid(category) ? category : null },
+      ],
+    });
+    const categoryId = categoryDoc ? categoryDoc._id : null;
+
+    const claimData = {
+      tenantId: req.tenantId,
+      employeeId: employee._id,
+      category,
+      categoryId,
+      amount: Number(amount),
+      currency: policy.currency,
+      expenseDate: extractedDate,
+      merchant,
+      description,
+      receiptUrl,
+      ocrConfidence,
+      ocrRawText,
+      imageHash,
+      ocrMetadata,
+      submittedBy: req.userId,
+    };
+
+    // Save initial claim
+    const initialClaim = await ExpenseClaim.create(claimData);
+
+    // Run Automated Adjudication (which updates status, fraud score, etc.)
+    const {
+      ExpenseAdjudicatorService,
+    } = require('../services/ExpenseAdjudicatorService');
+    const claim = await ExpenseAdjudicatorService.adjudicateClaim(
+      initialClaim._id,
+    );
+
+    // We mock evaluation for the response since Adjudicator handles it now
+    const evaluation = {
+      isCompliant: claim.policyViolations.length === 0,
+      violations: claim.policyViolations,
+    };
+
+    eventBus.emit('AUDIT_LOG', {
+      userId: req.userId,
+      action: 'EXPENSE_CLAIM_SUBMIT',
+      resourceType: 'ExpenseClaim',
+      resourceIds: [claim._id],
+      details: {
+        category,
+        amount: claim.amount,
+        status: claim.status,
+        isCompliant: evaluation.isCompliant,
+        isPossibleFraud: claim.isPossibleFraud,
+        ocrConfidence,
+      },
+      req,
+    });
+
+    res.status(201).json({ message: 'Expense submitted', claim, evaluation });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/expenses/my-claims
+ * Retrieve all claims for the authenticated employee.
+ */
+exports.getMyClaims = async (req, res, next) => {
+  try {
+    const employee = await Employee.findOne({
+      userId: req.userId,
+      tenantId: req.tenantId,
+    });
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee profile not found' });
+    }
+
+    const claims = await ExpenseClaim.find({
+      employeeId: employee._id,
+      tenantId: req.tenantId,
+    }).sort({ createdAt: -1 });
+
+    res.status(200).json({ claims });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PUT /api/expenses/claims/:id/adjudicate
+ * Adjudicate an expense claim from the Adjudication Workspace.
+ */
+exports.adjudicateClaimStatus = async (req, res, next) => {
+  try {
+    const { status, rejectionReason } = req.body;
+    const { id } = req.params;
+
+    if (!['approved', 'rejected', 'needs_info'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    const claim = await ExpenseClaim.findOne({
+      _id: id,
+      tenantId: req.tenantId,
+    });
+    if (!claim) {
+      return res.status(404).json({ message: 'Expense claim not found' });
+    }
+
+    claim.status = status;
+
+    if (status === 'rejected' || status === 'needs_info') {
+      claim.rejectionReason = rejectionReason || '';
+      claim.rejectedBy = req.userId;
+      claim.rejectedAt = new Date();
+    } else if (status === 'approved') {
+      claim.approvedBy = req.userId;
+      claim.approvedAt = new Date();
+    }
+
+    await claim.save();
+
+    eventBus.emit('AUDIT_LOG', {
+      userId: req.userId,
+      action: 'EXPENSE_CLAIM_ADJUDICATE',
+      resourceType: 'ExpenseClaim',
+      resourceIds: [claim._id],
+      details: {
+        status,
+        rejectionReason,
+      },
+      req,
+    });
+
+    res.status(200).json({ message: 'Expense claim adjudicated', claim });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================================================
+// LEGACY EXPENSE CLAIM CRUD (Preserved from original)
+// ============================================================================
+
 /**
  * POST /api/expenses
- * Submit a new expense claim with receipts
+ * Submit a new expense claim with receipts (legacy endpoint)
  */
 exports.submitExpense = async (req, res, next) => {
   try {
@@ -111,29 +399,50 @@ exports.submitExpense = async (req, res, next) => {
         .status(404)
         .json({ message: 'Expense category not found or inactive' });
 
-    // Process uploaded files (Multer). `file.filename` is the generated name on
-    // disk; `originalname` is kept only as the label shown to a human.
-    const receipts = (req.files || []).map((file) => ({
-      url: `/uploads/receipts/${file.filename}`,
-      filename: sanitizeText(String(file.originalname).slice(0, 255)),
-      mimetype: file.mimetype,
-      size: file.size,
-    }));
+    // Upload receipt bytes only after the claim's tenant/employee/category
+    // checks have passed. Nothing is written to the application filesystem.
+    const uploadedReceiptUris = [];
+    let receipts = [];
+    try {
+      receipts = await Promise.all(
+        (req.files || []).map(async (file) => {
+          const extension = file.mimetype === 'application/pdf'
+            ? 'pdf'
+            : file.mimetype.split('/')[1];
+          const key = createObjectKey({
+            tenantId: req.tenantId,
+            area: 'expenses/receipts',
+            extension,
+          });
+          const stored = await putObject({
+            key,
+            body: file.buffer,
+            contentType: file.mimetype,
+          });
+          uploadedReceiptUris.push(stored.uri);
+          return {
+            url: stored.uri,
+            filename: sanitizeText(String(file.originalname).slice(0, 255)),
+            mimetype: file.mimetype,
+            size: file.size,
+          };
+        }),
+      );
 
-    const claim = await ExpenseClaim.create({
-      tenantId: req.tenantId,
-      employeeId,
-      categoryId,
-      amount: parsedAmount,
-      currency: employee.currency || 'INR',
-      expenseDate: parsedDate,
-      description: sanitizeText(String(description).slice(0, 1000)),
-      receipts,
-      status: PENDING,
-      submittedBy: req.userId,
-    });
+        const claim = await ExpenseClaim.create({
+        tenantId: req.tenantId,
+        employeeId,
+        categoryId,
+        amount: parsedAmount,
+        currency: employee.currency || 'INR',
+        expenseDate: parsedDate,
+        description: sanitizeText(String(description).slice(0, 1000)),
+        receipts,
+        status: PENDING,
+        submittedBy: req.userId,
+      });
 
-    eventBus.emit('AUDIT_LOG', {
+      eventBus.emit('AUDIT_LOG', {
       userId: req.userId,
       action: 'EXPENSE_SUBMIT',
       resourceType: 'ExpenseClaim',
@@ -142,13 +451,35 @@ exports.submitExpense = async (req, res, next) => {
       req,
     });
 
-    res
-      .status(201)
-      .json({ message: 'Expense claim submitted successfully', claim });
+      res
+        .status(201)
+        .json({
+          message: 'Expense claim submitted successfully',
+          claim: await hydrateReceiptUrls(typeof claim.toObject === 'function' ? claim.toObject() : claim),
+        });
+    } catch (error) {
+      await Promise.all(uploadedReceiptUris.map((uri) => deleteObject(uri).catch(() => false)));
+      throw error;
+    }
   } catch (error) {
     next(error);
   }
 };
+
+async function hydrateReceiptUrls(claim) {
+  if (!claim?.receipts?.length) return claim;
+  return {
+    ...claim,
+    receipts: await Promise.all(
+      claim.receipts.map(async (receipt) => ({
+        ...receipt,
+        url: isStorageUri(receipt.url)
+          ? await getDownloadUrl(receipt.url)
+          : receipt.url,
+      })),
+    ),
+  };
+}
 
 /**
  * GET /api/expenses
@@ -186,7 +517,6 @@ exports.getExpenses = async (req, res, next) => {
     // which would silently paginate a list one row at a time.
     const positiveOr = (value, fallback, ceiling = Infinity) => {
       const parsed = Number.parseInt(value, 10);
-
       if (!Number.isFinite(parsed) || parsed < 1) return fallback;
       return Math.min(parsed, ceiling);
     };
@@ -206,8 +536,10 @@ exports.getExpenses = async (req, res, next) => {
       ExpenseClaim.countDocuments(query),
     ]);
 
+    const hydratedClaims = await Promise.all(claims.map((claim) => hydrateReceiptUrls(claim)));
+
     res.status(200).json({
-      claims,
+      claims: hydratedClaims,
       pagination: {
         total,
         page: parsedPage,
@@ -300,12 +632,12 @@ exports.updateExpenseStatus = async (req, res, next) => {
   }
 };
 
+// ============================================================================
+// CATEGORY MANAGEMENT (Preserved from original)
+// ============================================================================
+
 /**
  * GET /api/expenses/categories
- *
- * There was no way to read, and no way to create, the categories every claim is
- * required to reference — so the collection was empty on every install and the
- * first `POST /api/expenses` anyone could make was a guaranteed 404 (#794).
  */
 exports.getCategories = async (req, res, next) => {
   try {
@@ -366,7 +698,6 @@ exports.createCategory = async (req, res, next) => {
         .status(409)
         .json({ message: 'A category with that name already exists' });
     }
-
     next(error);
   }
 };
@@ -462,6 +793,224 @@ exports.updateCategory = async (req, res, next) => {
       userId: req.userId,
       error: error.message,
     });
+    next(error);
+  }
+};
+
+// ============================================================================
+// OCR RECEIPT PARSING (Updated for #1082)
+// ============================================================================
+
+/**
+ * POST /api/expenses/parse-receipt
+ * Parse receipt text/file using OCR parsing engine and auto-convert currency.
+ */
+exports.parseReceipt = async (req, res, next) => {
+  try {
+    const rawText =
+      req.body?.rawText || (req.file ? req.file.buffer.toString('utf8') : '');
+    const targetCurrency = req.body?.targetCurrency || 'USD';
+
+    if (!rawText || rawText.trim() === '') {
+      return res
+        .status(400)
+        .json({ message: 'No receipt text or image file provided' });
+    }
+
+    const ocrResult = await OCRService.processReceipt(rawText, targetCurrency);
+    return res.status(200).json(ocrResult);
+  } catch (error) {
+    logger.error('Failed to parse receipt via OCR', { error: error.message });
+    next(error);
+  }
+};
+
+// ============================================================================
+// CUSTOM EXPENSE REPORTS & REIMBURSEMENT TRACKING (#1285)
+// ============================================================================
+
+/**
+ * POST /api/expenses/reports/custom
+ * Create a new custom expense report bundling multiple expense claims.
+ */
+exports.createCustomReport = async (req, res, next) => {
+  try {
+    const { title, description, claimIds } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(400).json({ message: 'Title is required' });
+    }
+
+    let employeeId = pinnedEmployeeId(req);
+    if (!employeeId) {
+      if (req.body.employeeId) {
+        employeeId = req.body.employeeId;
+      } else {
+        const emp = await Employee.findOne({
+          userId: req.userId,
+          tenantId: req.tenantId,
+        });
+        employeeId = emp?._id || req.userId;
+      }
+    }
+
+    let claims = [];
+    let totalAmount = 0;
+    if (Array.isArray(claimIds) && claimIds.length > 0) {
+      claims = await ExpenseClaim.find({
+        _id: { $in: claimIds },
+        tenantId: req.tenantId,
+      });
+      totalAmount = claims.reduce((sum, c) => sum + (c.amount || 0), 0);
+    }
+
+    const report = await ExpenseReport.create({
+      title: sanitizeText(title),
+      description: description ? sanitizeText(description) : '',
+      employeeId,
+      userId: req.userId,
+      tenantId: req.tenantId,
+      claimIds: claims.map((c) => c._id),
+      totalAmount,
+      status: 'submitted',
+    });
+
+    res
+      .status(201)
+      .json({ message: 'Custom expense report created successfully', report });
+  } catch (error) {
+    logger.error('Failed to create custom expense report', {
+      userId: req.userId,
+      error: error.message,
+    });
+    next(error);
+  }
+};
+
+/**
+ * GET /api/expenses/reports/my
+ * Fetch custom expense reports for current employee with status tracking.
+ */
+exports.getMyReports = async (req, res, next) => {
+  try {
+    const reports = await ExpenseReport.find({
+      tenantId: req.tenantId,
+      userId: req.userId,
+    })
+      .populate('claimIds')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ reports });
+  } catch (error) {
+    logger.error('Failed to fetch expense reports', {
+      userId: req.userId,
+      error: error.message,
+    });
+    next(error);
+  }
+};
+
+/**
+ * GET /api/expenses/reports/export
+ * Filter expense claims/reports and return summary breakdown & export data.
+ */
+exports.exportExpenseReport = async (req, res, next) => {
+  try {
+    const { startDate, endDate, category, status } = req.query;
+    const filter = { tenantId: req.tenantId };
+
+    if (pinnedEmployeeId(req)) {
+      filter.employeeId = pinnedEmployeeId(req);
+    }
+
+    if (status) {
+      filter.status = status;
+    }
+
+    if (category) {
+      filter.category = category;
+    }
+
+    if (startDate || endDate) {
+      filter.expenseDate = {};
+      if (startDate) filter.expenseDate.$gte = new Date(startDate);
+      if (endDate) filter.expenseDate.$lte = new Date(endDate);
+    }
+
+    const claims = await ExpenseClaim.find(filter).sort({ expenseDate: -1 });
+
+    const totalAmount = claims.reduce((sum, c) => sum + (c.amount || 0), 0);
+    const categoryBreakdown = {};
+    claims.forEach((c) => {
+      categoryBreakdown[c.category] =
+        (categoryBreakdown[c.category] || 0) + c.amount;
+    });
+
+    res.status(200).json({
+      summary: {
+        totalClaims: claims.length,
+        totalAmount,
+        categoryBreakdown,
+        filter: { startDate, endDate, category, status },
+      },
+      claims,
+    });
+  } catch (error) {
+    logger.error('Failed to export custom expense report', {
+      error: error.message,
+    });
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/expenses/reports/:id/status
+ * Update reimbursement status for a custom expense report.
+ */
+exports.updateReportStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason } = req.body;
+
+    if (!['approved', 'reimbursed', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status transition' });
+    }
+
+    const report = await ExpenseReport.findOne({
+      _id: id,
+      tenantId: req.tenantId,
+    });
+    if (!report) {
+      return res.status(404).json({ message: 'Expense report not found' });
+    }
+
+    report.status = status;
+    if (status === 'rejected') {
+      report.rejectionReason = rejectionReason || 'No reason provided';
+    } else if (status === 'reimbursed') {
+      report.reimbursedAt = new Date();
+    }
+
+    await report.save();
+
+    res
+      .status(200)
+      .json({ message: `Expense report marked as ${status}`, report });
+  } catch (error) {
+    logger.error('Failed to update expense report status', {
+      error: error.message,
+    });
+    next(error);
+  }
+};
+
+exports.getFraudClaims = async (req, res, next) => {
+  try {
+    const claims = await ExpenseClaim.find({
+      tenantId: req.tenantId,
+      isPossibleFraud: true,
+    }).populate('employeeId', 'fullName email department');
+    res.status(200).json({ success: true, data: claims });
+  } catch (error) {
     next(error);
   }
 };

@@ -1,11 +1,11 @@
+import styles from './ThemeToggle.module.css';
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
-import { useDispatch, useSelector } from "react-redux";
-import { toggleTheme } from "../features/ui/uiSlice";
+import { useAppStore } from "../store/useAppStore";
 
 export default function ThemeToggle({ showLabel = false, className = "" }) {
-  const dispatch = useDispatch();
-  const themeMode = useSelector((state) => state.ui.themeMode);
+  const themeMode = useAppStore((state) => state.themeMode);
+  const toggleTheme = useAppStore((state) => state.toggleTheme);
   const isDark = themeMode === "dark";
 
   if (showLabel) {
@@ -13,7 +13,7 @@ export default function ThemeToggle({ showLabel = false, className = "" }) {
       <label
         className={`flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-700 transition-colors dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-200 ${className}`}
       >
-        <span className="flex items-center gap-2">
+        <span className={styles.container}>
           {isDark ? (
             <DarkModeOutlinedIcon style={{ fontSize: 18, color: "#f59e0b" }} />
           ) : (
@@ -25,7 +25,7 @@ export default function ThemeToggle({ showLabel = false, className = "" }) {
           <input
             type="checkbox"
             checked={isDark}
-            onChange={() => dispatch(toggleTheme())}
+            onChange={toggleTheme}
             className="peer sr-only"
             aria-label="Toggle theme"
           />
@@ -37,7 +37,7 @@ export default function ThemeToggle({ showLabel = false, className = "" }) {
 
   return (
     <button
-      onClick={() => dispatch(toggleTheme())}
+      onClick={toggleTheme}
       className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-500 dark:hover:bg-slate-800 transition-colors flex items-center justify-center cursor-pointer border border-transparent hover:border-gray-200 dark:hover:border-slate-700"
       title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
       aria-label="Toggle theme"

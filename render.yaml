@@ -1,0 +1,34 @@
+# Render Blueprint for PaySphere's backend API.
+#
+# `previews.generation: automatic` turns on Render's Pull Request Preview
+# Environments: once this Blueprint is connected to the repo in the Render
+# dashboard, Render spins up a temporary copy of the `backend` service for
+# every PR that touches it, and tears it down automatically when the PR is
+# closed or merged. Issue #1046.
+previews:
+  generation: automatic
+  expireAfterDays: 7
+
+services:
+  - type: web
+    name: paysphere-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    region: oregon
+    branch: main
+    healthCheckPath: /metrics
+    envVars:
+      - key: NODE_ENV
+        value: preview
+      - key: PORT
+        value: 5000
+      # Secrets and connection strings are set per-environment in the Render
+      # dashboard rather than committed here.
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: REDIS_URL
+        sync: false

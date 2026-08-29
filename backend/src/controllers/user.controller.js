@@ -1,13 +1,14 @@
 const axios = require('axios');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const zxcvbn = require('../utils/zxcvbn');
 const mongoose = require('mongoose');
 const { OAuth2Client } = require('google-auth-library');
 const crypto = require('crypto');
 const User = require('../models/user.model');
 const Employee = require('../models/employee.model');
 const PayrollUpdate = require('../models/payroll.model');
-const { sendEmail } = require('../utils/email');
+const { enqueueEmail } = require('../jobs/email.queue');
 const { authenticator } = require('otplib');
 const QRCode = require('qrcode');
 const {
@@ -18,10 +19,12 @@ const {
   OVERTIME_RATE_MAX,
 } = require('../utils/validators');
 const logger = require('../utils/logger');
+const { getDownloadUrl, isStorageUri, putObject, uploadDataUrl } = require('../services/objectStorage.service');
 const eventBus = require('../services/event.service');
 const { getDefaultRole } = require('../seeds/rbac.seed');
 const { resolveAccountType } = require('../config/accountTypes');
 const { ensureTenantForUser } = require('../services/tenant.service');
+const { createAuditLog } = require('../services/audit.service');
 
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
@@ -29,30 +32,48 @@ const GOOGLE_CLIENT_ID =
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
 
-const generateTokens = (user, res) => {
+const RefreshToken = require('../models/refreshToken.model');
+
+/**
+ * Generates access and refresh tokens with rotation support (Issue #725)
+ * @param {Object} user - The user document
+ * @param {Object} res - Express response object for setting cookies
+ * @param {string} [family=null] - Token family for rotation tracking
+ * @returns {Promise<string>} The access token
+ */
+const generateTokens = async (user, res, family = null) => {
+  // Short-lived access token (15 minutes)
   const accessToken = jwt.sign(
     {
       id: user._id,
       role: user.role,
       tenantId: user.tenantId,
-      tokenVersion: user.tokenVersion || 0,
+      tokenVersion: user.tokenVersion,
     },
     process.env.JWT_SECRET,
-    { expiresIn: '15m' },
+    { expiresIn: '15m' }, // Changed from 7d to 15m for security
   );
 
-  const refreshToken = jwt.sign(
-    {
-      id: user._id,
-      role: user.role,
-      tenantId: user.tenantId,
-      tokenVersion: user.tokenVersion || 0,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: '7d' },
-  );
+  // Generate cryptographically secure refresh token
+  const rawRefreshToken = crypto.randomBytes(64).toString('hex');
+  const tokenHash = RefreshToken.hashToken(rawRefreshToken);
 
-  res.cookie('refreshToken', refreshToken, {
+  // Use existing family or create new one
+  const tokenFamily = family || crypto.randomBytes(16).toString('hex');
+
+  // Store hashed refresh token in database
+  await RefreshToken.create({
+    tokenHash,
+    userId: user._id,
+    tenantId: user.tenantId,
+    family: tokenFamily,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    userAgent: '', // Will be set by caller if available
+    ip: '', // Will be set by caller if available
+  });
+
+  // Set refresh token in HTTP-only cookie
+  res.cookie('refreshToken', rawRefreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
@@ -93,6 +114,13 @@ exports.signup = async (req, res, next) => {
       });
     }
 
+    const strength = zxcvbn(password);
+    if (strength.score < 3) {
+      return res.status(400).json({
+        message: `Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`,
+      });
+    }
+
     const cleanEmail = email.trim().toLowerCase();
     const existingUser = await User.findOne({ email: cleanEmail });
     if (existingUser)
@@ -109,6 +137,7 @@ exports.signup = async (req, res, next) => {
       email: cleanEmail,
       companyName: sanitizeText(companyName),
       password: hashedPassword,
+      passwordHistory: [hashedPassword],
       ...(defaultRole ? { role: defaultRole._id } : {}),
     });
 
@@ -133,7 +162,7 @@ exports.signup = async (req, res, next) => {
     // filter, so they returned every company's rows (#612).
     await ensureTenantForUser(newUser);
 
-    const token = generateTokens(newUser, res);
+    const token = await generateTokens(newUser, res); // Added await for Issue #725
 
     // `role` here is the *account type* the client renders navigation from, not
     // the RBAC role reference — see config/accountTypes.js (#558).
@@ -168,9 +197,54 @@ exports.login = async (req, res, next) => {
     const user = await User.findOne({ email: cleanEmail });
     if (!user) return res.status(400).json({ message: 'Invalid credentials' });
 
+    // Check account lockout status (#1275)
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      const remainingMinutes = Math.ceil(
+        (user.lockUntil - Date.now()) / (60 * 1000),
+      );
+      return res.status(403).json({
+        message: `Account is locked due to 5 consecutive failed login attempts. Please try again after ${remainingMinutes} minute(s).`,
+        isLocked: true,
+        lockUntil: user.lockUntil,
+      });
+    }
+
+    // Auto-reset expired lockout
+    if (user.lockUntil && user.lockUntil <= Date.now()) {
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch)
-      return res.status(400).json({ message: 'Invalid credentials' });
+    if (!isMatch) {
+      user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+
+      if (user.failedLoginAttempts >= 5) {
+        user.lockUntil = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes lockout
+        await user.save();
+
+        return res.status(403).json({
+          message:
+            'Account locked due to 5 consecutive failed login attempts. Please try again after 30 minutes.',
+          isLocked: true,
+          lockUntil: user.lockUntil,
+        });
+      }
+
+      await user.save();
+      const remaining = 5 - user.failedLoginAttempts;
+      return res.status(400).json({
+        message: 'Invalid credentials',
+        remainingAttempts: remaining,
+      });
+    }
+
+    // Reset failed login attempts on successful match
+    if (user.failedLoginAttempts > 0 || user.lockUntil) {
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+      await user.save();
+    }
 
     if (user.isTwoFactorEnabled) {
       return res.status(200).json({
@@ -191,7 +265,7 @@ exports.login = async (req, res, next) => {
     // answered 500 for every account. It stayed invisible because the suite
     // covering it cannot even load: `otplib@13` pulls in ESM that jest is not
     // configured to transform (#792).
-    const token = generateTokens(user, res);
+    const token = await generateTokens(user, res); // Added await for Issue #725
 
     res.status(200).json({
       token,
@@ -219,15 +293,24 @@ exports.getSettings = async (req, res, next) => {
       tenantId: req.tenantId,
     });
 
+    const UserDTO = require('../utils/userDTO');
+    const safeUser = UserDTO.toClient(user);
+    const responseUser = { ...safeUser };
+    if (isStorageUri(responseUser.avatar)) {
+      responseUser.avatar = await getDownloadUrl(responseUser.avatar);
+    }
+    if (responseUser.settings?.companyInfo?.companyLogo && isStorageUri(responseUser.settings.companyInfo.companyLogo)) {
+      responseUser.settings = {
+        ...responseUser.settings,
+        companyInfo: {
+          ...responseUser.settings.companyInfo,
+          companyLogo: await getDownloadUrl(responseUser.settings.companyInfo.companyLogo),
+        },
+      };
+    }
+
     res.status(200).json({
-      fullName: user.fullName,
-      email: user.email,
-      avatar: user.avatar,
-      companyName: user.companyName,
-      settings: user.settings,
-      defaultOvertimeRate: user.defaultOvertimeRate || 0,
-      defaultDailyRate: user.defaultDailyRate || 0,
-      isGoogleLinked: !!user.googleId,
+      ...responseUser,
       organizationId: user._id.toString(),
       payrollId: 'PR-' + user._id.toString().slice(-6).toUpperCase(),
       employeeCount,
@@ -245,16 +328,18 @@ exports.uploadLogo = async (req, res, next) => {
       return res.status(400).json({ message: 'No image provided' });
 
     // Store as base64 string
-    const base64Data = req.file.buffer.toString('base64');
-    const mimeType = req.file.mimetype;
-    const logoDataUrl = `data:${mimeType};base64,${base64Data}`;
+    const storedLogo = await putObject({
+      key: `profiles/company-logos/${req.tenantId}/${Date.now()}-${require('crypto').randomUUID()}`,
+      body: req.file.buffer,
+      contentType: req.file.mimetype,
+    });
 
-    await User.findByIdAndUpdate(req.userId, { companyLogoData: logoDataUrl });
+    await User.findByIdAndUpdate(req.userId, { companyLogoData: storedLogo.uri });
+    const signedUrl = await getDownloadUrl(storedLogo.uri);
 
-    // Also invalidate settings cache if we had one
     res
       .status(200)
-      .json({ message: 'Logo updated successfully', logo: logoDataUrl });
+      .json({ message: 'Logo updated successfully', logo: signedUrl });
   } catch (error) {
     next(error);
   }
@@ -349,7 +434,26 @@ exports.updateSettings = async (req, res, next) => {
       user.defaultOvertimeRate = defaultOvertimeRate;
     if (defaultDailyRate !== undefined)
       user.defaultDailyRate = defaultDailyRate;
-    if (avatar !== undefined) user.avatar = avatar;
+
+    if (avatar !== undefined) {
+      if (avatar === '') {
+        user.avatar = '';
+      } else if (isStorageUri(avatar)) {
+        user.avatar = avatar;
+      } else if (typeof avatar === 'string' && avatar.startsWith('data:image/')) {
+        const storedAvatar = await uploadDataUrl({
+          dataUrl: avatar,
+          tenantId: req.tenantId,
+          area: 'profiles/avatars',
+        });
+        user.avatar = storedAvatar.uri;
+      } else {
+        // OAuth/provider avatars are already remote URLs and do not need to be
+        // copied into S3. Locally uploaded data URLs are the only values this
+        // endpoint migrates to object storage.
+        user.avatar = avatar;
+      }
+    }
 
     if (!user.settings) user.settings = {};
 
@@ -365,6 +469,15 @@ exports.updateSettings = async (req, res, next) => {
           ...(user.settings.companyInfo || {}),
           ...settings.companyInfo,
         };
+        const companyLogo = user.settings.companyInfo.companyLogo;
+        if (typeof companyLogo === 'string' && companyLogo.startsWith('data:image/')) {
+          const storedLogo = await uploadDataUrl({
+            dataUrl: companyLogo,
+            tenantId: req.tenantId,
+            area: 'profiles/company-logos',
+          });
+          user.settings.companyInfo.companyLogo = storedLogo.uri;
+        }
       }
       if (settings.payrollConfig) {
         user.settings.payrollConfig = {
@@ -395,13 +508,22 @@ exports.updateSettings = async (req, res, next) => {
       fields: Object.keys(req.body),
     });
 
+    const responseSettings = user.settings?.toObject ? user.settings.toObject() : { ...user.settings };
+    if (responseSettings.companyInfo?.companyLogo && isStorageUri(responseSettings.companyInfo.companyLogo)) {
+      responseSettings.companyInfo = {
+        ...responseSettings.companyInfo,
+        companyLogo: await getDownloadUrl(responseSettings.companyInfo.companyLogo),
+      };
+    }
+    const responseAvatar = isStorageUri(user.avatar) ? await getDownloadUrl(user.avatar) : user.avatar;
+
     res.status(200).json({
       message: 'Settings updated successfully',
-      settings: user.settings,
+      settings: responseSettings,
       fullName: user.fullName,
       email: user.email,
       companyName: user.companyName,
-      avatar: user.avatar,
+      avatar: responseAvatar,
       defaultOvertimeRate: user.defaultOvertimeRate,
       defaultDailyRate: user.defaultDailyRate,
     });
@@ -433,6 +555,13 @@ exports.updatePassword = async (req, res, next) => {
       });
     }
 
+    const strength = zxcvbn(newPassword);
+    if (strength.score < 3) {
+      return res.status(400).json({
+        message: `Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`,
+      });
+    }
+
     if (!user.password) {
       return res
         .status(400)
@@ -443,8 +572,26 @@ exports.updatePassword = async (req, res, next) => {
     if (!isMatch)
       return res.status(400).json({ message: 'Incorrect current password' });
 
+    if (user.passwordHistory && user.passwordHistory.length > 0) {
+      for (const oldHash of user.passwordHistory) {
+        const isReused = await bcrypt.compare(newPassword, oldHash);
+        if (isReused) {
+          return res.status(400).json({
+            message: 'You cannot reuse any of your last 5 passwords',
+          });
+        }
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     user.password = hashedPassword;
+    if (!user.passwordHistory) {
+      user.passwordHistory = [];
+    }
+    user.passwordHistory.push(hashedPassword);
+    if (user.passwordHistory.length > 5) {
+      user.passwordHistory.shift();
+    }
     user.tokenVersion = (user.tokenVersion || 0) + 1;
     await user.save();
 
@@ -542,7 +689,7 @@ exports.googleAuth = async (req, res, next) => {
     // it needs a tenant just as much as `signup` does (#612).
     await ensureTenantForUser(user);
 
-    const token = generateTokens(user, res);
+    const token = await generateTokens(user, res); // Added await for Issue #725
 
     const statusCode = isNewUser ? 201 : 200;
     res.status(statusCode).json({
@@ -647,7 +794,7 @@ exports.githubAuth = async (req, res, next) => {
 
     await ensureTenantForUser(user);
 
-    const token = generateTokens(user, res);
+    const token = await generateTokens(user, res); // Added await for Issue #725
 
     const statusCode = isNewUser ? 201 : 200;
     res.status(statusCode).json({
@@ -744,13 +891,12 @@ exports.forgotPassword = async (req, res, next) => {
       `<hr/>` +
       `<p>If you did not request this, please ignore this email and your password will remain unchanged.</p>`;
 
-    await sendEmail({
+    await enqueueEmail('generic', {
       to: user.email,
       subject: 'PaySphere Password Reset Link',
       text,
       html,
     });
-
     res.status(200).json({
       message:
         'If an account with that email exists, a password reset link has been sent.',
@@ -776,6 +922,13 @@ exports.resetPassword = async (req, res, next) => {
       });
     }
 
+    const strength = zxcvbn(password);
+    if (strength.score < 3) {
+      return res.status(400).json({
+        message: `Password is too weak. ${strength.feedback.warning || ''} Suggestions: ${strength.feedback.suggestions.join(', ')}`,
+      });
+    }
+
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
     const user = await User.findOne({
@@ -789,11 +942,29 @@ exports.resetPassword = async (req, res, next) => {
         .json({ message: 'Password reset token is invalid or has expired' });
     }
 
+    if (user.passwordHistory && user.passwordHistory.length > 0) {
+      for (const oldHash of user.passwordHistory) {
+        const isReused = await bcrypt.compare(password, oldHash);
+        if (isReused) {
+          return res.status(400).json({
+            message: 'You cannot reuse any of your last 5 passwords',
+          });
+        }
+      }
+    }
+
     // Hash the new password
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Save user new password, clear token fields, and increment tokenVersion
     user.password = hashedPassword;
+    if (!user.passwordHistory) {
+      user.passwordHistory = [];
+    }
+    user.passwordHistory.push(hashedPassword);
+    if (user.passwordHistory.length > 5) {
+      user.passwordHistory.shift();
+    }
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     user.tokenVersion = (user.tokenVersion || 0) + 1;
@@ -860,14 +1031,28 @@ exports.deleteAccount = async (req, res, next) => {
 
     const deleteOptions = session ? { session } : {};
 
+    const Tenant = require('../models/tenant.model');
     const AuditLog = require('../models/auditLog.model');
+    const tenant = await Tenant.findById(req.tenantId);
 
-    // Scoped by tenant: these rows are the company's, and since #585 they no
-    // longer carry a `createdBy` to match on. Filtering by the old key deleted
-    // nothing and left the company's employee and payroll records behind after
-    // the account that owned them was gone (#613).
-    await Employee.deleteMany({ tenantId: req.tenantId }, deleteOptions);
-    await PayrollUpdate.deleteMany({ tenantId: req.tenantId }, deleteOptions);
+    const isTenantOwner =
+      tenant && String(tenant.ownerId) === String(req.userId);
+
+    if (isTenantOwner) {
+      // Scoped by tenant: these rows are the company's, and since #585 they no
+      // longer carry a `createdBy` to match on. Filtering by the old key deleted
+      // nothing and left the company's employee and payroll records behind after
+      // the account that owned them was gone (#613).
+      await Employee.deleteMany({ tenantId: req.tenantId }, deleteOptions);
+      await PayrollUpdate.deleteMany({ tenantId: req.tenantId }, deleteOptions);
+      // Soft-delete the tenant as well
+      await Tenant.findByIdAndUpdate(
+        tenant._id,
+        { $set: { isActive: false } },
+        deleteOptions,
+      );
+    }
+
     await AuditLog.deleteMany({ userId: req.userId }, deleteOptions);
     await User.findByIdAndDelete(req.userId, deleteOptions);
 
@@ -902,59 +1087,113 @@ exports.deleteAccount = async (req, res, next) => {
   }
 };
 
-// REFRESH TOKEN
+// REFRESH TOKEN (Issue #725 - Token Rotation)
 exports.refresh = async (req, res, next) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
-    if (!refreshToken)
+    const rawRefreshToken = req.cookies.refreshToken;
+    if (!rawRefreshToken) {
       return res.status(401).json({ message: 'No refresh token provided' });
-
-    let decoded;
-    try {
-      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
-    } catch {
-      return res
-        .status(401)
-        .json({ message: 'Invalid or expired refresh token' });
     }
 
-    // `role`, `tenantId`, `companyName` and `employeeId` are selected because
-    // `generateTokens` reads all four into the claim. The projection used to
-    // stop at `tokenVersion`, so every refresh minted a token carrying
-    // `role: undefined, tenantId: undefined` — a session lost its tenant fifteen
-    // minutes after logging in, whatever `login` had put there (#612).
-    const user = await User.findById(decoded.id).select(
+    // Hash the token and look it up in the database
+    const tokenHash = RefreshToken.hashToken(rawRefreshToken);
+    const storedToken = await RefreshToken.findOne({ tokenHash });
+
+    // Security Check: Token not found or already revoked = potential theft
+    if (!storedToken || storedToken.isRevoked) {
+      // If token exists but is revoked, someone is reusing it - revoke entire family
+      if (storedToken) {
+        await RefreshToken.updateMany(
+          { family: storedToken.family, isRevoked: false },
+          { $set: { isRevoked: true } },
+        );
+        logger.warn('Token reuse detected - family revoked', {
+          userId: storedToken.userId,
+          family: storedToken.family,
+        });
+      }
+
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      });
+
+      return res.status(403).json({
+        message: 'Invalid or revoked refresh token. Session terminated.',
+      });
+    }
+
+    // Check expiration
+    if (storedToken.expiresAt < new Date()) {
+      storedToken.isRevoked = true;
+      await storedToken.save();
+
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+      });
+
+      return res.status(401).json({ message: 'Refresh token expired' });
+    }
+
+    // Fetch user with all required fields
+    const user = await User.findById(storedToken.userId).select(
       '_id isActive tokenVersion role tenantId companyName fullName employeeId',
     );
+
     if (!user || user.isActive === false) {
+      storedToken.isRevoked = true;
+      await storedToken.save();
       return res.status(401).json({ message: 'User not found or deactivated' });
     }
 
+    // Check token version (password change invalidation)
     if (
-      decoded.tokenVersion !== undefined &&
       user.tokenVersion !== undefined &&
-      decoded.tokenVersion !== user.tokenVersion
+      user.tokenVersion !== storedToken.tokenVersion
     ) {
+      storedToken.isRevoked = true;
+      await storedToken.save();
       return res.status(401).json({ message: 'Token is no longer valid' });
     }
 
     await ensureTenantForUser(user);
 
-    const token = generateTokens(user, res);
-    res.status(200).json({ token });
+    // ROTATION: Revoke old token and issue new one in same family
+    storedToken.isRevoked = true;
+    await storedToken.save();
+
+    // Generate new tokens with same family
+    const newAccessToken = await generateTokens(user, res, storedToken.family);
+
+    res.status(200).json({ token: newAccessToken });
   } catch (error) {
     next(error);
   }
 };
 
-// LOGOUT
+// LOGOUT (Issue #725 - Proper Token Revocation)
 exports.logout = async (req, res, next) => {
   try {
+    const rawRefreshToken = req.cookies.refreshToken;
+
+    // Revoke the refresh token in database
+    if (rawRefreshToken) {
+      const tokenHash = RefreshToken.hashToken(rawRefreshToken);
+      await RefreshToken.findOneAndUpdate(
+        { tokenHash },
+        { $set: { isRevoked: true } },
+      );
+    }
+
+    // Also increment tokenVersion to invalidate all access tokens
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
+      const accessToken = authHeader.split(' ')[1];
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+        const decoded = jwt.verify(accessToken, process.env.JWT_SECRET, {
           ignoreExpiration: true,
         });
         if (decoded && decoded.id) {
@@ -967,16 +1206,19 @@ exports.logout = async (req, res, next) => {
       }
     }
 
+    // Clear the refresh token cookie
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
     });
+
     res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
     next(error);
   }
 };
+
 // GENERATE 2FA QR CODE & SECRET
 exports.generate2FA = async (req, res, next) => {
   try {
@@ -1097,7 +1339,7 @@ exports.validate2FALogin = async (req, res, next) => {
     }
 
     // Generate full JWT access token after successful 2FA
-    const accessToken = generateTokens(user, res);
+    const accessToken = await generateTokens(user, res); // Added await for Issue #725
 
     return res.status(200).json({
       message: '2FA verification successful',
@@ -1109,6 +1351,166 @@ exports.validate2FALogin = async (req, res, next) => {
         email: user.email,
         fullName: user.fullName,
         companyName: user.companyName,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// IMPERSONATE USER
+exports.impersonateUser = async (req, res, next) => {
+  try {
+    const { targetUserId } = req.body;
+    if (!targetUserId) {
+      return res.status(400).json({ message: 'targetUserId is required' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return res.status(400).json({ message: 'Invalid targetUserId format' });
+    }
+
+    const impersonator = req.user;
+    if (!impersonator) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
+    if (String(impersonator._id) === String(targetUserId)) {
+      return res.status(400).json({ message: 'Cannot impersonate yourself' });
+    }
+
+    const targetUser = await User.findById(targetUserId).populate('role');
+    if (!targetUser || targetUser.isActive === false) {
+      return res
+        .status(404)
+        .json({ message: 'Target user not found or inactive' });
+    }
+
+    const targetRoleName = targetUser.role?.name || targetUser.role;
+    if (targetRoleName === 'SuperAdmin') {
+      return res
+        .status(403)
+        .json({ message: 'Cannot impersonate another SuperAdmin' });
+    }
+
+    if (
+      req.tenantId &&
+      targetUser.tenantId &&
+      String(req.tenantId) !== String(targetUser.tenantId)
+    ) {
+      return res
+        .status(403)
+        .json({ message: 'Target user belongs to another organization' });
+    }
+
+    const tokenPayload = {
+      id: targetUser._id,
+      role: targetUser.role?._id || targetUser.role,
+      tenantId: targetUser.tenantId,
+      tokenVersion: targetUser.tokenVersion,
+      isImpersonating: true,
+      impersonatorId: impersonator._id,
+      impersonatorName: impersonator.fullName,
+      impersonatorEmail: impersonator.email,
+    };
+
+    const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+      expiresIn: '1h',
+    });
+
+    await createAuditLog({
+      userId: impersonator._id,
+      tenantId: impersonator.tenantId || targetUser.tenantId,
+      action: 'IMPERSONATE_USER_START',
+      resourceType: 'User',
+      resourceIds: [targetUser._id],
+      details: {
+        impersonatorId: impersonator._id,
+        impersonatorEmail: impersonator.email,
+        impersonatedUserId: targetUser._id,
+        impersonatedUserEmail: targetUser.email,
+      },
+      req,
+    });
+
+    return res.status(200).json({
+      message: `Successfully impersonated ${targetUser.fullName}`,
+      token: accessToken,
+      isImpersonating: true,
+      impersonator: {
+        id: impersonator._id,
+        fullName: impersonator.fullName,
+        email: impersonator.email,
+      },
+      user: {
+        id: targetUser._id,
+        email: targetUser.email,
+        fullName: targetUser.fullName,
+        companyName: targetUser.companyName,
+        accountType: targetUser.accountType,
+        role: targetUser.role,
+        tenantId: targetUser.tenantId,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// STOP IMPERSONATION
+exports.stopImpersonation = async (req, res, next) => {
+  try {
+    if (!req.isImpersonating || !req.impersonatorId) {
+      return res
+        .status(400)
+        .json({ message: 'No active impersonation session' });
+    }
+
+    const impersonator = await User.findById(req.impersonatorId).populate(
+      'role',
+    );
+    if (!impersonator || impersonator.isActive === false) {
+      return res
+        .status(404)
+        .json({ message: 'Original admin account not found or inactive' });
+    }
+
+    const tokenPayload = {
+      id: impersonator._id,
+      role: impersonator.role?._id || impersonator.role,
+      tenantId: impersonator.tenantId,
+      tokenVersion: impersonator.tokenVersion,
+    };
+
+    const accessToken = jwt.sign(tokenPayload, process.env.JWT_SECRET, {
+      expiresIn: '15m',
+    });
+
+    await createAuditLog({
+      userId: impersonator._id,
+      tenantId: impersonator.tenantId,
+      action: 'IMPERSONATE_USER_STOP',
+      resourceType: 'User',
+      resourceIds: [req.userId],
+      details: {
+        impersonatorId: impersonator._id,
+        stoppedImpersonatingUserId: req.userId,
+      },
+      req,
+    });
+
+    return res.status(200).json({
+      message: 'Impersonation session ended',
+      token: accessToken,
+      isImpersonating: false,
+      user: {
+        id: impersonator._id,
+        email: impersonator.email,
+        fullName: impersonator.fullName,
+        companyName: impersonator.companyName,
+        accountType: impersonator.accountType,
+        role: impersonator.role,
+        tenantId: impersonator.tenantId,
       },
     });
   } catch (error) {

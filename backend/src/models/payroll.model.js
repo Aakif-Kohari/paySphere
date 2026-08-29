@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const softDeletePlugin = require('../utils/softDelete.plugin');
+const auditTrailPlugin = require('../middlewares/auditTrail.middleware');
+const cryptoSealPlugin = require('../middlewares/cryptoSeal.plugin');
 const {
   ALL_STATUSES,
   PAYROLL_STATUS,
@@ -16,22 +18,44 @@ const payrollUpdateSchema = new mongoose.Schema(
     employeeName: {
       type: String,
       required: true,
+      maxlength: [100, 'Employee name cannot exceed 100 characters'],
     },
     month: {
       type: Number, // 1-12
       required: true,
+      min: [1, 'Month must be between 1 and 12'],
+      max: [12, 'Month must be between 1 and 12'],
     },
     currency: {
       type: String,
       default: 'INR',
     },
+    baseCurrency: {
+      type: String,
+      default: 'USD',
+    },
+    disbursementCurrency: {
+      type: String,
+      default: 'USD',
+    },
+    fxRate: {
+      type: Number,
+      default: 1.0,
+    },
+    convertedNetSalary: {
+      type: Number,
+      default: null,
+    },
     year: {
       type: Number,
       required: true,
+      min: [2000, 'Year must be 2000 or later'],
+      max: [2100, 'Year must be 2100 or earlier'],
     },
     baseSalary: {
       type: Number,
       required: true,
+      min: [0, 'Base salary cannot be negative'],
     },
     overtimeRate: {
       type: Number,
@@ -55,8 +79,14 @@ const payrollUpdateSchema = new mongoose.Schema(
     },
     customDeductions: [
       {
-        name: String,
-        amount: Number,
+        name: {
+          type: String,
+          maxlength: [100, 'Deduction name cannot exceed 100 characters'],
+        },
+        amount: {
+          type: Number,
+          min: [0, 'Deduction amount cannot be negative'],
+        },
       },
     ],
     leaveDeduction: {
@@ -70,6 +100,14 @@ const payrollUpdateSchema = new mongoose.Schema(
     netSalary: {
       type: Number,
       required: true,
+    },
+    targetCurrency: {
+      type: String,
+      default: 'USD',
+    },
+    exchangeRate: {
+      type: Number,
+      default: 1,
     },
     /**
      * Who created this row. An audit fact, not a scoping key.
@@ -108,13 +146,8 @@ const payrollUpdateSchema = new mongoose.Schema(
     // written by either older revision keep validating.
     blockchainTxHash: { type: String },
     merkleRoot: { type: String },
-    status: {
-      type: String,
-      enum: ALL_STATUSES,
-      default: PAYROLL_STATUS.PENDING_APPROVAL,
-      set: (value) => normalizeStatus(value) || value,
-    },
-    /**
+    status:    { type: String, enum: PAYROLL_STATUSES, default: 'draft' },
+    finalizedAt: { type: Date, default: null },    /**
      * The maker–checker trail (#559).
      *
      * #458 mounted the approval routes and wired the controller to write these
@@ -226,6 +259,49 @@ const payrollUpdateSchema = new mongoose.Schema(
     ],
 
     /**
+     * Back pay released by this run for months already paid at an older rate
+     * (#931, declared here in #950).
+     *
+     * Its own column for the same reason `reimbursements` is: it is not this
+     * month's earnings. Folding it into `bonus` would misstate both the payslip
+     * and every month-over-month comparison built on top of these rows.
+     *
+     * The controller has been computing all three of these since #931 and
+     * writing them into a document whose schema declared none of them, so
+     * Mongoose dropped them silently and the payslip showed an unexplained net.
+     */
+    arrearsPayout: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    /**
+     * Which months the payout is made of, so a payslip can itemise it.
+     *
+     * Denormalised out of the ledger deliberately: the ledger rows can be
+     * corrected or superseded later, and a payslip has to keep showing what was
+     * actually paid at the time it was issued.
+     */
+    arrearsBreakdown: [
+      {
+        month: { type: Number, min: 1, max: 12 },
+        year: { type: Number },
+        amount: { type: Number, default: 0 },
+        isProRated: { type: Boolean, default: false },
+        days: { type: Number, default: 0 },
+      },
+    ],
+
+    /** The ledger rows this run retired, for the audit trail back. */
+    arrearsLedgerIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'ArrearsLedger',
+      },
+    ],
+
+    /**
      * The salary component split in force when this row was calculated (#461).
      *
      * Snapshotted rather than looked up at render time, so a payslip regenerated
@@ -245,14 +321,74 @@ const payrollUpdateSchema = new mongoose.Schema(
         },
       ],
     },
+    /**
+     * Immutable payroll calculation snapshot.
+     *
+     * This stores the exact values used by the calculation rather than relying
+     * on the employee record at the time a historical payslip is viewed.
+     */
+    calculationSnapshot: {
+      version: {
+        type: String,
+        required: true,
+      },
+      employee: {
+        fullName: String,
+        email: String,
+        role: String,
+        companyName: String,
+        language: String,
+      },
+      inputs: {
+        baseSalary: Number,
+        overtimeRate: Number,
+        leaveDays: Number,
+        overtimeHours: Number,
+        bonus: Number,
+        deductions: Number,
+        leaveDeduction: Number,
+        overtimePay: Number,
+        reimbursements: Number,
+        loanRecoveryTotal: Number,
+        arrearsPayout: Number,
+        exchangeRate: Number,
+        currency: String,
+        targetCurrency: String,
+        baseCurrency: String,
+        attendanceSource: String,
+        defaultDailyRate: Number,
+        defaultOvertimeRate: Number,
+      },
+      salarySnapshot: mongoose.Schema.Types.Mixed,
+      loanRecoveries: mongoose.Schema.Types.Mixed,
+      arrearsBreakdown: mongoose.Schema.Types.Mixed,
+      reimbursedExpenseIds: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'ExpenseClaim',
+        },
+      ],
+      finalAmounts: {
+        grossNetBeforeRecovery: Number,
+        netSalary: Number,
+      },
+      finalizedAt: {
+        type: Date,
+      },
+      finalizedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    },
     payslipEmailed: {
       type: Boolean,
       default: false,
-    },
+    },  },
+  {
+    timestamps: true,
+    optimisticConcurrency: true,
   },
-  { timestamps: true },
 );
-
 // Every index below leads with `tenantId` because that is what every query
 // filters on since #585. They led with `createdBy` until #613 — which meant the
 // rewritten queries had no index behind them and collection-scanned the largest
@@ -282,6 +418,59 @@ payrollUpdateSchema.index({ tenantId: 1, year: -1, month: -1, status: 1 });
 // queue, and the lookup an approver-is-not-the-submitter check needs (#559).
 // `submittedBy` is a user, so this one is genuinely per-actor within a company.
 payrollUpdateSchema.index({ tenantId: 1, submittedBy: 1, status: 1 });
+const snapshotIsBeingChanged = (update = {}) => {
+  const set = update.$set || {};
+  const unset = update.$unset || {};
 
+  return (
+    Object.keys(set).some((key) => key === 'calculationSnapshot' || key.startsWith('calculationSnapshot.')) ||
+    Object.keys(unset).some((key) => key === 'calculationSnapshot' || key.startsWith('calculationSnapshot.'))
+  );
+};
+
+payrollUpdateSchema.pre('save', function (next) {
+  if (
+    !this.isNew &&
+    this.get('calculationSnapshot.finalizedAt') &&
+    this.isModified('calculationSnapshot')
+  ) {
+    return next(
+      new Error('Finalized payroll calculation snapshot cannot be modified'),
+    );
+  }
+
+  next();
+});
+
+payrollUpdateSchema.pre(
+  ['updateOne', 'updateMany', 'findOneAndUpdate'],
+  async function (next) {
+    try {
+      if (!snapshotIsBeingChanged(this.getUpdate())) {
+        return next();
+      }
+
+      const query = this.getQuery();
+      const finalized = await this.model.exists({
+        ...query,
+        'calculationSnapshot.finalizedAt': { $exists: true, $ne: null },
+      });
+
+      if (finalized) {
+        return next(
+          new Error(
+            'Finalized payroll calculation snapshot cannot be modified',
+          ),
+        );
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 payrollUpdateSchema.plugin(softDeletePlugin);
+payrollUpdateSchema.plugin(auditTrailPlugin);
+payrollUpdateSchema.plugin(cryptoSealPlugin);
 module.exports = mongoose.model('PayrollUpdate', payrollUpdateSchema);

@@ -68,8 +68,14 @@ describe('startCronJobs', () => {
     expect(handlerFor('30 0 1 * *')).toBeInstanceOf(Function);
   });
 
+  it('registers the HRMS integration sync job', () => {
+    // #954: the adapters in src/integrations/ had no scheduled caller, so
+    // `syncSchedule` was a field nothing read.
+    expect(handlerFor('0 2 * * *')).toBeInstanceOf(Function);
+  });
+
   it('registers one schedule per job and no more', () => {
-    expect(cron.schedule).toHaveBeenCalledTimes(3);
+    expect(cron.schedule).toHaveBeenCalledTimes(4);
   });
 
   it('runs on the 1st of the month, after midnight', () => {

@@ -1,13 +1,32 @@
-const mongoose = require("mongoose");
-const Employee = require("../models/employee.model");
-const User = require("../models/user.model");
-const { parse } = require("csv-parse");
-const { isNonEmptyString, isValidEmail, isValidPhone, escapeRegex, sanitizeText, MONTHLY_SALARY_MAX, OVERTIME_RATE_MAX, FULLNAME_MAX_LENGTH, ROLE_MAX_LENGTH } = require("../utils/validators");
-const PayrollUpdate = require("../models/payroll.model");
-const logger = require("../utils/logger");
-const eventBus = require("../services/event.service");
-const cacheService = require("../services/cache.service");
-const Settlement = require("../models/settlement.model");
+const mongoose = require('mongoose');
+const Employee = require('../models/employee.model');
+const User = require('../models/user.model');
+const { parse } = require('csv-parse');
+const {
+  isNonEmptyString,
+  isValidEmail,
+  isValidPhone,
+  escapeRegex,
+  sanitizeText,
+  MONTHLY_SALARY_MAX,
+  OVERTIME_RATE_MAX,
+  FULLNAME_MAX_LENGTH,
+  ROLE_MAX_LENGTH,
+} = require('../utils/validators');
+const { tenantFilter } = require('../utils/tenantScope');
+const PayrollUpdate = require('../models/payroll.model');
+const logger = require('../utils/logger');
+const eventBus = require('../services/event.service');
+const cacheService = require('../services/cache.service');
+const { invalidateStatsCaches } = require('./stats.controller');
+const Settlement = require('../models/settlement.model');
+const { Client } = require('@elastic/elasticsearch');
+const customFieldService = require('../services/customField.service');
+const lifecycleEventService = require('../services/lifecycleEvent.service');
+
+const esClient = new Client({
+  node: process.env.ELASTICSEARCH_NODE || 'http://localhost:9200',
+});
 /**
  * Normalize an employee email for storage.
  *
@@ -21,7 +40,7 @@ const Settlement = require("../models/settlement.model");
  */
 function normalizeEmployeeEmail(value) {
   if (value === undefined) return { ok: true, value: undefined };
-  if (value === null || (typeof value === "string" && value.trim() === "")) {
+  if (value === null || (typeof value === 'string' && value.trim() === '')) {
     // Explicitly clearing the address.
     return { ok: true, value: undefined };
   }
@@ -42,12 +61,12 @@ function normalizeEmployeeEmail(value) {
  */
 function normalizeEmployeePhone(value) {
   if (value === undefined) return { ok: true, value: undefined };
-  if (value === null || (typeof value === "string" && value.trim() === "")) {
+  if (value === null || (typeof value === 'string' && value.trim() === '')) {
     return { ok: true, value: undefined };
   }
   if (!isValidPhone(value)) return { ok: false };
 
-  const normalized = value.trim().replace(/[()\s-]/g, "");
+  const normalized = value.trim().replace(/[()\s-]/g, '');
   return { ok: true, value: normalized };
 }
 
@@ -58,9 +77,14 @@ function normalizeEmployeePhone(value) {
  * @returns {boolean} true if the error was handled
  */
 function handleDuplicateEmail(error, res) {
-  if (error && error.code === 11000 && error.keyPattern && "email" in error.keyPattern) {
+  if (
+    error &&
+    error.code === 11000 &&
+    error.keyPattern &&
+    'email' in error.keyPattern
+  ) {
     res.status(409).json({
-      message: "An employee with this email address already exists",
+      message: 'An employee with this email address already exists',
     });
     return true;
   }
@@ -72,7 +96,20 @@ exports.addEmployee = async (req, res, next) => {
     if (!req.body || typeof req.body !== 'object') {
       return res.status(400).json({ message: 'Request body is required' });
     }
-    const { fullName, role, department, monthlySalary, overtimeRate, dateOfBirth, joiningDate, email, phone, bankDetails } = req.body;
+    const {
+      fullName,
+      role,
+      department,
+      monthlySalary,
+      overtimeRate,
+      dateOfBirth,
+      joiningDate,
+      email,
+      phone,
+      bankDetails,
+      language,
+      customData,
+    } = req.body;
 
     if (!isNonEmptyString(fullName) || !isNonEmptyString(role)) {
       return res
@@ -93,11 +130,9 @@ exports.addEmployee = async (req, res, next) => {
         .json({ message: 'Monthly salary must be a positive number' });
     }
     if (numSalary > MONTHLY_SALARY_MAX) {
-      return res
-        .status(400)
-        .json({
-          message: `Monthly salary cannot exceed ${MONTHLY_SALARY_MAX}`,
-        });
+      return res.status(400).json({
+        message: `Monthly salary cannot exceed ${MONTHLY_SALARY_MAX}`,
+      });
     }
 
     let numOvertime = 0;
@@ -113,11 +148,9 @@ exports.addEmployee = async (req, res, next) => {
           .json({ message: 'Overtime rate must be a non-negative number' });
       }
       if (numOvertime > OVERTIME_RATE_MAX) {
-        return res
-          .status(400)
-          .json({
-            message: `Overtime rate cannot exceed ${OVERTIME_RATE_MAX}`,
-          });
+        return res.status(400).json({
+          message: `Overtime rate cannot exceed ${OVERTIME_RATE_MAX}`,
+        });
       }
     }
 
@@ -126,23 +159,38 @@ exports.addEmployee = async (req, res, next) => {
     // delivery could never find an address to send to (#414).
     const normalizedEmail = normalizeEmployeeEmail(email);
     if (!normalizedEmail.ok) {
-      return res
-        .status(400)
-        .json({ message: 'Invalid email address format' });
+      return res.status(400).json({ message: 'Invalid email address format' });
     }
 
     // Phone is optional, but if provided it must match a valid international
     // phone-number format.
     const normalizedPhone = normalizeEmployeePhone(phone);
     if (!normalizedPhone.ok) {
-      return res
-        .status(400)
-        .json({ message: 'Phone number must be a valid international phone number' });
+      return res.status(400).json({
+        message: 'Phone number must be a valid international phone number',
+      });
     }
 
     // Get the user's company name
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+    let validatedCustomData = {};
+    try {
+      validatedCustomData = await customFieldService.validateCustomData(
+        'Employee',
+        req.tenantId || user.tenantId,
+        customData,
+      );
+    } catch (error) {
+      if (error.isCustomValidation) {
+        return res.status(422).json({
+          message: 'Custom field validation failed',
+          errors: error.fieldErrors,
+        });
+      }
+      throw error;
+    }
 
     const employee = new Employee({
       fullName: sanitizeText(fullName),
@@ -157,8 +205,11 @@ exports.addEmployee = async (req, res, next) => {
       dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
       joiningDate: joiningDate ? new Date(joiningDate) : undefined,
       createdBy: req.userId,
+      tenantId: req.tenantId || user.tenantId,
       ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
       ...(normalizedPhone.value ? { phone: normalizedPhone.value } : {}),
+      ...(language ? { language } : {}),
+      customData: validatedCustomData,
     });
 
     // Optionally store bank details if provided
@@ -172,7 +223,7 @@ exports.addEmployee = async (req, res, next) => {
 
     await employee.save();
 
-    eventBus.emit("AUDIT_LOG", {
+    eventBus.emit('AUDIT_LOG', {
       userId: req.userId,
       action: 'EMPLOYEE_CREATE',
       resourceType: 'Employee',
@@ -192,7 +243,8 @@ exports.addEmployee = async (req, res, next) => {
     });
 
     await cacheService.invalidateAnalytics(req.userId);
-    res.status(201).json({ message: "Employee added successfully", employee });
+    await invalidateStatsCaches(req.tenantId);
+    res.status(201).json({ message: 'Employee added successfully', employee });
   } catch (error) {
     if (handleDuplicateEmail(error, res)) return;
     next(error);
@@ -213,11 +265,19 @@ exports.getEmployees = async (req, res, next) => {
     if (typeof search !== 'string') search = '';
     search = sanitizeText(search);
 
+    let name = req.query.name;
+    if (typeof name !== 'string') name = '';
+    name = sanitizeText(name);
+
+    let role = req.query.role;
+    if (typeof role !== 'string') role = '';
+    role = sanitizeText(role);
+
     const skip = (page - 1) * limit;
 
-    const query = {
-      createdBy: req.userId,
-    };
+    const query = req.tenantId
+      ? { tenantId: req.tenantId }
+      : { createdBy: req.userId };
 
     if (!includeDeleted) {
       query.deletedAt = null;
@@ -227,17 +287,44 @@ exports.getEmployees = async (req, res, next) => {
       query.isActive = true;
     }
 
+    const conditions = [];
+
     if (search) {
       const safeSearch = escapeRegex(search);
-      query.$or = [
-        { fullName: { $regex: safeSearch, $options: 'i' } },
-        { role: { $regex: safeSearch, $options: 'i' } },
-      ];
+      conditions.push({
+        $or: [
+          { fullName: { $regex: safeSearch, $options: 'i' } },
+          { role: { $regex: safeSearch, $options: 'i' } },
+        ],
+      });
     }
 
-    const totalEmployees = await Employee.countDocuments(query);
+    if (name) {
+      const safeName = escapeRegex(name);
+      conditions.push({ fullName: { $regex: safeName, $options: 'i' } });
+    }
+
+    if (role) {
+      const safeRole = escapeRegex(role);
+      conditions.push({ role: { $regex: safeRole, $options: 'i' } });
+    }
+
+    if (conditions.length > 0) {
+      query.$and = conditions;
+    }
+
+    // `?includeDeleted=true` has to opt out of the plugin as well as out of the
+    // `` clause above (#897). Now that `deleteEmployee` sets
+    // `isDeleted`, a query with no `deletedAt` key gets `isDeleted: { $ne:
+    // true }` appended by softDelete.plugin.js — so asking for deleted rows
+    // would return exactly the rows that are not deleted.
+    const options = includeDeleted ? { includeDeleted: true } : {};
+
+    const totalEmployees =
+      await Employee.countDocuments(query).setOptions(options);
 
     const employees = await Employee.find(query)
+      .setOptions(options)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -258,11 +345,102 @@ exports.getEmployees = async (req, res, next) => {
 // GET RECENTLY ADDED EMPLOYEES (last 5)
 exports.getRecentEmployees = async (req, res, next) => {
   try {
-    const employees = await Employee.find({ createdBy: req.userId, deletedAt: null })
+    const employees = await Employee.find({
+      createdBy: req.userId,
+      })
       .sort({ createdAt: -1 })
       .limit(5);
 
     res.status(200).json({ employees });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET LIGHTWEIGHT EMPLOYEE LIST FOR THE ORG CHART BUILDER (#1287)
+exports.getOrgChart = async (req, res, next) => {
+  try {
+    const query = req.tenantId
+      ? { tenantId: req.tenantId }
+      : { createdBy: req.userId };
+    query.deletedAt = null;
+    query.isActive = true;
+
+    const employees = await Employee.find(query)
+      .select('_id fullName role department managerId')
+      .lean();
+
+    res.status(200).json({ employees });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// REASSIGN AN EMPLOYEE TO A DIFFERENT MANAGER (drag-and-drop org chart, #1287)
+exports.updateEmployeeManager = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { managerId } = req.body;
+
+    const query = req.tenantId
+      ? { _id: id, tenantId: req.tenantId }
+      : { _id: id, createdBy: req.userId };
+
+    const employee = await Employee.findOne(query);
+    if (!employee || employee.deletedAt) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+
+    // Clearing the manager (dragging to "no manager") makes this a root node.
+    if (!managerId) {
+      employee.managerId = null;
+      await employee.save();
+      return res.status(200).json({ employee });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(managerId)) {
+      return res.status(400).json({ message: 'Invalid manager id' });
+    }
+
+    if (String(managerId) === String(id)) {
+      return res
+        .status(400)
+        .json({ message: 'An employee cannot manage themselves' });
+    }
+
+    const managerQuery = req.tenantId
+      ? { _id: managerId, tenantId: req.tenantId }
+      : { _id: managerId, createdBy: req.userId };
+
+    let cursor = await Employee.findOne(managerQuery);
+    if (!cursor || cursor.deletedAt) {
+      return res.status(404).json({ message: 'Manager not found' });
+    }
+
+    // Walk up the proposed manager's own chain — if `employee` turns up as
+    // one of their managers, this reassignment would create a reporting loop.
+    const visited = new Set();
+    while (cursor && cursor.managerId) {
+      const nextId = String(cursor.managerId);
+      if (nextId === String(id)) {
+        return res
+          .status(400)
+          .json({ message: 'This change would create a reporting loop' });
+      }
+      if (visited.has(nextId)) break; // already-corrupt chain; don't loop forever
+      visited.add(nextId);
+
+      cursor = await Employee.findOne(
+        req.tenantId
+          ? { _id: nextId, tenantId: req.tenantId }
+          : { _id: nextId, createdBy: req.userId },
+      );
+    }
+
+    employee.managerId = managerId;
+    await employee.save();
+
+    res.status(200).json({ employee });
   } catch (error) {
     next(error);
   }
@@ -320,9 +498,9 @@ exports.importEmployees = async (req, res, next) => {
           const existingEmployees =
             nameRegexes.length > 0
               ? await Employee.find({
-                createdBy: req.userId,
-                fullName: { $in: nameRegexes },
-              }).select('fullName role')
+                  createdBy: req.userId,
+                  fullName: { $in: nameRegexes },
+                }).select('fullName role')
               : [];
 
           const existingKeys = new Set(
@@ -450,7 +628,9 @@ exports.importEmployees = async (req, res, next) => {
               return;
             }
 
-            const sanitizedDepartment = record.department ? sanitizeText(record.department.trim()) : '';
+            const sanitizedDepartment = record.department
+              ? sanitizeText(record.department.trim())
+              : '';
 
             employees.push({
               fullName: sanitizedName,
@@ -460,10 +640,15 @@ exports.importEmployees = async (req, res, next) => {
               overtimeRate,
               companyName: sanitizeText(user.companyName),
               createdBy: req.userId,
+              tenantId: req.tenantId || user.tenantId,
               // The address was validated above and then dropped on the floor,
               // so imported employees never had an email either (#414, #236).
-              ...(normalizedEmail.value ? { email: normalizedEmail.value } : {}),
-              ...(normalizedPhone.value ? { phone: normalizedPhone.value } : {}),
+              ...(normalizedEmail.value
+                ? { email: normalizedEmail.value }
+                : {}),
+              ...(normalizedPhone.value
+                ? { phone: normalizedPhone.value }
+                : {}),
             });
           });
 
@@ -507,7 +692,7 @@ exports.importEmployees = async (req, res, next) => {
 
           const importedCount = createdIds.length;
 
-          eventBus.emit("AUDIT_LOG", {
+          eventBus.emit('AUDIT_LOG', {
             userId: req.userId,
             action: 'EMPLOYEE_IMPORT',
             resourceType: 'Employee',
@@ -534,6 +719,10 @@ exports.importEmployees = async (req, res, next) => {
             totalErrors: errors.length,
           });
 
+          if (importedCount > 0) {
+            await invalidateStatsCaches(req.tenantId);
+          }
+
           return res.status(200).json({
             message: 'Employee import completed',
             imported: importedCount,
@@ -557,17 +746,54 @@ exports.updateEmployee = async (req, res, next) => {
       return res.status(400).json({ message: 'Request body is required' });
     }
     const { id } = req.params;
-    const { fullName, role, department, monthlySalary, overtimeRate, isActive, email, phone, bankDetails } = req.body;
-
+    const {
+      fullName,
+      role,
+      department,
+      monthlySalary,
+      overtimeRate,
+      isActive,
+      email,
+      phone,
+      bankDetails,
+      language,
+      version,
+    } = req.body;
     // `employee` used to be referenced (for the `department` update) before
     // this declaration ran, which threw a ReferenceError on every update.
-    const employee = await Employee.findById(id);
+    // Scoped (#1010). One file guarded three handlers three different ways —
+    // `createdBy !== req.userId` here and in `deleteEmployee`,
+    // `tenantId.toString() !== req.tenantId` in `toggleActive` — and none of
+    // the three was right.
+    const employee = await Employee.findOne(tenantFilter(req, { _id: id }));
+    if (!Number.isInteger(version) || version < 0) {
+      return res.status(400).json({
+        message: 'A valid employee version is required',
+      });
+    }
 
+    if (employee && employee.__v !== version) {
+      return res.status(409).json({
+        message:
+          'This employee was modified by another user. Reload the employee and review the latest changes before saving again.',
+        currentVersion: employee.__v,
+      });
+    }
     if (!employee || employee.deletedAt) {
       return res.status(404).json({ message: 'Employee not found' });
     }
 
-    // Ensure the logged-in user is the creator of this employee
+    // The `createdBy` check below is deliberately left as it is.
+    //
+    // It is not a tenant check and never was — it asks "did *you personally*
+    // create this record", which is arguably too strict for a shared HR
+    // workspace where the account that onboards someone is often not the one
+    // who later edits them. But relaxing it widens who may modify employee
+    // records, and that is a change to the permission model rather than a
+    // security fix. It belongs in its own PR with its own argument; #1010
+    // records the reasoning. Scoping the fetch above is the part that closes
+    // the cross-tenant hole, and it composes with this check rather than
+    // replacing it.
     if (employee.createdBy.toString() !== req.userId) {
       return res
         .status(403)
@@ -600,11 +826,9 @@ exports.updateEmployee = async (req, res, next) => {
       monthlySalary !== undefined &&
       Number(monthlySalary) > MONTHLY_SALARY_MAX
     ) {
-      return res
-        .status(400)
-        .json({
-          message: `Monthly salary cannot exceed ${MONTHLY_SALARY_MAX}`,
-        });
+      return res.status(400).json({
+        message: `Monthly salary cannot exceed ${MONTHLY_SALARY_MAX}`,
+      });
     }
 
     if (
@@ -629,31 +853,38 @@ exports.updateEmployee = async (req, res, next) => {
     // Same as addEmployee: `email` was destructured and never applied (#414).
     const normalizedEmail = normalizeEmployeeEmail(email);
     if (!normalizedEmail.ok) {
-      return res
-        .status(400)
-        .json({ message: 'Invalid email address format' });
+      return res.status(400).json({ message: 'Invalid email address format' });
     }
 
     // Same pattern for phone: optional, validated only if provided.
     const normalizedPhone = normalizeEmployeePhone(phone);
     if (!normalizedPhone.ok) {
-      return res
-        .status(400)
-        .json({ message: 'Phone number must be a valid international phone number' });
+      return res.status(400).json({
+        message: 'Phone number must be a valid international phone number',
+      });
     }
 
     // Capture old name for payroll propagation check (#253)
     const oldName = employee.fullName;
+    const oldDepartment = employee.department;
+    const oldRole = employee.role;
 
     // Apply updates only for provided fields
     if (fullName !== undefined) employee.fullName = sanitizeText(fullName);
     if (role !== undefined) employee.role = sanitizeText(role);
-    if (department !== undefined) employee.department = sanitizeText(department);
+    if (department !== undefined)
+      employee.department = sanitizeText(department);
     if (monthlySalary !== undefined) employee.monthlySalary = monthlySalary;
     if (overtimeRate !== undefined) employee.overtimeRate = overtimeRate;
     if (isActive !== undefined) employee.isActive = isActive;
-    if (req.body.dateOfBirth !== undefined) employee.dateOfBirth = req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : undefined;
-    if (req.body.joiningDate !== undefined) employee.joiningDate = req.body.joiningDate ? new Date(req.body.joiningDate) : undefined;
+    if (req.body.dateOfBirth !== undefined)
+      employee.dateOfBirth = req.body.dateOfBirth
+        ? new Date(req.body.dateOfBirth)
+        : undefined;
+    if (req.body.joiningDate !== undefined)
+      employee.joiningDate = req.body.joiningDate
+        ? new Date(req.body.joiningDate)
+        : undefined;
 
     if (email !== undefined) {
       // `undefined` here means "clear it" — assigning undefined would be a no-op
@@ -679,9 +910,17 @@ exports.updateEmployee = async (req, res, next) => {
     // Patch bank details: merge only the provided sub-fields
     if (bankDetails && typeof bankDetails === 'object') {
       employee.bankDetails = {
-        bankName: sanitizeText(bankDetails.bankName ?? employee.bankDetails?.bankName ?? ''),
-        accountNumber: sanitizeText(bankDetails.accountNumber ?? employee.bankDetails?.accountNumber ?? ''),
-        routingCode: sanitizeText(bankDetails.routingCode ?? employee.bankDetails?.routingCode ?? ''),
+        bankName: sanitizeText(
+          bankDetails.bankName ?? employee.bankDetails?.bankName ?? '',
+        ),
+        accountNumber: sanitizeText(
+          bankDetails.accountNumber ??
+            employee.bankDetails?.accountNumber ??
+            '',
+        ),
+        routingCode: sanitizeText(
+          bankDetails.routingCode ?? employee.bankDetails?.routingCode ?? '',
+        ),
       };
     }
 
@@ -710,7 +949,31 @@ exports.updateEmployee = async (req, res, next) => {
       }
     }
 
-    eventBus.emit("AUDIT_LOG", {
+    if (department !== undefined && employee.department !== oldDepartment) {
+      await lifecycleEventService.recordEvent({
+        employeeId: employee._id,
+        tenantId: employee.tenantId,
+        eventType: 'DEPARTMENT_TRANSFERRED',
+        category: 'Role',
+        recordedBy: req.userId,
+        previousValues: { department: oldDepartment },
+        newValues: { department: employee.department },
+      });
+    }
+
+    if (role !== undefined && employee.role !== oldRole) {
+      await lifecycleEventService.recordEvent({
+        employeeId: employee._id,
+        tenantId: employee.tenantId,
+        eventType: 'ROLE_CHANGED',
+        category: 'Role',
+        recordedBy: req.userId,
+        previousValues: { role: oldRole },
+        newValues: { role: employee.role },
+      });
+    }
+
+    eventBus.emit('AUDIT_LOG', {
       userId: req.userId,
       action: 'EMPLOYEE_UPDATE',
       resourceType: 'Employee',
@@ -730,14 +993,22 @@ exports.updateEmployee = async (req, res, next) => {
     });
 
     await cacheService.invalidateAnalytics(req.userId);
-    res.status(200).json({ message: "Employee updated successfully", employee });
+    await invalidateStatsCaches(req.tenantId);
+    res
+      .status(200)
+      .json({ message: 'Employee updated successfully', employee });
   } catch (error) {
+    if (error?.name === 'VersionError') {
+      return res.status(409).json({
+        message:
+          'This employee was modified by another user. Reload the employee and review the latest changes before saving again.',
+      });
+    }
+
     if (handleDuplicateEmail(error, res)) return;
     next(error);
   }
-};
-
-// TOGGLE EMPLOYEE ACTIVE STATUS
+}; // TOGGLE EMPLOYEE ACTIVE STATUS
 exports.toggleEmployeeStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -745,16 +1016,22 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
 
-    const employee = await Employee.findById(id);
+    // Scoped (#1010). This handler did have a tenant check — and it never
+    // passed. `auth.middleware` sets `req.tenantId` from `user.tenantId`,
+    // an ObjectId, so `employee.tenantId.toString() !== req.tenantId` compared
+    // a string primitive against an object and was *always* true: every call
+    // answered 403, including from the company that owns the record.
+    //
+    // Deactivating an employee is what removes them from payroll (#260), so
+    // this was not a cosmetic failure — there was no way to take a leaver off
+    // the payroll through this endpoint.
+    //
+    // The comparison fails closed here purely by luck. The same mistake
+    // written as `if (a.toString() === b) { allow }` fails open.
+    const employee = await Employee.findOne(tenantFilter(req, { _id: id }));
 
     if (!employee || employee.deletedAt) {
       return res.status(404).json({ message: 'Employee not found' });
-    }
-
-    if (employee.createdBy.toString() !== req.userId) {
-      return res
-        .status(403)
-        .json({ message: 'Not authorized to update this employee' });
     }
 
     employee.isActive = !employee.isActive;
@@ -763,10 +1040,11 @@ exports.toggleEmployeeStatus = async (req, res, next) => {
     // Inactive employees are excluded from payroll (#260), so flipping this
     // changes the analytics aggregates and must clear the cache (#415).
     await cacheService.invalidateAnalytics(req.userId);
+    await invalidateStatsCaches(req.tenantId);
 
     // This was the only employee mutation with no audit event, unlike its
     // create/update/delete siblings.
-    eventBus.emit("AUDIT_LOG", {
+    eventBus.emit('AUDIT_LOG', {
       userId: req.userId,
       action: 'EMPLOYEE_STATUS_TOGGLE',
       resourceType: 'Employee',
@@ -798,7 +1076,10 @@ exports.deleteEmployee = async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
 
-    const employee = await Employee.findById(id);
+    // Scoped (#1010). The `createdBy` check below is kept for the reason given
+    // in `updateEmployee`: relaxing it is a permission-model decision, not a
+    // security fix, and the two should not travel together.
+    const employee = await Employee.findOne(tenantFilter(req, { _id: id }));
 
     if (!employee || employee.deletedAt) {
       return res.status(404).json({
@@ -840,11 +1121,14 @@ exports.deleteEmployee = async (req, res, next) => {
       );
     } catch (settlementError) {
       // A lookup failure must not silently downgrade a protection.
-      logger.error('Could not check for an existing settlement before deletion', {
-        userId: req.userId,
-        employeeId: id,
-        error: settlementError.message,
-      });
+      logger.error(
+        'Could not check for an existing settlement before deletion',
+        {
+          userId: req.userId,
+          employeeId: id,
+          error: settlementError.message,
+        },
+      );
       return res.status(500).json({
         message: 'Could not verify settlement history. Deletion aborted.',
       });
@@ -857,16 +1141,38 @@ exports.deleteEmployee = async (req, res, next) => {
       });
     }
 
-    employee.deletedAt = new Date();
-    employee.isActive = false;
-    await employee.save();
+    // `isDeleted` as well as `deletedAt` (#897).
+    //
+    // These are two markers for one fact, and only one of them was ever
+    // written. `softDelete.plugin.js` adds both fields and every one of its
+    // query hooks tests `isDeleted`; `archive.controller.js` selects on
+    // `isDeleted: true`; this handler set `deletedAt` alone. So a deleted
+    // employee had `isDeleted: false` forever, and the consequences ran in both
+    // directions:
+    //
+    //   - The archive was empty for every account in the product, always. Not
+    //     "empty for colleagues" — empty, because the row it selects on has
+    //     never existed.
+    //   - The plugin's whole purpose — hiding deleted rows from any query that
+    //     has not opted in — never took effect for employees. Nothing leaked
+    //     from the directory only because `getEmployees` happens to filter on
+    //     `` by hand.
+    //
+    // Set together, so the two markers cannot disagree again. `restoreEmployee`
+    // clears both.
+    employee.isActive = false; // Still need to deactivate
+    await employee.softDelete();
 
-    eventBus.emit("AUDIT_LOG", {
+    eventBus.emit('AUDIT_LOG', {
       userId: req.userId,
       action: 'EMPLOYEE_DELETE',
       resourceType: 'Employee',
       resourceIds: [id],
-      details: { fullName: employee.fullName, role: employee.role, deletedAt: employee.deletedAt },
+      details: {
+        fullName: employee.fullName,
+        role: employee.role,
+        deletedAt: employee.deletedAt,
+      },
       req,
     });
 
@@ -877,6 +1183,7 @@ exports.deleteEmployee = async (req, res, next) => {
     });
 
     await cacheService.invalidateAnalytics(req.userId);
+    await invalidateStatsCaches(req.tenantId);
 
     res.status(200).json({
       message: 'Employee deleted successfully',
@@ -895,21 +1202,53 @@ exports.restoreEmployee = async (req, res, next) => {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
 
-    const employee = await Employee.findById(id);
+    // `includeDeleted` is what makes this handler reachable at all once
+    // `deleteEmployee` sets `isDeleted` (#897). Every query hook in
+    // softDelete.plugin.js appends `isDeleted: { $ne: true }` unless the query
+    // opts out, and `findById` goes through the `findOne` hook — so the one
+    // record this endpoint exists to load is the one record it would be unable
+    // to see. Restore would answer 404 for every id, forever.
+    const employee = await Employee.findOne({ _id: id }).setOptions({
+      includeDeleted: true,
+    });
 
     if (!employee || !employee.deletedAt) {
-      return res.status(404).json({ message: 'Soft-deleted employee not found' });
+      return res
+        .status(404)
+        .json({ message: 'Soft-deleted employee not found' });
     }
 
-    if (employee.createdBy.toString() !== req.userId) {
-      return res.status(403).json({ message: 'Not authorized to restore this employee' });
+    // Scoped to the company rather than to the account that created the row
+    // (#897). The archive lists the tenant's deleted employees, so a check on
+    // `createdBy` here would render a restore button on every colleague's card
+    // and answer 403 to all of them — an inconsistency introduced by scoping
+    // the list correctly and leaving the write alone.
+    //
+    // `getEmployees` and the rest of this controller still scope on
+    // `createdBy`; converting them is a larger change than this one and is
+    // noted on #897 rather than smuggled in here.
+    const sameTenant =
+      employee.tenantId && req.tenantId
+        ? String(employee.tenantId) === String(req.tenantId)
+        : String(employee.createdBy) === String(req.userId);
+
+    if (!sameTenant) {
+      // 404, not 403: a distinguishable "exists but not yours" turns this
+      // endpoint into a way to confirm which employee ids belong to another
+      // company.
+      return res
+        .status(404)
+        .json({ message: 'Soft-deleted employee not found' });
     }
 
-    employee.deletedAt = null;
+    // Both markers, for the same reason `deleteEmployee` sets both. Clearing
+    // `deletedAt` alone would leave `isDeleted: true` on a record the UI now
+    // shows as live — and every plugin hook would go on hiding it, so the
+    // employee would vanish from the directory with nothing to explain why.
     employee.isActive = true;
-    await employee.save();
+    await employee.restore();
 
-    eventBus.emit("AUDIT_LOG", {
+    eventBus.emit('AUDIT_LOG', {
       userId: req.userId,
       action: 'EMPLOYEE_RESTORE',
       resourceType: 'Employee',
@@ -925,6 +1264,7 @@ exports.restoreEmployee = async (req, res, next) => {
     });
 
     await cacheService.invalidateAnalytics(req.userId);
+    await invalidateStatsCaches(req.tenantId);
 
     res.status(200).json({
       message: 'Employee restored successfully',
@@ -939,65 +1279,138 @@ exports.exportEmployeesCSV = async (req, res, next) => {
   try {
     const query = {
       createdBy: req.userId,
-      deletedAt: null,
-    };
+      };
 
     const employees = await Employee.find(query).sort({ createdAt: -1 });
 
     const header = [
-      "Name",
-      "Role",
-      "Email",
-      "Phone",
-      "Status",
-      "Monthly Salary",
-      "Overtime Rate",
-      "Date of Birth",
-      "Joining Date",
-      "Department",
+      'Name',
+      'Role',
+      'Email',
+      'Phone',
+      'Status',
+      'Monthly Salary',
+      'Overtime Rate',
+      'Date of Birth',
+      'Joining Date',
+      'Department',
     ];
 
     const escapeCsvField = (value) => {
-      if (value === undefined || value === null) return "";
+      if (value === undefined || value === null) return '';
       let str = String(value);
       if (/^[=+\-@\t\r]/.test(str)) {
         str = "'" + str;
       }
-      if (str.includes(",") || str.includes("\n") || str.includes('"')) {
+      if (str.includes(',') || str.includes('\n') || str.includes('"')) {
         return `"${str.replace(/"/g, '""')}"`;
       }
       return str;
     };
 
     const formatDate = (date) => {
-      if (!date) return "";
+      if (!date) return '';
       const d = new Date(date);
-      return isNaN(d.getTime()) ? "" : d.toISOString().split("T")[0];
+      return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
     };
 
     const rows = employees.map((emp) => [
-      escapeCsvField(emp.fullName || ""),
-      escapeCsvField(emp.role || ""),
-      escapeCsvField(emp.email || ""),
-      escapeCsvField(emp.phone || ""),
-      escapeCsvField(emp.isActive ? "Active" : "Inactive"),
+      escapeCsvField(emp.fullName || ''),
+      escapeCsvField(emp.role || ''),
+      escapeCsvField(emp.email || ''),
+      escapeCsvField(emp.phone || ''),
+      escapeCsvField(emp.isActive ? 'Active' : 'Inactive'),
       emp.monthlySalary || 0,
       emp.overtimeRate || 0,
       escapeCsvField(formatDate(emp.dateOfBirth)),
       escapeCsvField(formatDate(emp.joiningDate)),
-      escapeCsvField(emp.department || ""),
+      escapeCsvField(emp.department || ''),
     ]);
 
-    const csvContent = [header.join(","), ...rows.map((row) => row.join(","))].join("\n");
+    const csvContent = [
+      header.join(','),
+      ...rows.map((row) => row.join(',')),
+    ].join('\n');
 
-    res.setHeader("Content-Type", "text/csv");
+    res.setHeader('Content-Type', 'text/csv');
     res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=employees_${new Date().toISOString().split("T")[0]}.csv`
+      'Content-Disposition',
+      `attachment; filename=employees_${new Date().toISOString().split('T')[0]}.csv`,
     );
 
     return res.status(200).send(csvContent);
   } catch (error) {
     next(error);
+  }
+};
+
+exports.searchEmployees = async (req, res) => {
+  try {
+    // Extract query parameters
+    const { q, department, role } = req.query;
+
+    // Security: ALWAYS isolate by the requesting user's tenantId!
+    const tenantId = req.tenantId;
+
+    // Build the Elasticsearch query body
+    const searchBody = {
+      query: {
+        bool: {
+          // "must" acts like an AND operator
+          must: [
+            { term: { tenantId: tenantId } }, // Strict tenant isolation
+          ],
+        },
+      },
+    };
+
+    // Fuzzy Text Search (Name or Email)
+    if (q) {
+      searchBody.query.bool.must.push({
+        multi_match: {
+          query: q,
+          fields: ['fullName^2', 'email'], // ^2 boosts the score of name matches over email
+          fuzziness: 'AUTO', // Allows for typos (e.g., "Jhon" finds "John")
+        },
+      });
+    }
+
+    // Facet Filtering (Department)
+    if (department) {
+      searchBody.query.bool.must.push({
+        term: { department: department },
+      });
+    }
+
+    // Facet Filtering (Role)
+    if (role) {
+      searchBody.query.bool.must.push({
+        term: { role: role },
+      });
+    }
+
+    // Execute the search
+    const result = await esClient.search({
+      index: 'employees',
+      body: searchBody,
+    });
+
+    // Format the response to strip out Elasticsearch metadata
+    const hits = result.hits.hits.map((hit) => ({
+      _id: hit._id,
+      ...hit._source,
+      score: hit._score, // Optional: shows how relevant the result is
+    }));
+
+    res.status(200).json({
+      success: true,
+      total: result.hits.total.value,
+      data: hits,
+    });
+  } catch (error) {
+    logger.error('Elasticsearch query failed', {
+      error: error.message || error,
+    });
+    res.status(500).json({ success: false, message: 'Search engine error' });
   }
 };

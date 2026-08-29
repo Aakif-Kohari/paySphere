@@ -1,4 +1,4 @@
-import { useSelector } from 'react-redux';
+import { useAppStore } from '../../store/useAppStore';
 import {
     Cell,
     Legend,
@@ -18,8 +18,8 @@ const COLORS = [
   "#dc2626",
 ];
 
-export default function SalaryDistributionChart({ data }) {
-  const themeMode = useSelector((state) => state.ui.themeMode);
+export default function SalaryDistributionChart({ data = [] }) {
+  const themeMode = useAppStore((state) => state.themeMode);
   const isDark = themeMode === 'dark';
   const tooltipContent = createChartTooltip({
     isDark,

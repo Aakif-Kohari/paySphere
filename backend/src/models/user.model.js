@@ -4,19 +4,21 @@ const {
   ALL_ACCOUNT_TYPES,
   DEFAULT_ACCOUNT_TYPE,
 } = require('../config/accountTypes');
-
+const { EMAIL_REGEX } = require('../utils/validators');
 const userSchema = new mongoose.Schema(
   {
     fullName: {
       type: String,
       required: true,
     },
-    email: {
+email: {
       type: String,
       required: true,
       unique: true,
-    },
-    companyLogoData: { type: String, default: '' },
+      trim: true,
+      lowercase: true,
+      match: [EMAIL_REGEX, 'Please provide a valid email address'],
+    },    companyLogoData: { type: String, default: '' },
     companyName: {
       type: String,
       required: true,
@@ -53,16 +55,20 @@ const userSchema = new mongoose.Schema(
       default: DEFAULT_ACCOUNT_TYPE,
       index: true,
     },
-    password: {
+password: {
       type: String,
       required: false,
+      validate: {
+        // Only checked when a password is actually being set — accounts
+        // created via Google sign-in (googleId) have no password at all.
+        validator: (value) => !value || value.length >= 8,
+        message: 'Password must be at least 8 characters long',
+      },
+    },    passwordHistory: {
+      type: [String],
+      default: [],
     },
     googleId: {
-      type: String,
-      unique: true,
-      sparse: true,
-    },
-    githubId: {
       type: String,
       unique: true,
       sparse: true,
@@ -75,6 +81,18 @@ const userSchema = new mongoose.Schema(
       default: '',
     },
     isTwoFactorEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    mfaSecret: {
+      type: String,
+      default: null,
+    },
+    mfaPendingSecret: {
+      type: String,
+      default: null,
+    },
+    isMfaEnabled: {
       type: Boolean,
       default: false,
     },
@@ -181,6 +199,14 @@ const userSchema = new mongoose.Schema(
     tokenVersion: {
       type: Number,
       default: 0,
+    },
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lockUntil: {
+      type: Date,
+      default: null,
     },
   },
   { timestamps: true },

@@ -1,6 +1,7 @@
-/* eslint-disable jsx-a11y/label-has-associated-control */
 import { useEffect, useState } from 'react';
 import api from '../services/api';
+import { useToast } from '../context/ToastContext';
+import { formatDateTime } from '../utils/formatLocale';
 
 const EVENT_LABELS = {
   EMPLOYEE_CREATE: 'Employee Created',
@@ -16,19 +17,10 @@ const EVENT_KEYS = Object.keys(EVENT_LABELS);
 const getErrorMessage = (err) =>
   err.response?.data?.message || 'Something went wrong. Please try again.';
 
-const formatDate = (value) =>
-  value ? new Date(value).toLocaleString() : '—';
-
-const copyToClipboard = async (text) => {
-  try {
-    await navigator.clipboard.writeText(text);
-    alert('Secret copied to clipboard.');
-  } catch {
-    alert('Could not copy automatically. Please copy it manually.');
-  }
-};
+const formatDate = (value) => formatDateTime(value);
 
 export default function WebhooksSection() {
+  const { toast } = useToast();
   const [webhooks, setWebhooks] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,12 +37,21 @@ export default function WebhooksSection() {
   const [deliveries, setDeliveries] = useState([]);
   const [deliveriesLoading, setDeliveriesLoading] = useState(false);
 
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Secret copied to clipboard.');
+    } catch {
+      toast.error('Could not copy automatically. Please copy it manually.');
+    }
+  };
+
   const loadWebhooks = () => {
     setLoading(true);
     api
       .get('/api/webhooks')
       .then((res) => setWebhooks(res.data || []))
-      .catch((err) => alert(getErrorMessage(err)))
+      .catch((err) => toast.error(getErrorMessage(err)))
       .finally(() => setLoading(false));
   };
 
@@ -107,7 +108,7 @@ export default function WebhooksSection() {
       };
       if (editingId) {
         await api.patch(`/api/webhooks/${editingId}`, payload);
-        alert('Webhook endpoint updated successfully!');
+        toast.success('Webhook endpoint updated successfully!');
       } else {
         const res = await api.post('/api/webhooks', payload);
         setRevealedSecret({
@@ -115,7 +116,7 @@ export default function WebhooksSection() {
           secret: res.data.secret,
           url: res.data.url,
         });
-        alert('Webhook endpoint created successfully!');
+        toast.success('Webhook endpoint created successfully!');
       }
       closeForm();
       loadWebhooks();
@@ -133,7 +134,7 @@ export default function WebhooksSection() {
       });
       loadWebhooks();
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -151,8 +152,9 @@ export default function WebhooksSection() {
         secret: res.data.secret,
         url: webhook.url,
       });
+      toast.success('Signing secret regenerated successfully.');
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -169,9 +171,10 @@ export default function WebhooksSection() {
         setShowDeliveriesFor(null);
         setDeliveries([]);
       }
+      toast.success('Webhook endpoint deleted successfully.');
       loadWebhooks();
     } catch (err) {
-      alert(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
     }
   };
 
@@ -189,7 +192,7 @@ export default function WebhooksSection() {
       setDeliveries(res.data || []);
     } catch (err) {
       setShowDeliveriesFor(null);
-      alert(getErrorMessage(err));
+      toast.error(getErrorMessage(err));
     } finally {
       setDeliveriesLoading(false);
     }
@@ -209,6 +212,7 @@ export default function WebhooksSection() {
         </div>
         <button
           onClick={openCreate}
+          aria-label="Add new webhook"
           className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-200 dark:shadow-none transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
         >
           Add Webhook
@@ -237,6 +241,7 @@ export default function WebhooksSection() {
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://api.mycompany.com/webhook/payroll"
+              aria-label="Endpoint URL"
               className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
@@ -251,6 +256,7 @@ export default function WebhooksSection() {
               onChange={(e) => setDescription(e.target.value)}
               maxLength={200}
               placeholder="e.g. Sync to QuickBooks"
+              aria-label="Webhook description"
               className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-800 outline-none text-sm text-gray-900 dark:text-white transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
@@ -273,6 +279,7 @@ export default function WebhooksSection() {
                     type="checkbox"
                     checked={selectedEvents.includes(event)}
                     onChange={() => toggleEvent(event)}
+                    aria-label={`${EVENT_LABELS[event]} event`}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
                   <span className="text-sm font-semibold text-gray-700 dark:text-slate-200">
@@ -284,12 +291,13 @@ export default function WebhooksSection() {
           </div>
 
           {formError && (
-            <p className="text-sm text-red-500 font-medium">{formError}</p>
+            <p className="text-sm text-red-500 font-medium" role="alert">{formError}</p>
           )}
 
           <div className="flex gap-3 justify-end pt-2 border-t border-gray-100 dark:border-slate-800">
             <button
               onClick={closeForm}
+              aria-label="Cancel webhook creation"
               className="px-5 py-2.5 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-bold transition hover:bg-gray-50 dark:hover:bg-slate-700"
             >
               Cancel
@@ -409,11 +417,13 @@ export default function WebhooksSection() {
                         className="sr-only peer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                         checked={webhook.isActive}
                         onChange={() => toggleActive(webhook)}
+                        aria-label={`Toggle active state for ${webhook.url}`}
                       />
                       <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                     <button
                       onClick={openEdit.bind(null, webhook)}
+                      aria-label={`Edit webhook ${webhook.url}`}
                       className="px-3 py-1.5 text-sm font-semibold text-gray-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition"
                     >
                       Edit
@@ -435,6 +445,8 @@ export default function WebhooksSection() {
                 <div className="flex flex-wrap gap-3 pt-1 border-t border-gray-100 dark:border-slate-800">
                   <button
                     onClick={() => toggleDeliveries(webhook)}
+                    aria-expanded={showDeliveriesFor === webhook._id}
+                    aria-label={`${showDeliveriesFor === webhook._id ? 'Hide' : 'View'} deliveries for ${webhook.url}`}
                     className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     {showDeliveriesFor === webhook._id
@@ -443,12 +455,14 @@ export default function WebhooksSection() {
                   </button>
                   <button
                     onClick={() => regenerateSecret(webhook)}
+                    aria-label={`Regenerate secret for ${webhook.url}`}
                     className="text-xs font-semibold text-amber-600 dark:text-amber-500 hover:underline"
                   >
                     Regenerate secret
                   </button>
                   <button
                     onClick={() => deleteWebhook(webhook)}
+                    aria-label={`Delete webhook ${webhook.url}`}
                     className="text-xs font-semibold text-red-600 dark:text-red-400 hover:underline"
                   >
                     Delete
@@ -470,7 +484,7 @@ export default function WebhooksSection() {
                     </p>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm">
+                      <table className="w-full text-left text-sm" aria-label={`Deliveries for ${webhook.url}`}>
                         <thead>
                           <tr className="text-xs uppercase tracking-wider text-gray-500 dark:text-slate-500 border-b border-gray-200 dark:border-slate-800">
                             <th className="py-2 pr-4 font-bold">Event</th>

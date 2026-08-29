@@ -1,45 +1,60 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { HelmetProvider } from 'react-helmet-async'
-import { GoogleOAuthProvider } from '@react-oauth/google'
-import { StyledEngineProvider } from '@mui/material'
-import { Provider } from 'react-redux'
-import { I18nextProvider } from 'react-i18next'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query' // Added for Issue #684
-import i18n from './i18n/i18n'
-import store from './store/store'
-import './index.css'
-import App from './App.jsx'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import * as Sentry from '@sentry/react';
+import * as serviceWorkerRegistration from './serviceWorkerRegistration'; // Added for #1022
+
+// Do not send errors to a placeholder project. Sentry is enabled only when a
+// real DSN has been supplied by the deployment environment.
+if (import.meta.env.VITE_SENTRY_DSN) {
+  Sentry.init({
+    dsn: import.meta.env.VITE_SENTRY_DSN,
+    integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
+    tracesSampleRate: 1.0,
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 0.1,
+    environment: import.meta.env.MODE || 'production',
+  });
+}
+import { HelmetProvider } from 'react-helmet-async';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import App from './App';
+import './index.css';
+import './i18n'; // Initialize i18n before app renders (Issue #736)
+
+import ErrorBoundary from './components/common/ErrorBoundary.jsx';
 
 // Configure QueryClient with default options (Issue #684)
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false, // Disable global auto-refetch on focus to prevent excessive API calls
-      retry: 1,
-    },
+    queries: { refetchOnWindowFocus: false, retry: 1 },
   },
 });
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "250441239388-ldget7kv1v1hvf6vm1r6b0p48fassv43.apps.googleusercontent.com";
-if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
-  console.warn("VITE_GOOGLE_CLIENT_ID is not set in env. Using default fallback Client ID.");
-}
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <HelmetProvider>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </HelmetProvider>
+  </React.StrictMode>,
+);
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <I18nextProvider i18n={i18n}>
-      <StyledEngineProvider injectFirst>
-        <Provider store={store}>
-          <QueryClientProvider client={queryClient}>
-            <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-              <HelmetProvider>
-                <App />
-              </HelmetProvider>
-            </GoogleOAuthProvider>
-          </QueryClientProvider>
-        </Provider>
-      </StyledEngineProvider>
-    </I18nextProvider>
-  </StrictMode>,
-)
+// Register Service Worker for offline caching (Issue #1022)
+if (import.meta.env.PROD) {
+  serviceWorkerRegistration.register({
+    onUpdate: (registration) => {
+      console.log('New content available; please refresh.');
+      // In a real app, show a toast notification prompting the user to reload
+      if (registration && registration.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        window.location.reload();
+      }
+    },
+    onSuccess: () => {
+      console.log('App is available offline.');
+    }
+  });
+} else {
+  serviceWorkerRegistration.unregister();
+}

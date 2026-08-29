@@ -1,0 +1,30 @@
+name: PR Merged Thank You
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  thank-you-comment:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post Thank You Comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const comment = `🎉 Thank you for your contribution and for helping improve PaySphere! Your PR has been merged. If you haven't already, please consider leaving a ⭐️ on the repository to help us grow. Keep up the great work!`;
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body: comment,
+            });

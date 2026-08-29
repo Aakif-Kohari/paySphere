@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import AvatarUpload from '../components/AvatarUpload';
 import ThemeToggle from '../components/ThemeToggle';
-import { logout } from '../features/auth/authSlice';
+import { useToast } from '../context/ToastContext';
+import { useAppStore } from '../store/useAppStore';
+
 import api from '../services/api';
 
 const UserIcon = () => (
@@ -56,7 +58,8 @@ const BellIcon = () => (
 
 export default function ProfileSettings() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const logout = useAppStore((state) => state.logout);
+  const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('profile');
   const [loading, setLoading] = useState(true);
@@ -73,8 +76,6 @@ export default function ProfileSettings() {
     isTwoFactorEnabled: false,
     payrollId: '',
   });
-
-  const fileInputRef = useRef(null);
 
   const [settings, setSettings] = useState({
     notifications: {
@@ -101,8 +102,7 @@ export default function ProfileSettings() {
     api
       .get('/api/auth/settings')
       .then((res) => {
-        setUserProfile((prev) => ({
-          ...prev,
+        setUserProfile({
           fullName: res.data.fullName || '',
           email: res.data.email || '',
           companyName: res.data.companyName || localCompanyName,
@@ -110,34 +110,33 @@ export default function ProfileSettings() {
           isGoogleLinked: res.data.isGoogleLinked || false,
           isTwoFactorEnabled: res.data.isTwoFactorEnabled || false,
           payrollId: res.data.payrollId || '',
-        }));
-
-        if (res.data.settings) {
+        });
+        if (res.data.settings?.notifications) {
           setSettings((prev) => ({
             ...prev,
-            notifications:
-              res.data.settings.notifications || prev.notifications,
+            notifications: res.data.settings.notifications,
           }));
         }
       })
-      .catch((err) => console.error('Failed to fetch settings', err))
+      .catch((err) => console.error(err))
       .finally(() => setLoading(false));
   }, [localCompanyName]);
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
   const handleSaveSettings = async () => {
+    let hasError = false;
     const errors = { fullName: '', email: '' };
 
     if (!userProfile.fullName || !userProfile.fullName.trim()) {
-      errors.fullName = 'Full name cannot be empty.';
+      errors.fullName = 'Full Name is required';
+      hasError = true;
     }
 
-    if (!userProfile.email || !emailRegex.test(userProfile.email.trim())) {
+    if (!userProfile.email || !/\S+@\S+\.\S+/.test(userProfile.email.trim())) {
       errors.email = 'Please enter a valid email address.';
+      hasError = true;
     }
 
-    if (errors.fullName || errors.email) {
+    if (hasError) {
       setProfileErrors(errors);
       return;
     }
@@ -151,46 +150,20 @@ export default function ProfileSettings() {
         email: userProfile.email.trim(),
         avatar: userProfile.avatar,
       });
-      alert('Profile updated successfully!');
+      toast.success('Profile updated successfully!');
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || 'Error saving profile.');
+      toast.error(err.response?.data?.message || 'Error saving profile.');
     }
-  };
-
-  const MAX_AVATAR_SIZE = 2 * 1024 * 1024; // 2 MB
-  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-
-  const handleAvatarChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      alert('Please select an image file (JPEG, PNG, WebP, or GIF).');
-      e.target.value = '';
-      return;
-    }
-
-    if (file.size > MAX_AVATAR_SIZE) {
-      alert('File size must be less than 2 MB.');
-      e.target.value = '';
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setUserProfile((prev) => ({ ...prev, avatar: reader.result }));
-    };
-    reader.readAsDataURL(file);
   };
 
   const handlePasswordUpdate = async () => {
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
     if (!currentPassword || !newPassword) {
-      return alert('Both current and new password are required.');
+      return toast.error('Both current and new password are required.');
     }
     if (!passwordRegex.test(newPassword)) {
-      return alert(
+      return toast.error(
         'New password must be at least 8 characters, contain at least one uppercase letter, one number, and one special character.',
       );
     }
@@ -199,11 +172,11 @@ export default function ProfileSettings() {
         currentPassword,
         newPassword,
       });
-      alert('Password updated successfully!');
+      toast.success('Password updated successfully!');
       setCurrentPassword('');
       setNewPassword('');
     } catch (err) {
-      alert(err.response?.data?.message || 'Error updating password.');
+      toast.error(err.response?.data?.message || 'Error updating password.');
     }
   };
 
@@ -216,10 +189,10 @@ export default function ProfileSettings() {
       return;
     try {
       await api.patch('/api/auth/security/disconnect-google');
-      alert('Google account disconnected successfully!');
+      toast.success('Google account disconnected successfully!');
       setUserProfile((prev) => ({ ...prev, isGoogleLinked: false }));
     } catch (err) {
-      alert(
+      toast.error(
         err.response?.data?.message || 'Error disconnecting Google account.',
       );
     }
@@ -230,22 +203,22 @@ export default function ProfileSettings() {
       const res = await api.post('/api/auth/security/2fa/setup');
       setQrCodeData(res.data);
     } catch (err) {
-      alert(err.response?.data?.message || 'Error starting 2FA setup.');
+      toast.error(err.response?.data?.message || 'Error starting 2FA setup.');
     }
   };
 
   const handleConfirm2FA = async () => {
     if (!twoFactorCode || twoFactorCode.length !== 6) {
-      return alert('Enter the 6-digit code from your authenticator app.');
+      return toast.error('Enter the 6-digit code from your authenticator app.');
     }
     try {
       await api.post('/api/auth/security/2fa/verify', { code: twoFactorCode });
       setUserProfile((prev) => ({ ...prev, isTwoFactorEnabled: true }));
       setQrCodeData(null);
       setTwoFactorCode('');
-      alert('Two-factor authentication enabled!');
+      toast.success('Two-factor authentication enabled!');
     } catch (err) {
-      alert(err.response?.data?.message || 'Invalid code. Try again.');
+      toast.error(err.response?.data?.message || 'Invalid code. Try again.');
     }
   };
 
@@ -303,24 +276,17 @@ export default function ProfileSettings() {
                 <p className="text-sm text-gray-500 dark:text-slate-500 mb-4">
                   {role} at {userProfile.companyName}
                 </p>
-                <div className="flex flex-wrap justify-center sm:justify-start gap-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
-                    ref={fileInputRef}
-                    onChange={handleAvatarChange}
+                <div className="space-y-3">
+                  <AvatarUpload
+                    value={userProfile.avatar}
+                    onChange={(avatar) => setUserProfile((prev) => ({ ...prev, avatar }))}
+                    onError={toast.error}
                   />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-semibold hover:bg-gray-50 dark:hover:bg-slate-700 transition"
-                  >
-                    Change Picture
-                  </button>
                   <button
                     onClick={() =>
                       setUserProfile({ ...userProfile, avatar: '' })
                     }
+                    aria-label="Remove profile picture"
                     className="px-4 py-2 text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
                   >
                     Remove
@@ -340,11 +306,10 @@ export default function ProfileSettings() {
                   onChange={(e) =>
                     setUserProfile({ ...userProfile, fullName: e.target.value })
                   }
-                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
-                    profileErrors.fullName
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.fullName
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
                       : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
-                  }`}
+                    }`}
                 />
                 {profileErrors.fullName && (
                   <p className="text-xs text-red-500 mt-1.5 font-medium">
@@ -362,11 +327,10 @@ export default function ProfileSettings() {
                   onChange={(e) =>
                     setUserProfile({ ...userProfile, email: e.target.value })
                   }
-                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${
-                    profileErrors.email
+                  className={`w-full px-4 py-3 rounded-xl bg-gray-100 dark:bg-slate-900 border focus:ring-2 outline-none text-sm text-gray-900 dark:text-white transition ${profileErrors.email
                       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'
                       : 'border-transparent dark:border-slate-800 focus:border-blue-500 focus:ring-blue-500/20'
-                  }`}
+                    }`}
                 />
                 {profileErrors.email && (
                   <p className="text-xs text-red-500 mt-1.5 font-medium">
@@ -461,11 +425,10 @@ export default function ProfileSettings() {
                   </p>
                 </div>
                 <span
-                  className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                    userProfile.isTwoFactorEnabled
+                  className={`px-2.5 py-1 rounded-full text-xs font-bold ${userProfile.isTwoFactorEnabled
                       ? 'bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400'
                       : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
-                  }`}
+                    }`}
                 >
                   {userProfile.isTwoFactorEnabled ? 'Enabled' : 'Disabled'}
                 </span>
@@ -501,6 +464,7 @@ export default function ProfileSettings() {
                           value={twoFactorCode}
                           onChange={(e) => setTwoFactorCode(e.target.value)}
                           placeholder="6-digit code"
+                          aria-label="6-digit two-factor authentication code"
                           className="px-3 py-2 rounded-lg bg-white dark:bg-slate-900 border text-xs text-center font-bold tracking-widest"
                         />
                         <button
@@ -562,6 +526,7 @@ export default function ProfileSettings() {
                   </div>
                   <button
                     onClick={handleDisconnectGoogle}
+                    aria-label="Disconnect Google Account"
                     className="text-red-600 dark:text-red-400 text-sm font-semibold hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-1.5 rounded-lg transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
                     Disconnect
@@ -605,6 +570,7 @@ export default function ProfileSettings() {
                         !settings.notifications.payrollCompletion,
                       )
                     }
+                    aria-label="Payroll completion notifications"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
@@ -630,6 +596,7 @@ export default function ProfileSettings() {
                         !settings.notifications.systemAlerts,
                       )
                     }
+                    aria-label="System alert notifications"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
@@ -655,6 +622,7 @@ export default function ProfileSettings() {
                         !settings.notifications.emailReminders,
                       )
                     }
+                    aria-label="Email reminder notifications"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
@@ -680,6 +648,7 @@ export default function ProfileSettings() {
                         !settings.notifications.featureAnnouncements,
                       )
                     }
+                    aria-label="Feature announcement notifications"
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
@@ -723,6 +692,7 @@ export default function ProfileSettings() {
             <button
               className="text-gray-500 hover:text-gray-900 dark:hover:text-white"
               onClick={() => navigate(-1)}
+              aria-label="Go back"
             >
               <svg
                 width="24"
@@ -758,7 +728,7 @@ export default function ProfileSettings() {
             </div>
             <button
               onClick={() => {
-                dispatch(logout());
+                logout();
                 localStorage.removeItem('companyName');
                 localStorage.removeItem('currency');
                 navigate('/auth');
@@ -778,11 +748,12 @@ export default function ProfileSettings() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-200 ${
-                      activeTab === tab.id
+                    role="tab"
+                    aria-selected={activeTab === tab.id}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-colors duration-200 ${activeTab === tab.id
                         ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm border border-gray-100 dark:border-slate-800'
                         : 'text-gray-500 dark:text-slate-500 hover:bg-white/60 dark:hover:bg-slate-900/50 hover:text-gray-900 dark:hover:text-white border border-transparent'
-                    }`}
+                      }`}
                   >
                     <span
                       className={
