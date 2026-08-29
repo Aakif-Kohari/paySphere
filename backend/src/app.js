@@ -522,6 +522,9 @@ app.use('/api/compensation', employeeCompensationRoutes);
 const letterTemplateRoutes = require('./routes/letterTemplate.routes');
 app.use('/api/templates', letterTemplateRoutes);
 
+const payslipTemplateRoutes = require('./routes/payslipTemplate.routes');
+app.use('/api/payslip-templates', payslipTemplateRoutes);
+
 // #1346. Its own prefix rather than a sub-path of `/api/payroll`: the
 // discretionary bonus on a payroll row and the statutory bonus under the Act
 // are different money with different authorities, and sharing a namespace
