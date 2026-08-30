@@ -368,6 +368,21 @@ const AUDIT_ACTIONS = [
   'APPRENTICESHIP_STRENGTH_RECORDED',
   'APPRENTICE_ENGAGED',
   'APPRENTICE_CONTRACT_REGISTERED',
+  // EPF International Workers, paragraph 83 (#1971). The determination and the
+  // certificate are audited because each moves a remittance by roughly a factor
+  // of forty, in opposite directions: the determination removes the ₹15,000
+  // ceiling and the certificate stops the contribution altogether. Nothing else
+  // in the product moves that much money on the strength of one field.
+  //
+  // The contribution is audited with the ceiling figure beside the basis
+  // actually used, because that pair is what lets a reviewer tell an intended
+  // full-pay basis from a bug — and a lapsed certificate turns every month
+  // since into an under-remittance carrying section 7Q interest and section 14B
+  // damages under #1875.
+  'IW_STATUS_DETERMINED',
+  'IW_CERTIFICATE_RECORDED',
+  'IW_CONTRIBUTION_COMPUTED',
+  'IW_ONE_FILED',
   'APPRENTICESHIP_ASSESSMENT_COMMITTED',
   // Inter-State Migrant Workmen Act, 1979 (#1826). The comparator is audited
   // for the same reason the recorded strength above is: it is the denominator

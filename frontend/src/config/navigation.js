@@ -525,6 +525,18 @@ export const APP_ROUTES = [
 
   // ── Compliance ───────────────────────────────────────────────────────────
   {
+    // In Compliance rather than in Payroll. The figures are payroll figures,
+    // but the thing that has to be watched is a certificate lapsing on a date
+    // nobody is looking at — and that belongs beside the other obligations with
+    // deadlines rather than beside the run (#1971).
+    path: '/international-workers',
+    component: lazy(() => import('../pages/InternationalWorkerRegister')),
+    appShell: true,
+    label: 'International workers',
+    group: 'compliance',
+    icon: 'globe',
+  },
+  {
     // In Compliance rather than Payroll: the register's subject is who the
     // scheme covers, and the fact people come to it for — that somebody above
     // the ceiling is still covered until the period ends — is a compliance
