@@ -98,6 +98,7 @@ const MOUNTED_ROUTES = [
   ['/api/archive', 'get', '/api/archive/employees'],
   ['/api/workflows', 'get', '/api/workflows'],
   ['/api/flashcards', 'get', '/api/flashcards/my-decks'],
+  ['/api/holidays', 'get', '/api/holidays/rules'],
   ['/api/contract-labour', 'get', '/api/contract-labour/contractors'],
   ['/api/apprenticeships', 'get', '/api/apprenticeships/rules'],
   ['/api/migrant-workmen', 'get', '/api/migrant-workmen/rules'],
@@ -232,6 +233,7 @@ const ROUTER_MOUNTS = {
   employee: '/api/employees',
   employeePortal: '/api/employee-portal',
   esop: '/api/esop',
+  holiday: '/api/holidays',
   professionalTax: '/api/professional-tax',
 
   expense: '/api/expenses',

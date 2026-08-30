@@ -202,6 +202,22 @@ const AUDIT_ACTIONS = [
   'EPS_ASSUMPTIONS_UPDATED',
   'EPS_WAGE_HISTORY_BACKFILLED',
   'EPS_VALUATION_COMMITTED',
+  // National and Festival Holidays Acts (#1970). The substitution is audited
+  // with the holiday's kind on it, because a NATIONAL kind on one of these rows
+  // means the engine's refusal was bypassed — 26 January, 15 August and 2
+  // October cannot be substituted by any agreement, and that is the record an
+  // inspection asks about.
+  //
+  // A holiday worked is audited with both the payable and what was paid,
+  // because the gap between them is the finding: the entitlement is a whole day
+  // at the statutory rate however few hours were worked, and the natural wrong
+  // answer — scaling it by hours through the overtime engine — produces a
+  // smaller number that looks arithmetically reasonable.
+  'HOLIDAY_CALENDAR_OPENED',
+  'HOLIDAY_LIST_SETTLED',
+  'FESTIVAL_HOLIDAY_DECLARED',
+  'HOLIDAY_SUBSTITUTED',
+  'HOLIDAY_WORKED_RECORDED',
   // A salary advance commits future deductions from someone's pay, so
   // issuing, pausing and collecting against one are all financial events
   // and are audited as such (#460).

@@ -173,6 +173,12 @@ const flashcardRoutes = require('./routes/flashcard.routes');
 const webhookRoutes = require('./routes/webhook.routes');
 const apiKeyRoutes = require('./routes/apiKey.routes');
 const integrationRoutes = require('./routes/integration.routes');
+// National and Festival Holidays Acts (#1970). Apart from the leave router
+// because a holiday is not leave: it is not applied for, cannot be refused, is
+// not deducted from a balance, and three of them cannot be moved at all. Apart
+// from the attendance router for the same reason a holiday worked is not
+// overtime — the entitlement is a whole day however few hours were worked.
+const holidayRoutes = require('./routes/nationalFestivalHolidays.routes');
 const archiveRoutes = require('./routes/archive.routes');
 const documentVaultRoutes = require('./routes/documentVault.routes');
 const notificationRoutes = require('./routes/notification.routes');
@@ -661,6 +667,13 @@ app.use('/api/events', companyEventRoutes);
 // payroll and employee events. The controller and models were written in #645
 // but never mounted here, so the whole feature was a 404.
 app.use('/api/webhooks', webhookRoutes);
+
+// #1970. The router owns `/rules`, `/calendars`, `/substitutions`, `/worked`,
+// `/eligibility` and `/position`. It refuses a substitution against 26 January,
+// 15 August or 2 October rather than recording one — that is outside the
+// employer's power rather than a policy they may set — and it produces a
+// payable for a holiday worked without posting it to any run.
+app.use('/api/holidays', holidayRoutes);
 
 // API Keys for B2B system-to-system integrations
 app.use('/api/api-keys', apiKeyRoutes);
