@@ -139,3 +139,69 @@ module.exports = {
   getAnnualReturn,
   customStateSlabOverrides,
 };
+
+/**
+ * GET /api/professional-tax/state-summary
+ *
+ * Summarizing monthly PT liabilities aggregated by state for government compliance filing.
+ */
+exports.getStateSummary = async (req, res, next) => {
+  try {
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const month = Number(req.query.month) || (new Date().getMonth() + 1);
+
+    if (month < 1 || month > 12) {
+      return res.status(400).json({ message: 'Valid month query parameter is required (1-12)' });
+    }
+
+    const financialYear = month >= 4 ? year : year - 1;
+
+    const { result } = await computeYear({
+      tenantId: req.tenantId,
+      financialYear,
+    });
+
+    const summaryMap = new Map();
+    const details = [];
+
+    for (const empYear of result.employees || []) {
+      const line = empYear.lines.find(
+        (l) => l.year === year && l.month === month
+      );
+
+      if (line && line.amount > 0) {
+        const state = line.workState || empYear.workState;
+
+        if (!summaryMap.has(state)) {
+          summaryMap.set(state, {
+            state,
+            employeeCount: 0,
+            totalLiability: 0,
+          });
+        }
+
+        const stateSummary = summaryMap.get(state);
+        stateSummary.employeeCount += 1;
+        stateSummary.totalLiability += line.amount;
+
+        details.push({
+          employeeId: empYear.employeeId,
+          name: empYear.name,
+          state,
+          amount: line.amount,
+          salary: line.salary,
+        });
+      }
+    }
+
+    return res.json({
+      year,
+      month,
+      financialYear,
+      summary: Array.from(summaryMap.values()),
+      details,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};

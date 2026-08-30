@@ -78,6 +78,11 @@ export const APP_ROUTES = [
     component: lazy(() => import('../pages/ResetPassword')),
     isProtected: false,
   },
+  {
+    path: '/verify-payslip',
+    component: lazy(() => import('../pages/payroll/PayslipVerificationPage')),
+    isProtected: false,
+  },
 
   // ── Overview ─────────────────────────────────────────────────────────────
   {
@@ -263,6 +268,16 @@ export const APP_ROUTES = [
 
   // ── Payroll ──────────────────────────────────────────────────────────────
   {
+    path: '/payslip-templates',
+    component: lazy(
+      () => import('../components/payroll/PayslipTemplateDesigner'),
+    ),
+    label: 'Payslip Templates',
+    group: 'payroll',
+    icon: 'document',
+    appShell: true,
+  },
+  {
     path: '/approvals',
     component: lazy(() => import('../pages/Approvals')),
     appShell: true,
@@ -369,15 +384,12 @@ export const APP_ROUTES = [
     label: 'Recognition Wall',
     group: 'payroll',
   },
-  },
   {
     path: '/team-performance',
     component: lazy(() => import('../components/TeamPerformanceDashboard')),
     label: 'Team Performance',
     group: 'payroll',
     icon: 'chart',
-  },
-    // In Payroll rather than Compliance: it is a deduction that has to be in
   },
   {
     path: '/learning',
@@ -387,6 +399,7 @@ export const APP_ROUTES = [
     icon: 'book',
   },
   {
+    // In Payroll rather than Compliance: it is a deduction that has to be in
     // the run, and it is missed because nobody schedules it rather than because
     // anybody computes it wrongly. Putting it where the run is planned is the
     // whole point (#1701).
