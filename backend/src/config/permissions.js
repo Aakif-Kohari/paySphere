@@ -11,6 +11,29 @@
 
 const PERMISSIONS = {
   READ_EMPLOYEE: 'READ_EMPLOYEE',
+
+  // --- Section 89(1) relief on salary arrears (#1969) ---------------------
+  //
+  // Split on which name can move a relief figure without touching a claim.
+  //
+  // MANAGE_TAX_RATE_TABLE is the widest authority in the module by a distance.
+  // Changing the 2022-23 slabs moves every relief ever computed against a
+  // relation year in that year, for every employee, with no claim record
+  // changing and nothing on any screen explaining why the number is different.
+  // The employee's assessed total income for a past year sits with it, because
+  // six lakh rather than nine moves the marginal rate the relation-year term is
+  // priced at and does the same damage by a shorter route.
+  //
+  // MANAGE_RELIEF_CLAIM records the arrear, its year-wise spread and the Form
+  // 10E furnishing, and gives the relief in the TDS computation once the form
+  // is on file. Clerical against documents.
+  //
+  // Deliberately not the payroll permissions. Payroll answers what was paid;
+  // this answers what the bunching of that payment cost in tax, and the section
+  // 201(1A) interest for getting it wrong lands on the employer.
+  READ_ARREAR_RELIEF: 'READ_ARREAR_RELIEF',
+  MANAGE_RELIEF_CLAIM: 'MANAGE_RELIEF_CLAIM',
+  MANAGE_TAX_RATE_TABLE: 'MANAGE_TAX_RATE_TABLE',
   WRITE_EMPLOYEE: 'WRITE_EMPLOYEE',
   DELETE_EMPLOYEE: 'DELETE_EMPLOYEE',
   // --- Section 10A, Standing Orders Act, 1946 (#1828) ----------------------
@@ -615,6 +638,21 @@ const PERMISSIONS = {
 };
 
 const PERMISSION_DEFINITIONS = [
+  {
+    name: PERMISSIONS.READ_ARREAR_RELIEF,
+    description:
+      'View the relief each salary arrear earns under section 89(1), the year-wise spread behind it, and the Form 10E position',
+  },
+  {
+    name: PERMISSIONS.MANAGE_RELIEF_CLAIM,
+    description:
+      'Record an arrear and its year-wise spread, record the employee’s Form 10E furnishing, and give the relief in the TDS computation',
+  },
+  {
+    name: PERMISSIONS.MANAGE_TAX_RATE_TABLE,
+    description:
+      'Maintain the dated slab, surcharge and rebate tables and the employee’s assessed income for past years — the figures every section 89(1) relief is computed against',
+  },
   {
     name: PERMISSIONS.READ_EMPLOYEE,
     description: 'View the employee directory and individual employee records',
@@ -1244,6 +1282,12 @@ const ROLE_DEFINITIONS = [
       PERMISSIONS.READ_EMPLOYEE,
       PERMISSIONS.WRITE_EMPLOYEE,
       PERMISSIONS.DELETE_EMPLOYEE,
+      // #1969. All three. Maintaining the rate table a relief is computed
+      // against and giving that relief in the TDS computation are two halves of
+      // the same check, and the owner is the one account allowed to be both.
+      PERMISSIONS.READ_ARREAR_RELIEF,
+      PERMISSIONS.MANAGE_RELIEF_CLAIM,
+      PERMISSIONS.MANAGE_TAX_RATE_TABLE,
       // #1828. All three. Deciding whose conduct delayed an enquiry and
       // certifying the establishment against the result are the two halves of
       // one check, and the owner is the one account allowed to be both.
@@ -1494,6 +1538,13 @@ const ROLE_DEFINITIONS = [
       // the party whose delay is in question, which is exactly why the finding
       // sits with the owner.
       PERMISSIONS.READ_SUSPENSION,
+      // #1969. Read and the claims, not the rate tables. Recording an arrear
+      // and an employee's Form 10E is clerical against documents; the dated
+      // slabs and a past year's assessed income are the figures every relief
+      // is computed against, and moving one of those silently moves every
+      // relief for every employee.
+      PERMISSIONS.READ_ARREAR_RELIEF,
+      PERMISSIONS.MANAGE_RELIEF_CLAIM,
       PERMISSIONS.MANAGE_SUSPENSION,
 
       PERMISSIONS.READ_PAYROLL,

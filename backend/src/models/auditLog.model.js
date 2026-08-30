@@ -20,6 +20,21 @@ const softDeletePlugin = require('../utils/softDelete.plugin');
  */
 const AUDIT_ACTIONS = [
   'PAYROLL_FINALIZE',
+  // Section 89(1) relief on salary arrears (#1969). The rate table is audited
+  // because it is the widest change in the module: moving the 2022-23 slabs
+  // moves every relief ever computed against a relation year in that year, for
+  // every employee, with no claim record changing and nothing on any screen
+  // saying why the figure is different.
+  //
+  // The Form 10E furnishing is audited for the neighbouring reason. Its *date*
+  // is what decides whether the relief stands — furnished after the return was
+  // filed the relief is disallowed — and giving the relief in the TDS
+  // computation without it is a short deduction the employer carries.
+  'RELIEF_RATE_TABLE_RECORDED',
+  'RELIEF_ASSESSED_YEAR_RECORDED',
+  'RELIEF_CLAIM_RECORDED',
+  'RELIEF_FORM_10E_FURNISHED',
+  'RELIEF_APPLIED_TO_TDS',
   // #438 shipped approve/reject handlers that emitted no audit event at
   // all, so the one action a maker–checker flow exists to record was the
   // one action left untracked (#458).
@@ -494,11 +509,12 @@ const auditLogSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
       },
     ],
-    details:   { type: mongoose.Schema.Types.Mixed, default: {} },
+    details: { type: mongoose.Schema.Types.Mixed, default: {} },
     // Integrity chain fields
     recordHash: { type: String, default: null, index: true },
     previousHash: { type: String, default: null },
-    hashChainValid: { type: Boolean, default: true },    result: {
+    hashChainValid: { type: Boolean, default: true },
+    result: {
       type: String,
       enum: ['success', 'failure', 'partial'],
       default: 'success',

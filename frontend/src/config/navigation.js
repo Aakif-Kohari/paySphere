@@ -286,6 +286,18 @@ export const APP_ROUTES = [
     icon: 'check',
   },
   {
+    // In Payroll rather than in Compliance. The relief is a figure that changes
+    // what is deducted this month, and the people who act on it are the ones
+    // running the deduction — putting it under Compliance would file it beside
+    // things nobody touches until an audit (#1969).
+    path: '/section-89-relief',
+    component: lazy(() => import('../pages/SectionEightyNineReliefRegister')),
+    appShell: true,
+    label: 'Section 89(1) relief',
+    group: 'payroll',
+    icon: 'calculator',
+  },
+  {
     path: '/loans',
     component: lazy(() => import('../pages/Loans')),
     appShell: true,
@@ -383,6 +395,7 @@ export const APP_ROUTES = [
     component: lazy(() => import('../components/EmployeeRecognitionWall')),
     label: 'Recognition Wall',
     group: 'payroll',
+    icon: 'trophy',
   },
   {
     path: '/team-performance',
